@@ -26,7 +26,7 @@ export async function fetchHealthState(fetchImpl: typeof fetch = fetch): Promise
   const liveOk = await isOk(fetchImpl, "/health/live");
 
   if (!liveOk) {
-    return { kind: "unavailable", detail: "A API do RiftLab nao respondeu." };
+    return { kind: "unavailable", detail: "A API do RiftLab não respondeu." };
   }
 
   try {

@@ -44,6 +44,6 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByText("Serviço indisponível")).toBeInTheDocument();
-    expect(screen.getByText(/API do RiftLab nao respondeu/i)).toBeInTheDocument();
+    expect(screen.getByText(/API do RiftLab não respondeu/i)).toBeInTheDocument();
   });
 });

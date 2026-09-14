@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { fetchHealthState, type HealthState } from "../api/health";
+import { ReviewPrototype } from "../features/review/ReviewPrototype";
+import "../features/review/review.css";
 import "./App.css";
+
+type View = "home" | "prototype";
 
 const STATUS_LABEL: Record<HealthState["kind"], string> = {
   loading: "Verificando disponibilidade...",
@@ -21,6 +25,7 @@ function StatusBanner({ state }: { state: HealthState }) {
 
 export default function App() {
   const [healthState, setHealthState] = useState<HealthState>({ kind: "loading" });
+  const [view, setView] = useState<View>("home");
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +38,10 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  if (view === "prototype") {
+    return <ReviewPrototype onExit={() => setView("home")} />;
+  }
 
   return (
     <main className="app">
@@ -52,6 +61,17 @@ export default function App() {
           Importação, revisão de compras e o modo Estudo chegam nas próximas
           entregas.
         </p>
+      </section>
+
+      <section className="app__prototype-entry">
+        <h2>Protótipo de jornadas</h2>
+        <p>
+          Protótipo navegável de baixa/média fidelidade das jornadas de revisão e do
+          modo Estudo, com dados ilustrativos — sem importação real.
+        </p>
+        <button type="button" onClick={() => setView("prototype")}>
+          Abrir protótipo (dados ilustrativos)
+        </button>
       </section>
     </main>
   );

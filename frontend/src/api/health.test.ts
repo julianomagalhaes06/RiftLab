@@ -33,7 +33,7 @@ describe("fetchHealthState", () => {
     expect(state).toEqual({ kind: "degraded", detail: "banco fora do ar" });
   });
 
-  it("retorna unavailable quando live nao responde", async () => {
+  it("retorna unavailable quando live não responde", async () => {
     const fetchImpl = vi.fn().mockRejectedValueOnce(new Error("network error"));
 
     const state = await fetchHealthState(fetchImpl);
@@ -41,7 +41,7 @@ describe("fetchHealthState", () => {
     expect(state.kind).toBe("unavailable");
   });
 
-  it("nao chama /health/ready quando live falha", async () => {
+  it("não chama /health/ready quando live falha", async () => {
     const fetchImpl = vi.fn().mockRejectedValueOnce(new Error("network error"));
 
     await fetchHealthState(fetchImpl);
