@@ -2,13 +2,39 @@ from __future__ import annotations
 
 import typer
 import uvicorn
+from alembic import command as alembic_command
+from alembic.config import Config as AlembicConfig
 
 from riftlab.config import get_settings
 
 app = typer.Typer(
-    help="RiftLab CLI (cc). Comandos implementados nesta etapa: api, worker, health.",
+    help="RiftLab CLI (cc). Comandos implementados nesta etapa: api, worker, health, db.",
     no_args_is_help=True,
 )
+
+db_app = typer.Typer(help="Migrações (Alembic).", no_args_is_help=True)
+app.add_typer(db_app, name="db")
+
+
+def _alembic_config() -> AlembicConfig:
+    # alembic.ini fica na raiz do pacote backend; cc e alembic.ini compartilham cwd
+    # tanto em desenvolvimento (uv run, a partir de backend/) quanto na imagem
+    # (WORKDIR /app).
+    return AlembicConfig("alembic.ini")
+
+
+@db_app.command("upgrade")
+def db_upgrade(
+    revision: str = typer.Argument("head", help="Revisão alvo (padrão: head)."),
+) -> None:
+    """Aplica migrations até a revisão informada. Idempotente em head."""
+    alembic_command.upgrade(_alembic_config(), revision)
+
+
+@db_app.command("current")
+def db_current() -> None:
+    """Mostra a revisão atual do banco configurado (RIFTLAB_DATABASE_URL)."""
+    alembic_command.current(_alembic_config(), verbose=True)
 
 
 @app.command()

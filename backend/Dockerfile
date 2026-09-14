@@ -9,8 +9,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-COPY backend/pyproject.toml backend/uv.lock backend/README.md ./
+COPY backend/pyproject.toml backend/uv.lock backend/README.md backend/alembic.ini ./
 COPY backend/src ./src
+COPY backend/migrations ./migrations
 
 # ---- test: inclui dependencias de dev (pytest/ruff/mypy) e testes ----
 FROM base AS test
