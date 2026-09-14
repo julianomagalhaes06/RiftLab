@@ -63,7 +63,28 @@ flowchart LR
 
 ## Situação atual
 
-Planejamento preparado. A aplicação, o pipeline de dados e os modelos ainda não foram implementados. Não existem resultados experimentais ou comandos de inicialização validados nesta etapa.
+Fundação técnica inicial implementada (CC-101): API FastAPI com health checks, worker mínimo, frontend React mínimo e ambiente reproduzível via Docker Compose, todos validados localmente em modo demonstração (sem chave Riot). Funcionalidades de produto — importação, revisão de compras, ranking, objetivos e modo Estudo — ainda não foram implementadas. Não existem resultados experimentais nem pipeline de dados/modelos nesta etapa.
+
+## Ambiente de desenvolvimento
+
+Requisitos: Docker e Docker Compose. Comandos validados localmente:
+
+```sh
+cp .env.example .env   # opcional; modo demo funciona sem chave Riot
+docker compose up -d --build
+curl http://127.0.0.1:8000/health/live
+curl http://127.0.0.1:8000/health/ready
+# frontend em http://127.0.0.1:5173
+docker compose down
+```
+
+Testes automatizados isolados (backend contra Postgres descartável):
+
+```sh
+docker compose -f compose.test.yaml run --rm backend-tests
+```
+
+Backend (Python 3.12, gerenciado com `uv`) e frontend (Node 22, React/TypeScript/Vite) também rodam fora de container para desenvolvimento; consulte os `package.json`/`pyproject.toml` de cada pacote para os scripts de lint, typecheck, testes e build.
 
 ## Avaliação
 

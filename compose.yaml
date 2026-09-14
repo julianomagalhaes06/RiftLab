@@ -1,0 +1,97 @@
+name: riftlab
+
+services:
+  db:
+    image: postgres:17.11-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-riftlab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-riftlab}
+      POSTGRES_DB: ${POSTGRES_DB:-riftlab}
+    volumes:
+      - riftlab_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-riftlab} -d ${POSTGRES_DB:-riftlab}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: runtime
+    command: ["api"]
+    environment:
+      RIFTLAB_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-riftlab}:${POSTGRES_PASSWORD:-riftlab}@db:5432/${POSTGRES_DB:-riftlab}
+      RIFTLAB_LOG_LEVEL: ${RIFTLAB_LOG_LEVEL:-INFO}
+      RIFTLAB_RIOT_API_KEY: ${RIFTLAB_RIOT_API_KEY:-}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request as u,sys; sys.exit(0 if u.urlopen('http://127.0.0.1:8000/health/live',timeout=3).status==200 else 1)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: runtime
+    command: ["worker"]
+    environment:
+      RIFTLAB_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-riftlab}:${POSTGRES_PASSWORD:-riftlab}@db:5432/${POSTGRES_DB:-riftlab}
+      RIFTLAB_LOG_LEVEL: ${RIFTLAB_LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import os,time,sys; p='/tmp/riftlab-worker.heartbeat'; sys.exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<30 else 1)",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      RIFTLAB_API_PROXY_TARGET: http://api:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5173/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  riftlab_postgres_data:

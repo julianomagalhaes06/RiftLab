@@ -12,6 +12,15 @@ CLAUDE.md
 **/node_modules
 **/.venv
 **/__pycache__
+**/dist
+**/*.tsbuildinfo
+**/playwright-report
+**/test-results
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/htmlcov
+**/.coverage
 data
 artifacts
 mlruns

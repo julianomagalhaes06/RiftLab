@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11-bookworm
+        env:
+          POSTGRES_USER: riftlab_test
+          POSTGRES_PASSWORD: riftlab_test
+          POSTGRES_DB: riftlab_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U riftlab_test -d riftlab_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      RIFTLAB_DATABASE_URL: postgresql+asyncpg://riftlab_test:riftlab_test@localhost:5432/riftlab_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.12.13"
+
+      - name: Instalar dependencias travadas (uv.lock)
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        working-directory: backend
+        run: uv run ruff check .
+
+      - name: Formatacao (ruff format --check)
+        working-directory: backend
+        run: uv run ruff format --check .
+
+      - name: Typecheck (mypy)
+        working-directory: backend
+        run: uv run mypy src
+
+      - name: Testes (pytest, banco isolado)
+        working-directory: backend
+        run: uv run pytest -v
+
+      - name: Build da imagem runtime
+        run: docker build --target runtime -f backend/Dockerfile -t riftlab-api:ci .
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.2"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias travadas (package-lock.json)
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint (eslint)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Typecheck (tsc)
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Testes unitarios (vitest)
+        working-directory: frontend
+        run: npm run test
+
+      - name: Instalar navegador do Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke e2e (Playwright, sucesso e indisponibilidade)
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Build de producao
+        working-directory: frontend
+        run: npm run build
+
+      - name: Build da imagem runtime
+        run: docker build -f frontend/Dockerfile -t riftlab-frontend:ci .
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build das imagens
+        run: docker compose build
+
+      - name: Subir stack completa
+        run: docker compose up -d --wait
+
+      - name: Verificar live/ready/frontend saudaveis
+        run: |
+          curl -sf http://127.0.0.1:8000/health/live
+          curl -sf http://127.0.0.1:8000/health/ready
+          curl -sf http://127.0.0.1:5173/ > /dev/null
+
+      - name: Readiness acompanha o banco
+        run: |
+          docker compose stop db
+          sleep 3
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health/ready)
+          test "$status" = "503"
+          docker compose start db
+          timeout 30 sh -c 'until [ "$(docker inspect -f "{{.State.Health.Status}}" riftlab-db-1)" = "healthy" ]; do sleep 1; done'
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/health/ready)
+          test "$status" = "200"
+
+      - name: Logs em caso de falha
+        if: failure()
+        run: docker compose logs
+
+      - name: Encerrar stack
+        if: always()
+        run: docker compose down -v

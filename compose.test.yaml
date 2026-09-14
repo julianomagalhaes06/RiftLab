@@ -1,0 +1,29 @@
+name: riftlab-test
+
+services:
+  db-test:
+    image: postgres:17.11-bookworm
+    environment:
+      POSTGRES_USER: riftlab_test
+      POSTGRES_PASSWORD: riftlab_test
+      POSTGRES_DB: riftlab_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U riftlab_test -d riftlab_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  backend-tests:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: test
+    environment:
+      RIFTLAB_DATABASE_URL: postgresql+asyncpg://riftlab_test:riftlab_test@db-test:5432/riftlab_test
+    depends_on:
+      db-test:
+        condition: service_healthy
+    command: ["pytest", "-v"]

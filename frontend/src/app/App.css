@@ -1,0 +1,88 @@
+:root {
+  color-scheme: light;
+  --color-bg: #0f172a;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-muted: #475569;
+  --color-available: #14532d;
+  --color-available-bg: #dcfce7;
+  --color-degraded: #713f12;
+  --color-degraded-bg: #fef9c3;
+  --color-unavailable: #7f1d1d;
+  --color-unavailable-bg: #fee2e2;
+  --color-loading: #1e3a5f;
+  --color-loading-bg: #e0f2fe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+  background: var(--color-surface);
+  min-height: 100vh;
+}
+
+.app h1 {
+  margin-bottom: 0.25rem;
+}
+
+.app__subtitle {
+  color: var(--color-muted);
+  margin-top: 0;
+}
+
+.status-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin: 1.5rem 0;
+  font-weight: 600;
+}
+
+.status-banner--loading {
+  color: var(--color-loading);
+  background: var(--color-loading-bg);
+}
+
+.status-banner--available {
+  color: var(--color-available);
+  background: var(--color-available-bg);
+}
+
+.status-banner--degraded {
+  color: var(--color-degraded);
+  background: var(--color-degraded-bg);
+}
+
+.status-banner--unavailable {
+  color: var(--color-unavailable);
+  background: var(--color-unavailable-bg);
+}
+
+.status-banner__detail {
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.app__notice {
+  color: var(--color-muted);
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+}
