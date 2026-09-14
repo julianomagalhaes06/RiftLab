@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "v1",
+  "gamePatch": "DEMO-2-INVALID",
+  "dataDragonVersion": "demo-datadragon-1",
+  "mappingVersion": "v1",
+  "items": [
+    {
+      "itemId": 100001,
+      "price": 400,
+      "recipe": [],
+      "attributes": {},
+      "flags": {}
+    },
+    {
+      "itemId": 100099,
+      "recipe": [],
+      "attributes": {},
+      "flags": {}
+    }
+  ]
+}

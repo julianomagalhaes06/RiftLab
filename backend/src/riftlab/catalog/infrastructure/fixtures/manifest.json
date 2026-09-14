@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "v1",
+  "catalogs": {
+    "DEMO-1": {
+      "file": "catalogs/demo_1.json",
+      "description": "Catálogo demo válido com 3 itens sintéticos, receita reconciliada com os cenários de partida."
+    },
+    "DEMO-2-INVALID": {
+      "file": "catalogs/demo_2_invalid.json",
+      "description": "Catálogo com item sem preço; carga deve falhar com diagnóstico identificável."
+    }
+  }
+}

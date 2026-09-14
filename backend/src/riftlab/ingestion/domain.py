@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Protocol
+from typing import Any, Protocol
+
+from riftlab.shared.domain import SourceOrigin
 
 
 class ImportMode(StrEnum):
@@ -80,3 +82,70 @@ class IngestionRepository(Protocol):
     async def list_active_import_jobs(
         self, requested_match_id: str, mode: ImportMode
     ) -> list[ImportJob]: ...
+
+
+@dataclass(frozen=True, slots=True)
+class MatchParticipantSourceDTO:
+    """Participante como a fonte bruta descreve, anterior à validação/persistência
+    (CC-201). Sem identidade pessoal: fontes demo não têm PUUID real algum."""
+
+    participant_id: int
+    champion_id: int
+    team: int
+    role: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TimelineFrameDTO:
+    """Snapshot bruto de um instante da partida. participant_frames fica opaco
+    (dict por participant_id) — reconstrução real de inventário/ouro é CC-201/204.
+    Um dicionário vazio preserva ausência de dado, nunca é preenchido por
+    aproximação."""
+
+    timestamp_ms: int
+    participant_frames: dict[int, dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class TimelineEventDTO:
+    """source_index preserva a posição original do provedor (ordem de frames e,
+    dentro de cada frame, ordem de eventos). Eventos idênticos ou com o mesmo
+    timestamp_ms nunca são deduplicados ou reordenados pelo adapter."""
+
+    source_index: int
+    timestamp_ms: int
+    type: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class MatchSourceResult:
+    """Retorno bruto de MatchSource, anterior a qualquer validação/reconstrução/
+    persistência (essas etapas pertencem a CC-201/203/204). origin=CURATED_DEMO é
+    a única origem implementada nesta etapa."""
+
+    match_id: str
+    origin: SourceOrigin
+    schema_version: str
+    raw_hash: str
+    queue: int
+    map_id: int
+    patch: str
+    start_at: datetime
+    duration_seconds: int
+    participants: tuple[MatchParticipantSourceDTO, ...]
+    frames: tuple[TimelineFrameDTO, ...]
+    events: tuple[TimelineEventDTO, ...]
+
+
+class MatchSource(Protocol):
+    """Fonte plugável de dados de partida. Implementações não escolhem uma fonte
+    real (ex.: Riot ao vivo) automaticamente na ausência de configuração — isso
+    fica para CC-105/201; nesta etapa só existe DemoMatchSource."""
+
+    async def load_match(self, match_id: str) -> MatchSourceResult:
+        """Levanta SourceNotFoundError para identificador fora do escopo da fonte
+        e SourceSchemaError para JSON inválido, schema desconhecido ou campo
+        estrutural obrigatório ausente. Nunca retorna None nem interpola dado
+        ausente."""
+        ...

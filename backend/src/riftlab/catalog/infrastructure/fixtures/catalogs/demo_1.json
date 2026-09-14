@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "v1",
+  "gamePatch": "DEMO-1",
+  "dataDragonVersion": "demo-datadragon-1",
+  "mappingVersion": "v1",
+  "items": [
+    {
+      "itemId": 100001,
+      "price": 400,
+      "recipe": [],
+      "attributes": { "name": "Componente Sintético A" },
+      "flags": { "completed": false }
+    },
+    {
+      "itemId": 100002,
+      "price": 350,
+      "recipe": [],
+      "attributes": { "name": "Componente Sintético B" },
+      "flags": { "completed": false }
+    },
+    {
+      "itemId": 100010,
+      "price": 1100,
+      "recipe": [
+        { "itemId": 100001, "quantity": 2 },
+        { "itemId": 100002, "quantity": 1 }
+      ],
+      "attributes": { "name": "Item Composto Sintético" },
+      "flags": { "completed": true }
+    }
+  ]
+}

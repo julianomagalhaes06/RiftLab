@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "v1",
+  "scenarios": {
+    "DEMO-0001": {
+      "file": "matches/demo_0001_compra_simples.json",
+      "description": "Compra simples de um item concluído."
+    },
+    "DEMO-0002": {
+      "file": "matches/demo_0002_receita_componentes.json",
+      "description": "Receita com componentes, multiplicidade do mesmo componente e eventos no mesmo timestamp."
+    },
+    "DEMO-0003": {
+      "file": "matches/demo_0003_venda.json",
+      "description": "Venda de um item previamente comprado."
+    },
+    "DEMO-0004": {
+      "file": "matches/demo_0004_undo.json",
+      "description": "Compra seguida de undo correlacionado, sem colapsar os dois eventos."
+    },
+    "DEMO-0005": {
+      "file": "matches/demo_0005_falta_de_frame.json",
+      "description": "Evento de compra cujo frame correspondente não tem participantFrames; ausência preservada, não fabricada."
+    },
+    "DEMO-0006": {
+      "file": "matches/demo_0006_patch_ausente.json",
+      "description": "Documento sem o campo patch; carga deve falhar com diagnóstico identificável, sem cair para o catálogo atual."
+    },
+    "DEMO-0007": {
+      "file": "matches/demo_0007_evento_repetido.json",
+      "description": "Evento idêntico duplicado no mesmo timestamp; ordem original preservada, sem deduplicar."
+    }
+  }
+}
