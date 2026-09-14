@@ -1,0 +1,40 @@
+# Local workspace files
+.private/
+/docs/
+/AGENTS.md
+/CLAUDE.md
+/.agents/
+/.codex/
+/.claude/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Data and model artifacts
+/data/
+/artifacts/
+/mlruns/
+/wandb/
+*.parquet
+*.cbm
+*.safetensors
+*.gguf
+*.pt
+# Build, caches and editors
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+.idea/
+.vscode/
+.DS_Store
