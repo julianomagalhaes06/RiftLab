@@ -159,15 +159,28 @@ class DurableRawMatchStore:
         no diretório raiz (sem `blobs/`, sem endereçamento por conteúdo).
         Um diretório com esses arquivos nunca é tratado como "nunca
         coletado" e silenciosamente substituído por nova coleta de rede
-        (revisão CC-201, achado 1 — apontado por inspeção, sem perda real
-        observada nesta sessão): migrado para o esquema atual de forma não
-        destrutiva (arquivos antigos preservados, nunca apagados) na
+        (revisão CC-201, achado 1): migrado para o esquema atual de forma
+        não destrutiva (arquivos antigos preservados, nunca apagados) na
         primeira leitura, então servido como se já estivesse no formato
-        novo."""
+        novo. Ambos ausentes é o único caso de "nunca gravado" — exatamente
+        um presente (par legado incompleto, ex.: crash no meio da escrita
+        antiga) nunca é confundido com ausência (revisão complementar
+        CC-201-REVIEW-3: `_migrate_legacy_if_present` original fazia
+        `not body.exists() or not hash.exists(): return None`, tratando
+        metade de um par legado como cache vazio e liberando nova coleta em
+        cima de dado local já parcialmente presente)."""
         legacy_body_path = self._directory / f"{match_id}.{kind}.json"
         legacy_hash_path = self._directory / f"{match_id}.{kind}.sha256"
-        if not legacy_body_path.exists() or not legacy_hash_path.exists():
+        body_exists = legacy_body_path.exists()
+        hash_exists = legacy_hash_path.exists()
+        if not body_exists and not hash_exists:
             return None
+        if body_exists != hash_exists:
+            raise RawStoreCorruptedError(
+                f"{kind} de {match_id!r} em formato legado incompleto (só "
+                f"{'corpo' if body_exists else 'sidecar .sha256'} presente); "
+                "resolução manual exigida, sem migração automática"
+            )
         body = legacy_body_path.read_bytes()
         expected_hash = legacy_hash_path.read_text().strip()
         actual_hash = hashlib.sha256(body).hexdigest()

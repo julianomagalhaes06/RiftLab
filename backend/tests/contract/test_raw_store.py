@@ -236,6 +236,31 @@ def test_legacy_format_with_corrupted_sidecar_is_detected_not_migrated(tmp_path)
         store.read_if_valid("BR1_222", "match")
 
 
+@pytest.mark.parametrize("missing", ["hash", "body"])
+def test_legacy_format_partial_pair_is_never_treated_as_absent(tmp_path, missing: str) -> None:
+    """Achado real da revisão complementar (CC-201-REVIEW-3,
+    legacy_partial_treated_as_absent=True no probe): um par legado com só
+    metade presente (corpo sem sidecar, ou sidecar sem corpo — ex.: crash no
+    meio da escrita antiga) era confundido com "nunca coletado" e liberava
+    nova coleta de rede em cima de dado local já parcialmente presente.
+    Agora sempre RawStoreCorruptedError, nunca None."""
+    directory = tmp_path / "raw"
+    directory.mkdir(parents=True)
+    if missing != "body":
+        (directory / "BR1_333.match.json").write_bytes(b'{"legacy": true}')
+    if missing != "hash":
+        (directory / "BR1_333.match.sha256").write_text(_sha(b'{"legacy": true}'))
+
+    store = DurableRawMatchStore(directory)
+    with pytest.raises(RawStoreCorruptedError):
+        store.read_if_valid("BR1_333", "match")
+
+    # Nunca migrado/sobrescrito por causa da leitura que falhou: nenhum
+    # arquivo do esquema novo foi criado.
+    assert not (directory / "BR1_333.match.ref").exists()
+    assert not (directory / "blobs").exists() or not any((directory / "blobs").iterdir())
+
+
 def test_directory_created_lazily_and_survives_relative_tmp_path(tmp_path, monkeypatch) -> None:
     """Nunca depende do cwd: construído com um Path relativo qualquer, ainda
     funciona porque Path.mkdir/writes resolvem a partir do Path fornecido,

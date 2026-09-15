@@ -481,3 +481,22 @@ async def test_corrupted_raw_store_raises_typed_error_not_generic_exception(tmp_
 
     with pytest.raises(RawStoreCorruptedError):
         store.read_if_valid(_MATCH_ID, "match")
+
+
+async def test_legacy_partial_raw_pair_never_triggers_silent_refetch(tmp_path) -> None:
+    """Achado real da revisão complementar (CC-201-REVIEW-3): um par legado
+    incompleto (só corpo ou só sidecar .sha256, formato anterior à correção
+    de 74224ab) era confundido com "nunca coletado" pelo raw_store e o
+    adapter refazia rede por cima. Agora vira RAW_STORE_CORRUPTED imediato,
+    o adapter nunca chega a chamar o transporte."""
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / f"{_MATCH_ID}.match.json").write_bytes(b'{"legacy": true}')  # sem o .sha256
+
+    handler = _RoutedHandler(_match_doc(), _timeline_doc())
+    source = _source(handler, raw_dir)
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "RAW_STORE_CORRUPTED"
+    assert handler.calls == []  # nunca tenta rede por cima de dado legado incompleto
