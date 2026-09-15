@@ -1,0 +1,110 @@
+"""POST /api/v1/analyses, GET /api/v1/analyses/{id} (docs/contracts.md).
+Schema-only: nenhuma rota montada nesta etapa (CC-301-304, CC-401-405)."""
+
+from __future__ import annotations
+
+from typing import Literal
+from uuid import UUID
+
+from pydantic import Field, model_validator
+
+from riftlab.shared.api.common import MINIMUM_ANALYSIS_REASON_CODES, CamelModel
+from riftlab.shared.api.enums import AnalysisEngine, AnalysisStatus, BudgetSource
+from riftlab.shared.api.objectives import ObjectiveForm
+
+BUDGET_GOLD_MIN = 0
+BUDGET_GOLD_MAX = 100_000
+
+
+class UserProvidedBudget(CamelModel):
+    """docs/contracts.md: Budget opcional {gold: inteiro 0..100000, source:
+    USER_PROVIDED}. source e Literal fixo: o cliente nunca pode declarar
+    FRAME_ESTIMATE/UNKNOWN, que so o servidor atribui — "fonte de orcamento do
+    servidor nao e sobrescrita, cria cenario separado"."""
+
+    gold: int = Field(ge=BUDGET_GOLD_MIN, le=BUDGET_GOLD_MAX)
+    source: Literal[BudgetSource.USER_PROVIDED] = BudgetSource.USER_PROVIDED
+
+
+class AnalysisRequest(CamelModel):
+    """{decisionId,objective,budget?} + Idempotency-Key (header HTTP, fora do
+    corpo). Reenvio da mesma chave com corpo identico e idempotente (200);
+    corpo divergente e 409 IDEMPOTENCY_CONFLICT — validado no handler, nao
+    neste schema de corpo."""
+
+    decision_id: UUID
+    objective: ObjectiveForm
+    budget: UserProvidedBudget | None = None
+
+
+class AnalysisVersions(CamelModel):
+    model: UUID | None = None  # None quando nao ha modelo ativo (baseline explicito)
+    catalog: str = Field(min_length=1, max_length=40)
+    features: str = Field(min_length=1, max_length=20)
+    candidates: str = Field(min_length=1, max_length=20)
+
+
+class AnalysisQuality(CamelModel):
+    budget_source: BudgetSource
+    frame_age_ms: int = Field(ge=0)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class AnalysisSupport(CamelModel):
+    """level nao e enumerado por completo em docs/contracts.md (so o exemplo
+    "LIMITED"); reasonCodes e lista aberta ("minimos", ver
+    common.MINIMUM_ANALYSIS_REASON_CODES)."""
+
+    level: str = Field(min_length=1, max_length=40)
+    reason_codes: list[str] = Field(default_factory=list)
+
+
+class AnalysisCandidate(CamelModel):
+    item_id: int = Field(ge=0)
+    rank: int = Field(ge=1)
+    score: float
+    remaining_cost: int = Field(ge=0)
+    affordability: str = Field(min_length=1, max_length=20)
+    evidence_codes: list[str] = Field(default_factory=list)
+
+
+class AnalysisResult(CamelModel):
+    """GET /analyses/{id}: resultado imutavel. Invariante de
+    docs/contracts.md: "Sem evidencia: candidates=[] e reasonCodes
+    obrigatorio" — status != AVAILABLE implica candidates vazio e ao menos um
+    reason code."""
+
+    analysis_id: UUID
+    decision_id: UUID
+    status: AnalysisStatus
+    engine: AnalysisEngine
+    objective: ObjectiveForm
+    versions: AnalysisVersions
+    quality: AnalysisQuality
+    support: AnalysisSupport
+    candidates: list[AnalysisCandidate] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _no_candidates_without_evidence(self) -> AnalysisResult:
+        if self.status != AnalysisStatus.AVAILABLE:
+            if self.candidates:
+                raise ValueError(
+                    "candidates deve ser vazio quando status != AVAILABLE (docs/contracts.md)"
+                )
+            if not self.support.reason_codes:
+                raise ValueError(
+                    "reasonCodes e obrigatorio quando nao ha evidencia (docs/contracts.md)"
+                )
+        return self
+
+
+__all__ = [
+    "MINIMUM_ANALYSIS_REASON_CODES",
+    "AnalysisCandidate",
+    "AnalysisQuality",
+    "AnalysisRequest",
+    "AnalysisResult",
+    "AnalysisSupport",
+    "AnalysisVersions",
+    "UserProvidedBudget",
+]

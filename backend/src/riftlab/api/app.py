@@ -4,12 +4,12 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 
 from riftlab import db
 from riftlab.api.routes.health import router as health_router
 from riftlab.config import Settings, get_settings
-from riftlab.errors import INTERNAL_ERROR, problem_response
+from riftlab.errors import register_exception_handlers
 from riftlab.observability import RequestIdMiddleware, configure_logging
 
 logger = logging.getLogger("riftlab.api")
@@ -32,16 +32,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="RiftLab API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router)
-
-    @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception):
-        logger.exception("erro nao tratado")
-        return problem_response(
-            request,
-            status_code=500,
-            code=INTERNAL_ERROR,
-            title="Erro interno",
-            detail="Falha inesperada ao processar a requisicao.",
-        )
+    register_exception_handlers(app)
 
     return app

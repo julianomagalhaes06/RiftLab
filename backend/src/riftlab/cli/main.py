@@ -10,12 +10,38 @@ from alembic.config import Config as AlembicConfig
 from riftlab.config import get_settings
 
 app = typer.Typer(
-    help="RiftLab CLI (cc). Comandos implementados nesta etapa: api, worker, health, db, riot.",
+    help="RiftLab CLI (cc). Comandos implementados nesta etapa: "
+    "api, worker, health, db, riot, openapi.",
     no_args_is_help=True,
 )
 
 db_app = typer.Typer(help="Migrações (Alembic).", no_args_is_help=True)
 app.add_typer(db_app, name="db")
+
+openapi_app = typer.Typer(
+    help="Contrato OpenAPI real, gerado da aplicacao (CC-106). Nunca inclui rota "
+    "de sprint futura: so o que create_app() de fato monta.",
+    no_args_is_help=True,
+)
+app.add_typer(openapi_app, name="openapi")
+
+
+@openapi_app.command("export")
+def openapi_export(
+    out: Path = typer.Argument(..., help="Caminho do arquivo JSON de saida."),
+) -> None:
+    """Exporta o schema OpenAPI real da aplicacao (riftlab.api.app.create_app)
+    para um arquivo JSON, formatado de forma estavel (chaves ordenadas,
+    indentacao de 2 espacos) para diff previsivel entre execucoes."""
+    import json
+
+    from riftlab.api.app import create_app
+
+    schema = create_app().openapi()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+    typer.echo(f"OpenAPI exportado para {out}")
+
 
 riot_app = typer.Typer(
     help="Spike administrativo de auditoria de acesso real (CC-105). Não é o "

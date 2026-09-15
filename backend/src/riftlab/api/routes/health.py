@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from riftlab import db
-from riftlab.errors import DATABASE_UNAVAILABLE, problem_response
+from riftlab.errors import DATABASE_UNAVAILABLE, ProblemDetail, problem_response
 
 router = APIRouter(tags=["health"])
 
@@ -25,7 +25,11 @@ async def live() -> LiveStatus:
     return LiveStatus()
 
 
-@router.get("/health/ready")
+@router.get(
+    "/health/ready",
+    response_model=ReadyStatus,
+    responses={503: {"model": ProblemDetail, "description": "Banco de dados indisponivel."}},
+)
 async def ready(request: Request) -> JSONResponse:
     settings = request.app.state.settings
     engine = request.app.state.db_engine

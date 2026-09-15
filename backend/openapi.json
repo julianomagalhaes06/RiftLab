@@ -1,0 +1,131 @@
+{
+  "components": {
+    "schemas": {
+      "LiveStatus": {
+        "properties": {
+          "status": {
+            "default": "UP",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "LiveStatus",
+        "type": "object"
+      },
+      "ProblemDetail": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "requestId": {
+            "title": "Requestid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail",
+          "requestId"
+        ],
+        "title": "ProblemDetail",
+        "type": "object"
+      },
+      "ReadyStatus": {
+        "properties": {
+          "database": {
+            "default": "UP",
+            "title": "Database",
+            "type": "string"
+          },
+          "status": {
+            "default": "UP",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "title": "ReadyStatus",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "RiftLab API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "description": "Nunca depende do banco; processo vivo responde sempre 200.",
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Banco de dados indisponivel."
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  }
+}

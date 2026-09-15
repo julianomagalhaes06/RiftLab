@@ -1,12 +1,12 @@
+import type { components } from "../shared/api/types";
+
 export type HealthState =
   | { kind: "loading" }
   | { kind: "available" }
   | { kind: "degraded"; detail: string }
   | { kind: "unavailable"; detail: string };
 
-interface ProblemDetail {
-  detail?: string;
-}
+type ProblemDetail = components["schemas"]["ProblemDetail"];
 
 async function isOk(fetchImpl: typeof fetch, path: string): Promise<boolean> {
   try {

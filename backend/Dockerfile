@@ -17,6 +17,7 @@ COPY backend/migrations ./migrations
 FROM base AS test
 RUN uv sync --frozen
 COPY backend/tests ./tests
+COPY backend/openapi.json ./openapi.json
 ENV PATH="/app/.venv/bin:$PATH"
 CMD ["pytest"]
 
