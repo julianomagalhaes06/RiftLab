@@ -6,7 +6,17 @@ proprio logger uvicorn.error apos o ServerErrorMiddleware relancar a excecao
 para o servidor real registrar. Estes testes cobrem os dois caminhos: a
 descricao segura usada por riftlab.errors (sem exc_info bruto) e um servidor
 uvicorn real de ponta a ponta, reproduzindo exatamente como "cc api" roda
-(log_config=None, uvicorn.error propaga ate o formatter da raiz)."""
+(log_config=None, uvicorn.error propaga ate o formatter da raiz).
+
+Revisao complementar (mesmo dia, sobre o commit c1c5454): os testes acima
+usam um segredo guardado numa variavel (SENTINEL) interpolada por f-string —
+o texto-fonte da linha do raise mostra so o nome "SENTINEL", nunca o valor,
+entao nao cobriam _safe_frames_from_tb incluindo frame.line (texto-fonte
+inteiro do quadro). Um literal sensivel escrito direto na linha do raise
+(sem passar por variavel) reaparecia verbatim na descricao "segura". Os
+dois testes *_literal_* abaixo escrevem o literal diretamente no raise
+(nao via variavel) para reproduzir exatamente esse caminho — nao troque para
+uma variavel/f-string, isso esvaziaria a regressao."""
 
 from __future__ import annotations
 
@@ -39,6 +49,43 @@ def test_safe_exception_description_omits_message_but_keeps_type_and_location() 
     assert SENTINEL not in description
     assert "RuntimeError" in description
     assert "test_error_logging.py" in description
+
+
+LITERAL_SENTINEL = "CC106_LITERAL_SYNTHETIC_SECRET_IN_SOURCE_LINE"  # noqa: S105
+
+
+def test_safe_exception_description_omits_literal_written_directly_in_raise() -> None:
+    """frame.line e o texto-fonte inteiro do raise — um literal (nao uma
+    variavel) escrito ali aparece verbatim se _safe_frames_from_tb incluir
+    frame.line (achado real da revisao complementar sobre c1c5454)."""
+    try:
+        raise RuntimeError("CC106_LITERAL_SYNTHETIC_SECRET_IN_SOURCE_LINE")
+    except RuntimeError as exc:
+        description = safe_exception_description(exc)
+
+    assert LITERAL_SENTINEL not in description
+    assert "RuntimeError" in description
+
+
+def test_json_log_formatter_omits_literal_written_directly_in_raise() -> None:
+    """Mesmo achado, caminho do formatter (exc_info de qualquer chamador,
+    ex.: uvicorn.error) — nao so o de safe_exception_description."""
+    try:
+        raise RuntimeError("CC106_LITERAL_SYNTHETIC_SECRET_IN_SOURCE_LINE")
+    except RuntimeError:
+        record = logging.LogRecord(
+            name="terceiro.qualquer",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="erro nao tratado",
+            args=(),
+            exc_info=sys.exc_info(),
+        )
+
+    formatted = _JsonLogFormatter().format(record)
+    assert LITERAL_SENTINEL not in formatted
+    assert "RuntimeError" in formatted
 
 
 async def test_unhandled_exception_secret_absent_even_with_default_formatter_handler(

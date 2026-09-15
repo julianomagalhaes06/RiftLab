@@ -21,12 +21,14 @@ def current_request_id() -> str:
 
 
 def _safe_frames_from_tb(exc_tb: TracebackType | None) -> list[str]:
-    """arquivo:linha:funcao de cada quadro (traceback.extract_tb: so o
-    texto-fonte da linha, nunca valor em runtime) — nunca str(exc)/args, que
-    pode carregar segredo, DSN, SQL ou entrada bruta do cliente."""
+    """arquivo:linha:funcao de cada quadro — nunca frame.line (texto-fonte da
+    linha) nem locals: um literal sensivel escrito direto na linha do raise
+    (ex.: raise RuntimeError("segredo-literal")) aparece verbatim no
+    texto-fonte, diferente de uma variavel (so o nome aparece) — revisao
+    complementar CC-106. Nunca str(exc)/args tambem, que pode carregar
+    segredo, DSN, SQL ou entrada bruta do cliente."""
     return [
-        f"{frame.filename}:{frame.lineno} em {frame.name}: {frame.line}"
-        for frame in traceback.extract_tb(exc_tb)
+        f"{frame.filename}:{frame.lineno} em {frame.name}" for frame in traceback.extract_tb(exc_tb)
     ]
 
 
