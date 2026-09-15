@@ -189,6 +189,96 @@ async def test_load_match_rejects_participant_set_mismatch(tmp_path) -> None:
     assert exc_info.value.code == "MATCH_TIMELINE_IDENTITY_MISMATCH"
 
 
+async def test_load_match_rejects_timeline_with_empty_info(tmp_path) -> None:
+    """Achado real da revisão CC-201 (missing_timeline_structure_accepted=True
+    no probe): timeline {metadata:{...}, info:{}} passava como sucesso com
+    zero frames/eventos — frames/participants deixaram de ter default []."""
+    empty_timeline = {"metadata": _timeline_doc()["metadata"], "info": {}}
+    handler = _RoutedHandler(_match_doc(), empty_timeline)
+    source = _source(handler, tmp_path / "raw")
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "MATCH_SOURCE_MISSING_FIELD"
+
+
+async def test_load_match_rejects_puuid_mismatch_for_same_participant_id(tmp_path) -> None:
+    """Achado real da revisão CC-201 (mismatched_timeline_puuid_accepted=True
+    no probe): o mesmo participantId com PUUID diferente entre match e
+    timeline passava — só o conjunto de participantId era comparado antes."""
+    mismatched_timeline = _timeline_doc()
+    mismatched_timeline["info"]["participants"][0]["puuid"] = "DIFFERENT_SYNTHETIC_SUBJECT"
+    handler = _RoutedHandler(_match_doc(), mismatched_timeline)
+    source = _source(handler, tmp_path / "raw")
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "MATCH_TIMELINE_IDENTITY_MISMATCH"
+
+
+async def test_load_match_rejects_missing_champion_id_without_raw_exception(tmp_path) -> None:
+    """Achado real da revisão CC-201 (missing_champion_exception=KeyError no
+    probe): campo obrigatório por participante ausente lançava KeyError cru
+    em vez de SourceSchemaError — job ficaria preso em RUNNING até lease/
+    tentativas se isto escapasse do worker sem classificação."""
+    broken = _match_doc()
+    del broken["info"]["participants"][0]["championId"]
+    handler = _RoutedHandler(broken, _timeline_doc())
+    source = _source(handler, tmp_path / "raw")
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "MATCH_SOURCE_MISSING_FIELD"
+
+
+async def test_load_match_rejects_duplicate_participant_id_in_match(tmp_path) -> None:
+    duplicated = _match_doc()
+    duplicated["info"]["participants"][1]["participantId"] = 1
+    handler = _RoutedHandler(duplicated, _timeline_doc())
+    source = _source(handler, tmp_path / "raw")
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "MATCH_SOURCE_MISSING_FIELD"
+
+
+async def test_load_match_rejects_empty_frames_list(tmp_path) -> None:
+    truncated_timeline = _timeline_doc()
+    truncated_timeline["info"]["frames"] = []
+    handler = _RoutedHandler(_match_doc(), truncated_timeline)
+    source = _source(handler, tmp_path / "raw")
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "MATCH_SOURCE_MISSING_FIELD"
+
+
+async def test_load_match_rejects_frame_with_missing_timestamp_without_raw_exception(
+    tmp_path,
+) -> None:
+    broken_timeline = _timeline_doc()
+    del broken_timeline["info"]["frames"][0]["timestamp"]
+    handler = _RoutedHandler(_match_doc(), broken_timeline)
+    source = _source(handler, tmp_path / "raw")
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "MATCH_SOURCE_MISSING_FIELD"
+
+
+async def test_load_match_rejects_metadata_of_wrong_type_without_raw_exception(tmp_path) -> None:
+    """TypeError/AttributeError de acesso em profundidade (ex.: metadata que
+    não é objeto) também nunca escapa cru — mesma classificação."""
+    broken = _match_doc()
+    broken["metadata"] = "nao-e-um-objeto"
+    handler = _RoutedHandler(broken, _timeline_doc())
+    source = _source(handler, tmp_path / "raw")
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "MATCH_SOURCE_MISSING_FIELD"
+
+
 async def test_load_match_rejects_missing_required_field(tmp_path) -> None:
     broken = _match_doc()
     del broken["info"]["gameDuration"]
@@ -277,16 +367,24 @@ async def test_second_load_match_reuses_durable_raw_store_without_network(tmp_pa
     assert result.match_id == _MATCH_ID
 
 
+def _corrupt_stored_blob(raw_dir, match_id: str, kind: str) -> None:
+    """Corrompe o blob endereçado por conteúdo referenciado pelo ponteiro
+    atual — layout novo da revisão CC-201 (blobs/<sha256>.json + <id>.<kind>.ref),
+    substitui o antigo "<id>.<kind>.json" direto."""
+    referenced_hash = (raw_dir / f"{match_id}.{kind}.ref").read_text().strip()
+    (raw_dir / "blobs" / f"{referenced_hash}.json").write_bytes(b'{"tampered": true}')
+
+
 async def test_corrupted_raw_store_is_reported_not_silently_refetched(tmp_path) -> None:
     handler = _RoutedHandler(_match_doc(), _timeline_doc())
     raw_dir = tmp_path / "raw"
     source = _source(handler, raw_dir)
     await source.load_match(_MATCH_ID)
 
-    (raw_dir / f"{_MATCH_ID}.match.json").write_bytes(b'{"tampered": true}')
+    _corrupt_stored_blob(raw_dir, _MATCH_ID, "match")
 
     handler.calls.clear()
-    with pytest.raises(SourceError) as exc_info:
+    with pytest.raises(SourceSchemaError) as exc_info:
         await source.load_match(_MATCH_ID)
     assert exc_info.value.code == "RAW_STORE_CORRUPTED"
     assert handler.calls == []  # nunca tenta rede por cima de dado corrompido
@@ -297,7 +395,7 @@ async def test_corrupted_raw_store_raises_typed_error_not_generic_exception(tmp_
     store = DurableRawMatchStore(raw_dir)
     body = b'{"a": 1}'
     store.store(_MATCH_ID, "match", body, hashlib.sha256(body).hexdigest())
-    (raw_dir / f"{_MATCH_ID}.match.json").write_bytes(b"outro conteudo qualquer")
+    _corrupt_stored_blob(raw_dir, _MATCH_ID, "match")
 
     with pytest.raises(RawStoreCorruptedError):
         store.read_if_valid(_MATCH_ID, "match")

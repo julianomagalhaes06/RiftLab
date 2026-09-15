@@ -140,6 +140,20 @@ class IngestionRepository(Protocol):
         generation."""
         ...
 
+    async def get_riot_cooldown_until(self) -> datetime | None:
+        """Cooldown compartilhado entre TODOS os jobs RIOT (não por job),
+        durável entre reinícios do worker — 429 numa chamada real pausa a
+        fila inteira até este instante, não só o job que recebeu o 429
+        (CC-201, achado real da revisão: cada job tinha seu próprio
+        retry_at isolado, a fila continuava chamando a API)."""
+        ...
+
+    async def extend_riot_cooldown_until(self, until: datetime) -> None:
+        """Só estende — nunca encurta um cooldown existente mais longo
+        (defesa contra um 429 mais antigo processado fora de ordem
+        reduzir uma espera já em vigor)."""
+        ...
+
 
 @dataclass(frozen=True, slots=True)
 class MatchParticipantSourceDTO:

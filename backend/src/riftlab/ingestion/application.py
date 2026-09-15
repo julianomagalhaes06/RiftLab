@@ -12,6 +12,7 @@ import contextlib
 import logging
 import random
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -52,20 +53,32 @@ logger = logging.getLogger("riftlab.worker")
 
 
 async def request_import(
-    session_factory: SessionFactory, requested_match_id: str, mode: ImportMode
+    session_factory: SessionFactory,
+    requested_match_id: str,
+    mode: ImportMode,
+    _after_initial_read: Callable[[], object] | None = None,
 ) -> ImportJob:
     """POST /imports: idempotente. Reaproveita o job mais recente da
     identidade se ainda ativo ou já SUCCEEDED (nunca duplica partida/job
     ativo); cria um novo só quando o mais recente é FAILED ou não existe.
-    Duas chamadas concorrentes para uma identidade nova competem no índice
-    único parcial do banco — a perdedora nunca recebe 409: reconsulta numa
-    transação nova e devolve o job da vencedora (idempotência real de
-    POST, não só na ausência de corrida)."""
+    Duas chamadas concorrentes competem no índice único parcial do banco —
+    que cobre estados ativos E SUCCEEDED (revisão CC-201, achado 4: sem
+    isso, um concorrente terminando SUCCEEDED bem entre esta consulta e o
+    create_import_job abaixo não era barrado pelo índice, que só cobria
+    QUEUED/RUNNING/RETRY_WAIT). A perdedora nunca recebe 409: reconsulta
+    numa transação nova e devolve o job da vencedora. _after_initial_read é
+    injetável só para teste (barreira determinística da janela de corrida),
+    nunca usado em produção."""
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         latest = await repo.get_latest_import_job(requested_match_id, mode)
         if latest is not None and latest.state != ImportJobState.FAILED:
             return latest
+
+    if _after_initial_read is not None:
+        result = _after_initial_read()
+        if hasattr(result, "__await__"):
+            await result
 
     new_job = ImportJob(
         id=uuid.uuid4(),
@@ -97,12 +110,20 @@ async def get_import_job(session_factory: SessionFactory, job_id: uuid.UUID) -> 
     return job
 
 
-async def retry_import(session_factory: SessionFactory, job_id: uuid.UUID) -> ImportJob:
+async def retry_import(
+    session_factory: SessionFactory,
+    job_id: uuid.UUID,
+    _after_initial_read: Callable[[], object] | None = None,
+) -> ImportJob:
     """POST /imports/{id}/retry: só permitido quando o job alvo está FAILED
     (docs/contracts.md). Cria uma nova tentativa vinculada — histórico do job
     anterior preservado, nunca sobrescrito. Corrida entre dois retries do
-    mesmo job (ou entre um retry e um POST /imports concorrente) é resolvida
-    do mesmo jeito que request_import: reconsulta e devolve a vencedora."""
+    mesmo job, entre um retry e um POST /imports concorrente, ou entre um
+    retry de um FAILED antigo e uma tentativa sucessora que já terminou
+    SUCCEEDED nesse meio-tempo, é resolvida do mesmo jeito que
+    request_import: o índice único cobre estados ativos e SUCCEEDED, então a
+    inserção perdedora nunca cria duplicata — reconsulta e devolve a
+    vencedora. _after_initial_read é injetável só para teste."""
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         target = await repo.get_import_job(job_id)
@@ -113,6 +134,11 @@ async def retry_import(session_factory: SessionFactory, job_id: uuid.UUID) -> Im
                 f"import job {job_id} não está FAILED (estado atual: "
                 f"{target.state.value}); retry só é permitido para jobs falhados"
             )
+
+    if _after_initial_read is not None:
+        result = _after_initial_read()
+        if hasattr(result, "__await__"):
+            await result
 
     new_job = ImportJob(
         id=uuid.uuid4(),
@@ -175,13 +201,20 @@ async def _renew_lease_periodically(
             await repo.renew_lease(job_id, generation, datetime.now(UTC))
 
 
+def _default_riot_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(follow_redirects=False)
+
+
 async def _load_from_source(
-    job: ImportJob, raw_store: DurableRawMatchStore, settings: Settings
+    job: ImportJob,
+    raw_store: DurableRawMatchStore,
+    settings: Settings,
+    riot_client_factory: Callable[[], httpx.AsyncClient],
 ) -> MatchSourceResult:
     if job.mode == ImportMode.DEMO:
         return await DemoMatchSource().load_match(job.requested_match_id)
 
-    client = httpx.AsyncClient(follow_redirects=False)
+    client = riot_client_factory()
     try:
         transport = RiotHttpTransport(
             api_key=settings.riot_api_key or "",
@@ -210,18 +243,27 @@ async def _finalize_failed(
         await repo.mark_import_failed(job.id, job.lease_generation, error_code)
 
 
-async def _finalize_retry_wait(
+async def _finalize_retry_wait_at(
     session_factory: SessionFactory,
     job: ImportJob,
     error_code: str,
-    retry_after_seconds: float | None,
+    retry_at: datetime,
 ) -> None:
-    retry_at = datetime.now(UTC) + timedelta(
-        seconds=_transient_retry_delay(job.attempts, retry_after_seconds)
-    )
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         await repo.mark_import_retry_wait(job.id, job.lease_generation, retry_at, error_code)
+
+
+async def _get_riot_cooldown_until(session_factory: SessionFactory) -> datetime | None:
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        return await repo.get_riot_cooldown_until()
+
+
+async def _extend_riot_cooldown_until(session_factory: SessionFactory, until: datetime) -> None:
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        await repo.extend_riot_cooldown_until(until)
 
 
 async def _persist_result(
@@ -284,22 +326,40 @@ async def _persist_result(
 
 
 async def process_next_job(
-    session_factory: SessionFactory, raw_store: DurableRawMatchStore, settings: Settings
+    session_factory: SessionFactory,
+    raw_store: DurableRawMatchStore,
+    settings: Settings,
+    riot_client_factory: Callable[[], httpx.AsyncClient] | None = None,
 ) -> bool:
     """Um ciclo do worker. True se um job foi processado (mesmo que tenha
     falhado) — o chamador não espera antes de tentar o próximo; False se não
-    havia trabalho elegível agora — o chamador espera o intervalo de poll."""
+    havia trabalho elegível agora — o chamador espera o intervalo de poll.
+    riot_client_factory é injetável só para teste (httpx.MockTransport, sem
+    rede real); cc worker nunca passa isto, usa sempre o cliente real."""
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         job = await repo.reserve_next_job(datetime.now(UTC))
     if job is None:
         return False
 
+    if job.mode == ImportMode.RIOT:
+        # Cooldown compartilhado entre TODOS os jobs RIOT (achado real da
+        # revisão CC-201: um 429 só adiava o job atual; a fila continuava
+        # chamando a API com outros matchId). Nunca toca rede nem constrói
+        # transporte enquanto o cooldown estiver em vigor — DEMO nunca passa
+        # por aqui (mode != RIOT), nunca para por causa disto.
+        cooldown_until = await _get_riot_cooldown_until(session_factory)
+        if cooldown_until is not None and cooldown_until > datetime.now(UTC):
+            await _finalize_retry_wait_at(session_factory, job, "RIOT_RATE_LIMITED", cooldown_until)
+            return True
+
     heartbeat_task = asyncio.create_task(
         _renew_lease_periodically(session_factory, job.id, job.lease_generation)
     )
     try:
-        result = await _load_from_source(job, raw_store, settings)
+        result = await _load_from_source(
+            job, raw_store, settings, riot_client_factory or _default_riot_client
+        )
     except SubjectHashSecretMissingError:
         await _finalize_failed(session_factory, job, "SUBJECT_HASH_SECRET_MISSING")
         return True
@@ -307,10 +367,19 @@ async def process_next_job(
         await _finalize_failed(session_factory, job, exc.code)
         return True
     except SourceRateLimitedError as exc:
-        await _finalize_retry_wait(session_factory, job, exc.code, exc.retry_after_seconds)
+        retry_at = datetime.now(UTC) + timedelta(
+            seconds=_transient_retry_delay(job.attempts, exc.retry_after_seconds)
+        )
+        if job.mode == ImportMode.RIOT:
+            # A mesma espera que se aplica a este job vira o cooldown
+            # compartilhado — é o mesmo limite de taxa upstream sendo
+            # respeitado, não um limite por job.
+            await _extend_riot_cooldown_until(session_factory, retry_at)
+        await _finalize_retry_wait_at(session_factory, job, exc.code, retry_at)
         return True
     except SourceError as exc:
-        await _finalize_retry_wait(session_factory, job, exc.code, None)
+        retry_at = datetime.now(UTC) + timedelta(seconds=_transient_retry_delay(job.attempts, None))
+        await _finalize_retry_wait_at(session_factory, job, exc.code, retry_at)
         return True
     finally:
         heartbeat_task.cancel()

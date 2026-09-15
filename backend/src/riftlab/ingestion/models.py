@@ -53,13 +53,22 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
             "state IN ('QUEUED','RUNNING','RETRY_WAIT','SUCCEEDED','FAILED')",
             name="state_valid",
         ),
-        # Identidade ativa: no máximo um job em estado ativo por (match solicitado, modo).
+        # Identidade ativa: no máximo um job em estado ativo OU SUCCEEDED por
+        # (match solicitado, modo) — FAILED é o único estado fora do índice.
+        # Revisão CC-201, achado 4: sem incluir SUCCEEDED aqui, um job
+        # concorrente que termina SUCCEEDED bem entre a consulta e o insert
+        # de request_import/retry_import não bloqueava a segunda inserção,
+        # criando um job QUEUED duplicado que refaria a rede para uma
+        # partida já importada. Com SUCCEEDED coberto, a inserção perdedora
+        # sempre viola o índice — vira ConflictError, e o chamador reconsulta
+        # e devolve a vencedora (mesmo caminho já usado para dois QUEUED
+        # concorrentes).
         Index(
             "ux_import_jobs_active_identity",
             "requested_match_id",
             "mode",
             unique=True,
-            postgresql_where=text("state IN ('QUEUED','RUNNING','RETRY_WAIT')"),
+            postgresql_where=text("state IN ('QUEUED','RUNNING','RETRY_WAIT','SUCCEEDED')"),
         ),
         Index("ix_import_jobs_state_retry_at", "state", "retry_at"),
     )
@@ -88,3 +97,16 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class RiotRateLimitModel(Base):
+    """Linha única (key="global"): cooldown compartilhado entre TODOS os jobs
+    RIOT, não por job (revisão CC-201 — achado 3: 429 só adiava o job atual,
+    a fila continuava chamando a API com IDs diferentes). Durável (sobrevive
+    a reinício do worker, docs/architecture.md/plano do CC-201: "cooldown
+    durável"); nunca guarda a chave/segredo em si, só até quando esperar."""
+
+    __tablename__ = "riot_rate_limit"
+
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    cooldown_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

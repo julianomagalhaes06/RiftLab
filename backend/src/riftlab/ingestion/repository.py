@@ -18,8 +18,15 @@ from riftlab.ingestion.domain import (
     Match,
     Participant,
 )
-from riftlab.ingestion.models import ImportJobModel, MatchModel, ParticipantModel
+from riftlab.ingestion.models import (
+    ImportJobModel,
+    MatchModel,
+    ParticipantModel,
+    RiotRateLimitModel,
+)
 from riftlab.shared.errors import ConflictError
+
+_RIOT_RATE_LIMIT_KEY = "global"
 
 
 class SqlAlchemyIngestionRepository:
@@ -244,6 +251,17 @@ class SqlAlchemyIngestionRepository:
         result = await self._session.execute(stmt)
         assert isinstance(result, CursorResult)
         return result.rowcount == 1
+
+    async def get_riot_cooldown_until(self) -> datetime | None:
+        row = await self._session.get(RiotRateLimitModel, _RIOT_RATE_LIMIT_KEY)
+        return row.cooldown_until if row is not None else None
+
+    async def extend_riot_cooldown_until(self, until: datetime) -> None:
+        row = await self._session.get(RiotRateLimitModel, _RIOT_RATE_LIMIT_KEY)
+        if row is None:
+            self._session.add(RiotRateLimitModel(key=_RIOT_RATE_LIMIT_KEY, cooldown_until=until))
+        elif until > row.cooldown_until:
+            row.cooldown_until = until
 
 
 def _job_from_row(row: ImportJobModel) -> ImportJob:
