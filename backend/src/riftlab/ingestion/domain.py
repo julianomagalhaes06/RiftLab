@@ -140,6 +140,17 @@ class IngestionRepository(Protocol):
         generation."""
         ...
 
+    async def mark_import_deferred_by_cooldown(
+        self, job_id: uuid.UUID, generation: int, retry_at: datetime
+    ) -> bool:
+        """Adia um job RIOT por cooldown compartilhado ANTES de qualquer
+        tentativa de rede — desfaz o incremento de attempts que
+        reserve_next_job já aplicou ao reservar este job, senão um cooldown
+        longo o bastante esgotaria MAX_TRANSIENT_ATTEMPTS de um job que
+        nunca chegou a tentar a rede (achado real da revisão CC-201).
+        Guardado por generation, mesma semântica de mark_import_retry_wait."""
+        ...
+
     async def get_riot_cooldown_until(self) -> datetime | None:
         """Cooldown compartilhado entre TODOS os jobs RIOT (não por job),
         durável entre reinícios do worker — 429 numa chamada real pausa a

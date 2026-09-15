@@ -243,6 +243,14 @@ async def _finalize_failed(
         await repo.mark_import_failed(job.id, job.lease_generation, error_code)
 
 
+async def _finalize_deferred_by_cooldown(
+    session_factory: SessionFactory, job: ImportJob, retry_at: datetime
+) -> None:
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        await repo.mark_import_deferred_by_cooldown(job.id, job.lease_generation, retry_at)
+
+
 async def _finalize_retry_wait_at(
     session_factory: SessionFactory,
     job: ImportJob,
@@ -350,7 +358,10 @@ async def process_next_job(
         # por aqui (mode != RIOT), nunca para por causa disto.
         cooldown_until = await _get_riot_cooldown_until(session_factory)
         if cooldown_until is not None and cooldown_until > datetime.now(UTC):
-            await _finalize_retry_wait_at(session_factory, job, "RIOT_RATE_LIMITED", cooldown_until)
+            # Nunca conta como tentativa transitória (achado real da revisão
+            # CC-201): este job nunca chegou a tocar rede, só foi adiado
+            # pelo cooldown compartilhado de outro job.
+            await _finalize_deferred_by_cooldown(session_factory, job, cooldown_until)
             return True
 
     heartbeat_task = asyncio.create_task(

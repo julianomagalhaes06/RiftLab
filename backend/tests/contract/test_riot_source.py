@@ -231,6 +231,88 @@ async def test_load_match_rejects_missing_champion_id_without_raw_exception(tmp_
     assert exc_info.value.code == "MATCH_SOURCE_MISSING_FIELD"
 
 
+@pytest.mark.parametrize(
+    ("name", "mutate"),
+    [
+        (
+            "negative_duration",
+            lambda m, t: m["info"].__setitem__("gameDuration", -1),
+        ),
+        (
+            "champion_wrong_type",
+            lambda m, t: m["info"]["participants"][0].__setitem__("championId", "invalid"),
+        ),
+        (
+            "champion_bool_disguised_as_int",
+            lambda m, t: m["info"]["participants"][0].__setitem__("championId", True),
+        ),
+        (
+            "frame_invalid_key",
+            lambda m, t: t["info"]["frames"][0].__setitem__("participantFrames", {"bad-key": {}}),
+        ),
+        (
+            "timestamp_overflow",
+            lambda m, t: m["info"].__setitem__("gameStartTimestamp", 10**100),
+        ),
+        (
+            "queue_wrong_type",
+            lambda m, t: m["info"].__setitem__("queueId", "420"),
+        ),
+        (
+            "game_version_wrong_type",
+            lambda m, t: m["info"].__setitem__("gameVersion", 16.17),
+        ),
+        (
+            "event_timestamp_negative",
+            lambda m, t: t["info"]["frames"][1]["events"][0].__setitem__("timestamp", -1),
+        ),
+        (
+            "event_type_wrong_type",
+            lambda m, t: t["info"]["frames"][1]["events"][0].__setitem__("type", 123),
+        ),
+        (
+            "participant_frames_not_a_dict",
+            lambda m, t: t["info"]["frames"][0].__setitem__("participantFrames", ["not-a-dict"]),
+        ),
+    ],
+)
+async def test_load_match_rejects_invalid_field_types_and_limits_without_raw_exception(
+    tmp_path, name: str, mutate
+) -> None:
+    """Achado real da revisão complementar CC-201 (review_cc201_correction_probe.py):
+    duração negativa e championId de tipo errado eram aceitos sem checagem
+    (só quebrariam tarde, numa constraint do banco, com o job preso em
+    RUNNING até expirar/repetir); chave de participantFrames não numérica
+    vazava ValueError cru de int(pid); timestamp de início absurdo vazava
+    OverflowError cru de datetime.fromtimestamp — nenhum dos dois coberto
+    por _STRUCTURAL_ACCESS_ERRORS. Todos agora viram SourceSchemaError
+    permanente e classificado, nunca uma exceção crua nem um valor
+    silenciosamente aceito."""
+    match_doc = _match_doc()
+    timeline_doc = _timeline_doc()
+    mutate(match_doc, timeline_doc)
+    handler = _RoutedHandler(match_doc, timeline_doc)
+    source = _source(handler, tmp_path / "raw" / name)
+
+    with pytest.raises(SourceSchemaError) as exc_info:
+        await source.load_match(_MATCH_ID)
+    assert exc_info.value.code == "MATCH_SOURCE_MISSING_FIELD"
+
+
+async def test_load_match_still_accepts_valid_synthetic_payload_after_validation_hardening(
+    tmp_path,
+) -> None:
+    """Prova que a validação explícita adicionada acima não passou a rejeitar
+    o payload sintético válido de baseline (mesmo formato usado por todos os
+    outros testes deste arquivo)."""
+    handler = _RoutedHandler(_match_doc(), _timeline_doc())
+    source = _source(handler, tmp_path / "raw")
+
+    result = await source.load_match(_MATCH_ID)
+    assert result.duration_seconds == 1800
+    assert result.participants[0].champion_id == 89
+
+
 async def test_load_match_rejects_duplicate_participant_id_in_match(tmp_path) -> None:
     duplicated = _match_doc()
     duplicated["info"]["participants"][1]["participantId"] = 1

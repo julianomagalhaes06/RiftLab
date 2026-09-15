@@ -15,7 +15,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import httpx
-from sqlalchemy import delete
+from sqlalchemy import delete, update
 
 from riftlab.config import Settings
 from riftlab.ingestion.application import (
@@ -281,6 +281,43 @@ async def test_process_next_job_riot_403_marks_failed_in_pipeline(
     assert job.error_code == "RIOT_AUTH_FAILED"
 
 
+async def test_process_next_job_riot_invalid_field_marks_failed_permanently_no_partial_persistence(
+    session_factory, tmp_path
+) -> None:
+    """Achado real da revisão complementar CC-201 (review_cc201_correction_probe.py):
+    campo de tipo/limite inválido (aqui, gameDuration negativo) precisa
+    falhar permanente e limpo no pipeline completo (reserva -> busca ->
+    finaliza via process_next_job), não só no parser isolado — nunca job
+    preso em RUNNING/RETRY_WAIT nem partida/participantes persistidos
+    parcialmente antes da falha."""
+    await _reset_riot_cooldown(session_factory)
+    match_id = f"BR1_{uuid.uuid4().int % 10**10}"
+    job_id = await _create_job(session_factory, match_id, ImportMode.RIOT)
+    settings = Settings(
+        subject_hash_secret=_FAKE_SUBJECT_HASH_SECRET, riot_api_key=_FAKE_RIOT_API_KEY
+    )
+    raw_store = DurableRawMatchStore(tmp_path / "raw")
+
+    match_doc, timeline_doc = _riot_docs(match_id)
+    match_doc["info"]["gameDuration"] = -1
+    handler = _success_handler(match_doc, timeline_doc)
+
+    processed = await process_next_job(
+        session_factory, raw_store, settings, riot_client_factory=_riot_client_factory(handler)
+    )
+    assert processed is True
+
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        job = await repo.get_import_job(job_id)
+        match = await repo.get_match(match_id)
+    assert job is not None
+    assert job.state == ImportJobState.FAILED
+    assert job.error_code == "MATCH_SOURCE_MISSING_FIELD"
+    assert job.attempts == 1  # falha permanente na primeira tentativa, nunca RETRY_WAIT
+    assert match is None  # nenhuma persistência parcial
+
+
 async def test_process_next_job_riot_503_then_retry_succeeds_in_pipeline(
     session_factory, tmp_path
 ) -> None:
@@ -411,6 +448,79 @@ async def test_riot_429_sets_shared_cooldown_blocking_other_riot_jobs_without_ne
         reserved_b = await repo.reserve_next_job(job_b.retry_at)
         assert reserved_b is not None and reserved_b.id == job_b_id
         await repo.mark_import_failed(reserved_b.id, reserved_b.lease_generation, "TEST_CLEANUP")
+    await _reset_riot_cooldown(session_factory)
+
+
+async def test_riot_cooldown_deferral_never_consumes_transient_attempt_budget(
+    session_factory, tmp_path
+) -> None:
+    """Achado real da revisão complementar CC-201: reserve_next_job incrementa
+    attempts ao reservar QUALQUER job, inclusive um job RIOT que só vai ser
+    adiado pelo cooldown compartilhado sem nunca tocar rede. Sem correção,
+    um cooldown longo o bastante esgota MAX_TRANSIENT_ATTEMPTS (5) de um job
+    que nunca fez uma tentativa de rede sequer, falhando permanente por
+    RETRY_LIMIT_EXCEEDED sem nenhuma causa real de rede. Verificado com
+    reservas reais repetidas (mais que MAX_TRANSIENT_ATTEMPTS), não só
+    apontado por leitura de código."""
+    await _reset_riot_cooldown(session_factory)
+    match_id = f"BR1_{uuid.uuid4().int % 10**10}"
+    job_id = await _create_job(session_factory, match_id, ImportMode.RIOT)
+    settings = Settings(
+        subject_hash_secret=_FAKE_SUBJECT_HASH_SECRET, riot_api_key=_FAKE_RIOT_API_KEY
+    )
+    raw_store = DurableRawMatchStore(tmp_path / "raw")
+
+    def network_should_never_be_called(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("cooldown em vigor: nao deveria tocar rede nunca")
+
+    # MAX_TRANSIENT_ATTEMPTS (5) + 2 ciclos extras. Cada ciclo simula o
+    # cenário real de fila concorrida: o cooldown compartilhado é renovado
+    # por 429s reais de OUTROS jobs RIOT (extend_riot_cooldown_until de
+    # novo) exatamente quando o retry_at deste job (de um poll anterior) já
+    # venceu — sem isso o job nunca voltaria a ser elegível antes do
+    # cooldown em si já ter expirado, o que mascararia o achado (não daria
+    # para provar "adiamentos repetidos" sem esperar de verdade). Se o
+    # adiamento por cooldown consumisse o orçamento de tentativas
+    # transitórias, o job já teria virado FAILED (RETRY_LIMIT_EXCEEDED) bem
+    # antes do 6o/7o ciclo.
+    for _ in range(7):
+        async with unit_of_work(session_factory) as session:
+            repo = SqlAlchemyIngestionRepository(session)
+            await repo.extend_riot_cooldown_until(datetime.now(UTC) + timedelta(hours=1))
+            await session.execute(
+                update(ImportJobModel)
+                .where(ImportJobModel.id == job_id)
+                .values(retry_at=datetime.now(UTC) - timedelta(seconds=1))
+            )
+        processed = await process_next_job(
+            session_factory,
+            raw_store,
+            settings,
+            riot_client_factory=_riot_client_factory(network_should_never_be_called),
+        )
+        assert processed is True
+        async with unit_of_work(session_factory) as session:
+            repo = SqlAlchemyIngestionRepository(session)
+            job = await repo.get_import_job(job_id)
+        assert job is not None
+        assert job.state == ImportJobState.RETRY_WAIT, (
+            f"job deveria continuar RETRY_WAIT (adiado só por cooldown, nunca tocou "
+            f"rede) mas foi para {job.state} apos poucos ciclos de reserva "
+            "(attempts consumido por adiamento de cooldown, nao por tentativa real)"
+        )
+        assert job.error_code == "RIOT_RATE_LIMITED"
+        assert job.attempts == 0, (
+            "adiamento por cooldown compartilhado nao deveria consumir orcamento de "
+            f"tentativas transitorias (attempts={job.attempts}, esperado 0)"
+        )
+
+    # Limpeza direta (fora do caminho guardado por lease/generation, mesmo
+    # padrão de _delete_job): identidade aleatória por execução deste teste,
+    # nunca chegou a SUCCEEDED/match_id, então remover a linha é seguro e
+    # evita que `reserve_next_job(now)` com um "now" futuro (necessário para
+    # simular adiamentos repetidos acima) reserve por engano um job de
+    # OUTRO teste que também esteja elegível nesse instante virtual.
+    await _delete_job(session_factory, job_id)
     await _reset_riot_cooldown(session_factory)
 
 

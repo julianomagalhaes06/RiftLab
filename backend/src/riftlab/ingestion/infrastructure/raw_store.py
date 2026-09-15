@@ -30,10 +30,39 @@ class RawStoreCorruptedError(Exception):
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
     """Escreve num arquivo temporário no mesmo diretório e usa os.replace
     (atômico em POSIX, mesma partição): o arquivo final nunca fica visível
-    parcialmente escrito, mesmo se o processo morrer no meio."""
+    parcialmente escrito, mesmo se o processo morrer no meio. os.replace
+    SEMPRE "vence" (substitui o que já estiver lá) — nunca usar isto para
+    publicar uma identidade write-once (ver _publish_once abaixo; revisão
+    CC-201, achado 1: dois escritores concorrentes que checam
+    `not path.exists()` antes de chamar isto podem os dois observar ausência
+    e os dois "ganharem", um sobrescrevendo o outro silenciosamente)."""
     tmp_path = path.with_name(f"{path.name}.tmp-{os.getpid()}-{uuid.uuid4().hex}")
     tmp_path.write_bytes(data)
     os.replace(tmp_path, path)
+
+
+def _publish_once(path: Path, data: bytes) -> bool:
+    """Publica `path` com `data` de forma write-once e exclusiva de verdade:
+    o conteúdo completo vai primeiro para um arquivo temporário no mesmo
+    diretório (mesmo filesystem), depois um hard link exclusivo
+    (os.link, falha com FileExistsError se o destino já existir) o publica —
+    nunca um `if path.exists()` seguido de escrita, que é check-then-act e
+    permite dois escritores concorrentes observarem ausência e os dois
+    "vencerem" (revisão CC-201, achado 1, reproduzido com barreira real:
+    os.replace sempre substitui, então não é suficiente aqui). Um leitor
+    nunca observa `path` parcialmente escrito: o inode só passa a ter esse
+    nome depois de já conter o conteúdo inteiro. Retorna True se este
+    chamador publicou de fato; False se outro já publicou ali primeiro (o
+    chamador decide o que fazer com o conteúdo já existente)."""
+    tmp_path = path.with_name(f"{path.name}.tmp-{os.getpid()}-{uuid.uuid4().hex}")
+    tmp_path.write_bytes(data)
+    try:
+        os.link(tmp_path, path)
+        return True
+    except FileExistsError:
+        return False
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 class DurableRawMatchStore:
@@ -64,13 +93,14 @@ class DurableRawMatchStore:
         self._blobs_directory.mkdir(parents=True, exist_ok=True)
 
     def read_if_valid(self, match_id: str, kind: str) -> bytes | None:
-        """None se nunca foi gravado. Bytes se presente e íntegro. Levanta
+        """None se nunca foi gravado (nem no formato atual, nem no legado
+        pré-correção). Bytes se presente e íntegro. Levanta
         RawStoreCorruptedError se o estado em disco não pode ser confiado —
         nunca finge ausência nem sobrescreve sozinho."""
         self._validate(match_id, kind)
         ref_path = self._ref_path(match_id, kind)
         if not ref_path.exists():
-            return None
+            return self._migrate_legacy_if_present(match_id, kind)
         referenced_hash = ref_path.read_text().strip()
         if not _SHA256_HEX_PATTERN.fullmatch(referenced_hash):
             raise RawStoreCorruptedError(
@@ -82,38 +112,72 @@ class DurableRawMatchStore:
     def store(self, match_id: str, kind: str, body: bytes, sha256: str) -> None:
         """Só chamado com bytes recém-buscados e já verificados pelo
         transporte (RawRiotResponse.sha256). Idempotente para o mesmo
-        conteúdo (inclusive entre execuções/processos diferentes); rejeita
-        publicar um conteúdo diferente sob a mesma identidade (match_id,
-        kind) em vez de sobrescrever — ver docstring da classe."""
+        conteúdo (inclusive entre execuções/processos diferentes, inclusive
+        sob concorrência real — publicação write-once via _publish_once, não
+        check-then-act); rejeita publicar um conteúdo diferente sob a mesma
+        identidade (match_id, kind) em vez de sobrescrever — ver docstring
+        da classe."""
         self._validate(match_id, kind)
         actual_hash = hashlib.sha256(body).hexdigest()
         if actual_hash != sha256:
             raise ValueError("sha256 informado não bate com o corpo fornecido")
 
         blob_path = self._blob_path(actual_hash)
-        if blob_path.exists():
-            # Blob endereçado por conteúdo já existe: mesmo hash só pode
-            # significar mesmo conteúdo, mas confirmamos mesmo assim (bit
-            # rot/adulteração externa é uma causa real de corrupção).
+        if not _publish_once(blob_path, body):
+            # Outro escritor (talvez este mesmo processo numa tentativa
+            # anterior) já publicou este blob primeiro. Endereçado por
+            # conteúdo: mesmo hash só pode significar mesmo conteúdo, mas
+            # confirmamos mesmo assim (bit rot/adulteração externa é uma
+            # causa real de corrupção).
             if hashlib.sha256(blob_path.read_bytes()).hexdigest() != actual_hash:
                 raise RawStoreCorruptedError(
                     f"blob {actual_hash} de {kind} para {match_id!r} diverge do "
                     "próprio nome; resolução manual exigida"
                 )
-        else:
-            _atomic_write_bytes(blob_path, body)
 
         ref_path = self._ref_path(match_id, kind)
-        if ref_path.exists():
-            existing_hash = ref_path.read_text().strip()
-            if existing_hash == actual_hash:
-                return  # idempotente: mesma identidade, mesmo conteúdo já publicado
+        if _publish_once(ref_path, actual_hash.encode("ascii")):
+            return  # este chamador publicou a referência primeiro
+        # Outro escritor publicou a referência primeiro nesta identidade —
+        # write-once de verdade (hard link exclusivo), não "o último
+        # os.replace vence": um segundo escritor concorrente nunca sobrepõe
+        # o que o primeiro já publicou, mesmo que ambos tenham observado
+        # `not ref_path.exists()` no mesmo instante (revisão CC-201, achado
+        # 1 — reproduzido com barreira real antes desta correção).
+        existing_hash = ref_path.read_text().strip()
+        if existing_hash == actual_hash:
+            return  # idempotente: mesma identidade, mesmo conteúdo já publicado
+        raise RawStoreCorruptedError(
+            f"{kind} de {match_id!r} já publicado com hash {existing_hash} "
+            f"diferente do agora recebido ({actual_hash}); nunca sobrescrito "
+            "automaticamente, resolução manual exigida"
+        )
+
+    def _migrate_legacy_if_present(self, match_id: str, kind: str) -> bytes | None:
+        """Formato anterior à correção CC-201 (commit 63f638a): corpo em
+        `<match_id>.<kind>.json` + sidecar `<match_id>.<kind>.sha256`, direto
+        no diretório raiz (sem `blobs/`, sem endereçamento por conteúdo).
+        Um diretório com esses arquivos nunca é tratado como "nunca
+        coletado" e silenciosamente substituído por nova coleta de rede
+        (revisão CC-201, achado 1 — apontado por inspeção, sem perda real
+        observada nesta sessão): migrado para o esquema atual de forma não
+        destrutiva (arquivos antigos preservados, nunca apagados) na
+        primeira leitura, então servido como se já estivesse no formato
+        novo."""
+        legacy_body_path = self._directory / f"{match_id}.{kind}.json"
+        legacy_hash_path = self._directory / f"{match_id}.{kind}.sha256"
+        if not legacy_body_path.exists() or not legacy_hash_path.exists():
+            return None
+        body = legacy_body_path.read_bytes()
+        expected_hash = legacy_hash_path.read_text().strip()
+        actual_hash = hashlib.sha256(body).hexdigest()
+        if not _SHA256_HEX_PATTERN.fullmatch(expected_hash) or actual_hash != expected_hash:
             raise RawStoreCorruptedError(
-                f"{kind} de {match_id!r} já publicado com hash {existing_hash} "
-                f"diferente do agora recebido ({actual_hash}); nunca sobrescrito "
-                "automaticamente, resolução manual exigida"
+                f"{kind} de {match_id!r} em formato legado diverge do hash do "
+                "sidecar .sha256; resolução manual exigida, sem migração automática"
             )
-        _atomic_write_bytes(ref_path, actual_hash.encode("ascii"))
+        self.store(match_id, kind, body, actual_hash)
+        return body
 
     def _read_blob(self, match_id: str, kind: str, expected_hash: str) -> bytes:
         blob_path = self._blob_path(expected_hash)

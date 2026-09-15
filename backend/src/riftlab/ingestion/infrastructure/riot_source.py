@@ -110,6 +110,51 @@ def _parse_json(kind: str, body: bytes) -> Any:
         ) from exc
 
 
+def _require_int(value: Any, field: str) -> int:
+    """Rejeita explicitamente qualquer valor que não seja int de verdade
+    (revisão CC-201, achado 2: championId='invalid' e gameDuration=-1 eram
+    aceitos sem checagem de tipo/sinal, só descobertos como erro tarde,
+    numa constraint do banco, com o job preso em RUNNING até expirar/
+    repetir em vez de falhar como schema imediatamente). bool é subclasse
+    de int em Python mas nunca um valor legítimo aqui — rejeitado à parte."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise SourceSchemaError(
+            code="MATCH_SOURCE_MISSING_FIELD", detail=f"{field} não é um inteiro válido"
+        )
+    return value
+
+
+def _require_non_negative_int(value: Any, field: str) -> int:
+    parsed = _require_int(value, field)
+    if parsed < 0:
+        raise SourceSchemaError(
+            code="MATCH_SOURCE_MISSING_FIELD", detail=f"{field} não pode ser negativo"
+        )
+    return parsed
+
+
+def _require_str(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise SourceSchemaError(
+            code="MATCH_SOURCE_MISSING_FIELD", detail=f"{field} ausente ou não é texto"
+        )
+    return value
+
+
+def _epoch_millis_to_datetime(value: int, field: str) -> datetime:
+    """datetime.fromtimestamp levanta OverflowError/ValueError/OSError para
+    um epoch fora da faixa representável (revisão CC-201, achado 2:
+    gameStartTimestamp=10**100 escapava como OverflowError cru, não coberto
+    por _STRUCTURAL_ACCESS_ERRORS) — convertido aqui para schema
+    incompatível permanente, nunca uma exceção crua até o worker."""
+    try:
+        return datetime.fromtimestamp(value / 1000, tz=UTC)
+    except (OverflowError, ValueError, OSError) as exc:
+        raise SourceSchemaError(
+            code="MATCH_SOURCE_MISSING_FIELD", detail=f"{field} fora da faixa representável"
+        ) from exc
+
+
 def _patch_from_game_version(game_version: str) -> str:
     """ "13.10.500.1234" -> "13.10" (major.minor, mesmo estilo dos patches em
     configs/scope.yaml). gameVersion vazio/sem dois segmentos é schema
@@ -201,7 +246,7 @@ def _build_match_source_result(
     participants: list[MatchParticipantSourceDTO] = []
     match_puuid_by_id: dict[int, str] = {}
     for raw_participant in raw_participants:
-        participant_id = raw_participant["participantId"]
+        participant_id = _require_int(raw_participant["participantId"], "participantId")
         puuid = raw_participant.get("puuid")
         if not isinstance(puuid, str) or not puuid:
             raise SourceSchemaError(
@@ -215,8 +260,8 @@ def _build_match_source_result(
         participants.append(
             MatchParticipantSourceDTO(
                 participant_id=participant_id,
-                champion_id=raw_participant["championId"],
-                team=raw_participant["teamId"],
+                champion_id=_require_int(raw_participant["championId"], "championId"),
+                team=_require_int(raw_participant["teamId"], "teamId"),
                 subject_hash=compute_real_subject_hash(puuid, subject_hash_secret),
                 role=role or None,
             )
@@ -234,7 +279,7 @@ def _build_match_source_result(
         )
     timeline_puuid_by_id: dict[int, str] = {}
     for raw_timeline_participant in timeline_raw_participants:
-        participant_id = raw_timeline_participant["participantId"]
+        participant_id = _require_int(raw_timeline_participant["participantId"], "participantId")
         puuid = raw_timeline_participant.get("puuid")
         if participant_id in timeline_puuid_by_id:
             raise SourceSchemaError(
@@ -272,21 +317,42 @@ def _build_match_source_result(
         # participantFrames pode legitimamente faltar um participante que
         # ainda não existia naquele instante (CC-104: "frame ausente" —
         # ausência real, nunca fabricada) — só o campo frames em si é
-        # obrigatório, não cada entrada de participantFrames.
+        # obrigatório, não cada entrada de participantFrames. As chaves
+        # ainda precisam ser participantId numéricos válidos (revisão
+        # CC-201, achado 2: uma chave não numérica levantava ValueError cru
+        # em int(pid), fora de _STRUCTURAL_ACCESS_ERRORS).
+        raw_participant_frames = raw_frame.get("participantFrames", {})
+        if not isinstance(raw_participant_frames, dict):
+            raise SourceSchemaError(
+                code="MATCH_SOURCE_MISSING_FIELD", detail="participantFrames não é um objeto"
+            )
+        participant_frames: dict[int, dict[str, Any]] = {}
+        for pid, pf in raw_participant_frames.items():
+            if not isinstance(pid, str) or not pid.isdigit():
+                raise SourceSchemaError(
+                    code="MATCH_SOURCE_MISSING_FIELD",
+                    detail="chave de participantFrames não é um participantId numérico",
+                )
+            if not isinstance(pf, dict):
+                raise SourceSchemaError(
+                    code="MATCH_SOURCE_MISSING_FIELD",
+                    detail="valor de participantFrames não é um objeto",
+                )
+            participant_frames[int(pid)] = dict(pf)
         frames.append(
             TimelineFrameDTO(
-                timestamp_ms=raw_frame["timestamp"],
-                participant_frames={
-                    int(pid): dict(pf) for pid, pf in raw_frame.get("participantFrames", {}).items()
-                },
+                timestamp_ms=_require_non_negative_int(raw_frame["timestamp"], "frame.timestamp"),
+                participant_frames=participant_frames,
             )
         )
         for raw_event in raw_frame.get("events", []):
             events.append(
                 TimelineEventDTO(
                     source_index=source_index,
-                    timestamp_ms=raw_event["timestamp"],
-                    type=raw_event["type"],
+                    timestamp_ms=_require_non_negative_int(
+                        raw_event["timestamp"], "event.timestamp"
+                    ),
+                    type=_require_str(raw_event["type"], "event.type"),
                     payload={k: v for k, v in raw_event.items() if k not in {"timestamp", "type"}},
                 )
             )
@@ -297,11 +363,14 @@ def _build_match_source_result(
         origin=SourceOrigin.COMPLETED_MATCH,
         schema_version="riot-match-v5",
         raw_hash=hashlib.sha256(match_body).hexdigest(),
-        queue=match_info["queueId"],
-        map_id=match_info["mapId"],
-        patch=_patch_from_game_version(match_info["gameVersion"]),
-        start_at=datetime.fromtimestamp(match_info["gameStartTimestamp"] / 1000, tz=UTC),
-        duration_seconds=match_info["gameDuration"],
+        queue=_require_non_negative_int(match_info["queueId"], "queueId"),
+        map_id=_require_non_negative_int(match_info["mapId"], "mapId"),
+        patch=_patch_from_game_version(_require_str(match_info["gameVersion"], "gameVersion")),
+        start_at=_epoch_millis_to_datetime(
+            _require_non_negative_int(match_info["gameStartTimestamp"], "gameStartTimestamp"),
+            "gameStartTimestamp",
+        ),
+        duration_seconds=_require_non_negative_int(match_info["gameDuration"], "gameDuration"),
         participants=tuple(participants),
         frames=tuple(frames),
         events=tuple(events),

@@ -231,6 +231,24 @@ class SqlAlchemyIngestionRepository:
         )
         return await self._apply_guarded_update(stmt)
 
+    async def mark_import_deferred_by_cooldown(
+        self, job_id: uuid.UUID, generation: int, retry_at: datetime
+    ) -> bool:
+        # attempts=attempts-1 desfaz o incremento que reserve_next_job já
+        # aplicou ao reservar este job: um adiamento por cooldown
+        # compartilhado nunca chegou a tentar rede, então nunca deveria
+        # consumir orçamento de tentativa transitória (revisão CC-201,
+        # achado real: cooldown longo o bastante esgotava MAX_TRANSIENT_
+        # ATTEMPTS de um job que nunca tocou a API).
+        stmt = self._guarded_update(job_id, generation).values(
+            state=ImportJobState.RETRY_WAIT.value,
+            lease_until=None,
+            retry_at=retry_at,
+            error_code="RIOT_RATE_LIMITED",
+            attempts=ImportJobModel.attempts - 1,
+        )
+        return await self._apply_guarded_update(stmt)
+
     @staticmethod
     def _guarded_update(job_id: uuid.UUID, generation: int) -> Update:
         """Toda escrita final e o heartbeat passam por aqui: WHERE id + a
