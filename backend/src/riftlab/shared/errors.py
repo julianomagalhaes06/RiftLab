@@ -28,3 +28,20 @@ class SourceNotFoundError(SourceError):
 class SourceSchemaError(SourceError):
     """JSON inválido, schema desconhecido ou campo estrutural obrigatório ausente
     (ex.: patch obrigatório ausente não recebe catálogo atual como substituto)."""
+
+
+class SourceAuthError(SourceError):
+    """Credencial rejeitada pela fonte remota (401/403). Falha permanente: o
+    chamador nunca tenta de novo automaticamente, mesmo dentro do orçamento de
+    tentativas (CC-105)."""
+
+
+class SourceRateLimitedError(SourceError):
+    """Limite de taxa da fonte remota excedido (HTTP 429) além do orçamento local
+    de tentativas/tempo, ou orçamento local esgotado antes disso (CC-105). Nunca
+    presume uma quota fixa: só reflete o que o servidor ou o próprio orçamento
+    local realmente impôs."""
+
+    def __init__(self, *, code: str, detail: str, retry_after_seconds: float | None = None) -> None:
+        super().__init__(code=code, detail=detail)
+        self.retry_after_seconds = retry_after_seconds

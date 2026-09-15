@@ -46,6 +46,14 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.flake8-bugbear]
+# B008 ignora parametros com tipo imutavel (str/int/bool), mas Path nao entra
+# nessa lista; typer.Option/typer.Argument sao o idioma padrao do projeto desde
+# o CC-101 e nunca reavaliam o default em cada chamada (Typer os executa uma vez
+# na construcao do comando), entao sao seguros aqui — mecanismo documentado pelo
+# proprio ruff para este caso exato (rule B008).
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
 [tool.mypy]
 python_version = "3.12"
 packages = ["riftlab"]

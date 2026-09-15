@@ -1,0 +1,88 @@
+# Recorte inicial da Sprint 1 (CC-105), congelado a partir de auditoria real
+# de partidas concluídas (Account-V1/Match-V5, API oficial da Riot). Só
+# valores reais e sua origem — nenhum campeão/patch foi escolhido por
+# preferência presumida. Nenhum identificador pessoal (Riot ID, PUUID, nome
+# de conta) aparece neste arquivo; os corpos brutos e a auditoria completa
+# ficam em diretórios locais fora do Git (ver docs/domain-model.md).
+
+schemaVersion: v1
+frozenAt: "2026-09-14"
+frozenByCard: CC-105
+
+# Ranqueada solo/duo, Summoner's Rift (docs/evaluation.md).
+queue: 420
+map: 11
+
+# Avaliada primeiro, conforme o plano do card. Escolhida por ser a role com
+# a maior concentração observada de campeões recorrentes na amostra real.
+role: BOTTOM
+
+# Os 3 campeões com maior cobertura real observada em BOTTOM, dentro da
+# janela de patches abaixo (não da amostra bruta inteira — ver "patches").
+championIds:
+  - 145 # 18 partidas observadas na janela
+  - 51 # 14 partidas observadas na janela
+  - 81 # 12 partidas observadas na janela
+
+# Os dois patches minor adjacentes com maior volume real na amostra bruta
+# (que cobre 15 patches distintos ao longo de mais de um ano — misturar
+# todos introduziria inconsistência de balanceamento entre patches
+# distantes, por isso a cobertura de campeões foi restrita a esta janela).
+patches:
+  - gamePatch: "16.16"
+    fullGameVersion: "16.16.804.9184"
+    dataDragonVersion: "16.16.1"
+    matchesObserved: 17
+  - gamePatch: "16.17"
+    fullGameVersion: "16.17.810.4348"
+    dataDragonVersion: "16.17.1"
+    matchesObserved: 46
+
+# Correspondência patch de jogo -> versão do Data Dragon (catálogo), real e
+# confirmada em ddragon.leagueoflegends.com/api/versions.json (14/09/2026) —
+# não presumida. A sincronização completa do catálogo (itens/preços/receitas
+# reais) é entrega do CC-202; este card só registra a correspondência.
+
+coverage:
+  totalMatchesAudited: 122
+  matchesInPatchWindow: 63
+  championMatchesInWindowByRole:
+    BOTTOM:
+      "145": 18
+      "51": 14
+      "81": 12
+
+# Metodologia e limites da amostra — obrigatório citar sempre que este
+# recorte for referenciado (docs/evaluation.md, relatórios, apresentação).
+sampleMethodology:
+  type: convenience_sample
+  accountsAudited: 5
+  description: >-
+    Amostra de conveniência: o operador do projeto e 4 amigos que deram
+    permissão explícita para auditar suas próprias partidas concluídas via
+    API oficial da Riot. Não é uma amostra aleatória da população de
+    jogadores BR1 — reflete o grupo social e a faixa de habilidade dessas 5
+    pessoas específicas, não a população geral.
+  limitations:
+    - >-
+      Viés de seleção real por grupo social/faixa de habilidade; volume
+      adicional dentro do mesmo grupo de 5 contas não resolve isso.
+    - >-
+      Não equivale a amostra suficiente para treinar o modelo de ranking
+      (CC-401 em diante exige uma amostra muito maior, da ordem de milhares
+      de partidas, conforme docs/evaluation.md) nem a evidência científica
+      de eficácia do produto.
+    - >-
+      Cobertura de campeão calculada só dentro da janela de patches acima;
+      fora dela a amostra bruta cobre 15 patches distintos, não usados
+      diretamente por inconsistência de balanceamento entre patches
+      distantes no tempo.
+    - >-
+      Recorte deve ser reavaliado quando uma amostra mais ampla e menos
+      enviesada estiver disponível — decisão de produto futura, fora do
+      escopo do CC-105.
+
+# O limiar de suporte/abstenção do ranker contextual ({20, 50, 100} exemplos
+# citado em docs/evaluation.md) é um mecanismo separado e posterior
+# (CC-402/CC-403), sobre o modelo já treinado — não é o critério usado para
+# congelar este recorte, e não deve ser confundido com ele.
