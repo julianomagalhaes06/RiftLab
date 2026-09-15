@@ -26,6 +26,15 @@ ACTIVE_IMPORT_JOB_STATES: frozenset[ImportJobState] = frozenset(
     {ImportJobState.QUEUED, ImportJobState.RUNNING, ImportJobState.RETRY_WAIT}
 )
 
+# docs/architecture.md: "cinco tentativas transitórias com backoff exponencial/
+# jitter e teto 15 min". attempts conta cada vez que o job é entregue a um
+# worker (reserva fresca, retomada de RETRY_WAIT ou reclamação de lease
+# vencido) — contar a reclamação evita loop infinito num job que sempre
+# derruba o worker (CC-201).
+MAX_TRANSIENT_ATTEMPTS = 5
+LEASE_SECONDS = 120
+LEASE_HEARTBEAT_SECONDS = 30
+
 
 @dataclass(frozen=True, slots=True)
 class Match:
@@ -53,7 +62,9 @@ class Participant:
 @dataclass(frozen=True, slots=True)
 class ImportJob:
     """requested_match_id nunca tem FK obrigatória para matches: o job precede a
-    importação. match_id só é preenchido depois que a partida existe de fato."""
+    importação. match_id só é preenchido depois que a partida existe de fato.
+    lease_generation é o token de posse (CC-201): quem reservou o job guarda o
+    valor retornado e o usa em toda escrita final subsequente."""
 
     id: uuid.UUID
     requested_match_id: str
@@ -62,8 +73,10 @@ class ImportJob:
     attempts: int = 0
     match_id: str | None = None
     lease_until: datetime | None = None
+    lease_generation: int = 0
     retry_at: datetime | None = None
     error_code: str | None = None
+    retry_of_job_id: uuid.UUID | None = None
 
 
 class IngestionRepository(Protocol):
@@ -83,15 +96,65 @@ class IngestionRepository(Protocol):
         self, requested_match_id: str, mode: ImportMode
     ) -> list[ImportJob]: ...
 
+    async def get_latest_import_job(
+        self, requested_match_id: str, mode: ImportMode
+    ) -> ImportJob | None:
+        """Job mais recente (qualquer estado) para a identidade — usado por
+        POST /imports para reaproveitar um job ativo ou já SUCCEEDED sem
+        duplicar partida (CC-201)."""
+        ...
+
+    async def reserve_next_job(self, now: datetime) -> ImportJob | None:
+        """SELECT ... FOR UPDATE SKIP LOCKED numa transação curta: reserva o
+        próximo job elegível (QUEUED, RETRY_WAIT devido ou RUNNING com lease
+        vencido), incrementa lease_generation e devolve o job com o novo
+        token de posse. Jobs que já esgotaram MAX_TRANSIENT_ATTEMPTS são
+        marcados FAILED nesta mesma transação em vez de reservados de novo
+        (evita loop infinito). None se não há trabalho elegível agora."""
+        ...
+
+    async def renew_lease(self, job_id: uuid.UUID, generation: int, now: datetime) -> bool:
+        """Heartbeat: estende lease_until só se generation ainda bate (posse
+        preservada). False se a posse já mudou de mãos."""
+        ...
+
+    async def mark_import_succeeded(
+        self, job_id: uuid.UUID, generation: int, match_id: str
+    ) -> bool:
+        """Guardado por generation: um worker que perdeu a posse não pode
+        finalizar um job já reclamado por outro. False se a escrita foi
+        rejeitada (posse perdida) — o chamador nunca trata isso como erro a
+        propagar, só descarta o resultado."""
+        ...
+
+    async def mark_import_failed(self, job_id: uuid.UUID, generation: int, error_code: str) -> bool:
+        """Falha permanente (401/403/404/schema incompatível/tentativas
+        esgotadas). Guardado por generation."""
+        ...
+
+    async def mark_import_retry_wait(
+        self, job_id: uuid.UUID, generation: int, retry_at: datetime, error_code: str
+    ) -> bool:
+        """Falha transitória (timeout/5xx/429): libera a lease e agenda
+        retry_at durável, sem manter transação/rede pendente. Guardado por
+        generation."""
+        ...
+
 
 @dataclass(frozen=True, slots=True)
 class MatchParticipantSourceDTO:
     """Participante como a fonte bruta descreve, anterior à validação/persistência
-    (CC-201). Sem identidade pessoal: fontes demo não têm PUUID real algum."""
+    (CC-201). subject_hash já sai hasheado da fonte — nenhum identificador
+    pessoal bruto (PUUID/Riot ID) chega a existir neste DTO nem em qualquer
+    camada além do adapter que o calculou: fontes demo não têm PUUID real
+    algum (hash não-secreto derivado só de match_id+participant_id, dado
+    sintético); a fonte Riot usa HMAC-SHA256 com segredo local separado
+    (RIFTLAB_SUBJECT_HASH_SECRET), nunca hash simples nem chave fixa."""
 
     participant_id: int
     champion_id: int
     team: int
+    subject_hash: str
     role: str | None = None
 
 

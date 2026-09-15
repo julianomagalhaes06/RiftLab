@@ -23,8 +23,26 @@ class Settings(BaseSettings):
 
     riot_api_key: str | None = None
 
+    # HMAC (nunca hash simples/chave fixa) de PUUID em modo RIOT (CC-201): só
+    # exigido quando um job RIOT de verdade precisa persistir participantes —
+    # DEMO nunca depende disso (fixtures não tem PUUID real algum).
+    subject_hash_secret: str | None = None
+
+    # Caminho absoluto por padrao (analogo a database_url, que ja assume a
+    # rede do compose): corresponde ao WORKDIR /app da imagem runtime
+    # (backend/Dockerfile). Para dev fora de container, sobrescrever via env
+    # var — nunca calculado via Path(__file__).parents[N], que teria
+    # profundidade diferente dentro do container (COPY backend/src ./src
+    # remove o nivel "backend/" que existe no checkout do host).
+    raw_storage_dir: str = "/app/data/raw/imports"
+
     worker_heartbeat_path: str = "/tmp/riftlab-worker.heartbeat"
-    worker_heartbeat_interval_seconds: float = 10.0
+    # Toque do heartbeat: a cada ciclo do worker (reserva -> busca -> persiste
+    # um job), e a cada espera deste intervalo quando ocioso — substitui o
+    # intervalo fixo do CC-101 (worker_heartbeat_interval_seconds), agora sem
+    # uso: processar um job já toca o heartbeat, não é preciso um timer
+    # separado (CC-201).
+    worker_poll_interval_seconds: float = 2.0
 
     @property
     def demo_mode(self) -> bool:

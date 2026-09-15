@@ -30,6 +30,13 @@ _REQUIRED_MATCH_FIELDS = (
 )
 
 
+def _demo_subject_hash(match_id: str, participant_id: int) -> str:
+    """Fixtures demo não têm PUUID real algum — nada a proteger com segredo.
+    Hash não-secreto, só para ocupar o mesmo formato de identidade opaca que
+    a fonte Riot usa (subject_hash), claramente derivado de dado sintético."""
+    return hashlib.sha256(f"DEMO:{match_id}:{participant_id}".encode()).hexdigest()
+
+
 class DemoMatchSource:
     """MatchSource cujo conteúdo vem inteiramente de fixtures sintéticas
     empacotadas com o backend (mesma imagem runtime e test, sem rede). Só serve
@@ -93,6 +100,7 @@ def parse_match_source_document(match_id: str, raw_bytes: bytes) -> MatchSourceR
             participant_id=raw_participant["participantId"],
             champion_id=raw_participant["championId"],
             team=raw_participant["team"],
+            subject_hash=_demo_subject_hash(match_id, raw_participant["participantId"]),
             role=raw_participant.get("role"),
         )
         for raw_participant in document["participants"]

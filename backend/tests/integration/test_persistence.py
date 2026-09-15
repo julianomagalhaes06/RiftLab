@@ -306,14 +306,30 @@ class TestDecisionStates:
                 )
 
 
+async def _consume_queued_job(session_factory, job_id: uuid.UUID) -> None:
+    """CC-201: reserve_next_job (worker) escaneia a tabela inteira; um job
+    QUEUED deixado por um teste de persistência pura ficaria elegível para
+    qualquer teste posterior que reserve trabalho (test_import_job_lease.py,
+    test_worker_processing.py). Finaliza aqui para não vazar entre arquivos —
+    RUNNING/RETRY_WAIT criados diretamente (sem lease_until/retry_at) nunca
+    são elegíveis (comparação com NULL nunca bate em SQL), não precisam
+    disso."""
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        reserved = await repo.reserve_next_job(datetime.now(UTC))
+        assert reserved is not None and reserved.id == job_id
+        await repo.mark_import_failed(reserved.id, reserved.lease_generation, "TEST_CLEANUP")
+
+
 class TestImportJobs:
     async def test_job_created_before_match_exists(self, session_factory):
         requested_match_id = f"BR1_{uuid.uuid4().int % 10**10}"
+        job_id = uuid.uuid4()
         async with unit_of_work(session_factory) as session:
             repo = SqlAlchemyIngestionRepository(session)
             await repo.create_import_job(
                 ImportJob(
-                    id=uuid.uuid4(),
+                    id=job_id,
                     requested_match_id=requested_match_id,
                     mode=ImportMode.DEMO,
                     state=ImportJobState.QUEUED,
@@ -324,6 +340,8 @@ class TestImportJobs:
             match = await repo.get_match(requested_match_id)
         assert match is None  # job existe sem que a partida exista ainda
 
+        await _consume_queued_job(session_factory, job_id)
+
     @pytest.mark.parametrize(
         "active_state",
         [ImportJobState.QUEUED, ImportJobState.RUNNING, ImportJobState.RETRY_WAIT],
@@ -332,11 +350,12 @@ class TestImportJobs:
         self, session_factory, active_state
     ):
         requested_match_id = f"BR1_{uuid.uuid4().int % 10**10}"
+        existing_id = uuid.uuid4()
         async with unit_of_work(session_factory) as session:
             repo = SqlAlchemyIngestionRepository(session)
             await repo.create_import_job(
                 ImportJob(
-                    id=uuid.uuid4(),
+                    id=existing_id,
                     requested_match_id=requested_match_id,
                     mode=ImportMode.DEMO,
                     state=active_state,
@@ -354,6 +373,12 @@ class TestImportJobs:
                         state=ImportJobState.QUEUED,
                     )
                 )
+
+        if active_state == ImportJobState.QUEUED:
+            # RUNNING/RETRY_WAIT criados aqui sem lease_until/retry_at nunca
+            # ficam elegíveis para reserve_next_job (NULL nunca bate em
+            # comparação SQL) — só QUEUED precisa de limpeza explícita.
+            await _consume_queued_job(session_factory, existing_id)
 
     async def test_terminal_state_frees_new_attempt_and_preserves_history(self, session_factory):
         requested_match_id = f"BR1_{uuid.uuid4().int % 10**10}"
@@ -387,13 +412,17 @@ class TestImportJobs:
         assert first is not None and first.state == ImportJobState.FAILED
         assert second is not None and second.state == ImportJobState.QUEUED
 
+        await _consume_queued_job(session_factory, second_id)
+
     async def test_distinct_modes_are_separate_active_identity(self, session_factory):
         requested_match_id = f"BR1_{uuid.uuid4().int % 10**10}"
+        demo_id = uuid.uuid4()
+        riot_id = uuid.uuid4()
         async with unit_of_work(session_factory) as session:
             repo = SqlAlchemyIngestionRepository(session)
             await repo.create_import_job(
                 ImportJob(
-                    id=uuid.uuid4(),
+                    id=demo_id,
                     requested_match_id=requested_match_id,
                     mode=ImportMode.DEMO,
                     state=ImportJobState.QUEUED,
@@ -401,7 +430,7 @@ class TestImportJobs:
             )
             await repo.create_import_job(
                 ImportJob(
-                    id=uuid.uuid4(),
+                    id=riot_id,
                     requested_match_id=requested_match_id,
                     mode=ImportMode.RIOT,
                     state=ImportJobState.QUEUED,
@@ -414,6 +443,12 @@ class TestImportJobs:
             riot_jobs = await repo.list_active_import_jobs(requested_match_id, ImportMode.RIOT)
         assert len(demo_jobs) == 1
         assert len(riot_jobs) == 1
+
+        # RIOT tambem fica QUEUED (elegivel) — limpa sem deixar o worker
+        # tentar rede real por cima deste job sintetico em teste algum
+        # posterior.
+        await _consume_queued_job(session_factory, demo_id)
+        await _consume_queued_job(session_factory, riot_id)
 
 
 class TestRollback:

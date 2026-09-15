@@ -1,6 +1,144 @@
 {
   "components": {
     "schemas": {
+      "ImportJobAccepted": {
+        "additionalProperties": false,
+        "description": "202 de POST /imports: job novo ou job ativo reaproveitado.",
+        "properties": {
+          "jobId": {
+            "format": "uuid",
+            "title": "Jobid",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportJobState"
+          },
+          "statusUrl": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Statusurl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "status",
+          "statusUrl"
+        ],
+        "title": "ImportJobAccepted",
+        "type": "object"
+      },
+      "ImportJobKind": {
+        "description": "docs/contracts.md: DELETE /matches/{id} cria \"job de expurgo,\nconsultavel em /imports/{jobId} com kind=PURGE\" — import comum e o padrao\nimplicito nas demais rotas de /imports.",
+        "enum": [
+          "IMPORT",
+          "PURGE"
+        ],
+        "title": "ImportJobKind",
+        "type": "string"
+      },
+      "ImportJobState": {
+        "description": "docs/architecture.md: QUEUED -> RUNNING -> SUCCEEDED; RUNNING ->\nRETRY_WAIT -> RUNNING; RUNNING -> FAILED.",
+        "enum": [
+          "QUEUED",
+          "RUNNING",
+          "RETRY_WAIT",
+          "SUCCEEDED",
+          "FAILED"
+        ],
+        "title": "ImportJobState",
+        "type": "string"
+      },
+      "ImportJobStatus": {
+        "additionalProperties": false,
+        "description": "200 de GET /imports/{id}.",
+        "properties": {
+          "attempts": {
+            "minimum": 0.0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errorcode"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ImportJobKind",
+            "default": "IMPORT"
+          },
+          "matchId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matchid"
+          },
+          "retryAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retryat"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportJobState"
+          }
+        },
+        "required": [
+          "status",
+          "attempts"
+        ],
+        "title": "ImportJobStatus",
+        "type": "object"
+      },
+      "ImportMode": {
+        "description": "docs/contracts.md: POST /api/v1/imports {matchId, mode: RIOT ou DEMO}.",
+        "enum": [
+          "RIOT",
+          "DEMO"
+        ],
+        "title": "ImportMode",
+        "type": "string"
+      },
+      "ImportRequest": {
+        "additionalProperties": false,
+        "description": "matchId discriminado por mode (plano do CC-106): DEMO so aceita o\nformato do manifesto fechado (DEMO-dddd), RIOT so aceita o padrao BR1\nreal. Nunca libera URL, caminho ou host — o padrao de cada modo ja exclui\nqualquer caractere fora de [A-Z0-9_-].",
+        "properties": {
+          "matchId": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Matchid",
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ImportMode"
+          }
+        },
+        "required": [
+          "matchId",
+          "mode"
+        ],
+        "title": "ImportRequest",
+        "type": "object"
+      },
       "LiveStatus": {
         "properties": {
           "status": {
@@ -74,6 +212,163 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/imports": {
+      "post": {
+        "operationId": "create_import_api_v1_imports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Requisição inválida."
+          }
+        },
+        "summary": "Create Import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{job_id}": {
+      "get": {
+        "operationId": "get_import_api_v1_imports__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Job de importação não encontrado."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "job_id não é um UUID válido."
+          }
+        },
+        "summary": "Get Import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{job_id}/retry": {
+      "post": {
+        "operationId": "retry_import_route_api_v1_imports__job_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Job de importação não encontrado."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Job ainda ativo ou não está FAILED."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "job_id não é um UUID válido."
+          }
+        },
+        "summary": "Retry Import Route",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
     "/health/live": {
       "get": {
         "description": "Nunca depende do banco; processo vivo responde sempre 200.",

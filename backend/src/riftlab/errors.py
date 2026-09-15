@@ -11,6 +11,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from riftlab.observability import safe_exception_description
+from riftlab.shared.errors import ConflictError, NotFoundError
 
 logger = logging.getLogger("riftlab.api")
 
@@ -22,6 +23,7 @@ PROBLEM_MEDIA_TYPE = "application/problem+json"
 # citado literalmente no contrato de erros de dominio, mas e o generico de
 # infraestrutura ja usado desde o CC-101 para excecao nao tratada.
 DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
+IMPORT_ACTIVE = "IMPORT_ACTIVE"
 INTERNAL_ERROR = "INTERNAL_ERROR"
 RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
 VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -147,6 +149,35 @@ def register_exception_handlers(app: FastAPI) -> None:
             title=title,
             detail=detail,
             headers=exc.headers,
+        )
+
+    @app.exception_handler(NotFoundError)
+    async def not_found_error_handler(request: Request, exc: NotFoundError) -> JSONResponse:
+        # NotFoundError e generico de dominio (agregado solicitado nao existe,
+        # shared/errors.py) — mensagem interna de exc nunca repassada, mesmo
+        # racional do StarletteHTTPException (revisao CC-106).
+        return problem_response(
+            request,
+            status_code=404,
+            code=RESOURCE_NOT_FOUND,
+            title="Recurso nao encontrado",
+            detail="Recurso ou rota nao encontrados.",
+        )
+
+    @app.exception_handler(ConflictError)
+    async def conflict_error_handler(request: Request, exc: ConflictError) -> JSONResponse:
+        # Unico produtor atual de ConflictError ate a borda HTTP e o retry de
+        # import (CC-201: job alvo nao esta FAILED) — corrida na criacao do
+        # job ativo e absorvida antes, dentro de ingestion.application, nunca
+        # chega aqui. Se um cenario de conflito com outro codigo (ex.:
+        # IDEMPOTENCY_CONFLICT) precisar de um 409 diferente no futuro, este
+        # handler generico deixa de bastar — revisar entao.
+        return problem_response(
+            request,
+            status_code=409,
+            code=IMPORT_ACTIVE,
+            title="Conflito",
+            detail="A requisicao conflita com o estado atual do recurso.",
         )
 
     @app.exception_handler(Exception)

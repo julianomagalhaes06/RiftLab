@@ -1,14 +1,14 @@
 # riftlab (backend)
 
 Monólito FastAPI do RiftLab. Consulte o README público na raiz do repositório para o
-contexto do produto. Esta etapa cobre a fundação técnica (CC-101: configuração tipada,
+contexto do produto. Sprint 1 cobriu a fundação técnica (CC-101: configuração tipada,
 health checks, worker mínimo, entrypoint `cc`), a persistência inicial (CC-103:
 migrations Alembic, fronteiras de domínio/repositórios para catálogo, partidas,
 participantes, eventos, jobs de importação e estados de decisão) e o gate de contratos
 (CC-106: erro padronizado em `application/problem+json`, OpenAPI real das rotas de saúde,
-schemas Pydantic dos contratos de sprints futuras em `src/riftlab/shared/api/`, sem
-nenhuma rota nova montada). Importação real, reconstrução temporal, ranking e análises
-chegam em sprints posteriores.
+schemas Pydantic dos contratos de sprints futuras em `src/riftlab/shared/api/`). Sprint 2
+entregou o importador real (CC-201, abaixo). Reconstrução temporal, ranking e análises
+chegam em cards posteriores.
 
 ## Contratos e OpenAPI (CC-106)
 
@@ -26,6 +26,32 @@ Pydantic em `src/riftlab/shared/api/`, validados por `tests/contract/test_shared
 mas nenhum deles está montado como endpoint — ver `docs/contracts.md` para a matriz
 completa.
 
+## Importação (CC-201)
+
+```sh
+curl -X POST http://127.0.0.1:8000/api/v1/imports \
+  -H "Content-Type: application/json" -d '{"matchId":"DEMO-0001","mode":"DEMO"}'
+curl http://127.0.0.1:8000/api/v1/imports/<jobId>   # polling
+```
+
+`POST /api/v1/imports`, `GET .../{id}` e `POST .../{id}/retry` são rotas reais
+(`src/riftlab/api/routes/imports.py`). Job durável em `import_jobs`: o worker reserva
+com `SELECT ... FOR UPDATE SKIP LOCKED` (lease 120s, token de posse
+`lease_generation` — uma escrita final com generation desatualizada nunca é aplicada),
+busca a partida via `DemoMatchSource` (mode=DEMO, fixtures empacotadas) ou
+`RiotMatchSource` (mode=RIOT, Match-V5/Timeline-V5 real — só aceita
+`endOfGameResult=GameComplete`), valida e persiste match/participantes/eventos numa
+única transação atômica antes de marcar `SUCCEEDED`. Até 5 tentativas transitórias
+(timeout/5xx/429, backoff exponencial com jitter, nunca ignora `Retry-After`) antes de
+`FAILED` permanente; 401/403/404/schema incompatível falham direto, sem retry.
+
+Modo RIOT exige `RIFTLAB_RIOT_API_KEY` **e** `RIFTLAB_SUBJECT_HASH_SECRET`
+(HMAC-SHA256 do PUUID — nunca persistido bruto) configuradas no servidor; ausência de
+qualquer uma delas recusa o job antes de qualquer rede/persistência. Corpos brutos
+match+timeline ficam num armazenamento local durável
+(`src/riftlab/ingestion/infrastructure/raw_store.py`, volume `riftlab_raw_data` no
+Compose), reaproveitado sem nova rede se o worker for reiniciado.
+
 ## Migrações
 
 ```sh
@@ -35,4 +61,5 @@ uv run cc db current                # mostra a revisão atual do banco configura
 ```
 
 Requer `RIFTLAB_DATABASE_URL` apontando para um PostgreSQL real (SQLite não é
-suportado). Em produção/dev via Compose: `docker compose run --rm api cc db upgrade`.
+suportado). Em produção/dev via Compose: `docker compose run --rm api db upgrade`
+(o entrypoint da imagem já é `cc` — não repetir o nome do comando).

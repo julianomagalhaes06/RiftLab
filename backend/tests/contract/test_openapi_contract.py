@@ -20,10 +20,17 @@ def _current_schema() -> dict:
 
 
 def test_openapi_only_announces_real_routes() -> None:
-    """Rotas de sprints futuras (imports, matches, analyses, ...) sao schema-only
-    em riftlab.shared.api; nenhuma delas pode aparecer aqui."""
+    """Rotas de sprints futuras (matches, analyses, learning-attempts, ...)
+    continuam schema-only em riftlab.shared.api; nenhuma delas pode aparecer
+    aqui. imports (POST/GET/retry) passou a real no CC-201."""
     schema = _current_schema()
-    assert set(schema["paths"].keys()) == {"/health/live", "/health/ready"}
+    assert set(schema["paths"].keys()) == {
+        "/health/live",
+        "/health/ready",
+        "/api/v1/imports",
+        "/api/v1/imports/{job_id}",
+        "/api/v1/imports/{job_id}/retry",
+    }
 
 
 def test_openapi_declares_problem_detail_for_ready_503() -> None:

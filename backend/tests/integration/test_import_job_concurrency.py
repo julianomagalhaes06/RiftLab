@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 
-from riftlab.ingestion.domain import ImportJob, ImportJobState, ImportMode
+from riftlab.ingestion.domain import ImportJob, ImportJobState, ImportMode, Match
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import ConflictError
@@ -75,3 +76,28 @@ async def test_concurrent_active_job_creation_only_one_wins(session_factory):
         repo = SqlAlchemyIngestionRepository(session)
         active_jobs = await repo.list_active_import_jobs(requested_match_id, ImportMode.DEMO)
     assert len(active_jobs) == 1
+
+    # Finaliza o job vencedor: senão fica QUEUED, elegível para reserve_next_job
+    # (CC-201) em qualquer teste posterior que escaneie a tabela inteira.
+    # match_id precisa existir de fato: import_jobs.match_id tem FK real.
+    cleanup_match_id = f"BR1_{uuid.uuid4().int % 10**10}"
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        await repo.add_match(
+            Match(
+                match_id=cleanup_match_id,
+                queue=420,
+                map_id=11,
+                patch="16.17",
+                start_at=datetime.now(UTC),
+                duration_seconds=1800,
+                raw_hash="0" * 64,
+            )
+        )
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        reserved = await repo.reserve_next_job(datetime.now(UTC))
+        assert reserved is not None and reserved.id == active_jobs[0].id
+        await repo.mark_import_succeeded(
+            reserved.id, reserved.lease_generation, match_id=cleanup_match_id
+        )

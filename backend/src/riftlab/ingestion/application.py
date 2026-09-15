@@ -1,0 +1,324 @@
+"""Serviço de aplicação de imports (CC-201): orquestra transações curtas
+sobre IngestionRepository — nunca abre transação de banco durante rede
+(aqui não há rede nenhuma; quem toca rede é o worker). Camada intermediária
+entre as rotas HTTP/worker e o repositório, dona da idempotência de
+POST /imports, da precondição de retry e do ciclo reserva -> busca -> valida
+-> persiste do worker."""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import logging
+import random
+import uuid
+from datetime import UTC, datetime, timedelta
+
+import httpx
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from riftlab.config import Settings
+from riftlab.ingestion.domain import (
+    LEASE_HEARTBEAT_SECONDS,
+    ImportJob,
+    ImportJobState,
+    ImportMode,
+    Match,
+    MatchSourceResult,
+    Participant,
+)
+from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
+from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+from riftlab.ingestion.infrastructure.riot_source import RiotMatchSource
+from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
+from riftlab.ingestion.infrastructure.subject_hash import SubjectHashSecretMissingError
+from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.shared.db import unit_of_work
+from riftlab.shared.errors import (
+    ConflictError,
+    NotFoundError,
+    SourceAuthError,
+    SourceError,
+    SourceNotFoundError,
+    SourceRateLimitedError,
+    SourceSchemaError,
+)
+from riftlab.timeline.domain import TimelineEvent
+from riftlab.timeline.repository import SqlAlchemyTimelineRepository
+
+SessionFactory = async_sessionmaker[AsyncSession]
+
+logger = logging.getLogger("riftlab.worker")
+
+
+async def request_import(
+    session_factory: SessionFactory, requested_match_id: str, mode: ImportMode
+) -> ImportJob:
+    """POST /imports: idempotente. Reaproveita o job mais recente da
+    identidade se ainda ativo ou já SUCCEEDED (nunca duplica partida/job
+    ativo); cria um novo só quando o mais recente é FAILED ou não existe.
+    Duas chamadas concorrentes para uma identidade nova competem no índice
+    único parcial do banco — a perdedora nunca recebe 409: reconsulta numa
+    transação nova e devolve o job da vencedora (idempotência real de
+    POST, não só na ausência de corrida)."""
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        latest = await repo.get_latest_import_job(requested_match_id, mode)
+        if latest is not None and latest.state != ImportJobState.FAILED:
+            return latest
+
+    new_job = ImportJob(
+        id=uuid.uuid4(),
+        requested_match_id=requested_match_id,
+        mode=mode,
+        state=ImportJobState.QUEUED,
+        retry_of_job_id=latest.id if latest is not None else None,
+    )
+    try:
+        async with unit_of_work(session_factory) as session:
+            repo = SqlAlchemyIngestionRepository(session)
+            await repo.create_import_job(new_job)
+        return new_job
+    except ConflictError:
+        async with unit_of_work(session_factory) as session:
+            repo = SqlAlchemyIngestionRepository(session)
+            winner = await repo.get_latest_import_job(requested_match_id, mode)
+        if winner is None:  # pragma: no cover - defensivo, não deveria acontecer
+            raise
+        return winner
+
+
+async def get_import_job(session_factory: SessionFactory, job_id: uuid.UUID) -> ImportJob:
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        job = await repo.get_import_job(job_id)
+    if job is None:
+        raise NotFoundError(f"import job {job_id} não encontrado")
+    return job
+
+
+async def retry_import(session_factory: SessionFactory, job_id: uuid.UUID) -> ImportJob:
+    """POST /imports/{id}/retry: só permitido quando o job alvo está FAILED
+    (docs/contracts.md). Cria uma nova tentativa vinculada — histórico do job
+    anterior preservado, nunca sobrescrito. Corrida entre dois retries do
+    mesmo job (ou entre um retry e um POST /imports concorrente) é resolvida
+    do mesmo jeito que request_import: reconsulta e devolve a vencedora."""
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        target = await repo.get_import_job(job_id)
+        if target is None:
+            raise NotFoundError(f"import job {job_id} não encontrado")
+        if target.state != ImportJobState.FAILED:
+            raise ConflictError(
+                f"import job {job_id} não está FAILED (estado atual: "
+                f"{target.state.value}); retry só é permitido para jobs falhados"
+            )
+
+    new_job = ImportJob(
+        id=uuid.uuid4(),
+        requested_match_id=target.requested_match_id,
+        mode=target.mode,
+        state=ImportJobState.QUEUED,
+        retry_of_job_id=target.id,
+    )
+    try:
+        async with unit_of_work(session_factory) as session:
+            repo = SqlAlchemyIngestionRepository(session)
+            await repo.create_import_job(new_job)
+        return new_job
+    except ConflictError:
+        async with unit_of_work(session_factory) as session:
+            repo = SqlAlchemyIngestionRepository(session)
+            winner = await repo.get_latest_import_job(target.requested_match_id, target.mode)
+        if winner is None:  # pragma: no cover - defensivo, não deveria acontecer
+            raise
+        return winner
+
+
+# ---------------------------------------------------------------------------
+# Worker: reserva -> busca (fora de transação) -> valida -> persiste
+# ---------------------------------------------------------------------------
+
+_MAX_RETRY_DELAY_SECONDS = 15 * 60  # docs/architecture.md: "teto 15 min"
+
+
+class _LeaseLostDuringPersistError(Exception):
+    """Levantada dentro da própria transação de persistência quando
+    mark_import_succeeded devolve False (posse perdida entre a reserva e a
+    finalização) — força rollback de match/participantes/eventos junto,
+    nunca deixando dado persistido sem o job correspondente em SUCCEEDED
+    (evitaria uma inconsistência observável: FAILED com a partida já
+    existindo). Quem reclamou o lease refaz o trabalho — reaproveitando o
+    armazenamento bruto durável, sem nova rede."""
+
+
+def _transient_retry_delay(attempts: int, retry_after_seconds: float | None) -> float:
+    """Backoff exponencial com jitter, teto 15 min (docs/architecture.md).
+    Retry-After do servidor nunca é reduzido para caber no backoff — o maior
+    dos dois vence, mesmo que isso ultrapasse o teto local."""
+    backoff = min(_MAX_RETRY_DELAY_SECONDS, (2 ** max(attempts, 1)) + random.uniform(0, 1))
+    if retry_after_seconds is not None:
+        return max(backoff, retry_after_seconds)
+    return backoff
+
+
+async def _renew_lease_periodically(
+    session_factory: SessionFactory, job_id: uuid.UUID, generation: int
+) -> None:
+    """Heartbeat durante I/O (docs/architecture.md: 30s) — mantém a posse
+    viva enquanto o worker busca/valida a fonte. Cancelada pelo chamador
+    assim que a busca termina, sucesso ou falha."""
+    while True:
+        await asyncio.sleep(LEASE_HEARTBEAT_SECONDS)
+        async with unit_of_work(session_factory) as session:
+            repo = SqlAlchemyIngestionRepository(session)
+            await repo.renew_lease(job_id, generation, datetime.now(UTC))
+
+
+async def _load_from_source(
+    job: ImportJob, raw_store: DurableRawMatchStore, settings: Settings
+) -> MatchSourceResult:
+    if job.mode == ImportMode.DEMO:
+        return await DemoMatchSource().load_match(job.requested_match_id)
+
+    client = httpx.AsyncClient(follow_redirects=False)
+    try:
+        transport = RiotHttpTransport(
+            api_key=settings.riot_api_key or "",
+            # max_attempts_per_request=1: o job é o único dono do retry
+            # transitório (ver módulo riot_source) — nenhum sleep/retry em
+            # memória aqui, o erro surge imediato para retry_at durável.
+            budget=RiotFetchBudget(
+                max_matches=1,
+                max_requests=10,
+                max_attempts_per_request=1,
+                max_total_seconds=30.0,
+            ),
+            client=client,
+        )
+        source = RiotMatchSource(transport, raw_store, settings.subject_hash_secret)
+        return await source.load_match(job.requested_match_id)
+    finally:
+        await client.aclose()
+
+
+async def _finalize_failed(
+    session_factory: SessionFactory, job: ImportJob, error_code: str
+) -> None:
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        await repo.mark_import_failed(job.id, job.lease_generation, error_code)
+
+
+async def _finalize_retry_wait(
+    session_factory: SessionFactory,
+    job: ImportJob,
+    error_code: str,
+    retry_after_seconds: float | None,
+) -> None:
+    retry_at = datetime.now(UTC) + timedelta(
+        seconds=_transient_retry_delay(job.attempts, retry_after_seconds)
+    )
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        await repo.mark_import_retry_wait(job.id, job.lease_generation, retry_at, error_code)
+
+
+async def _persist_result(
+    session_factory: SessionFactory, job: ImportJob, result: MatchSourceResult
+) -> None:
+    """Transação única e curta: match+participantes+eventos+SUCCEEDED juntos,
+    ou nada (docs/architecture.md, plano do CC-201: "falha parcial não libera
+    partida"). existing != None é a recuperação idempotente depois de um
+    crash anterior a este ponto (match já persistido por uma execução
+    passada, raw_store já tinha os bytes — sem nova rede); nunca re-insere."""
+    async with unit_of_work(session_factory) as session:
+        ingestion_repo = SqlAlchemyIngestionRepository(session)
+        timeline_repo = SqlAlchemyTimelineRepository(session)
+
+        existing = await ingestion_repo.get_match(result.match_id)
+        if existing is None:
+            await ingestion_repo.add_match(
+                Match(
+                    match_id=result.match_id,
+                    queue=result.queue,
+                    map_id=result.map_id,
+                    patch=result.patch,
+                    start_at=result.start_at,
+                    duration_seconds=result.duration_seconds,
+                    raw_hash=result.raw_hash,
+                )
+            )
+            # CC-103 (docs/domain-model.md): sem relationship() do ORM, o
+            # flush explícito entre agregados garante a ordem de INSERT que
+            # as FKs exigem.
+            await session.flush()
+            for participant in result.participants:
+                await ingestion_repo.add_participant(
+                    Participant(
+                        match_id=result.match_id,
+                        participant_id=participant.participant_id,
+                        champion_id=participant.champion_id,
+                        team=participant.team,
+                        subject_hash=participant.subject_hash,
+                        role=participant.role,
+                    )
+                )
+            for event in result.events:
+                await timeline_repo.add_event(
+                    TimelineEvent(
+                        match_id=result.match_id,
+                        source_index=event.source_index,
+                        timestamp_ms=event.timestamp_ms,
+                        type=event.type,
+                        payload=event.payload,
+                    )
+                )
+            await session.flush()
+
+        ok = await ingestion_repo.mark_import_succeeded(
+            job.id, job.lease_generation, result.match_id
+        )
+        if not ok:
+            raise _LeaseLostDuringPersistError(f"posse do job {job.id} perdida antes de finalizar")
+
+
+async def process_next_job(
+    session_factory: SessionFactory, raw_store: DurableRawMatchStore, settings: Settings
+) -> bool:
+    """Um ciclo do worker. True se um job foi processado (mesmo que tenha
+    falhado) — o chamador não espera antes de tentar o próximo; False se não
+    havia trabalho elegível agora — o chamador espera o intervalo de poll."""
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        job = await repo.reserve_next_job(datetime.now(UTC))
+    if job is None:
+        return False
+
+    heartbeat_task = asyncio.create_task(
+        _renew_lease_periodically(session_factory, job.id, job.lease_generation)
+    )
+    try:
+        result = await _load_from_source(job, raw_store, settings)
+    except SubjectHashSecretMissingError:
+        await _finalize_failed(session_factory, job, "SUBJECT_HASH_SECRET_MISSING")
+        return True
+    except (SourceAuthError, SourceNotFoundError, SourceSchemaError) as exc:
+        await _finalize_failed(session_factory, job, exc.code)
+        return True
+    except SourceRateLimitedError as exc:
+        await _finalize_retry_wait(session_factory, job, exc.code, exc.retry_after_seconds)
+        return True
+    except SourceError as exc:
+        await _finalize_retry_wait(session_factory, job, exc.code, None)
+        return True
+    finally:
+        heartbeat_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await heartbeat_task
+
+    try:
+        await _persist_result(session_factory, job, result)
+    except _LeaseLostDuringPersistError:
+        logger.warning("worker perdeu a posse do job %s antes de persistir com sucesso", job.id)
+    return True

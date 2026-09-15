@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/api/v1/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Import */
+        post: operations["create_import_api_v1_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Import */
+        get: operations["get_import_api_v1_imports__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{job_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Import Route */
+        post: operations["retry_import_route_api_v1_imports__job_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -45,6 +96,70 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ImportJobAccepted
+         * @description 202 de POST /imports: job novo ou job ativo reaproveitado.
+         */
+        ImportJobAccepted: {
+            /**
+             * Jobid
+             * Format: uuid
+             */
+            jobId: string;
+            status: components["schemas"]["ImportJobState"];
+            /** Statusurl */
+            statusUrl: string;
+        };
+        /**
+         * ImportJobKind
+         * @description docs/contracts.md: DELETE /matches/{id} cria "job de expurgo,
+         *     consultavel em /imports/{jobId} com kind=PURGE" — import comum e o padrao
+         *     implicito nas demais rotas de /imports.
+         * @enum {string}
+         */
+        ImportJobKind: "IMPORT" | "PURGE";
+        /**
+         * ImportJobState
+         * @description docs/architecture.md: QUEUED -> RUNNING -> SUCCEEDED; RUNNING ->
+         *     RETRY_WAIT -> RUNNING; RUNNING -> FAILED.
+         * @enum {string}
+         */
+        ImportJobState: "QUEUED" | "RUNNING" | "RETRY_WAIT" | "SUCCEEDED" | "FAILED";
+        /**
+         * ImportJobStatus
+         * @description 200 de GET /imports/{id}.
+         */
+        ImportJobStatus: {
+            /** Attempts */
+            attempts: number;
+            /** Errorcode */
+            errorCode?: string | null;
+            /** @default IMPORT */
+            kind: components["schemas"]["ImportJobKind"];
+            /** Matchid */
+            matchId?: string | null;
+            /** Retryat */
+            retryAt?: string | null;
+            status: components["schemas"]["ImportJobState"];
+        };
+        /**
+         * ImportMode
+         * @description docs/contracts.md: POST /api/v1/imports {matchId, mode: RIOT ou DEMO}.
+         * @enum {string}
+         */
+        ImportMode: "RIOT" | "DEMO";
+        /**
+         * ImportRequest
+         * @description matchId discriminado por mode (plano do CC-106): DEMO so aceita o
+         *     formato do manifesto fechado (DEMO-dddd), RIOT so aceita o padrao BR1
+         *     real. Nunca libera URL, caminho ou host — o padrao de cada modo ja exclui
+         *     qualquer caractere fora de [A-Z0-9_-].
+         */
+        ImportRequest: {
+            /** Matchid */
+            matchId: string;
+            mode: components["schemas"]["ImportMode"];
+        };
         /** LiveStatus */
         LiveStatus: {
             /**
@@ -90,6 +205,128 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    create_import_api_v1_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobAccepted"];
+                };
+            };
+            /** @description Requisição inválida. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_import_api_v1_imports__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobStatus"];
+                };
+            };
+            /** @description Job de importação não encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description job_id não é um UUID válido. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    retry_import_route_api_v1_imports__job_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobAccepted"];
+                };
+            };
+            /** @description Job de importação não encontrado. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Job ainda ativo ou não está FAILED. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description job_id não é um UUID válido. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     live_health_live_get: {
         parameters: {
             query?: never;
