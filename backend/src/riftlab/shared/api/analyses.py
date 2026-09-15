@@ -45,8 +45,13 @@ class AnalysisVersions(CamelModel):
 
 
 class AnalysisQuality(CamelModel):
+    """frameAgeMs e None quando nao ha snapshot anterior para estimar (ex.:
+    budgetSource=UNKNOWN) — ausencia real e mascara null, nunca 0 inventado
+    (docs/domain-model.md, mesmo padrao de shared.api.matches.DecisionState).
+    Idade negativa continua rejeitada quando o valor esta presente."""
+
     budget_source: BudgetSource
-    frame_age_ms: int = Field(ge=0)
+    frame_age_ms: int | None = Field(default=None, ge=0)
     warnings: list[str] = Field(default_factory=list)
 
 

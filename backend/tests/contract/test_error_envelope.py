@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 import pytest_asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient
 
 from riftlab.errors import RESOURCE_NOT_FOUND, VALIDATION_ERROR, register_exception_handlers
@@ -19,12 +19,14 @@ from riftlab.observability import RequestIdMiddleware
 from riftlab.shared.api.imports import ImportRequest
 
 SENTINEL_SECRET = "sentinela-sql-postgresql+asyncpg://riftlab:s3nh4-nunca-real@db/riftlab"  # noqa: S105
+SENTINEL_HTTP_DETAIL = "sentinela-http-exception-detail-nao-confiavel"  # noqa: S105
 
 
 def _build_error_probe_app() -> FastAPI:
     """App FastAPI so de teste: mesmos handlers de erro da aplicacao real, mais
-    uma rota que valida corpo (422) e uma que sempre lanca (500 com segredo
-    sintetico embutido na mensagem, para provar que nunca vaza)."""
+    rotas que provocam cada caminho de erro (422 corpo invalido, 500 com
+    segredo sintetico embutido na mensagem, 400 com HTTPException.detail
+    nao confiavel), para provar que nenhum deles vaza no corpo/headers."""
     app = FastAPI()
     app.add_middleware(RequestIdMiddleware)
     register_exception_handlers(app)
@@ -36,6 +38,12 @@ def _build_error_probe_app() -> FastAPI:
     @app.get("/__test__/boom")
     async def _boom() -> None:
         raise RuntimeError(f"falha interna com segredo sintetico: {SENTINEL_SECRET}")
+
+    @app.get("/__test__/http-error")
+    async def _http_error() -> None:
+        # simula rota futura que lanca HTTPException com detail nao confiavel
+        # (ex.: interpolando um valor recebido do cliente sem querer).
+        raise HTTPException(status_code=400, detail=SENTINEL_HTTP_DETAIL)
 
     return app
 
@@ -111,6 +119,24 @@ async def test_missing_required_field_returns_problem_json_422(error_probe_clien
     assert body["code"] == VALIDATION_ERROR
 
 
+async def test_unknown_field_name_is_redacted_in_validation_log(error_probe_client, caplog):
+    """ImportRequest (CamelModel: extra="forbid") rejeita campo desconhecido; o
+    erro extra_forbidden do pydantic ecoa a propria chave enviada pelo cliente
+    em loc[-1] — nunca a chave literal no log, so um marcador (revisao
+    CC-106)."""
+    sensitive_field_name = "sentinela-nome-de-campo-nao-deve-vazar-no-log"
+    with caplog.at_level("WARNING", logger="riftlab.api"):
+        response = await error_probe_client.post(
+            "/__test__/imports",
+            json={"matchId": "DEMO-0001", "mode": "DEMO", sensitive_field_name: "x"},
+        )
+
+    assert response.status_code == 422
+    log_text = "\n".join(record.getMessage() for record in caplog.records)
+    assert sensitive_field_name not in log_text
+    assert "<campo-desconhecido>" in log_text
+
+
 async def test_unhandled_exception_returns_generic_500_without_leaking_secret(
     error_probe_client,
 ):
@@ -130,3 +156,39 @@ async def test_unhandled_exception_returns_generic_500_without_leaking_secret(
     assert "RuntimeError" not in response.text
     for header_value in response.headers.values():
         assert SENTINEL_SECRET not in header_value
+
+
+async def test_http_exception_detail_is_never_echoed_to_client(error_probe_client):
+    """exc.detail e texto livre de quem lanca a excecao — nunca confiavel para
+    o corpo publico (revisao CC-106). Titulo/detalhe vem de um mapa fechado
+    por status_code, nao do detail arbitrario da excecao."""
+    response = await error_probe_client.get("/__test__/http-error")
+
+    assert response.status_code == 400
+    assert response.headers["content-type"].startswith("application/problem+json")
+    body = response.json()
+    assert set(body.keys()) == {"type", "title", "status", "code", "detail", "requestId"}
+    assert SENTINEL_HTTP_DETAIL not in response.text
+    for header_value in response.headers.values():
+        assert SENTINEL_HTTP_DETAIL not in header_value
+
+
+async def test_method_not_allowed_preserves_allow_header_without_leaking_detail() -> None:
+    """Starlette anexa Allow via HTTPException.headers num 405 real de rota —
+    cabecalho de protocolo preservado mesmo substituindo o corpo padrao pelo
+    problem+json (revisao CC-106)."""
+    app = FastAPI()
+    app.add_middleware(RequestIdMiddleware)
+    register_exception_handlers(app)
+
+    @app.get("/__test__/only-get")
+    async def _only_get() -> dict[str, str]:
+        return {}
+
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/__test__/only-get")
+
+    assert response.status_code == 405
+    assert response.headers.get("allow") == "GET"
+    assert response.headers["content-type"].startswith("application/problem+json")

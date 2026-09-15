@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -8,6 +9,8 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+
+from riftlab.observability import safe_exception_description
 
 logger = logging.getLogger("riftlab.api")
 
@@ -22,6 +25,32 @@ DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
 INTERNAL_ERROR = "INTERNAL_ERROR"
 RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
 VALIDATION_ERROR = "VALIDATION_ERROR"
+
+# exc.detail de um StarletteHTTPException/HTTPException e texto livre definido
+# por quem lanca a excecao (nosso codigo, dependencia ou o proprio Starlette) —
+# nunca confiavel para o corpo publico, pois codigo de rota futuro pode
+# involuntariamente colocar entrada do cliente ali (revisao CC-106). titulo e
+# detalhe vem so deste mapa fechado por status_code; status nao mapeado cai no
+# fallback generico, nunca ecoando exc.detail.
+_KNOWN_HTTP_PROBLEM_TEXT: dict[int, tuple[str, str]] = {
+    400: ("Requisicao invalida", "A requisicao nao pode ser processada."),
+    404: ("Recurso nao encontrado", "Recurso ou rota nao encontrados."),
+    405: ("Metodo nao permitido", "Metodo HTTP nao suportado para esta rota."),
+    409: ("Conflito", "A requisicao conflita com o estado atual do recurso."),
+}
+_DEFAULT_HTTP_PROBLEM_TITLE = "Erro na requisicao"
+_DEFAULT_HTTP_PROBLEM_DETAIL = "A requisicao nao pode ser atendida."
+
+# error["type"] do pydantic cujo loc pode conter um segmento escolhido pelo
+# cliente (nao um nome de campo do nosso schema): extra_forbidden ecoa a
+# propria chave desconhecida enviada no payload em loc[-1]. Nunca logar esse
+# segmento textualmente (revisao CC-106); os demais tipos de erro atuais do
+# projeto so tem nomes de campo do proprio schema em loc (nenhum schema em
+# shared/api/ tem dict[str, <tipo estrito>] hoje — so dict[str, Any], que nunca
+# falha por chave). Se um schema futuro adicionar um dict de chave estrita,
+# revisar este conjunto.
+_CLIENT_CONTROLLED_LOC_ERROR_TYPES = frozenset({"extra_forbidden"})
+_REDACTED_LOC_SEGMENT = "<campo-desconhecido>"
 
 
 class ProblemDetail(BaseModel):
@@ -40,9 +69,12 @@ def problem_response(
     code: str,
     title: str,
     detail: str,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     """Monta erro application/problem+json sem DSN, SQL, stack trace ou segredo,
-    conforme docs/contracts.md."""
+    conforme docs/contracts.md. headers e so para cabecalhos de protocolo
+    conhecidos (ex.: Allow em 405) que o proprio Starlette anexa a
+    HTTPException — nunca texto controlado pelo cliente (revisao CC-106)."""
     request_id = getattr(request.state, "request_id", "-")
     problem = ProblemDetail(
         type=f"https://riftlab.local/problems/{code.lower()}",
@@ -56,6 +88,7 @@ def problem_response(
         status_code=status_code,
         content=problem.model_dump(),
         media_type=PROBLEM_MEDIA_TYPE,
+        headers=dict(headers) if headers else None,
     )
 
 
@@ -72,12 +105,16 @@ def register_exception_handlers(app: FastAPI) -> None:
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
         # exc.errors() inclui o valor bruto submetido ("input"); nunca repassar
-        # ao cliente nem logar campo a campo com esse valor — so o local (loc)
-        # e o tipo do erro (codigo estavel do pydantic) sao seguros.
-        field_locations = [
-            ".".join(str(part) for part in error["loc"] if part not in ("body", "query", "path"))
-            for error in exc.errors()
-        ]
+        # ao cliente nem logar campo a campo com esse valor. loc tambem nao e
+        # sempre seguro para ecoar: em extra_forbidden, loc[-1] e a propria
+        # chave desconhecida enviada pelo cliente, nao um nome do nosso schema
+        # (revisao CC-106) — redigido antes de logar.
+        field_locations = []
+        for error in exc.errors():
+            parts = [str(part) for part in error["loc"] if part not in ("body", "query", "path")]
+            if error["type"] in _CLIENT_CONTROLLED_LOC_ERROR_TYPES and parts:
+                parts[-1] = _REDACTED_LOC_SEGMENT
+            field_locations.append(".".join(parts))
         logger.warning(
             "validacao de requisicao falhou campos=%s tipos=%s",
             field_locations,
@@ -95,23 +132,30 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        # exc.detail nunca e repassado ao cliente: e texto livre de quem lanca
+        # a excecao (rota futura pode colocar entrada do usuario ali sem
+        # querer) — so titulo/detalhe deste mapa fechado por status_code, com
+        # fallback generico (revisao CC-106).
         code = RESOURCE_NOT_FOUND if exc.status_code == 404 else f"HTTP_{exc.status_code}"
-        detail = (
-            exc.detail
-            if isinstance(exc.detail, str) and exc.detail
-            else "Recurso ou rota nao encontrados."
+        title, detail = _KNOWN_HTTP_PROBLEM_TEXT.get(
+            exc.status_code, (_DEFAULT_HTTP_PROBLEM_TITLE, _DEFAULT_HTTP_PROBLEM_DETAIL)
         )
         return problem_response(
             request,
             status_code=exc.status_code,
             code=code,
-            title="Erro na requisicao",
+            title=title,
             detail=detail,
+            headers=exc.headers,
         )
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("erro nao tratado")
+        # logger.exception()/exc_info=True anexaria a excecao original inteira
+        # ao LogRecord, visivel a qualquer handler que a formate (nao so o
+        # nosso _JsonLogFormatter) — descricao ja sanitizada antes de logar
+        # (revisao CC-106; ver riftlab.observability.safe_exception_description).
+        logger.error("erro nao tratado detalhe=%s", safe_exception_description(exc))
         return problem_response(
             request,
             status_code=500,

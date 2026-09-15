@@ -223,6 +223,21 @@ def test_analysis_result_without_evidence_requires_reason_codes() -> None:
 
 
 # ---------------------------------------------------------------------------
+# AnalysisQuality.frameAgeMs: null e mascara de ausencia, nao 0 (revisao CC-106)
+# ---------------------------------------------------------------------------
+
+
+def test_analysis_quality_accepts_null_frame_age_when_budget_source_unknown() -> None:
+    quality = AnalysisQuality(budget_source=BudgetSource.UNKNOWN, frame_age_ms=None)
+    assert quality.frame_age_ms is None
+
+
+def test_analysis_quality_rejects_negative_frame_age() -> None:
+    with pytest.raises(ValidationError):
+        AnalysisQuality(budget_source=BudgetSource.FRAME_ESTIMATE, frame_age_ms=-1)
+
+
+# ---------------------------------------------------------------------------
 # Feedback: grade 0..3 ou null
 # ---------------------------------------------------------------------------
 
