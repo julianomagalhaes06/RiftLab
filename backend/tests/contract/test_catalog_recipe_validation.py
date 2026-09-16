@@ -99,3 +99,20 @@ def test_validate_item_types_and_limits_rejects_component_quantity_as_bool() -> 
 def test_validate_item_types_and_limits_accepts_valid_catalog() -> None:
     items = (_item(1), _item(2, recipe=[{"itemId": 1, "quantity": 3}]))
     validate_item_types_and_limits(items)  # não levanta
+
+
+def test_validate_item_types_and_limits_rejects_recipe_entry_that_is_not_a_dict() -> None:
+    """Achado real da revisão: um CatalogItemSourceDTO malformado com
+    recipe=["not-a-dict"] levantava AttributeError cru em component.get()
+    antes desta checagem explícita."""
+    items = (_item(1, recipe=["not-a-dict"]),)  # type: ignore[list-item]
+    with pytest.raises(SourceSchemaError) as excinfo:
+        validate_item_types_and_limits(items)
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"
+
+
+def test_validate_recipe_graph_rejects_recipe_entry_that_is_not_a_dict() -> None:
+    items = (_item(1), _item(2, recipe=["not-a-dict"]))  # type: ignore[list-item]
+    with pytest.raises(SourceSchemaError) as excinfo:
+        validate_recipe_graph(items)
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"

@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riftlab.catalog.domain import CatalogVersion, ExcludedCatalogItem, Item
-from riftlab.catalog.models import CatalogExcludedItemModel, CatalogVersionModel, ItemModel
+from riftlab.catalog.models import (
+    CatalogExcludedItemModel,
+    CatalogIdentityModel,
+    CatalogVersionModel,
+    ItemModel,
+)
 from riftlab.shared.errors import ConflictError, NotFoundError
 
 
@@ -28,7 +34,6 @@ class SqlAlchemyCatalogRepository:
                 mapping_version=catalog.mapping_version,
                 raw_hash=catalog.raw_hash,
                 curation_rules_version=catalog.curation_rules_version,
-                is_canonical=False,  # mark_canonical() decide isso explicitamente depois
             )
         )
         try:
@@ -102,36 +107,62 @@ class SqlAlchemyCatalogRepository:
     async def find_canonical_catalog_version(
         self, game_patch: str, data_dragon_version: str, mapping_version: str
     ) -> CatalogVersion | None:
-        stmt = select(CatalogVersionModel).where(
-            CatalogVersionModel.game_patch == game_patch,
-            CatalogVersionModel.data_dragon_version == data_dragon_version,
-            CatalogVersionModel.mapping_version == mapping_version,
-            CatalogVersionModel.is_canonical.is_(True),
+        identity = await self._session.get(
+            CatalogIdentityModel,
+            {
+                "game_patch": game_patch,
+                "data_dragon_version": data_dragon_version,
+                "mapping_version": mapping_version,
+            },
         )
-        result = await self._session.execute(stmt)
-        row = result.scalars().first()
-        return _catalog_version_from_row(row) if row is not None else None
+        if identity is None or identity.canonical_catalog_id is None:
+            return None
+        return await self.get_catalog_version(identity.canonical_catalog_id)
 
     async def mark_canonical(self, catalog_id: uuid.UUID) -> None:
         row = await self._session.get(CatalogVersionModel, catalog_id)
         if row is None:
             raise NotFoundError(f"catalog_version {catalog_id} não encontrado")
-        # Desmarca qualquer OUTRA linha da mesma identidade primeiro — o
-        # índice único parcial (revisão CC-202) não é deferido, então nunca
-        # pode haver duas linhas simultaneamente canônicas nem por um
-        # instante dentro desta transação; a ordem aqui garante isso.
+
+        # Upsert idempotente da linha de identidade — existe (via
+        # ON CONFLICT DO NOTHING, nunca levanta se outra transação
+        # concorrente já criou a mesma linha) mesmo antes de qualquer
+        # catalog_versions existir para ela (revisão complementar CC-202:
+        # sem isto, duas sincronizações concorrentes de uma identidade nova
+        # não tinham nenhuma linha estável para travar).
         await self._session.execute(
-            update(CatalogVersionModel)
-            .where(
-                CatalogVersionModel.game_patch == row.game_patch,
-                CatalogVersionModel.data_dragon_version == row.data_dragon_version,
-                CatalogVersionModel.mapping_version == row.mapping_version,
-                CatalogVersionModel.id != catalog_id,
-                CatalogVersionModel.is_canonical.is_(True),
+            pg_insert(CatalogIdentityModel)
+            .values(
+                game_patch=row.game_patch,
+                data_dragon_version=row.data_dragon_version,
+                mapping_version=row.mapping_version,
+                canonical_catalog_id=None,
             )
-            .values(is_canonical=False)
+            .on_conflict_do_nothing(
+                index_elements=["game_patch", "data_dragon_version", "mapping_version"]
+            )
         )
-        row.is_canonical = True
+
+        # SELECT ... FOR UPDATE trava a linha de identidade — serializa de
+        # verdade toda promoção concorrente para a mesma identidade. A
+        # segunda transação concorrente bloqueia aqui até a primeira
+        # commitar (nunca um erro de índice bruto), então prossegue e
+        # decide deterministicamente: última transação a commitar depois de
+        # obter o lock vence, sem perder o conteúdo de nenhuma das duas
+        # sincronizações (catalog_versions já foi inserido antes, em
+        # nenhum momento é revertido por causa desta promoção).
+        stmt = (
+            select(CatalogIdentityModel)
+            .where(
+                CatalogIdentityModel.game_patch == row.game_patch,
+                CatalogIdentityModel.data_dragon_version == row.data_dragon_version,
+                CatalogIdentityModel.mapping_version == row.mapping_version,
+            )
+            .with_for_update()
+        )
+        result = await self._session.execute(stmt)
+        identity = result.scalar_one()
+        identity.canonical_catalog_id = catalog_id
         await self._session.flush()
 
 
@@ -144,5 +175,4 @@ def _catalog_version_from_row(row: CatalogVersionModel) -> CatalogVersion:
         mapping_version=row.mapping_version,
         raw_hash=row.raw_hash,
         curation_rules_version=row.curation_rules_version,
-        is_canonical=row.is_canonical,
     )

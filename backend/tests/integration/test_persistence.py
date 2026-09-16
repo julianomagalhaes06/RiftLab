@@ -503,7 +503,7 @@ class TestIndexes:
             "ix_timeline_events_match_ts",
             "ix_decision_states_match_participant",
             "uq_catalog_versions_sha256",
-            "ux_catalog_versions_canonical_identity",
+            "pk_catalog_identities",
         }
         async with session_factory() as session:
             result = await session.execute(

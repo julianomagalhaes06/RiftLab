@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from unittest import mock
 
 import pytest
 
@@ -352,3 +353,151 @@ async def test_concurrent_sync_catalog_service_calls_same_content_converge(
         repo = SqlAlchemyCatalogRepository(session)
         item = await repo.get_item(catalog_a.id, 1001)
     assert item is not None
+
+
+def _mark_canonical_barrier(n: int):
+    """Barreira real sobre SqlAlchemyCatalogRepository.mark_canonical — a
+    N-ésima chamada libera todas (mesmo padrão de
+    review_cc202_canonical_probe.py): força a janela de corrida exatamente
+    na promoção a canônico, depois que cada transação já inseriu seu
+    próprio catalog_versions (ainda não commitado)."""
+    original = SqlAlchemyCatalogRepository.mark_canonical
+    arrived = 0
+    released = asyncio.Event()
+
+    async def paused(self: SqlAlchemyCatalogRepository, catalog_id: uuid.UUID) -> None:
+        nonlocal arrived
+        arrived += 1
+        if arrived >= n:
+            released.set()
+        await asyncio.wait_for(released.wait(), timeout=5)
+        await original(self, catalog_id)
+
+    return paused
+
+
+async def test_concurrent_sync_different_content_new_identity_preserves_both(
+    session_factory,
+) -> None:
+    """Achado real da revisão complementar (review_cc202_canonical_probe.py):
+    duas sync_catalog reais e concorrentes para uma identidade NOVA (sem
+    nenhuma linha catalog_versions/catalog_identities ainda existente),
+    conteúdos DIFERENTES, barreira imediatamente antes de mark_canonical —
+    ambas as transações já tinham inserido seu próprio catalog_versions
+    (não commitado) quando a promoção a canônico corria. Antes da correção,
+    a perdedora recebia IntegrityError bruto do índice único sobre
+    catalog_versions e perdia o conteúdo que tinha acabado de inserir.
+    Depois da correção (lock de linha em catalog_identities), as duas
+    sempre têm sucesso, nenhuma exceção, nenhuma perda de conteúdo — só uma
+    vira canônica."""
+    identity = "concurrent-new-" + uuid.uuid4().hex
+    source_a = _FakeCatalogSource(
+        _result(
+            game_patch=identity,
+            raw_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+            price=100,
+            mapping_version=identity,
+        )
+    )
+    source_b = _FakeCatalogSource(
+        _result(
+            game_patch=identity,
+            raw_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+            price=200,
+            mapping_version=identity,
+        )
+    )
+
+    paused = _mark_canonical_barrier(2)
+    with mock.patch.object(SqlAlchemyCatalogRepository, "mark_canonical", paused):
+        catalog_a, catalog_b = await asyncio.wait_for(
+            asyncio.gather(
+                sync_catalog(session_factory, source_a, identity),
+                sync_catalog(session_factory, source_b, identity),
+            ),
+            timeout=15,
+        )
+
+    assert catalog_a.id != catalog_b.id  # conteúdo diferente, identidades diferentes
+
+    # mapping_version dos dois é `identity` (ver _result), não um mapping
+    # YAML separado — consulta a mesma identidade lógica diretamente pelo
+    # repositório, sem risco de descasamento entre o mapping construído no
+    # teste e o mapping_version realmente usado pelo sync.
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        resolved = await repo.find_canonical_catalog_version(identity, "16.17.1", identity)
+    assert resolved is not None
+    assert resolved.id in (catalog_a.id, catalog_b.id)  # exatamente uma virou canônica
+
+    # As duas continuam consultáveis por ID exato, com o preço próprio
+    # intacto — nenhuma perdeu conteúdo por causa da corrida na promoção.
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        item_a = await repo.get_item(catalog_a.id, 1001)
+        item_b = await repo.get_item(catalog_b.id, 1001)
+    assert item_a is not None and item_a.price == 100
+    assert item_b is not None and item_b.price == 200
+
+
+async def test_concurrent_sync_different_content_switches_existing_canonical(
+    session_factory,
+) -> None:
+    """Mesma corrida do teste acima, mas para uma identidade que JÁ tem um
+    canônico estabelecido (linha catalog_identities já existe) — prova que
+    o lock de linha serializa corretamente também neste caso, não só na
+    criação sem linha prévia."""
+    identity = "concurrent-switch-" + uuid.uuid4().hex
+    first_source = _FakeCatalogSource(
+        _result(
+            game_patch=identity,
+            raw_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+            price=1,
+            mapping_version=identity,
+        )
+    )
+    first_catalog = await sync_catalog(session_factory, first_source, identity)
+
+    source_a = _FakeCatalogSource(
+        _result(
+            game_patch=identity,
+            raw_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+            price=300,
+            mapping_version=identity,
+        )
+    )
+    source_b = _FakeCatalogSource(
+        _result(
+            game_patch=identity,
+            raw_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+            price=400,
+            mapping_version=identity,
+        )
+    )
+
+    paused = _mark_canonical_barrier(2)
+    with mock.patch.object(SqlAlchemyCatalogRepository, "mark_canonical", paused):
+        catalog_a, catalog_b = await asyncio.wait_for(
+            asyncio.gather(
+                sync_catalog(session_factory, source_a, identity),
+                sync_catalog(session_factory, source_b, identity),
+            ),
+            timeout=15,
+        )
+
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        resolved = await repo.find_canonical_catalog_version(identity, "16.17.1", identity)
+    assert resolved is not None
+    assert resolved.id in (catalog_a.id, catalog_b.id)  # nunca o antigo, sempre um dos novos
+
+    # O catálogo original (agora superado) continua consultável por ID
+    # exato, com seu conteúdo original intacto.
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        original_item = await repo.get_item(first_catalog.id, 1001)
+        item_a = await repo.get_item(catalog_a.id, 1001)
+        item_b = await repo.get_item(catalog_b.id, 1001)
+    assert original_item is not None and original_item.price == 1
+    assert item_a is not None and item_a.price == 300
+    assert item_b is not None and item_b.price == 400

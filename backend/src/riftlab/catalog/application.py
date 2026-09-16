@@ -124,11 +124,11 @@ async def resolve_catalog_for_match(
 ) -> CatalogVersion | None:
     """None = MISSING_CATALOG: patch sem entrada no mapping explícito (nunca
     tenta rede para adivinhar), OU coberto pelo mapping mas sem catálogo
-    canônico definido (nunca sincronizado, ou legado ambíguo de antes da
-    revisão que introduziu is_canonical). Resolução determinística: no
-    máximo uma linha pode ser canônica para (game_patch, data_dragon_version,
-    mapping_version) — índice único parcial, nunca ORDER BY created_at
-    (empate possível, escolha incidental por data)."""
+    canônico definido (nunca sincronizado, ou legado ambíguo). Resolução
+    determinística: a identidade (game_patch, data_dragon_version,
+    mapping_version) é uma linha própria (catalog_identities), nunca
+    ORDER BY created_at sobre catalog_versions (empate possível, escolha
+    incidental por data)."""
     entry = mapping.resolve(game_patch)
     if entry is None:
         return None

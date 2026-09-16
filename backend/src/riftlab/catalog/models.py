@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String, text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,19 +18,6 @@ class CatalogVersionModel(UuidPkMixin, CreatedAtMixin, Base):
         # linha; conteúdo divergente sempre gera identidade (e linha) nova,
         # nunca sobrescreve a existente.
         Index("uq_catalog_versions_sha256", "sha256", unique=True),
-        # No máximo uma linha por identidade (game_patch, data_dragon_version,
-        # mapping_version) pode ser a canônica — revisão CC-202: substitui o
-        # antigo ORDER BY created_at (empate possível, escolha incidental
-        # por data). A associação canônica é deliberada, atualizada
-        # explicitamente por mark_canonical a cada sync bem-sucedido.
-        Index(
-            "ux_catalog_versions_canonical_identity",
-            "game_patch",
-            "data_dragon_version",
-            "mapping_version",
-            unique=True,
-            postgresql_where=text("is_canonical"),
-        ),
     )
 
     game_patch: Mapped[str] = mapped_column(String, nullable=False)
@@ -42,7 +29,36 @@ class CatalogVersionModel(UuidPkMixin, CreatedAtMixin, Base):
     # possível recuperar qual fetch/curadoria gerou o catálogo.
     raw_hash: Mapped[str] = mapped_column(String, nullable=False)
     curation_rules_version: Mapped[str] = mapped_column(String, nullable=False)
-    is_canonical: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class CatalogIdentityModel(Base):
+    """Uma linha por identidade lógica (game_patch, data_dragon_version,
+    mapping_version) — chave estável que existe (via upsert idempotente)
+    ANTES de qualquer catalog_versions ser inserido para ela, ao contrário
+    de um índice único sobre catalog_versions (revisão complementar
+    CC-202: um índice único só impede duas linhas canônicas simultâneas
+    DEPOIS de ambas tentarem existir — duas sincronizações concorrentes de
+    conteúdo divergente para uma identidade nova, sem nenhuma linha
+    catalog_versions ainda visível uma para a outra, colidiam só no COMMIT,
+    e a perdedora recebia IntegrityError bruto, derrubando a transação
+    inteira e perdendo o conteúdo que tinha acabado de inserir).
+
+    canonical_catalog_id é atualizado sob um lock de linha
+    (SELECT ... FOR UPDATE) desta própria linha de identidade — serializa
+    de verdade toda promoção concorrente para a mesma identidade, nunca um
+    erro de índice: a segunda transação simplesmente espera a primeira
+    commitar, então prossegue e decide de forma determinística (última
+    transação a COMMITAR depois de obter o lock vence — mesma semântica de
+    "sync é uma ação deliberada", nunca uma corrida por ordem de chegada)."""
+
+    __tablename__ = "catalog_identities"
+
+    game_patch: Mapped[str] = mapped_column(String, primary_key=True)
+    data_dragon_version: Mapped[str] = mapped_column(String, primary_key=True)
+    mapping_version: Mapped[str] = mapped_column(String, primary_key=True)
+    canonical_catalog_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("catalog_versions.id"), nullable=True
+    )
 
 
 class ItemModel(Base):

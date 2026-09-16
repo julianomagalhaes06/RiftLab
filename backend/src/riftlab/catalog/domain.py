@@ -27,16 +27,21 @@ class CatalogVersion:
     raw_hash e curation_rules_version (revisão CC-202) são proveniência
     persistida separadamente do hash combinado — sha256 não é reversível,
     então sem esses dois campos um consumidor não teria como recuperar qual
-    fetch/curadoria gerou este catálogo. is_canonical marca, no máximo uma
-    linha por identidade (game_patch, data_dragon_version, mapping_version —
-    índice único parcial em models.py), qual sincronização é a canônica
-    para NOVAS resoluções (resolve_catalog_for_match) — uma associação
-    deliberada, atualizada explicitamente a cada sync bem-sucedido, nunca
-    "a mais recente por created_at" (que pode empatar e não é uma decisão
-    intencional). Um catalog_id já obtido por um consumidor é sempre
-    consultável por ID exato e nunca muda de conteúdo, independentemente de
-    is_canonical — só a resolução para trabalho NOVO aponta para o
-    canônico atual."""
+    fetch/curadoria gerou este catálogo.
+
+    Qual sincronização é a CANÔNICA para novas resoluções
+    (resolve_catalog_for_match) por identidade (game_patch,
+    data_dragon_version, mapping_version) não é um campo desta classe —
+    vive numa linha de identidade separada (CatalogIdentityModel,
+    models.py), serializada por lock de linha (revisão complementar: um
+    índice único sobre catalog_versions só impedia duas linhas canônicas
+    simultâneas DEPOIS de ambas tentarem existir, deixando uma corrida real
+    entre sincronizações concorrentes de conteúdo divergente para uma
+    identidade nova — a perdedora recebia erro de banco bruto e perdia o
+    conteúdo que tinha acabado de inserir). Um catalog_id já obtido por um
+    consumidor é sempre consultável por ID exato e nunca muda de conteúdo,
+    independentemente de qual linha é a canônica agora — só a resolução
+    para trabalho NOVO aponta para o canônico atual."""
 
     id: uuid.UUID
     game_patch: str
@@ -45,7 +50,6 @@ class CatalogVersion:
     mapping_version: str
     raw_hash: str
     curation_rules_version: str
-    is_canonical: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,22 +99,28 @@ class CatalogRepository(Protocol):
         """Resolução determinística partida->catálogo (CC-202, revisão): dado
         o mapping já resolvido (game_patch, data_dragon_version,
         mapping_version — os três fixados por configuração explícita, nunca
-        "latest" implícito), devolve a linha marcada is_canonical=true para
-        essa identidade exata, ou None (MISSING_CATALOG — nunca
-        sincronizado, ou legado sem canônico definido). Nunca ORDER BY
-        created_at: no máximo uma linha por identidade pode ser canônica
-        (índice único parcial em models.py), então não há empate possível
-        nem escolha incidental por data."""
+        "latest" implícito), devolve o catálogo referenciado pela linha de
+        identidade correspondente (CatalogIdentityModel.canonical_catalog_id),
+        ou None (MISSING_CATALOG — identidade nunca sincronizada, ou sem
+        canônico definido, ex.: legado ambíguo). Nunca ORDER BY created_at:
+        a identidade é uma linha própria, não uma consulta sobre
+        catalog_versions, então não há empate possível nem escolha
+        incidental por data."""
         ...
 
     async def mark_canonical(self, catalog_id: uuid.UUID) -> None:
         """Marca catalog_id como a associação canônica para sua identidade
-        (game_patch, data_dragon_version, mapping_version), desmarcando
-        qualquer outra linha da mesma identidade — ação deliberada chamada
-        ao final de todo sync bem-sucedido (revisão CC-202), nunca inferida
-        implicitamente por ordem de inserção. Nunca reescreve conteúdo de
-        item/catálogo, só a associação de qual linha é a canônica agora;
-        catalog_id antigos continuam consultáveis por ID exato, imutáveis."""
+        (game_patch, data_dragon_version, mapping_version) — ação deliberada
+        chamada ao final de todo sync bem-sucedido (revisão CC-202), nunca
+        inferida implicitamente por ordem de inserção. Serializado por lock
+        de linha na identidade (revisão complementar): duas promoções
+        concorrentes para a MESMA identidade, mesmo sem nenhuma linha
+        catalog_versions ainda visível entre si, nunca colidem com erro de
+        banco bruto — a segunda espera a primeira commitar, então decide
+        deterministicamente, sem perder o conteúdo de nenhuma das duas
+        sincronizações. Nunca reescreve conteúdo de item/catálogo, só a
+        associação de qual linha é a canônica agora; catalog_id antigos
+        continuam consultáveis por ID exato, imutáveis."""
         ...
 
 

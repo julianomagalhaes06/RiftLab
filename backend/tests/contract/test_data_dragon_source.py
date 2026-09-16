@@ -207,6 +207,43 @@ async def test_load_catalog_propagates_permanent_not_found_for_missing_version()
     assert excinfo.value.code == "DATA_DRAGON_VERSION_NOT_FOUND"
 
 
+async def test_load_catalog_rejects_body_with_divergent_version() -> None:
+    """Achado real da revisão complementar: a URL correta não prova que o
+    corpo é correto (proxy/cache/versão trocada) — o body pode declarar uma
+    version diferente da pedida mesmo respondendo 200 na URL certa."""
+    body = json.dumps({"type": "item", "version": "99.99.1", "data": {}}).encode()
+    source = _source(_handler(body=body))
+
+    with pytest.raises(SourceSchemaError) as excinfo:
+        await source.load_catalog("16.17")
+    assert excinfo.value.code == "DATA_DRAGON_VERSION_MISMATCH"
+
+
+async def test_load_catalog_rejects_body_with_missing_version_field() -> None:
+    body = json.dumps({"type": "item", "data": {}}).encode()
+    source = _source(_handler(body=body))
+
+    with pytest.raises(SourceSchemaError) as excinfo:
+        await source.load_catalog("16.17")
+    assert excinfo.value.code == "DATA_DRAGON_VERSION_MISMATCH"
+
+
+async def test_load_catalog_rejects_body_with_wrong_type_field() -> None:
+    body = json.dumps({"type": "champion", "version": "16.17.1", "data": {}}).encode()
+    source = _source(_handler(body=body))
+
+    with pytest.raises(SourceSchemaError) as excinfo:
+        await source.load_catalog("16.17")
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"
+
+
+async def test_load_catalog_accepts_body_with_matching_type_and_version() -> None:
+    """Caminho válido: type/version do corpo batendo com o pedido nunca é
+    rejeitado pela checagem nova."""
+    result = await _source(_handler()).load_catalog("16.17")
+    assert result.data_dragon_version == "16.17.1"
+
+
 async def test_load_catalog_rejects_invalid_json_body() -> None:
     source = _source(_handler(body=b"{not valid json"))
 
