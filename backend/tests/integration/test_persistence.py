@@ -21,6 +21,14 @@ from riftlab.timeline.domain import DecisionState, TimelineEvent
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 
+def _fake_sha256() -> str:
+    """CatalogVersion.sha256 é identidade de conteúdo com índice único real
+    (CC-202) — nunca um placeholder fixo repetido entre testes, senão uma
+    reexecução da suíte contra o mesmo Postgres persistente colide consigo
+    mesma (mesma lição de higiene já aplicada em CC-201)."""
+    return uuid.uuid4().hex + uuid.uuid4().hex
+
+
 def _match(match_id: str = "BR1_1000000001", **overrides: object) -> Match:
     defaults: dict[str, object] = {
         "match_id": match_id,
@@ -83,7 +91,7 @@ class TestCatalogRoundTrip:
                     id=catalog_id,
                     game_patch="14.18",
                     data_dragon_version="14.18.1",
-                    sha256="a" * 64,
+                    sha256=_fake_sha256(),
                     mapping_version="v1",
                 )
             )
@@ -117,7 +125,7 @@ class TestCatalogRoundTrip:
                         id=catalog_id,
                         game_patch=patch,
                         data_dragon_version=patch + ".1",
-                        sha256="b" * 64,
+                        sha256=_fake_sha256(),
                         mapping_version="v1",
                     )
                 )
@@ -140,7 +148,7 @@ class TestCatalogRoundTrip:
                         id=catalog_id,
                         game_patch="14.18",
                         data_dragon_version="14.18.1",
-                        sha256="c" * 64,
+                        sha256=_fake_sha256(),
                         mapping_version="v1",
                     )
                 )
@@ -464,7 +472,7 @@ class TestRollback:
                         id=catalog_id,
                         game_patch="14.18",
                         data_dragon_version="14.18.1",
-                        sha256="d" * 64,
+                        sha256=_fake_sha256(),
                         mapping_version="v1",
                     )
                 )
@@ -486,6 +494,8 @@ class TestIndexes:
             "ix_import_jobs_state_retry_at",
             "ix_timeline_events_match_ts",
             "ix_decision_states_match_participant",
+            "uq_catalog_versions_sha256",
+            "ix_catalog_versions_identity_created_at",
         }
         async with session_factory() as session:
             result = await session.execute(

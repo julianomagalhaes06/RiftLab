@@ -12,6 +12,9 @@ WORKDIR /app
 COPY backend/pyproject.toml backend/uv.lock backend/README.md backend/alembic.ini ./
 COPY backend/src ./src
 COPY backend/migrations ./migrations
+# Settings.catalog_mappings_path (CC-202) aponta para este caminho absoluto
+# em ambas as imagens (test e runtime) — mesmo racional de raw_storage_dir.
+COPY configs/catalog-mappings.yaml ./configs/catalog-mappings.yaml
 
 # ---- test: inclui dependencias de dev (pytest/ruff/mypy) e testes ----
 FROM base AS test

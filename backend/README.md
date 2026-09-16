@@ -52,6 +52,28 @@ match+timeline ficam num armazenamento local durável
 (`src/riftlab/ingestion/infrastructure/raw_store.py`, volume `riftlab_raw_data` no
 Compose), reaproveitado sem nova rede se o worker for reiniciado.
 
+## Catálogo (CC-202)
+
+```sh
+uv run cc catalog sync --mode demo --patch DEMO-1              # fixture sintética, sem rede
+uv run cc catalog sync --mode real --patch 16.17                # Data Dragon público real
+```
+
+`configs/catalog-mappings.yaml` mapeia `game_patch` real (major.minor, mesmo
+formato de `matches.patch`) para a versão do Data Dragon — um patch sem
+entrada aí recusa o sync antes de qualquer rede (`MISSING_CATALOG`), nunca
+cai para "latest". `DataDragonCatalogSource`
+(`src/riftlab/catalog/infrastructure/data_dragon_source.py`) busca
+`item.json` real do CDN público (`ddragon.leagueoflegends.com`, sem
+credencial), curadoria (`curation.py`) separa normalização de campos
+documentados (preço, receita como multiconjunto explícito, nunca um
+conjunto) de itens sem reconciliação numérica (`specialRecipe`, sem `name`,
+ou dependentes de um item excluído) — excluídos com motivo explícito, nunca
+forçados a caber no formato nem derrubando o catálogo inteiro. Sincronização
+idempotente e imutável: `catalog_versions.sha256` é a identidade de
+conteúdo (raw + mapping + curadoria); mesmo conteúdo nunca duplica linha,
+conteúdo divergente nunca sobrescreve uma versão já publicada.
+
 ## Migrações
 
 ```sh

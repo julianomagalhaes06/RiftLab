@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # remove o nivel "backend/" que existe no checkout do host).
     raw_storage_dir: str = "/app/data/raw/imports"
 
+    # Mesmo racional de raw_storage_dir (absoluto, não Path(__file__).parents[N]):
+    # o Dockerfile copia configs/catalog-mappings.yaml para este caminho, tanto
+    # na imagem runtime (worker/api) quanto na imagem test (CC-202).
+    catalog_mappings_path: str = "/app/configs/catalog-mappings.yaml"
+
     worker_heartbeat_path: str = "/tmp/riftlab-worker.heartbeat"
     # Toque do heartbeat: a cada ciclo do worker (reserva -> busca -> persiste
     # um job), e a cada espera deste intervalo quando ocioso — substitui o

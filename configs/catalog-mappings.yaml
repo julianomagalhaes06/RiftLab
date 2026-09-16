@@ -1,0 +1,35 @@
+# Mapeamento explícito gameVersion/gamePatch -> versão do Data Dragon
+# (catálogo público oficial), congelado a partir do recorte real do CC-105
+# (configs/scope.yaml). Um patch sem entrada aqui nunca recebe fallback
+# "latest": a resolução (backend/src/riftlab/catalog/infrastructure/
+# catalog_mapping.py, CC-202) devolve MISSING_CATALOG sem tentar rede.
+#
+# matches.patch (docs/domain-model.md) guarda só major.minor (ex.: "16.17");
+# o raw bruto persistido pela importação (CC-201) contém a versão completa
+# do jogo (ex.: "16.17.810.4348"), não usada aqui — a correspondência com o
+# Data Dragon é feita pelo major.minor, que já identifica o patch de forma
+# estável para o recorte deste projeto.
+#
+# Correspondência real e confirmada em
+# ddragon.leagueoflegends.com/api/versions.json (16/09/2026), mesma
+# metodologia de configs/scope.yaml (CC-105): 16.16.1 e 16.17.1 conferidos
+# como versões reais e existentes do Data Dragon nesta sessão.
+schemaVersion: v1
+
+# Muda só quando a própria regra de mapeamento é alterada deliberadamente
+# (ex.: passa a considerar patch major sem minor, ou muda a fonte da
+# correspondência) — não a cada patch novo adicionado à lista abaixo, a
+# menos que a curadoria decida um bump explícito. Entra na identidade de
+# conteúdo do catálogo persistido (CatalogVersion.sha256, CC-202): mudar
+# este valor invalida o reaproveitamento idempotente de sincronizações
+# anteriores, mesmo que o restante do mapping não tenha mudado.
+mappingVersion: v1
+
+# Só os dois patches minor adjacentes congelados em configs/scope.yaml
+# (CC-105) — ampliar esta lista para outros patches está fora do escopo do
+# CC-202 (não amplia coleta de partidas nem recorte).
+mappings:
+  "16.16":
+    dataDragonVersion: "16.16.1"
+  "16.17":
+    dataDragonVersion: "16.17.1"

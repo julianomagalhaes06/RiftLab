@@ -3,7 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 
-from riftlab.catalog.domain import CatalogItemSourceDTO, CatalogSourceResult
+from riftlab.catalog.domain import (
+    CatalogItemSourceDTO,
+    CatalogSourceResult,
+    validate_recipe_graph,
+)
 from riftlab.shared.domain import SourceOrigin
 from riftlab.shared.errors import SourceNotFoundError, SourceSchemaError
 from riftlab.shared.resources import read_package_bytes, read_package_json
@@ -13,7 +17,13 @@ SUPPORTED_SCHEMA_VERSION = "v1"
 _FIXTURES_PACKAGE = "riftlab.catalog.infrastructure.fixtures"
 _MANIFEST_NAME = "manifest.json"
 
-_REQUIRED_CATALOG_FIELDS = ("gamePatch", "dataDragonVersion", "mappingVersion", "items")
+_REQUIRED_CATALOG_FIELDS = (
+    "gamePatch",
+    "dataDragonVersion",
+    "mappingVersion",
+    "curationRulesVersion",
+    "items",
+)
 _REQUIRED_ITEM_FIELDS = ("itemId", "price")
 
 
@@ -82,12 +92,15 @@ def parse_catalog_source_document(raw_bytes: bytes) -> CatalogSourceResult:
             )
         )
 
-    return CatalogSourceResult(
+    result = CatalogSourceResult(
         game_patch=document["gamePatch"],
         origin=SourceOrigin.CURATED_DEMO,
         schema_version=schema_version,
         raw_hash=raw_hash,
         data_dragon_version=document["dataDragonVersion"],
         mapping_version=document["mappingVersion"],
+        curation_rules_version=document["curationRulesVersion"],
         items=tuple(items),
     )
+    validate_recipe_graph(result.items)
+    return result

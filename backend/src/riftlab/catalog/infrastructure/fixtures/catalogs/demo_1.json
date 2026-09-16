@@ -3,6 +3,7 @@
   "gamePatch": "DEMO-1",
   "dataDragonVersion": "demo-datadragon-1",
   "mappingVersion": "v1",
+  "curationRulesVersion": "curated_demo_v1",
   "items": [
     {
       "itemId": 100001,

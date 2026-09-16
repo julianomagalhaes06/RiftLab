@@ -50,6 +50,99 @@ riot_app = typer.Typer(
 )
 app.add_typer(riot_app, name="riot")
 
+catalog_app = typer.Typer(
+    help="Sincronização de catálogo versionado e imutável (CC-202).",
+    no_args_is_help=True,
+)
+app.add_typer(catalog_app, name="catalog")
+
+
+@catalog_app.command("sync")
+def catalog_sync(
+    mode: str = typer.Option(
+        ..., help="'demo' (fixture sintética, sem rede) ou 'real' (Data Dragon público)."
+    ),
+    patch: str = typer.Option(
+        ...,
+        help="Identificador do catálogo: id da fixture demo (ex.: DEMO-1) ou "
+        "gamePatch major.minor real (ex.: 16.17, precisa estar em "
+        "configs/catalog-mappings.yaml).",
+    ),
+    mapping_file: Path = typer.Option(
+        None,
+        help="Caminho do mapping YAML (padrão: RIFTLAB_CATALOG_MAPPINGS_PATH/"
+        "Settings.catalog_mappings_path). Só usado em --mode real.",
+    ),
+    env_file: Path = typer.Option(
+        None, help="Caminho do .env a carregar (padrão: raiz do repositório)."
+    ),
+) -> None:
+    """Busca (rede fora de transação em modo real), valida e persiste
+    catálogo+itens numa transação única. Idempotente: mesmo conteúdo
+    (raw+mapping+curadoria) nunca duplica linha, sempre devolve a mesma
+    identidade. Modo demo nunca precisa de rede nem banco configurado além
+    do já exigido para qualquer comando desta CLI."""
+    import asyncio
+
+    from riftlab.catalog.application import sync_catalog
+    from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource
+    from riftlab.cli.env_file import load_settings
+    from riftlab.db import build_engine
+    from riftlab.shared.db import build_session_factory
+    from riftlab.shared.errors import SourceError
+
+    if mode not in ("demo", "real"):
+        typer.echo(f"BLOCKED: --mode deve ser 'demo' ou 'real', recebido {mode!r}.", err=True)
+        raise typer.Exit(code=1)
+
+    settings = load_settings(env_file)
+
+    async def _run() -> None:
+        from riftlab.catalog.domain import CatalogSource
+
+        engine = build_engine(settings.database_url)
+        session_factory = build_session_factory(engine)
+        transport = None
+        try:
+            source: CatalogSource
+            if mode == "demo":
+                source = DemoCatalogSource()
+            else:
+                from riftlab.catalog.infrastructure.catalog_mapping import load_catalog_mapping
+                from riftlab.catalog.infrastructure.data_dragon_source import (
+                    DataDragonCatalogSource,
+                )
+                from riftlab.catalog.infrastructure.data_dragon_transport import (
+                    DataDragonTransport,
+                )
+
+                resolved_mapping_file = mapping_file or Path(settings.catalog_mappings_path)
+                if not resolved_mapping_file.exists():
+                    typer.echo(
+                        f"BLOCKED: mapping de catálogo não encontrado em {resolved_mapping_file}.",
+                        err=True,
+                    )
+                    raise typer.Exit(code=1)
+                mapping = load_catalog_mapping(resolved_mapping_file)
+                transport = DataDragonTransport()
+                source = DataDragonCatalogSource(transport, mapping)
+
+            result = await sync_catalog(session_factory, source, patch)
+            typer.echo(
+                f"catalogId={result.id} gamePatch={result.game_patch} "
+                f"dataDragonVersion={result.data_dragon_version} sha256={result.sha256}"
+            )
+        finally:
+            if transport is not None:
+                await transport.aclose()
+            await engine.dispose()
+
+    try:
+        asyncio.run(_run())
+    except SourceError as exc:
+        typer.echo(f"BLOCKED: {exc.code} - {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
 
 def _alembic_config() -> AlembicConfig:
     # alembic.ini fica na raiz do pacote backend; cc e alembic.ini compartilham cwd
