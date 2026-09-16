@@ -8,7 +8,8 @@ participantes, eventos, jobs de importação e estados de decisão) e o gate de 
 (CC-106: erro padronizado em `application/problem+json`, OpenAPI real das rotas de saúde,
 schemas Pydantic dos contratos de sprints futuras em `src/riftlab/shared/api/`). Sprint 2
 entregou o importador real (CC-201, abaixo). Reconstrução temporal, ranking e análises
-chegam em cards posteriores.
+Reconstrução pré-compra de inventário chegou no CC-203 (abaixo). Ranking, objetivos e
+modo Estudo chegam em cards posteriores.
 
 ## Contratos e OpenAPI (CC-106)
 
@@ -73,6 +74,33 @@ forçados a caber no formato nem derrubando o catálogo inteiro. Sincronização
 idempotente e imutável: `catalog_versions.sha256` é a identidade de
 conteúdo (raw + mapping + curadoria); mesmo conteúdo nunca duplica linha,
 conteúdo divergente nunca sobrescreve uma versão já publicada.
+
+## Reconstrução de inventário (CC-203)
+
+Exige a partida já importada (seção Importação acima, `POST /api/v1/imports` ou
+`process_next_job`) e o catálogo do patch da partida já sincronizado (seção Catálogo).
+
+```sh
+uv run cc timeline reconstruct --mode demo --match-id DEMO-0001   # fixture sintética, sem rede
+uv run cc timeline reconstruct --mode real --match-id <matchId>   # raw já importado (CC-201), sem coleta nova
+```
+
+`src/riftlab/timeline/application.py:reconstruct_match` resolve o catálogo da partida
+uma única vez (fixado, nunca reconsultado durante o replay), carrega os eventos já
+persistidos (`timeline_events`, CC-201) e relê a mesma fonte local só para os frames
+(nunca persistidos pelo CC-201, nunca uma coleta nova — raw imutável, releitura local).
+`reconstruct_participant_purchases` (puro, sem I/O) reduz os eventos de cada
+participante em ordem `(timestamp_ms, source_index)`, guardando o inventário
+imediatamente ANTES de cada compra (nunca o item comprado aparece no próprio estado):
+multiconjunto de itens com trinket em slot separada (achado real: todo item com a tag
+`"Trinket"` no catálogo real tem receita vazia), receita consumida por quantidade
+possuída (compra direta paga o restante, nunca exige posse total), venda, undo (restaura
+o multiconjunto exato de uma correlação comprovada, nunca um palpite) e ouro estimado a
+partir do último frame estritamente anterior ao evento (nunca interpolado). Ambiguidade
+(item desconhecido do catálogo, destruição não reconciliada, undo sem correlação única,
+catálogo ausente para o patch) fica marcada como incerta de forma explícita e datada,
+nunca escondida nem "reparada" pelo inventário final. Persistência idempotente:
+reconstruir a mesma partida de novo devolve os mesmos estados, nunca duplica.
 
 ## Migrações
 

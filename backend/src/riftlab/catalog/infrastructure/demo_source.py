@@ -8,6 +8,7 @@ from riftlab.catalog.domain import (
     CatalogSourceResult,
     validate_recipe_graph,
 )
+from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, MappingEntry
 from riftlab.shared.domain import SourceOrigin
 from riftlab.shared.errors import SourceNotFoundError, SourceSchemaError
 from riftlab.shared.resources import read_package_bytes, read_package_json
@@ -47,6 +48,27 @@ class DemoCatalogSource:
             )
         raw_bytes = read_package_bytes(_FIXTURES_PACKAGE, relative_path)
         return parse_catalog_source_document(raw_bytes)
+
+
+def demo_catalog_mapping() -> CatalogMapping:
+    """CatalogMapping derivado diretamente das fixtures demo (nunca um
+    literal solto duplicado por quem precisa resolver catálogo demo para
+    uma partida — ex.: timeline.application.reconstruct_match): o mapping
+    YAML real (configs/catalog-mappings.yaml) só cobre patches reais, nunca
+    "DEMO-1". Catálogos deliberadamente inválidos do manifesto (ex.:
+    DEMO-2-INVALID) são ignorados aqui, nunca entram no mapping."""
+    manifest = read_package_json(_FIXTURES_PACKAGE, _MANIFEST_NAME)
+    entries: dict[str, MappingEntry] = {}
+    mapping_version = "v1"
+    for game_patch, entry in manifest["catalogs"].items():
+        raw_bytes = read_package_bytes(_FIXTURES_PACKAGE, entry["file"])
+        try:
+            result = parse_catalog_source_document(raw_bytes)
+        except SourceSchemaError:
+            continue
+        entries[game_patch] = MappingEntry(data_dragon_version=result.data_dragon_version)
+        mapping_version = result.mapping_version
+    return CatalogMapping(schema_version="v1", mapping_version=mapping_version, entries=entries)
 
 
 def parse_catalog_source_document(raw_bytes: bytes) -> CatalogSourceResult:

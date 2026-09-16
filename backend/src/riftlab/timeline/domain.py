@@ -5,7 +5,22 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
 
+from riftlab.shared.errors import DomainError
+
 CURRENT_DECISION_STATE_SCHEMA_VERSION = "v1"
+
+
+class TimelineReplayError(DomainError):
+    """Evento pertencente ao próprio participante tem payload estruturalmente
+    inválido para seu type (ex.: ITEM_PURCHASED sem itemId inteiro) — falha
+    permanente da reconstrução (CC-203), nunca uma tentativa de adivinhar o
+    campo ausente. Distinto de INVENTORY_UNCERTAIN (domain-model.md): isto é
+    corrupção estrutural do dado, não ambiguidade semântica de um dado bem
+    formado."""
+
+    def __init__(self, *, code: str, detail: str) -> None:
+        super().__init__(detail)
+        self.code = code
 
 
 @dataclass(frozen=True, slots=True)

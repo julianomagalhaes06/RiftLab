@@ -11,7 +11,7 @@ from riftlab.config import get_settings
 
 app = typer.Typer(
     help="RiftLab CLI (cc). Comandos implementados nesta etapa: "
-    "api, worker, health, db, riot, openapi.",
+    "api, worker, health, db, riot, openapi, catalog, timeline.",
     no_args_is_help=True,
 )
 
@@ -141,6 +141,116 @@ def catalog_sync(
         asyncio.run(_run())
     except SourceError as exc:
         typer.echo(f"BLOCKED: {exc.code} - {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+timeline_app = typer.Typer(
+    help="Reconstrução pré-compra de inventário (CC-203).",
+    no_args_is_help=True,
+)
+app.add_typer(timeline_app, name="timeline")
+
+
+@timeline_app.command("reconstruct")
+def timeline_reconstruct(
+    mode: str = typer.Option(
+        ..., help="'demo' (fixture sintética, sem rede) ou 'real' (raw já importado, CC-201)."
+    ),
+    match_id: str = typer.Option(
+        ..., help="Identificador da partida já importada (POST /imports)."
+    ),
+    mapping_file: Path = typer.Option(
+        None,
+        help="Caminho do mapping YAML de catálogo (padrão: "
+        "RIFTLAB_CATALOG_MAPPINGS_PATH/Settings.catalog_mappings_path). "
+        "Só usado em --mode real; --mode demo usa o mapping fixo do catálogo demo (DEMO-1).",
+    ),
+    env_file: Path = typer.Option(
+        None, help="Caminho do .env a carregar (padrão: raiz do repositório)."
+    ),
+) -> None:
+    """Busca (banco + fonte local, fora de transação) -> reduz (puro,
+    domain-model.md) -> persiste (uma transação, todos os participantes
+    juntos ou nada). Idempotente: partida já reconstruída não duplica.
+    Nunca coleta partida nova — a fonte só re-lê dado já importado (CC-201)."""
+    import asyncio
+
+    from riftlab.catalog.infrastructure.catalog_mapping import load_catalog_mapping
+    from riftlab.catalog.infrastructure.demo_source import demo_catalog_mapping
+    from riftlab.cli.env_file import load_settings
+    from riftlab.db import build_engine
+    from riftlab.ingestion.domain import MatchSource
+    from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
+    from riftlab.shared.db import build_session_factory
+    from riftlab.shared.errors import DomainError, SourceError
+    from riftlab.timeline.application import reconstruct_match
+
+    if mode not in ("demo", "real"):
+        typer.echo(f"BLOCKED: --mode deve ser 'demo' ou 'real', recebido {mode!r}.", err=True)
+        raise typer.Exit(code=1)
+
+    settings = load_settings(env_file)
+    if mode == "demo":
+        # Catálogo demo (fixtures/catalogs/demo_1.json, CC-202) não tem
+        # entrada no mapping YAML real (esse só cobre patches reais de
+        # configs/catalog-mappings.yaml) — derivado da própria fixture.
+        mapping = demo_catalog_mapping()
+    else:
+        resolved_mapping_file = mapping_file or Path(settings.catalog_mappings_path)
+        if not resolved_mapping_file.exists():
+            typer.echo(
+                f"BLOCKED: mapping de catálogo não encontrado em {resolved_mapping_file}.", err=True
+            )
+            raise typer.Exit(code=1)
+        mapping = load_catalog_mapping(resolved_mapping_file)
+
+    async def _run() -> None:
+        from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+        from riftlab.ingestion.infrastructure.riot_source import RiotMatchSource
+        from riftlab.ingestion.infrastructure.riot_transport import (
+            RiotFetchBudget,
+            RiotHttpTransport,
+        )
+
+        engine = build_engine(settings.database_url)
+        session_factory = build_session_factory(engine)
+        client = None
+        try:
+            source: MatchSource
+            if mode == "demo":
+                source = DemoMatchSource()
+            else:
+                import httpx
+
+                client = httpx.AsyncClient(follow_redirects=False)
+                transport = RiotHttpTransport(
+                    api_key=settings.riot_api_key or "",
+                    budget=RiotFetchBudget(
+                        max_matches=1,
+                        max_requests=10,
+                        max_attempts_per_request=1,
+                        max_total_seconds=30.0,
+                    ),
+                    client=client,
+                )
+                raw_store = DurableRawMatchStore(Path(settings.raw_storage_dir))
+                source = RiotMatchSource(transport, raw_store, settings.subject_hash_secret)
+
+            result = await reconstruct_match(session_factory, mapping, source, match_id)
+            typer.echo(
+                f"matchId={result.match_id} catalogId={result.catalog_id} "
+                f"decisionStates={len(result.decision_states)}"
+            )
+        finally:
+            if client is not None:
+                await client.aclose()
+            await engine.dispose()
+
+    try:
+        asyncio.run(_run())
+    except (SourceError, DomainError) as exc:
+        code = getattr(exc, "code", exc.__class__.__name__)
+        typer.echo(f"BLOCKED: {code} - {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
 

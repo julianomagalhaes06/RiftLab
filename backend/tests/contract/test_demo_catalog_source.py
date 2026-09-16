@@ -13,6 +13,7 @@ import pytest
 from riftlab.catalog.domain import CatalogSource, CatalogSourceResult
 from riftlab.catalog.infrastructure.demo_source import (
     DemoCatalogSource,
+    demo_catalog_mapping,
     parse_catalog_source_document,
 )
 from riftlab.shared.domain import SourceOrigin
@@ -123,3 +124,21 @@ def test_parse_catalog_source_document_rejects_unknown_schema_version() -> None:
         parse_catalog_source_document(b'{"schemaVersion":"v0"}')
 
     assert excinfo.value.code == "SCHEMA_UNSUPPORTED"
+
+
+async def test_demo_catalog_mapping_resolves_demo_1_to_the_real_fixture_identity() -> None:
+    """CC-203: reconstruct_match precisa resolver o catálogo demo sem o
+    mapping YAML real (que só cobre patches reais) — deriva da própria
+    fixture, nunca um literal duplicado à mão."""
+    mapping = demo_catalog_mapping()
+    demo_result = await DemoCatalogSource().load_catalog("DEMO-1")
+
+    entry = mapping.resolve("DEMO-1")
+    assert entry is not None
+    assert entry.data_dragon_version == demo_result.data_dragon_version
+    assert mapping.mapping_version == demo_result.mapping_version
+
+
+def test_demo_catalog_mapping_never_includes_deliberately_invalid_fixtures() -> None:
+    mapping = demo_catalog_mapping()
+    assert mapping.resolve("DEMO-2-INVALID") is None
