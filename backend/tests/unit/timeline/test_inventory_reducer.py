@@ -38,7 +38,10 @@ def _event(source_index: int, timestamp_ms: int, type_: str, **payload: Any) -> 
 
 
 def _item(
-    item_id: int, recipe: list[dict[str, Any]] | None = None, tags: tuple[str, ...] = ()
+    item_id: int,
+    recipe: list[dict[str, Any]] | None = None,
+    tags: tuple[str, ...] = (),
+    flags: dict[str, Any] | None = None,
 ) -> Item:
     return Item(
         catalog_id=CATALOG_ID,
@@ -46,7 +49,7 @@ def _item(
         price=100,
         recipe=recipe or [],
         attributes={"tags": list(tags)},
-        flags={},
+        flags=flags or {},
     )
 
 
@@ -435,3 +438,258 @@ def test_trinket_purchase_never_occupies_the_six_slots() -> None:
     # nunca aparece no multiconjunto normal, nem o antigo nem o novo
     assert purchases[2].inventory_before.owned(3340) == 0
     assert purchases[2].inventory_before.owned(3364) == 0
+
+
+# ---------------------------------------------------------------------------
+# Regressões da revisão de aa3e304 (.private/handoffs/CC-203-REVIEW.md,
+# review_cc203_probe.py) — cada achado reproduzido e testado isoladamente,
+# não só o probe espelhado.
+# ---------------------------------------------------------------------------
+
+
+def test_undo_with_afterid_not_matching_any_consumed_component_is_contradictory() -> None:
+    """Achado 1: comparar só beforeId não comprova correlação — item 1 não
+    tem receita (nada consumido), então afterId só pode ser 0; afterId=999
+    é uma contradição, nunca aplicada às cegas mesmo com beforeId correto."""
+    catalog = {1: _item(1), 4: _item(4)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_UNDO", participantId=P1, beforeId=1, afterId=999),
+        _event(2, 3000, "ITEM_PURCHASED", participantId=P1, itemId=4),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[1].inventory_before.owned(1) == 1  # nunca reparte pelo palpite
+    assert purchases[1].uncertain is True
+    assert any(r.code == "UNDO_UNCORRELATED" for r in purchases[1].reasons)
+
+
+def test_undo_with_afterid_matching_consumed_component_is_accepted() -> None:
+    """afterId=0 é sempre válido (nenhum item visível na própria slot da
+    compra desfeita); testa explicitamente que um afterId=0 continua
+    aceito quando a compra desfeita consumiu componentes de verdade."""
+    catalog = {1: _item(1), 2: _item(2, recipe=[{"itemId": 1, "quantity": 1}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_PURCHASED", participantId=P1, itemId=2),
+        _event(2, 3000, "ITEM_UNDO", participantId=P1, beforeId=2, afterId=0),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].uncertain is False
+
+
+def test_undo_of_sale_restores_sold_item() -> None:
+    """Achado 1: venda sempre apagava o ledger, deixando undo de venda sem
+    caminho suportado — plano explicitamente exige "venda/undo"."""
+    catalog = {1: _item(1), 9: _item(9)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_SOLD", participantId=P1, itemId=1, goldGain=50),
+        _event(2, 3000, "ITEM_UNDO", participantId=P1, beforeId=1, afterId=0),
+        _event(3, 4000, "ITEM_PURCHASED", participantId=P1, itemId=9),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].inventory_before.owned(1) == 1  # venda desfeita, item restaurado
+    assert purchases[-1].uncertain is False
+
+
+def test_undo_intervening_unrelated_purchase_invalidates_earlier_ledger() -> None:
+    """ "Operações intervenientes": comprar A, comprar B, tentar desfazer A
+    (beforeId=A) — a operação reversível mais recente é a compra de B, não a
+    de A, então correlacionar com A é ambíguo, nunca aplicado."""
+    catalog = {1: _item(1), 2: _item(2)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_PURCHASED", participantId=P1, itemId=2),
+        _event(2, 3000, "ITEM_UNDO", participantId=P1, beforeId=1, afterId=0),
+        _event(3, 4000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert any(r.code == "UNDO_UNCORRELATED" for r in purchases[-1].reasons)
+    assert purchases[-1].inventory_before.owned(1) == 1  # não removido pelo undo ambíguo
+    assert purchases[-1].inventory_before.owned(2) == 1  # item de B nunca é tocado
+
+
+def test_multiple_identical_purchases_only_the_most_recent_is_undoable() -> None:
+    """ "Várias compras iguais": duas compras do mesmo item base; undo desfaz
+    só a mais recente (ledger por operação, nunca por tipo de item)."""
+    catalog = {1: _item(1), 9: _item(9)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(2, 3000, "ITEM_UNDO", participantId=P1, beforeId=1, afterId=0),
+        _event(3, 4000, "ITEM_PURCHASED", participantId=P1, itemId=9),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].inventory_before.owned(1) == 1  # só a segunda unidade foi desfeita
+    assert purchases[-1].uncertain is False
+
+
+def test_undo_of_recipe_purchase_clears_pending_destroys_for_that_purchase() -> None:
+    """ "Ledger/pending_destroys após undo": compra de receita no MESMO
+    timestamp de um undo subsequente; um ITEM_DESTROYED chegando depois, no
+    mesmo timestamp, para o componente da compra JÁ DESFEITA nunca deve se
+    reconciliar contra ela — fica não reconciliado (a compra nunca
+    "aconteceu" do ponto de vista pós-undo)."""
+    catalog = {1: _item(1), 2: _item(2, recipe=[{"itemId": 1, "quantity": 1}]), 9: _item(9)}
+    events = [
+        _event(0, 5000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 5000, "ITEM_PURCHASED", participantId=P1, itemId=2),  # consome o componente 1
+        _event(2, 5000, "ITEM_UNDO", participantId=P1, beforeId=2, afterId=0),  # desfaz a compra
+        _event(3, 5000, "ITEM_DESTROYED", participantId=P1, itemId=1),  # chega depois, mesmo ts
+        _event(4, 6000, "ITEM_PURCHASED", participantId=P1, itemId=9),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    final = purchases[-1]
+    # destroy não reconciliado (a compra que "justificaria" foi desfeita) —
+    # remove o item 1 de novo (agora incerto), nunca silenciosamente ignorado
+    assert any(r.code == "UNRECONCILED_ITEM_DESTROYED" for r in final.reasons)
+    assert final.inventory_before.owned(1) == 0
+
+
+def test_recipe_consumes_transitive_subcomponent_when_intermediate_not_owned() -> None:
+    """Achado 2: A->B->C, possui A, compra C diretamente (nunca comprou B) —
+    a receita de C precisa decompor B em A quando B não está na posse."""
+    catalog = {
+        1: _item(1),
+        2: _item(2, recipe=[{"itemId": 1, "quantity": 1}]),
+        3: _item(3, recipe=[{"itemId": 2, "quantity": 1}]),
+    }
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3),  # pula B
+        _event(2, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, catalog_items=catalog)
+    final = purchases[-1]
+    assert final.inventory_before.owned(1) == 0  # decomposto via B, nunca sobra
+    assert final.inventory_before.owned(2) == 0  # B nunca chega a existir (virtual)
+    assert final.inventory_before.owned(3) == 1
+    assert final.uncertain is False
+
+
+def test_recipe_prefers_owned_complete_component_over_decomposing_it() -> None:
+    """ "Preferência explícita pelo componente já completo": possui B pronto
+    (comprado) e A avulso; comprar C (recipe=[B]) deve consumir o B já
+    pronto, nunca decompor A à toa nem sobrar B intocado."""
+    catalog = {
+        1: _item(1),
+        2: _item(2, recipe=[{"itemId": 1, "quantity": 1}]),
+        3: _item(3, recipe=[{"itemId": 2, "quantity": 1}]),
+    }
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),  # A avulso
+        _event(1, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),  # mais um A avulso
+        _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=2),  # B pronto (consome 1 A)
+        _event(3, 3000, "ITEM_PURCHASED", participantId=P1, itemId=3),  # C consome o B pronto
+        _event(4, 4000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, catalog_items=catalog)
+    final = purchases[-1]
+    assert final.inventory_before.owned(1) == 1  # o A avulso sobrando nunca é tocado
+    assert final.inventory_before.owned(2) == 0  # B pronto foi consumido, nunca duplicado
+    assert final.inventory_before.owned(3) == 1
+
+
+def test_recipe_repeated_subcomponent_multiplicity_via_transitive_path() -> None:
+    """Componentes repetidos por um caminho transitivo: C precisa de 2 B, só
+    A é possuído (2 unidades) — decompõe as duas ocorrências de B sem
+    sobrar/faltar nenhuma unidade de A."""
+    catalog = {
+        1: _item(1),
+        2: _item(2, recipe=[{"itemId": 1, "quantity": 1}]),
+        3: _item(3, recipe=[{"itemId": 2, "quantity": 2}]),
+    }
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3),
+        _event(3, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, catalog_items=catalog)
+    final = purchases[-1]
+    assert final.inventory_before.owned(1) == 0
+    assert final.inventory_before.owned(3) == 1
+
+
+def test_inventory_capacity_overflow_marks_uncertain() -> None:
+    """Achado 2: 7 itens normais distintos (sem regra de stack) excede as 6
+    slots normais — nunca passa despercebido."""
+    catalog = {i: _item(i) for i in range(1, 8)}
+    events = [
+        _event(i - 1, i * 1000, "ITEM_PURCHASED", participantId=P1, itemId=i) for i in range(1, 8)
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].uncertain is True
+    assert any(r.code == "INVENTORY_CAPACITY_EXCEEDED" for r in purchases[-1].reasons)
+
+
+def test_inventory_within_six_slots_never_flags_capacity() -> None:
+    catalog = {i: _item(i) for i in range(1, 7)}
+    events = [
+        _event(i - 1, i * 1000, "ITEM_PURCHASED", participantId=P1, itemId=i) for i in range(1, 7)
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].uncertain is False
+
+
+def test_stackable_consumable_within_declared_limit_never_overflows() -> None:
+    """Stack suportado: 5 poções (stacks=5, declarado pelo catálogo) cabem
+    numa slot só, mesmo com outros 5 itens normais preenchendo o resto."""
+    catalog = {i: _item(i) for i in range(1, 6)}
+    catalog[100] = _item(100, flags={"consumed": True, "stacks": 5})
+    events = [
+        _event(i - 1, i * 1000, "ITEM_PURCHASED", participantId=P1, itemId=i) for i in range(1, 6)
+    ]
+    events += [
+        _event(4 + n, (5 + n) * 1000, "ITEM_PURCHASED", participantId=P1, itemId=100)
+        for n in range(5)
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].uncertain is False
+    assert purchases[-1].inventory_before.owned(100) == 4  # antes da 5a poção
+
+
+def test_stack_rule_unknown_for_consumable_without_declared_stacks() -> None:
+    """Stack desconhecido: item consumível sem `stacks` declarado nunca tem
+    capacidade inventada — fica explicitamente incerto."""
+    catalog = {1: _item(1, flags={"consumed": True})}
+    events = [_event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1)]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].uncertain is True
+    assert any(r.code == "ITEM_STACK_RULE_UNKNOWN" for r in purchases[-1].reasons)
+
+
+def test_destroy_reconciliation_heuristic_flag_propagates_forward_only() -> None:
+    """Achado 3: reconciliação de destroy é sempre uma estimativa (corpus
+    ausente), propagada explicitamente em toda decisão a partir do ponto em
+    que ocorre — nunca contamina uma decisão anterior."""
+    catalog = {1: _item(1), 2: _item(2, recipe=[{"itemId": 1, "quantity": 1}]), 9: _item(9)}
+    events = [
+        _event(
+            0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1
+        ),  # antes: nunca usa heurística
+        _event(1, 2000, "ITEM_PURCHASED", participantId=P1, itemId=2),  # consome componente 1
+        _event(2, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1),  # reconciliado
+        _event(3, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9),  # depois: heurística usada
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[0].destroy_reconciliation_heuristic_used is False
+    assert purchases[1].destroy_reconciliation_heuristic_used is False  # ainda antes do destroy
+    assert purchases[2].destroy_reconciliation_heuristic_used is True
+    # reconciliação em si nunca bloqueia recomendação sozinha (distinto de uncertain)
+    assert purchases[2].uncertain is False
+
+
+def test_unknown_items_also_count_toward_six_slot_capacity() -> None:
+    """Capacidade é verificada em TODO caminho de compra, não só quando o
+    item é conhecido do catálogo — um item desconhecido ainda ocupa uma
+    slot normal de verdade."""
+    catalog: dict[int, Item] = {}  # nenhum item conhecido: tudo vira ITEM_UNKNOWN
+    events = [
+        _event(i - 1, i * 1000, "ITEM_PURCHASED", participantId=P1, itemId=i) for i in range(1, 8)
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert any(r.code == "INVENTORY_CAPACITY_EXCEEDED" for r in purchases[-1].reasons)

@@ -94,13 +94,24 @@ participante em ordem `(timestamp_ms, source_index)`, guardando o inventário
 imediatamente ANTES de cada compra (nunca o item comprado aparece no próprio estado):
 multiconjunto de itens com trinket em slot separada (achado real: todo item com a tag
 `"Trinket"` no catálogo real tem receita vazia), receita consumida por quantidade
-possuída (compra direta paga o restante, nunca exige posse total), venda, undo (restaura
-o multiconjunto exato de uma correlação comprovada, nunca um palpite) e ouro estimado a
-partir do último frame estritamente anterior ao evento (nunca interpolado). Ambiguidade
-(item desconhecido do catálogo, destruição não reconciliada, undo sem correlação única,
-catálogo ausente para o patch) fica marcada como incerta de forma explícita e datada,
-nunca escondida nem "reparada" pelo inventário final. Persistência idempotente:
-reconstruir a mesma partida de novo devolve os mesmos estados, nunca duplica.
+possuída inclusive por subcomponentes transitivos nunca comprados diretamente (compra
+direta paga o restante, nunca exige posse total), 6 slots normais verificados contra as
+regras de empilhamento do catálogo (`flags.consumed`/`flags.stacks`), venda, undo
+(restaura o multiconjunto exato de uma correlação comprovada — inclusive o `afterId`
+declarado, nunca só o item — nunca um palpite) e ouro estimado a partir do último frame
+estritamente anterior ao evento (nunca interpolado, nunca negativo). Ambiguidade (item
+desconhecido do catálogo, destruição não reconciliada, capacidade excedida, regra de
+empilhamento desconhecida, undo sem correlação única, catálogo ausente para o patch)
+fica marcada como incerta de forma explícita e datada, nunca escondida nem "reparada"
+pelo inventário final. Persistência idempotente por uma marca atômica própria
+(`match_reconstructions`): reconstruir a mesma partida de novo devolve os mesmos
+estados, nunca duplica, independente de qual participante teve compra.
+
+**Limitação registrada, não resolvida**: a reconciliação entre uma compra de receita e
+os `ITEM_DESTROYED` que ela dispara usa uma correlação por instante/item/quantidade —
+nunca validada contra o corpus de partidas reais auditado no CC-105 (indisponível neste
+ambiente). `DecisionState.quality.destroyReconciliationHeuristic` propaga essa
+limitação de forma explícita em todo estado persistido, nunca como certeza.
 
 ## Migrações
 

@@ -206,35 +206,22 @@ def timeline_reconstruct(
 
     async def _run() -> None:
         from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
-        from riftlab.ingestion.infrastructure.riot_source import RiotMatchSource
-        from riftlab.ingestion.infrastructure.riot_transport import (
-            RiotFetchBudget,
-            RiotHttpTransport,
-        )
+        from riftlab.ingestion.infrastructure.riot_source import LocalRawMatchSource
 
         engine = build_engine(settings.database_url)
         session_factory = build_session_factory(engine)
-        client = None
         try:
             source: MatchSource
             if mode == "demo":
                 source = DemoMatchSource()
             else:
-                import httpx
-
-                client = httpx.AsyncClient(follow_redirects=False)
-                transport = RiotHttpTransport(
-                    api_key=settings.riot_api_key or "",
-                    budget=RiotFetchBudget(
-                        max_matches=1,
-                        max_requests=10,
-                        max_attempts_per_request=1,
-                        max_total_seconds=30.0,
-                    ),
-                    client=client,
-                )
+                # Reconstrução nunca coleta partida nova (fronteira explícita
+                # do plano): LocalRawMatchSource não importa transporte/chave
+                # nenhum, estruturalmente incapaz de emitir rede — falha
+                # explícita se o raw ainda não estiver em cache local, nunca
+                # busca da Riot para completar (achado da revisão de aa3e304).
                 raw_store = DurableRawMatchStore(Path(settings.raw_storage_dir))
-                source = RiotMatchSource(transport, raw_store, settings.subject_hash_secret)
+                source = LocalRawMatchSource(raw_store, settings.subject_hash_secret)
 
             result = await reconstruct_match(session_factory, mapping, source, match_id)
             typer.echo(
@@ -242,8 +229,6 @@ def timeline_reconstruct(
                 f"decisionStates={len(result.decision_states)}"
             )
         finally:
-            if client is not None:
-                await client.aclose()
             await engine.dispose()
 
     try:

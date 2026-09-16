@@ -5,8 +5,12 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riftlab.timeline.domain import DecisionState, TimelineEvent
-from riftlab.timeline.models import DecisionStateModel, TimelineEventModel
+from riftlab.timeline.domain import DecisionState, MatchReconstructionMarker, TimelineEvent
+from riftlab.timeline.models import (
+    DecisionStateModel,
+    MatchReconstructionModel,
+    TimelineEventModel,
+)
 
 
 class SqlAlchemyTimelineRepository:
@@ -78,6 +82,15 @@ class SqlAlchemyTimelineRepository:
         )
         result = await self._session.execute(stmt)
         return [_decision_state_from_row(row) for row in result.scalars()]
+
+    async def get_match_reconstruction(self, match_id: str) -> MatchReconstructionMarker | None:
+        row = await self._session.get(MatchReconstructionModel, match_id)
+        if row is None:
+            return None
+        return MatchReconstructionMarker(match_id=row.match_id, catalog_id=row.catalog_id)
+
+    async def add_match_reconstruction(self, match_id: str, catalog_id: uuid.UUID | None) -> None:
+        self._session.add(MatchReconstructionModel(match_id=match_id, catalog_id=catalog_id))
 
 
 def _event_from_row(row: TimelineEventModel) -> TimelineEvent:

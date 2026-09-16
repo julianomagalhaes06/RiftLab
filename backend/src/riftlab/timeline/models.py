@@ -34,6 +34,24 @@ class TimelineEventModel(Base):
     schema_version: Mapped[str] = mapped_column(String, nullable=False, default="v1")
 
 
+class MatchReconstructionModel(CreatedAtMixin, Base):
+    """Marca de conclusão atômica de uma reconstrução (CC-203, revisão):
+    existe independente de contagem de compra de qualquer participante."""
+
+    __tablename__ = "match_reconstructions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["match_id"], ["matches.match_id"], name="fk_match_reconstructions_match"
+        ),
+        ForeignKeyConstraint(
+            ["catalog_id"], ["catalog_versions.id"], name="fk_match_reconstructions_catalog"
+        ),
+    )
+
+    match_id: Mapped[str] = mapped_column(String, primary_key=True)
+    catalog_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+
+
 class DecisionStateModel(UuidPkMixin, CreatedAtMixin, Base):
     __tablename__ = "decision_states"
     __table_args__ = (

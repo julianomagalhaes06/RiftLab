@@ -27,7 +27,8 @@ from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import NotFoundError
 from riftlab.timeline.application import reconstruct_match
-from riftlab.timeline.models import DecisionStateModel, TimelineEventModel
+from riftlab.timeline.domain import TimelineReplayError
+from riftlab.timeline.models import DecisionStateModel, MatchReconstructionModel, TimelineEventModel
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 
@@ -38,8 +39,12 @@ async def _reset_match(session_factory, match_id: str) -> None:
     pytest. Uma partida deixada SUCCEEDED por este arquivo bloqueia
     permanentemente a criação de job desses arquivos-irmãos (índice único de
     import_jobs cobre SUCCEEDED desde a revisão do CC-201) — limpa a árvore
-    completa da partida (decisões, eventos, participantes, match, job)."""
+    completa da partida (marca de reconstrução, decisões, eventos,
+    participantes, match, job) na ordem que respeita as FKs."""
     async with unit_of_work(session_factory) as session:
+        await session.execute(
+            delete(MatchReconstructionModel).where(MatchReconstructionModel.match_id == match_id)
+        )
         await session.execute(
             delete(DecisionStateModel).where(DecisionStateModel.match_id == match_id)
         )
@@ -133,7 +138,7 @@ async def test_reconstruct_match_persists_states_matching_recipe_consumption(
 async def test_reconstruct_match_is_idempotent_never_duplicates(
     session_factory, tmp_path, _demo_match
 ) -> None:
-    await _sync_demo_catalog(session_factory)
+    catalog_id = await _sync_demo_catalog(session_factory)
     await _import_demo_match(session_factory, tmp_path, "DEMO-0001")
 
     first = await reconstruct_match(
@@ -148,10 +153,82 @@ async def test_reconstruct_match_is_idempotent_never_duplicates(
     assert (
         first_ids == second_ids
     )  # segunda chamada devolve exatamente os mesmos estados, nunca duplica
+    # Achado 5 da revisão: a segunda chamada devolvia um catalog_id RERESOLVIDO
+    # na hora, podendo divergir do catalog_id realmente usado nos estados já
+    # persistidos — agora vem da marca gravada junto da primeira execução.
+    assert first.catalog_id == catalog_id
+    assert second.catalog_id == catalog_id
 
     async with unit_of_work(session_factory) as session:
         persisted = await SqlAlchemyTimelineRepository(session).list_decision_states("DEMO-0001", 1)
+        # participante 6 nunca compra nada em DEMO-0001 (fixture real do
+        # projeto) — prova que idempotência não depende de qual participante
+        # tem compra: zero estados para ele nas duas chamadas, sem erro.
+        empty_participant = await SqlAlchemyTimelineRepository(session).list_decision_states(
+            "DEMO-0001", 6
+        )
     assert len(persisted) == len(first.decision_states)
+    assert empty_participant == []
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0007"], indirect=True)
+async def test_reconstruct_match_idempotent_marker_independent_of_purchase_count(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    """Achado 5 da revisão: a checagem de idempotência antiga olhava só
+    `list_decision_states` do primeiro participante — se esse participante
+    especificamente não tivesse compra alguma (mas outro tivesse), a
+    reexecução tentava reinserir estados já existentes e levantava
+    IntegrityError. A marca explícita (`match_reconstructions`) nunca
+    depende de qual participante comprou o quê (as fixtures demo reais
+    deste projeto sempre têm o participante 1 primeiro com compra — a marca
+    é a correção estrutural que nunca mais lê essa ordem para decidir
+    idempotência, o que este teste confirma diretamente via o repositório)."""
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, "DEMO-0007")
+
+    first = await reconstruct_match(
+        session_factory, _DEMO_1_MAPPING, DemoMatchSource(), "DEMO-0007"
+    )
+    async with unit_of_work(session_factory) as session:
+        marker = await SqlAlchemyTimelineRepository(session).get_match_reconstruction("DEMO-0007")
+    assert marker is not None
+    assert marker.catalog_id == first.catalog_id
+
+    second = await reconstruct_match(
+        session_factory, _DEMO_1_MAPPING, DemoMatchSource(), "DEMO-0007"
+    )
+    assert sorted(str(s.id) for s in second.decision_states) == sorted(
+        str(s.id) for s in first.decision_states
+    )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0005"], indirect=True)
+async def test_reconstruct_match_rejects_source_diverging_from_persisted_raw_hash(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    """Achado 4 da revisão: nada garantia que a releitura da fonte local
+    (frames/participantes) correspondia de verdade à mesma partida já
+    persistida — nunca mistura uma releitura divergente com eventos já
+    persistidos."""
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, "DEMO-0005")
+
+    class _TamperedSource:
+        def __init__(self, inner: DemoMatchSource) -> None:
+            self._inner = inner
+
+        async def load_match(self, match_id: str):
+            import dataclasses
+
+            result = await self._inner.load_match(match_id)
+            return dataclasses.replace(result, raw_hash="0" * 64)
+
+    with pytest.raises(TimelineReplayError) as excinfo:
+        await reconstruct_match(
+            session_factory, _DEMO_1_MAPPING, _TamperedSource(DemoMatchSource()), "DEMO-0005"
+        )
+    assert excinfo.value.code == "SOURCE_RAW_HASH_MISMATCH"
 
 
 async def test_reconstruct_match_raises_not_found_for_never_imported_match(session_factory) -> None:

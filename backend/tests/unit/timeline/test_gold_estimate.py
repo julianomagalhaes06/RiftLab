@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from riftlab.shared.api.enums import BudgetSource
 from riftlab.timeline.application import STALE_FRAME_THRESHOLD_MS, select_gold_estimate
 
 P1 = 1
@@ -22,7 +23,7 @@ def test_no_frame_before_event_is_unknown_not_zero() -> None:
     estimate = select_gold_estimate(
         frames, P1, event_timestamp_ms=1000
     )  # mesmo timestamp: não é anterior
-    assert estimate.origin == "UNKNOWN"
+    assert estimate.origin == BudgetSource.UNKNOWN.value
     assert estimate.value is None
     assert estimate.age_ms is None
 
@@ -36,7 +37,7 @@ def test_same_timestamp_frame_never_used() -> None:
 def test_future_frame_never_used() -> None:
     frames = [_Frame(5000, {P1: {"currentGold": 900}})]
     estimate = select_gold_estimate(frames, P1, event_timestamp_ms=1000)
-    assert estimate.origin == "UNKNOWN"
+    assert estimate.origin == BudgetSource.UNKNOWN.value
     assert estimate.value is None
 
 
@@ -49,7 +50,7 @@ def test_picks_last_frame_strictly_before_never_interpolates() -> None:
     estimate = select_gold_estimate(frames, P1, event_timestamp_ms=90_000)
     assert estimate.value == 100
     assert estimate.age_ms == 30_000
-    assert estimate.origin == "OBSERVED"
+    assert estimate.origin == BudgetSource.FRAME_ESTIMATE.value
 
 
 def test_frame_present_without_participant_data_is_unknown() -> None:
@@ -58,7 +59,7 @@ def test_frame_present_without_participant_data_is_unknown() -> None:
         _Frame(60_000, {}),
     ]  # frame existe mas vazio (ex.: falha real de coleta)
     estimate = select_gold_estimate(frames, P1, event_timestamp_ms=61_000)
-    assert estimate.origin == "UNKNOWN"
+    assert estimate.origin == BudgetSource.UNKNOWN.value
     assert estimate.value is None
     assert estimate.age_ms == 1000  # idade ainda é conhecida (o frame existe), só o dado que falta
 
@@ -80,11 +81,45 @@ def test_zero_gold_is_real_value_distinct_from_absent() -> None:
     frames = [_Frame(0, {P1: {"currentGold": 0}})]
     estimate = select_gold_estimate(frames, P1, event_timestamp_ms=1000)
     assert estimate.value == 0
-    assert estimate.origin == "OBSERVED"
+    assert estimate.origin == BudgetSource.FRAME_ESTIMATE.value
 
 
 def test_non_int_gold_field_is_unknown_never_guessed() -> None:
     frames = [_Frame(0, {P1: {"currentGold": "N/A"}})]
     estimate = select_gold_estimate(frames, P1, event_timestamp_ms=1000)
-    assert estimate.origin == "UNKNOWN"
+    assert estimate.origin == BudgetSource.UNKNOWN.value
     assert estimate.value is None
+
+
+def test_negative_gold_is_unknown_never_presented_as_observed() -> None:
+    """Achado real da revisão: currentGold=-5 era aceito e marcado OBSERVED —
+    ouro real nunca é negativo, então um valor negativo é falha de dado, não
+    uma observação válida."""
+    frames = [_Frame(0, {P1: {"currentGold": -5}})]
+    estimate = select_gold_estimate(frames, P1, event_timestamp_ms=1000)
+    assert estimate.origin == BudgetSource.UNKNOWN.value
+    assert estimate.value is None
+
+
+def test_bool_gold_field_is_unknown_never_guessed() -> None:
+    frames = [_Frame(0, {P1: {"currentGold": True}})]  # bool é subclasse de int
+    estimate = select_gold_estimate(frames, P1, event_timestamp_ms=1000)
+    assert estimate.origin == BudgetSource.UNKNOWN.value
+    assert estimate.value is None
+
+
+def test_null_gold_field_is_unknown_never_guessed() -> None:
+    frames = [_Frame(0, {P1: {"currentGold": None}})]
+    estimate = select_gold_estimate(frames, P1, event_timestamp_ms=1000)
+    assert estimate.origin == BudgetSource.UNKNOWN.value
+    assert estimate.value is None
+
+
+def test_origin_uses_public_budget_source_vocabulary_never_a_custom_label() -> None:
+    """Achado real da revisão: "OBSERVED" não é um valor de
+    shared/api/enums.py:BudgetSource (UNKNOWN, FRAME_ESTIMATE, USER_PROVIDED)
+    — este teste falha se alguém reintroduzir um rótulo próprio."""
+    frames = [_Frame(0, {P1: {"currentGold": 500}})]
+    estimate = select_gold_estimate(frames, P1, event_timestamp_ms=1000)
+    assert estimate.origin in {member.value for member in BudgetSource}
+    assert estimate.origin != "OBSERVED"

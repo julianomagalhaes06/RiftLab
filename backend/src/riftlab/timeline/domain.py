@@ -37,6 +37,22 @@ class TimelineEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class MatchReconstructionMarker:
+    """Prova explícita de que uma partida já foi reconstruída por completo
+    (CC-203, revisão): existe independente de qualquer participante ter
+    tido compra alguma — checar só `list_decision_states` do primeiro
+    participante (tentativa anterior) falha quando esse participante não
+    comprou nada, mas outro comprou; a segunda execução então tentava
+    reinserir estados já existentes. catalog_id aqui é o valor REALMENTE
+    usado quando a reconstrução foi computada — reexecuções idempotentes
+    nunca reresolve o canônico atual (que pode ter mudado desde então) e o
+    reportam como se fosse o valor usado para os estados já persistidos."""
+
+    match_id: str
+    catalog_id: uuid.UUID | None
+
+
+@dataclass(frozen=True, slots=True)
 class DecisionState:
     """Estado imediatamente anterior a uma decisão. catalog_id é opcional: um
     estado incompatível pode ser registrado sem catálogo disponível, sem que
@@ -69,3 +85,18 @@ class TimelineRepository(Protocol):
     async def list_decision_states(
         self, match_id: str, participant_id: int
     ) -> list[DecisionState]: ...
+
+    async def get_match_reconstruction(self, match_id: str) -> MatchReconstructionMarker | None:
+        """None = partida nunca reconstruída (ou reconstrução anterior não
+        chegou a commitar). Existência da marca é a única fonte de verdade
+        de idempotência — nunca inferida a partir de contagem de estados de
+        um participante específico."""
+        ...
+
+    async def add_match_reconstruction(self, match_id: str, catalog_id: uuid.UUID | None) -> None:
+        """Gravado na MESMA transação dos `DecisionState`s produzidos — tudo
+        ou nada (revisão CC-203). Levanta ConflictError (via IntegrityError
+        traduzido pelo chamador) se já existe marca para este match_id:
+        reconstrução concorrente da mesma partida, nunca uma segunda marca
+        silenciosa."""
+        ...

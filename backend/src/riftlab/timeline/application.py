@@ -9,6 +9,7 @@ catalog.application.sync_catalog (CC-202)."""
 
 from __future__ import annotations
 
+import math
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -22,6 +23,7 @@ from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.ingestion.domain import MatchSource
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.shared.api.enums import BudgetSource
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import ConflictError, NotFoundError
 from riftlab.timeline.domain import (
@@ -35,6 +37,11 @@ from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 SessionFactory = async_sessionmaker[AsyncSession]
 
 STALE_FRAME_THRESHOLD_MS = 90_000
+
+# 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
+# conta aqui. Achado real da revisão: um inventário com mais de 6 itens
+# normais distintos/empilhados além da regra do catálogo passava sem alerta.
+_MAX_NORMAL_SLOTS = 6
 
 # Tipos de evento que afetam o inventário de item (CC-105: os únicos 4 tipos
 # reais de mutação de item observados na amostra auditada). Qualquer outro
@@ -153,14 +160,19 @@ class GoldEstimate:
         }
 
 
-_UNKNOWN_GOLD_ESTIMATE_NO_AGE = GoldEstimate(value=None, age_ms=None, stale=False, origin="UNKNOWN")
+_UNKNOWN_GOLD_ESTIMATE_NO_AGE = GoldEstimate(
+    value=None, age_ms=None, stale=False, origin=BudgetSource.UNKNOWN.value
+)
 
 
 def select_gold_estimate(
     frames: Sequence[FrameLike], participant_id: int, event_timestamp_ms: int
 ) -> GoldEstimate:
     """Último frame ESTRITAMENTE anterior ao evento — nunca mesmo timestamp
-    nem futuro por conveniência, nunca interpolado com o frame seguinte."""
+    nem futuro por conveniência, nunca interpolado com o frame seguinte.
+    origin usa o vocabulário público de budget_source (docs/domain-model.md,
+    shared/api/enums.py:BudgetSource) — nunca um rótulo próprio inventado
+    (achado da revisão: "OBSERVED" não é um valor do contrato)."""
     candidate: FrameLike | None = None
     for frame in frames:
         if frame.timestamp_ms < event_timestamp_ms and (
@@ -174,9 +186,16 @@ def select_gold_estimate(
     stale = age_ms > STALE_FRAME_THRESHOLD_MS
     participant_frame = candidate.participant_frames.get(participant_id)
     gold = participant_frame.get("currentGold") if participant_frame else None
-    if gold is None or isinstance(gold, bool) or not isinstance(gold, int):
-        return GoldEstimate(value=None, age_ms=age_ms, stale=stale, origin="UNKNOWN")
-    return GoldEstimate(value=gold, age_ms=age_ms, stale=stale, origin="OBSERVED")
+    # bool é subclasse de int; ouro negativo é impossível de verdade (achado
+    # da revisão: currentGold=-5 era aceito como observado) — os dois viram
+    # UNKNOWN, nunca um valor inválido apresentado como se fosse confiável.
+    if gold is None or isinstance(gold, bool) or not isinstance(gold, int) or gold < 0:
+        return GoldEstimate(
+            value=None, age_ms=age_ms, stale=stale, origin=BudgetSource.UNKNOWN.value
+        )
+    return GoldEstimate(
+        value=gold, age_ms=age_ms, stale=stale, origin=BudgetSource.FRAME_ESTIMATE.value
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,18 +211,26 @@ class ReconstructedPurchase:
     gold_estimate: GoldEstimate
     uncertain: bool
     reasons: tuple[UncertainReason, ...]
+    destroy_reconciliation_heuristic_used: bool
 
 
 @dataclass(frozen=True, slots=True)
 class _ReversibleOp:
-    """Ledger da última compra reversível (CC-203, revisão de design): guarda
-    o multiconjunto EXATO anterior à operação, não uma reconstrução
+    """Ledger da última OPERAÇÃO reversível do participante (compra OU
+    venda — revisão: venda sempre apagava o ledger, então undo de venda
+    nunca tinha caminho suportado, contradizendo o plano). Guarda o
+    multiconjunto EXATO anterior à operação, não uma reconstrução
     aproximada a partir de beforeId/afterId — undo restaura esse valor
     diretamente quando a correlação é única, nunca "repara" a partir do
-    inventário final."""
+    inventário final. consumed_components (vazio para venda/item sem
+    receita) é o conjunto de invariantes que afterId precisa respeitar
+    (revisão: comparar só beforeId não comprova correlação — beforeId=999
+    era aceito mesmo sem nenhum componente 999 envolvido)."""
 
     resulting_item_id: int
     prior_inventory: InventorySnapshot
+    consumed_components: tuple[tuple[int, int], ...] = ()
+    timestamp_ms: int = 0
 
 
 def _require_int_field(event: TimelineEvent, field_name: str) -> int:
@@ -217,6 +244,68 @@ def _require_int_field(event: TimelineEvent, field_name: str) -> int:
             ),
         )
     return value
+
+
+def _consume_recipe(
+    inventory: InventorySnapshot,
+    item: Item,
+    catalog_items: Mapping[int, Item],
+    consumed_log: list[tuple[int, int]],
+) -> InventorySnapshot:
+    """Consome a receita de `item` recursivamente (revisão, achado 2): prefere
+    sempre um componente já PRONTO possuído diretamente; só decompõe um
+    componente faltante em SEUS PRÓPRIOS subcomponentes quando ele tem
+    receita conhecida no catálogo (fechamento transitivo carregado pelo
+    orquestrador) — nunca consome o mesmo ancestral duas vezes, pois cada
+    remoção já muta `inventory` antes do próximo componente ser avaliado.
+    Sem receita conhecida para decompor, o restante é só pago em ouro (não
+    modelado aqui), igual à compra direta de um item base."""
+    for component in item.recipe:
+        component_id = int(component["itemId"])
+        needed = int(component["quantity"])
+        have = inventory.owned(component_id)
+        direct_take = min(have, needed)
+        if direct_take > 0:
+            inventory = inventory.with_removed(component_id, direct_take)
+            consumed_log.append((component_id, direct_take))
+            needed -= direct_take
+        if needed > 0:
+            sub_item = catalog_items.get(component_id)
+            if sub_item is not None and sub_item.recipe:
+                for _ in range(needed):
+                    inventory = _consume_recipe(inventory, sub_item, catalog_items, consumed_log)
+    return inventory
+
+
+def _stack_limit(item: Item | None) -> int | None:
+    """None = regra de stack desconhecida (item consumível sem `stacks`
+    declarado no catálogo) — nunca inventada. 1 = não empilha (regra padrão
+    confiável para item não-consumível/desconhecido — a esmagadora maioria
+    dos itens reais). >1 = limite real declarado pelo catálogo (achado do
+    CC-202: curadoria só grava `flags.stacks` para itens consumíveis)."""
+    if item is None or not item.flags.get("consumed"):
+        return 1
+    stacks = item.flags.get("stacks")
+    if isinstance(stacks, int) and not isinstance(stacks, bool) and stacks > 0:
+        return stacks
+    return None
+
+
+def _slots_used(
+    inventory: InventorySnapshot, catalog_items: Mapping[int, Item]
+) -> tuple[int, bool]:
+    """Slots normais ocupados (trinket nunca entra, é slot própria) e se
+    algum item tinha regra de stack desconhecida (capacidade então não é
+    verificável com confiança para aquele item, nunca inventada)."""
+    slots = 0
+    unknown = False
+    for item_id, count in inventory.items:
+        limit = _stack_limit(catalog_items.get(item_id))
+        if limit is None:
+            unknown = True
+            continue
+        slots += math.ceil(count / limit)
+    return slots, unknown
 
 
 def reconstruct_participant_purchases(
@@ -252,6 +341,7 @@ def reconstruct_participant_purchases(
     inventory = EMPTY_INVENTORY
     uncertain = False
     reasons: list[UncertainReason] = []
+    destroy_heuristic_used = False
     last_reversible: _ReversibleOp | None = None
     # pending_destroys[timestamp_ms][component_item_id] = unidades consumidas
     # por uma compra de receita neste mesmo instante, ainda não confirmadas
@@ -271,26 +361,33 @@ def reconstruct_participant_purchases(
             )
         )
 
+    def _discard_pending(consumed: tuple[tuple[int, int], ...], timestamp_ms: int) -> None:
+        """Desfaz a expectativa de destroy de uma compra desfeita por undo
+        (revisão, achado 1): sem isto, um ITEM_DESTROYED real chegando depois
+        no MESMO timestamp (source_index maior, ordem de evento preservada)
+        podia se reconciliar contra a compra já desfeita — never removido de
+        verdade do inventário, mas contabilizado como se tivesse sido."""
+        if not consumed:
+            return
+        bucket = pending_destroys.get(timestamp_ms)
+        if not bucket:
+            return
+        for component_id, qty in consumed:
+            if component_id in bucket:
+                bucket[component_id] = max(0, bucket[component_id] - qty)
+
     for event in owned_events:
         if event.type == "ITEM_PURCHASED":
             item_id = _require_int_field(event, "itemId")
             before = inventory
+            consumed: list[tuple[int, int]] = []
 
             if not catalog_available:
                 _mark_uncertain("NO_CATALOG", event, item_id)
                 inventory = inventory.with_added(item_id, 1)
             elif item_id in catalog_items:
                 item = catalog_items[item_id]
-                new_inventory = inventory
-                consumed: list[tuple[int, int]] = []
-                for component in item.recipe:
-                    component_id = int(component["itemId"])
-                    component_qty = int(component["quantity"])
-                    have = new_inventory.owned(component_id)
-                    take = min(have, component_qty)
-                    if take > 0:
-                        new_inventory = new_inventory.with_removed(component_id, take)
-                        consumed.append((component_id, take))
+                new_inventory = _consume_recipe(inventory, item, catalog_items, consumed)
                 is_trinket = "Trinket" in item.attributes.get("tags", ())
                 new_inventory = (
                     new_inventory.with_trinket(item_id)
@@ -309,6 +406,16 @@ def reconstruct_participant_purchases(
                 _mark_uncertain("ITEM_UNKNOWN", event, item_id)
                 inventory = inventory.with_added(item_id, 1)
 
+            # Capacidade verificada sempre (não só no caminho de catálogo
+            # conhecido): um item desconhecido/excluído/sem catálogo também
+            # ocupa uma slot normal (trinket nunca entra em `.items`, então
+            # esta checagem é naturalmente um no-op para ele).
+            slots, stack_unknown = _slots_used(inventory, catalog_items)
+            if stack_unknown:
+                _mark_uncertain("ITEM_STACK_RULE_UNKNOWN", event, item_id)
+            elif slots > _MAX_NORMAL_SLOTS:
+                _mark_uncertain("INVENTORY_CAPACITY_EXCEEDED", event, item_id)
+
             results.append(
                 ReconstructedPurchase(
                     event_source_index=event.source_index,
@@ -318,25 +425,53 @@ def reconstruct_participant_purchases(
                     gold_estimate=select_gold_estimate(frames, participant_id, event.timestamp_ms),
                     uncertain=uncertain,
                     reasons=tuple(reasons),
+                    destroy_reconciliation_heuristic_used=destroy_heuristic_used,
                 )
             )
-            last_reversible = _ReversibleOp(resulting_item_id=item_id, prior_inventory=before)
+            last_reversible = _ReversibleOp(
+                resulting_item_id=item_id,
+                prior_inventory=before,
+                consumed_components=tuple(consumed),
+                timestamp_ms=event.timestamp_ms,
+            )
 
         elif event.type == "ITEM_SOLD":
             item_id = _require_int_field(event, "itemId")
+            before = inventory
             if inventory.trinket_item_id == item_id:
                 inventory = inventory.with_trinket(None)
+                last_reversible = _ReversibleOp(
+                    resulting_item_id=item_id,
+                    prior_inventory=before,
+                    timestamp_ms=event.timestamp_ms,
+                )
             elif inventory.owned(item_id) > 0:
                 inventory = inventory.with_removed(item_id, 1)
+                # venda também é reversível (revisão: "venda sempre apaga o
+                # ledger" deixava undo de venda sem caminho suportado, contra
+                # o plano) — resulting_item_id é o item vendido (o mesmo que
+                # beforeId de um ITEM_UNDO correlacionado precisa bater).
+                last_reversible = _ReversibleOp(
+                    resulting_item_id=item_id,
+                    prior_inventory=before,
+                    timestamp_ms=event.timestamp_ms,
+                )
             else:
                 _mark_uncertain("SALE_WITHOUT_OWNERSHIP", event, item_id)
-            last_reversible = None
 
         elif event.type == "ITEM_DESTROYED":
             item_id = _require_int_field(event, "itemId")
             pending = pending_destroys.get(event.timestamp_ms)
             if pending and pending.get(item_id, 0) > 0:
-                pending[item_id] -= 1  # reconciliado: já removido pela receita, nunca de novo
+                # Reconciliado por heurística de timestamp/item/quantidade
+                # (revisão, achado 3): NUNCA removido de novo (evita dupla
+                # contagem), mas isto é uma ESTIMATIVA, nunca comprovada
+                # contra o corpus real (CC-105 ausente nesta sessão) —
+                # propagado explicitamente em quality, nunca junto de
+                # `uncertain` (que bloqueia recomendação; aqui não bloqueia,
+                # só desconta o crédito de certeza empírica).
+                pending[item_id] -= 1
+                destroy_heuristic_used = True
             else:
                 _mark_uncertain("UNRECONCILED_ITEM_DESTROYED", event, item_id)
                 if inventory.trinket_item_id == item_id:
@@ -349,13 +484,25 @@ def reconstruct_participant_purchases(
 
         elif event.type == "ITEM_UNDO":
             before_id = _require_int_field(event, "beforeId")
-            _require_int_field(
-                event, "afterId"
-            )  # validado, não usado diretamente (ver _ReversibleOp)
-            if last_reversible is None or last_reversible.resulting_item_id != before_id:
+            after_id = _require_int_field(event, "afterId")
+            valid_after_ids = {0}
+            if last_reversible is not None:
+                valid_after_ids |= {
+                    component_id for component_id, _ in last_reversible.consumed_components
+                }
+            if (
+                last_reversible is None
+                or last_reversible.resulting_item_id != before_id
+                or after_id not in valid_after_ids
+            ):
+                # Revisão, achado 1: comparar só beforeId não comprova
+                # correlação — beforeId batendo com afterId contraditório
+                # (ex.: item nunca consumido por esta operação) nunca é
+                # aplicado às cegas, mesmo com beforeId correto.
                 _mark_uncertain("UNDO_UNCORRELATED", event, before_id)
             else:
                 inventory = last_reversible.prior_inventory
+                _discard_pending(last_reversible.consumed_components, last_reversible.timestamp_ms)
                 last_reversible = None
 
     return results
@@ -379,10 +526,59 @@ def _decision_state_from_purchase(
             "uncertain": purchase.uncertain,
             "reasons": [reason.to_payload() for reason in purchase.reasons],
             "goldEstimate": purchase.gold_estimate.to_payload(),
+            # Revisão, achado 3: reconciliação de ITEM_DESTROYED por
+            # timestamp/item/quantidade é uma HEURÍSTICA nunca validada
+            # contra o corpus real (data/raw/cc-105/ ausente nesta sessão,
+            # BLOCKED — .private/validation/sprint-2/CC-203/01-corpus-
+            # investigation-blocked.txt). Propagado sempre, mesmo quando não
+            # aplicado (validated=False é uma propriedade do MÉTODO, não do
+            # resultado desta compra específica) — nunca confundido com
+            # `uncertain` (que bloqueia recomendação; isto só desconta
+            # certeza empírica de uma estimativa que continua sendo o
+            # melhor esforço disponível).
+            "destroyReconciliationHeuristic": {
+                "appliedToThisParticipant": purchase.destroy_reconciliation_heuristic_used,
+                "validatedAgainstRealCorpus": False,
+                "note": (
+                    "correlação por timestamp_ms/item_id/quantidade entre compra de "
+                    "receita e ITEM_DESTROYED; nunca confirmada contra dado real "
+                    "(corpus CC-105 indisponível nesta sessão) — estimativa, não certeza"
+                ),
+            },
         },
         schema_version=CURRENT_DECISION_STATE_SCHEMA_VERSION,
         catalog_id=catalog_id,
     )
+
+
+async def _load_catalog_items_closure(
+    catalog_repo: SqlAlchemyCatalogRepository, catalog_id: uuid.UUID, seed_item_ids: set[int]
+) -> dict[int, Item]:
+    """Carrega o FECHAMENTO TRANSITIVO de receita a partir dos item_ids
+    literalmente comprados/vendidos/destruídos (revisão, achado 2): um item
+    intermediário nunca comprado diretamente (ex.: B, quando só A e C=f(B)
+    aparecem nos eventos) precisa estar disponível para `_consume_recipe`
+    decompor C até A quando B não está na posse — sem isto, o orquestrador
+    só via os IDs presentes em eventos, nunca as receitas intermediárias."""
+    resolved: dict[int, Item] = {}
+    pending = set(seed_item_ids)
+    while pending:
+        item_id = pending.pop()
+        if item_id in resolved:
+            continue
+        item = await catalog_repo.get_item(catalog_id, item_id)
+        if item is None:
+            continue
+        resolved[item_id] = item
+        for component in item.recipe:
+            component_id = component.get("itemId")
+            if (
+                isinstance(component_id, int)
+                and not isinstance(component_id, bool)
+                and component_id not in resolved
+            ):
+                pending.add(component_id)
+    return resolved
 
 
 async def _referenced_item_ids(events: Sequence[TimelineEvent]) -> set[int]:
@@ -416,12 +612,15 @@ async def reconstruct_match(
 ) -> MatchReconstruction:
     """Orquestrador (CC-203): busca (banco+fonte local, fora de transação de
     escrita) -> reduz (puro, um participante por vez) -> persiste (uma única
-    transação, todos os participantes juntos ou nada). Idempotente: uma
-    partida já reconstruída devolve os estados já persistidos sem duplicar
-    nem recalcular. Catálogo é resolvido e fixado uma única vez aqui; nunca
-    reconsultado durante o replay, mesmo que uma sincronização concorrente
-    troque o canônico enquanto este comando roda (catalog_id obtido continua
-    consultável por ID exato e imutável, docs/domain-model.md)."""
+    transação, todos os participantes juntos ou nada). Idempotente via marca
+    explícita `match_reconstructions` (revisão, achado 5: checar só
+    `list_decision_states` do primeiro participante falhava quando esse
+    participante especificamente não tinha compra alguma). Catálogo é
+    resolvido e fixado uma única vez aqui; a reexecução idempotente devolve o
+    catalog_id REALMENTE usado (da marca persistida), nunca um valor
+    reresolvido na hora — mesmo que uma sincronização concorrente já tenha
+    trocado o canônico atual (catalog_id obtido continua consultável por ID
+    exato e imutável, docs/domain-model.md)."""
     ingestion_repo_factory = SqlAlchemyIngestionRepository
     timeline_repo_factory = SqlAlchemyTimelineRepository
     catalog_repo_factory = SqlAlchemyCatalogRepository
@@ -430,6 +629,37 @@ async def reconstruct_match(
         match = await ingestion_repo_factory(session).get_match(match_id)
     if match is None:
         raise NotFoundError(f"match {match_id!r} não encontrado; importar antes de reconstruir")
+
+    # Fonte local (fixture demo ou raw imutável real já persistido pelo
+    # CC-201): nunca coleta nova, só re-leitura — LocalRawMatchSource é
+    # estruturalmente incapaz de emitir rede (revisão, achado 4). Frames não
+    # são persistidos pelo CC-201 (só eventos), então esta é a única forma
+    # de obtê-los aqui; raw_hash é conferido contra o já persistido — nunca
+    # mistura uma releitura divergente (fonte trocada/corrompida) com os
+    # eventos já persistidos da mesma partida.
+    source_result = await match_source.load_match(match_id)
+    if source_result.raw_hash != match.raw_hash:
+        raise TimelineReplayError(
+            code="SOURCE_RAW_HASH_MISMATCH",
+            detail=(
+                f"raw recarregado para {match_id!r} diverge do raw_hash já persistido "
+                f"({source_result.raw_hash} != {match.raw_hash}); reconstrução nunca "
+                "mistura fonte divergente com eventos já persistidos"
+            ),
+        )
+    participant_ids = [p.participant_id for p in source_result.participants]
+
+    async with unit_of_work(session_factory) as session:
+        marker = await timeline_repo_factory(session).get_match_reconstruction(match_id)
+    if marker is not None:
+        all_existing: list[DecisionState] = []
+        async with unit_of_work(session_factory) as session:
+            repo = timeline_repo_factory(session)
+            for participant_id in participant_ids:
+                all_existing.extend(await repo.list_decision_states(match_id, participant_id))
+        return MatchReconstruction(
+            match_id=match_id, catalog_id=marker.catalog_id, decision_states=all_existing
+        )
 
     catalog_id: uuid.UUID | None = None
     entry = mapping.resolve(match.patch)
@@ -443,37 +673,13 @@ async def reconstruct_match(
     async with unit_of_work(session_factory) as session:
         events = await timeline_repo_factory(session).list_events(match_id)
 
-    # Fonte local (fixtures estáticas ou raw imutável já persistido pelo
-    # CC-201): nunca coleta nova, só re-leitura — frames não são persistidos
-    # pelo CC-201 (só eventos), então esta é a única forma de obtê-los aqui.
-    source_result = await match_source.load_match(match_id)
-    participant_ids = [p.participant_id for p in source_result.participants]
-
-    if participant_ids:
-        async with unit_of_work(session_factory) as session:
-            existing = await timeline_repo_factory(session).list_decision_states(
-                match_id, participant_ids[0]
-            )
-        if existing:
-            all_existing: list[DecisionState] = []
-            async with unit_of_work(session_factory) as session:
-                repo = timeline_repo_factory(session)
-                for participant_id in participant_ids:
-                    all_existing.extend(await repo.list_decision_states(match_id, participant_id))
-            return MatchReconstruction(
-                match_id=match_id, catalog_id=catalog_id, decision_states=all_existing
-            )
-
     catalog_items: dict[int, Item] = {}
     excluded_item_ids: frozenset[int] = frozenset()
     if catalog_id is not None:
-        referenced = await _referenced_item_ids(events)
+        seeds = await _referenced_item_ids(events)
         async with unit_of_work(session_factory) as session:
             catalog_repo = catalog_repo_factory(session)
-            for item_id in referenced:
-                item = await catalog_repo.get_item(catalog_id, item_id)
-                if item is not None:
-                    catalog_items[item_id] = item
+            catalog_items = await _load_catalog_items_closure(catalog_repo, catalog_id, seeds)
             excluded_item_ids = frozenset(
                 excluded.item_id for excluded in await catalog_repo.list_excluded_items(catalog_id)
             )
@@ -497,6 +703,7 @@ async def reconstruct_match(
             repo = timeline_repo_factory(session)
             for state in all_decision_states:
                 await repo.add_decision_state(state)
+            await repo.add_match_reconstruction(match_id, catalog_id)
     except IntegrityError as exc:
         raise ConflictError(
             f"reconstrução concorrente de {match_id!r} já em andamento/concluída"

@@ -24,7 +24,7 @@ from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore, Raw
 from riftlab.ingestion.infrastructure.riot_transport import RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
 from riftlab.shared.domain import SourceOrigin
-from riftlab.shared.errors import SourceSchemaError
+from riftlab.shared.errors import SourceNotFoundError, SourceSchemaError
 
 # endOfGameResult real (auditado em CC-105, data-audit.md): só este valor
 # confirma conclusão normal. Qualquer outro (remake/abandono/ausente) não é
@@ -99,6 +99,45 @@ class RiotMatchSource:
                 detail=f"conflito ao publicar {kind} bruto local; resolução manual exigida",
             ) from exc
         return response.body
+
+
+class LocalRawMatchSource:
+    """MatchSource somente-local (CC-203, revisão): NUNCA importa
+    RiotHttpTransport, nunca recebe cliente HTTP ou chave — estruturalmente
+    incapaz de emitir rede (achado da revisão: reconstruct_match/CLI usava
+    RiotMatchSource, que busca da Riot de verdade quando o cache local está
+    ausente/incompleto, contradizendo "nunca coleta nova"). Falha explícita
+    (SourceNotFoundError) se o raw ainda não estiver completo em disco;
+    nunca tenta completar o cache buscando da rede."""
+
+    def __init__(self, raw_store: DurableRawMatchStore, subject_hash_secret: str | None) -> None:
+        self._raw_store = raw_store
+        self._subject_hash_secret = subject_hash_secret
+
+    async def load_match(self, match_id: str) -> MatchSourceResult:
+        match_bytes = self._require_cached(match_id, "match")
+        timeline_bytes = self._require_cached(match_id, "timeline")
+        return _parse_riot_match_and_timeline(
+            match_id, match_bytes, timeline_bytes, self._subject_hash_secret
+        )
+
+    def _require_cached(self, match_id: str, kind: str) -> bytes:
+        try:
+            cached = self._raw_store.read_if_valid(match_id, kind)
+        except RawStoreCorruptedError as exc:
+            raise SourceSchemaError(
+                code="RAW_STORE_CORRUPTED",
+                detail=f"dado bruto local de {kind} corrompido; resolução manual exigida",
+            ) from exc
+        if cached is None:
+            raise SourceNotFoundError(
+                code="RAW_MATCH_NOT_CACHED",
+                detail=(
+                    f"{kind} de {match_id!r} não está em cache local; reconstrução nunca "
+                    "coleta rede nova, importar a partida antes (POST /imports)"
+                ),
+            )
+        return cached
 
 
 def _parse_json(kind: str, body: bytes) -> Any:
