@@ -55,7 +55,10 @@ async def sync_catalog(
 ) -> CatalogVersion:
     """MISSING_CATALOG (patch fora do mapping/manifesto) propaga como
     SourceNotFoundError/SourceSchemaError da própria fonte — nunca captado
-    aqui, nunca substituído por fallback algum."""
+    aqui, nunca substituído por fallback algum. Todo sync bem-sucedido
+    (idempotente ou não) termina marcando sua identidade de conteúdo como
+    canônica para (game_patch, data_dragon_version, mapping_version) — ação
+    deliberada (revisão CC-202), nunca inferida por ordem de inserção."""
     result = await source.load_catalog(game_patch)
     validate_item_types_and_limits(result.items)
     validate_recipe_graph(result.items)
@@ -65,8 +68,13 @@ async def sync_catalog(
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyCatalogRepository(session)
         existing = await repo.find_catalog_version_by_content_hash(content_hash)
+        if existing is not None:
+            # Idempotente: mesmo conteúdo já sincronizado antes — ainda
+            # assim confirma a associação canônica (auto-recuperação se por
+            # algum motivo esta linha não fosse mais a canônica).
+            await repo.mark_canonical(existing.id)
     if existing is not None:
-        return existing  # idempotente: mesmo conteúdo já sincronizado antes
+        return existing
 
     new_catalog = CatalogVersion(
         id=uuid.uuid4(),
@@ -74,6 +82,8 @@ async def sync_catalog(
         data_dragon_version=result.data_dragon_version,
         sha256=content_hash,
         mapping_version=result.mapping_version,
+        raw_hash=result.raw_hash,
+        curation_rules_version=result.curation_rules_version,
     )
     try:
         async with unit_of_work(session_factory) as session:
@@ -91,17 +101,21 @@ async def sync_catalog(
                         schema_version=item.schema_version,
                     )
                 )
+            for excluded in result.excluded_items:
+                await repo.add_excluded_item(new_catalog.id, excluded)
+            await repo.mark_canonical(new_catalog.id)
         return new_catalog
     except ConflictError:
         # Corrida real: outro sync com o MESMO conteúdo publicou primeiro.
         # A linha perdedora nunca fica parcialmente gravada (transação
-        # inteira revertida) e nunca sobrescreve a vencedora — reconsulta e
-        # devolve a mesma identidade.
+        # inteira revertida) e nunca sobrescreve a vencedora — reconsulta,
+        # confirma a associação canônica e devolve a mesma identidade.
         async with unit_of_work(session_factory) as session:
             repo = SqlAlchemyCatalogRepository(session)
             winner = await repo.find_catalog_version_by_content_hash(content_hash)
-        if winner is None:  # pragma: no cover - defensivo, não deveria acontecer
-            raise
+            if winner is None:  # pragma: no cover - defensivo, não deveria acontecer
+                raise
+            await repo.mark_canonical(winner.id)
         return winner
 
 
@@ -109,15 +123,17 @@ async def resolve_catalog_for_match(
     session_factory: SessionFactory, mapping: CatalogMapping, game_patch: str
 ) -> CatalogVersion | None:
     """None = MISSING_CATALOG: patch sem entrada no mapping explícito (nunca
-    tenta rede para adivinhar) OU coberto pelo mapping mas nunca
-    sincronizado ainda. Resolução determinística: a identidade
-    (game_patch, data_dragon_version, mapping_version) é fixada pelo
-    mapping, nunca um "latest" implícito entre patches distintos."""
+    tenta rede para adivinhar), OU coberto pelo mapping mas sem catálogo
+    canônico definido (nunca sincronizado, ou legado ambíguo de antes da
+    revisão que introduziu is_canonical). Resolução determinística: no
+    máximo uma linha pode ser canônica para (game_patch, data_dragon_version,
+    mapping_version) — índice único parcial, nunca ORDER BY created_at
+    (empate possível, escolha incidental por data)."""
     entry = mapping.resolve(game_patch)
     if entry is None:
         return None
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyCatalogRepository(session)
-        return await repo.find_latest_catalog_version(
+        return await repo.find_canonical_catalog_version(
             game_patch, entry.data_dragon_version, mapping.mapping_version
         )

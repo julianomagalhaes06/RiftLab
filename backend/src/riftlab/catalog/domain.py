@@ -20,15 +20,32 @@ class CatalogVersion:
     aplicadas (nunca só os bytes brutos): uma mudança em qualquer um dos três
     produz uma identidade nova, nunca reaproveita conteúdo derivado
     desatualizado (pedido explícito do plano do CC-202). Único no banco
-    (índice único parcial em models.py) — a mesma identidade de conteúdo
-    nunca duplica linha (sync idempotente); conteúdo divergente sempre vira
-    uma linha nova, nunca sobrescreve a existente."""
+    (índice único em models.py) — a mesma identidade de conteúdo nunca
+    duplica linha (sync idempotente); conteúdo divergente sempre vira uma
+    linha nova, nunca sobrescreve a existente.
+
+    raw_hash e curation_rules_version (revisão CC-202) são proveniência
+    persistida separadamente do hash combinado — sha256 não é reversível,
+    então sem esses dois campos um consumidor não teria como recuperar qual
+    fetch/curadoria gerou este catálogo. is_canonical marca, no máximo uma
+    linha por identidade (game_patch, data_dragon_version, mapping_version —
+    índice único parcial em models.py), qual sincronização é a canônica
+    para NOVAS resoluções (resolve_catalog_for_match) — uma associação
+    deliberada, atualizada explicitamente a cada sync bem-sucedido, nunca
+    "a mais recente por created_at" (que pode empatar e não é uma decisão
+    intencional). Um catalog_id já obtido por um consumidor é sempre
+    consultável por ID exato e nunca muda de conteúdo, independentemente de
+    is_canonical — só a resolução para trabalho NOVO aponta para o
+    canônico atual."""
 
     id: uuid.UUID
     game_patch: str
     data_dragon_version: str
     sha256: str
     mapping_version: str
+    raw_hash: str
+    curation_rules_version: str
+    is_canonical: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +72,14 @@ class CatalogRepository(Protocol):
 
     async def add_item(self, item: Item) -> None: ...
 
+    async def add_excluded_item(self, catalog_id: uuid.UUID, excluded: ExcludedCatalogItem) -> None:
+        """Persiste um item excluído da curadoria com motivo (revisão
+        CC-202: sem isto, um consumidor não distingue item inexistente de
+        item conhecido e explicitamente não suportado)."""
+        ...
+
+    async def list_excluded_items(self, catalog_id: uuid.UUID) -> list[ExcludedCatalogItem]: ...
+
     async def get_catalog_version(self, catalog_id: uuid.UUID) -> CatalogVersion | None: ...
 
     async def get_item(self, catalog_id: uuid.UUID, item_id: int) -> Item | None: ...
@@ -64,18 +89,28 @@ class CatalogRepository(Protocol):
         de idempotência antes de tentar persistir de novo."""
         ...
 
-    async def find_latest_catalog_version(
+    async def find_canonical_catalog_version(
         self, game_patch: str, data_dragon_version: str, mapping_version: str
     ) -> CatalogVersion | None:
-        """Resolução determinística partida->catálogo (CC-202): dado o
-        mapping já resolvido (game_patch, data_dragon_version, mapping_version
-        — os três fixados por configuração explícita, nunca "latest"
-        implícito), devolve o catálogo mais recente sincronizado para essa
-        identidade exata, ou None (MISSING_CATALOG — nunca sincronizado).
-        Mais de uma linha para a mesma identidade só ocorre se o conteúdo
-        upstream divergiu entre sincronizações (nunca sobrescrito); a mais
-        recente é a canônica para novas resoluções — catálogos antigos
-        continuam consultáveis por ID exato, nunca reescritos."""
+        """Resolução determinística partida->catálogo (CC-202, revisão): dado
+        o mapping já resolvido (game_patch, data_dragon_version,
+        mapping_version — os três fixados por configuração explícita, nunca
+        "latest" implícito), devolve a linha marcada is_canonical=true para
+        essa identidade exata, ou None (MISSING_CATALOG — nunca
+        sincronizado, ou legado sem canônico definido). Nunca ORDER BY
+        created_at: no máximo uma linha por identidade pode ser canônica
+        (índice único parcial em models.py), então não há empate possível
+        nem escolha incidental por data."""
+        ...
+
+    async def mark_canonical(self, catalog_id: uuid.UUID) -> None:
+        """Marca catalog_id como a associação canônica para sua identidade
+        (game_patch, data_dragon_version, mapping_version), desmarcando
+        qualquer outra linha da mesma identidade — ação deliberada chamada
+        ao final de todo sync bem-sucedido (revisão CC-202), nunca inferida
+        implicitamente por ordem de inserção. Nunca reescreve conteúdo de
+        item/catálogo, só a associação de qual linha é a canônica agora;
+        catalog_id antigos continuam consultáveis por ID exato, imutáveis."""
         ...
 
 
@@ -167,6 +202,11 @@ def validate_item_types_and_limits(items: tuple[CatalogItemSourceDTO, ...]) -> N
                 detail=f"item {item.item_id} com price inválido: {item.price!r}",
             )
         for component in item.recipe:
+            if not isinstance(component, dict):
+                raise SourceSchemaError(
+                    code="CATALOG_SOURCE_MISSING_FIELD",
+                    detail=f"item {item.item_id} com entrada de receita que não é objeto",
+                )
             component_id = component.get("itemId")
             quantity = component.get("quantity")
             if isinstance(component_id, bool) or not isinstance(component_id, int):
@@ -193,6 +233,11 @@ def validate_recipe_graph(items: tuple[CatalogItemSourceDTO, ...]) -> None:
     by_id = {item.item_id: item for item in items}
     for item in items:
         for component in item.recipe:
+            if not isinstance(component, dict):
+                raise SourceSchemaError(
+                    code="CATALOG_SOURCE_MISSING_FIELD",
+                    detail=f"item {item.item_id} com entrada de receita que não é objeto",
+                )
             component_id = component.get("itemId")
             if component_id not in by_id:
                 raise RecipeReferenceError(

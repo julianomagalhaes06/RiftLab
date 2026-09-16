@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, String
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,16 +18,18 @@ class CatalogVersionModel(UuidPkMixin, CreatedAtMixin, Base):
         # linha; conteúdo divergente sempre gera identidade (e linha) nova,
         # nunca sobrescreve a existente.
         Index("uq_catalog_versions_sha256", "sha256", unique=True),
-        # Resolução determinística partida -> catálogo mais recente para uma
-        # identidade (game_patch, data_dragon_version, mapping_version) já
-        # fixada por configuração explícita — nunca "latest" entre patches
-        # distintos, só desempate dentro da MESMA identidade declarada.
+        # No máximo uma linha por identidade (game_patch, data_dragon_version,
+        # mapping_version) pode ser a canônica — revisão CC-202: substitui o
+        # antigo ORDER BY created_at (empate possível, escolha incidental
+        # por data). A associação canônica é deliberada, atualizada
+        # explicitamente por mark_canonical a cada sync bem-sucedido.
         Index(
-            "ix_catalog_versions_identity_created_at",
+            "ux_catalog_versions_canonical_identity",
             "game_patch",
             "data_dragon_version",
             "mapping_version",
-            "created_at",
+            unique=True,
+            postgresql_where=text("is_canonical"),
         ),
     )
 
@@ -35,6 +37,12 @@ class CatalogVersionModel(UuidPkMixin, CreatedAtMixin, Base):
     data_dragon_version: Mapped[str] = mapped_column(String, nullable=False)
     sha256: Mapped[str] = mapped_column(String, nullable=False)
     mapping_version: Mapped[str] = mapped_column(String, nullable=False)
+    # Proveniência persistida separadamente do hash combinado (revisão
+    # CC-202): sha256 não é reversível, sem estes dois campos não seria
+    # possível recuperar qual fetch/curadoria gerou o catálogo.
+    raw_hash: Mapped[str] = mapped_column(String, nullable=False)
+    curation_rules_version: Mapped[str] = mapped_column(String, nullable=False)
+    is_canonical: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class ItemModel(Base):
@@ -50,3 +58,19 @@ class ItemModel(Base):
     attributes: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     flags: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     schema_version: Mapped[str] = mapped_column(String, nullable=False, default="v1")
+
+
+class CatalogExcludedItemModel(Base):
+    """Item presente na fonte bruta mas excluído da curadoria com motivo
+    explícito (revisão CC-202) — sem esta tabela, um consumidor não
+    distingue item inexistente de item conhecido e explicitamente não
+    suportado ao ler um catálogo já persistido."""
+
+    __tablename__ = "catalog_excluded_items"
+
+    catalog_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("catalog_versions.id"), primary_key=True
+    )
+    item_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reason_code: Mapped[str] = mapped_column(String, nullable=False)
+    detail: Mapped[str] = mapped_column(String, nullable=False)

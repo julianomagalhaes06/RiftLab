@@ -93,6 +93,8 @@ class TestCatalogRoundTrip:
                     data_dragon_version="14.18.1",
                     sha256=_fake_sha256(),
                     mapping_version="v1",
+                    raw_hash=_fake_sha256(),
+                    curation_rules_version="v1",
                 )
             )
             await repo.add_item(
@@ -127,6 +129,8 @@ class TestCatalogRoundTrip:
                         data_dragon_version=patch + ".1",
                         sha256=_fake_sha256(),
                         mapping_version="v1",
+                        raw_hash=_fake_sha256(),
+                        curation_rules_version="v1",
                     )
                 )
                 await repo.add_item(Item(catalog_id=catalog_id, item_id=2003, price=800))
@@ -150,6 +154,8 @@ class TestCatalogRoundTrip:
                         data_dragon_version="14.18.1",
                         sha256=_fake_sha256(),
                         mapping_version="v1",
+                        raw_hash=_fake_sha256(),
+                        curation_rules_version="v1",
                     )
                 )
                 await repo.add_item(Item(catalog_id=catalog_id, item_id=1, price=-1))
@@ -474,6 +480,8 @@ class TestRollback:
                         data_dragon_version="14.18.1",
                         sha256=_fake_sha256(),
                         mapping_version="v1",
+                        raw_hash=_fake_sha256(),
+                        curation_rules_version="v1",
                     )
                 )
                 ingestion_repo = SqlAlchemyIngestionRepository(session)
@@ -495,7 +503,7 @@ class TestIndexes:
             "ix_timeline_events_match_ts",
             "ix_decision_states_match_participant",
             "uq_catalog_versions_sha256",
-            "ix_catalog_versions_identity_created_at",
+            "ux_catalog_versions_canonical_identity",
         }
         async with session_factory() as session:
             result = await session.execute(

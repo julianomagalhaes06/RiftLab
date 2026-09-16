@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from riftlab.catalog.domain import CatalogVersion, Item
-from riftlab.catalog.models import CatalogVersionModel, ItemModel
-from riftlab.shared.errors import ConflictError
+from riftlab.catalog.domain import CatalogVersion, ExcludedCatalogItem, Item
+from riftlab.catalog.models import CatalogExcludedItemModel, CatalogVersionModel, ItemModel
+from riftlab.shared.errors import ConflictError, NotFoundError
 
 
 class SqlAlchemyCatalogRepository:
@@ -26,6 +26,9 @@ class SqlAlchemyCatalogRepository:
                 data_dragon_version=catalog.data_dragon_version,
                 sha256=catalog.sha256,
                 mapping_version=catalog.mapping_version,
+                raw_hash=catalog.raw_hash,
+                curation_rules_version=catalog.curation_rules_version,
+                is_canonical=False,  # mark_canonical() decide isso explicitamente depois
             )
         )
         try:
@@ -52,6 +55,26 @@ class SqlAlchemyCatalogRepository:
             )
         )
 
+    async def add_excluded_item(self, catalog_id: uuid.UUID, excluded: ExcludedCatalogItem) -> None:
+        self._session.add(
+            CatalogExcludedItemModel(
+                catalog_id=catalog_id,
+                item_id=excluded.item_id,
+                reason_code=excluded.reason_code,
+                detail=excluded.detail,
+            )
+        )
+
+    async def list_excluded_items(self, catalog_id: uuid.UUID) -> list[ExcludedCatalogItem]:
+        stmt = select(CatalogExcludedItemModel).where(
+            CatalogExcludedItemModel.catalog_id == catalog_id
+        )
+        result = await self._session.execute(stmt)
+        return [
+            ExcludedCatalogItem(item_id=row.item_id, reason_code=row.reason_code, detail=row.detail)
+            for row in result.scalars()
+        ]
+
     async def get_catalog_version(self, catalog_id: uuid.UUID) -> CatalogVersion | None:
         row = await self._session.get(CatalogVersionModel, catalog_id)
         return _catalog_version_from_row(row) if row is not None else None
@@ -76,22 +99,40 @@ class SqlAlchemyCatalogRepository:
         row = result.scalars().first()
         return _catalog_version_from_row(row) if row is not None else None
 
-    async def find_latest_catalog_version(
+    async def find_canonical_catalog_version(
         self, game_patch: str, data_dragon_version: str, mapping_version: str
     ) -> CatalogVersion | None:
-        stmt = (
-            select(CatalogVersionModel)
-            .where(
-                CatalogVersionModel.game_patch == game_patch,
-                CatalogVersionModel.data_dragon_version == data_dragon_version,
-                CatalogVersionModel.mapping_version == mapping_version,
-            )
-            .order_by(CatalogVersionModel.created_at.desc())
-            .limit(1)
+        stmt = select(CatalogVersionModel).where(
+            CatalogVersionModel.game_patch == game_patch,
+            CatalogVersionModel.data_dragon_version == data_dragon_version,
+            CatalogVersionModel.mapping_version == mapping_version,
+            CatalogVersionModel.is_canonical.is_(True),
         )
         result = await self._session.execute(stmt)
         row = result.scalars().first()
         return _catalog_version_from_row(row) if row is not None else None
+
+    async def mark_canonical(self, catalog_id: uuid.UUID) -> None:
+        row = await self._session.get(CatalogVersionModel, catalog_id)
+        if row is None:
+            raise NotFoundError(f"catalog_version {catalog_id} não encontrado")
+        # Desmarca qualquer OUTRA linha da mesma identidade primeiro — o
+        # índice único parcial (revisão CC-202) não é deferido, então nunca
+        # pode haver duas linhas simultaneamente canônicas nem por um
+        # instante dentro desta transação; a ordem aqui garante isso.
+        await self._session.execute(
+            update(CatalogVersionModel)
+            .where(
+                CatalogVersionModel.game_patch == row.game_patch,
+                CatalogVersionModel.data_dragon_version == row.data_dragon_version,
+                CatalogVersionModel.mapping_version == row.mapping_version,
+                CatalogVersionModel.id != catalog_id,
+                CatalogVersionModel.is_canonical.is_(True),
+            )
+            .values(is_canonical=False)
+        )
+        row.is_canonical = True
+        await self._session.flush()
 
 
 def _catalog_version_from_row(row: CatalogVersionModel) -> CatalogVersion:
@@ -101,4 +142,7 @@ def _catalog_version_from_row(row: CatalogVersionModel) -> CatalogVersion:
         data_dragon_version=row.data_dragon_version,
         sha256=row.sha256,
         mapping_version=row.mapping_version,
+        raw_hash=row.raw_hash,
+        curation_rules_version=row.curation_rules_version,
+        is_canonical=row.is_canonical,
     )

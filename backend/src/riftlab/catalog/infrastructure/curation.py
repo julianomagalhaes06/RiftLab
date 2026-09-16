@@ -25,10 +25,22 @@ Worlds" (3867, excluído por specialRecipe) declaram from=["3867"]. Uma
 referência para um item excluído nunca é tratada como "inexistente" (erro
 de catálogo inteiro) nem como componente normal (reconciliação impossível,
 o item base não tem preço/receita numérica real) — o item dependente é
-excluído em cascata, motivo explícito, nunca reescrito para caber (v3)."""
+excluído em cascata, motivo explícito, nunca reescrito para caber (v3).
+
+Revisão (v4): validação explícita reforçada em toda leitura de container —
+chaves de `from`/`maps` precisam ser strings numéricas de verdade antes de
+`int()` (nunca deixa `ValueError` cru escapar); valores de `maps` precisam
+ser booleanos de verdade (um valor não-booleano nunca é tratado como
+"mapa=false" por acidente — isso confundiria inválido com ausência
+legítima); valores de `stats` precisam ser número finito, nunca bool nem
+string; `name` de tipo errado (não string) é falha estrutural — só uma
+string vazia (tipo certo, valor legitimamente ausente, achado real de
+rede) é excluída como artefato; item_id duplicado após normalização (ex.:
+chaves "007" e "7" colapsando no mesmo inteiro) é rejeitado explicitamente."""
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 from dataclasses import dataclass
 from typing import Any
@@ -36,7 +48,7 @@ from typing import Any
 from riftlab.catalog.domain import CatalogItemSourceDTO, ExcludedCatalogItem
 from riftlab.shared.errors import SourceSchemaError
 
-CURATION_RULES_VERSION = "data_dragon_v3"
+CURATION_RULES_VERSION = "data_dragon_v4"
 
 _REASON_SPECIAL_RECIPE = "SPECIAL_RECIPE_UNSUPPORTED"
 _REASON_MISSING_NAME = "MISSING_NAME_UNSUPPORTED"
@@ -69,6 +81,82 @@ def _require_non_negative_int(value: Any, field: str) -> int:
     return parsed
 
 
+def _parse_legal_maps(maps_field: Any, item_id: int) -> list[int]:
+    if not isinstance(maps_field, dict):
+        raise SourceSchemaError(
+            code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} sem campo maps"
+        )
+    legal_maps: list[int] = []
+    for map_id, legal in maps_field.items():
+        if not isinstance(map_id, str) or not map_id.isdigit():
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=f"item {item_id} com chave de maps não numérica: {map_id!r}",
+            )
+        # bool de verdade, nunca um valor truthy qualquer (revisão: "yes"
+        # não pode virar false silenciosamente — inválido e ausência
+        # legítima são coisas diferentes).
+        if not isinstance(legal, bool):
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=f"item {item_id} com valor de maps[{map_id!r}] não booleano: {legal!r}",
+            )
+        if legal:
+            legal_maps.append(int(map_id))
+    return sorted(legal_maps)
+
+
+def _parse_tags(tags: Any, item_id: int) -> list[str]:
+    if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+        raise SourceSchemaError(
+            code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} tags inválidas"
+        )
+    return tags
+
+
+def _parse_stats(stats: Any, item_id: int) -> dict[str, float]:
+    if not isinstance(stats, dict):
+        raise SourceSchemaError(
+            code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} stats inválido"
+        )
+    for stat_key, stat_value in stats.items():
+        if not isinstance(stat_key, str) or not stat_key:
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=f"item {item_id} com chave de stats inválida: {stat_key!r}",
+            )
+        if (
+            isinstance(stat_value, bool)
+            or not isinstance(stat_value, (int, float))
+            or not math.isfinite(stat_value)
+        ):
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=(
+                    f"item {item_id} com stats[{stat_key!r}] não numérico finito: {stat_value!r}"
+                ),
+            )
+    return stats
+
+
+def _parse_recipe(raw_from: Any, item_id: int) -> list[dict[str, int]]:
+    if not isinstance(raw_from, list):
+        raise SourceSchemaError(
+            code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} campo from inválido"
+        )
+    for component in raw_from:
+        if not isinstance(component, str) or not component.isdigit():
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=f"item {item_id} com componente de from inválido: {component!r}",
+            )
+    component_counts = Counter(raw_from)
+    return [
+        {"itemId": int(component_id), "quantity": quantity}
+        for component_id, quantity in sorted(component_counts.items(), key=lambda kv: kv[0])
+    ]
+
+
 def curate_data_dragon_items(
     raw_items: Any,
 ) -> tuple[tuple[CatalogItemSourceDTO, ...], tuple[ExcludedCatalogItem, ...]]:
@@ -86,6 +174,7 @@ def curate_data_dragon_items(
 
     candidates: dict[int, _Candidate] = {}
     excluded: list[ExcludedCatalogItem] = []
+    seen_ids: set[int] = set()
 
     for raw_item_id, raw_item in raw_items.items():
         if not isinstance(raw_item_id, str) or not raw_item_id.isdigit():
@@ -94,6 +183,15 @@ def curate_data_dragon_items(
                 detail=f"chave de item não é um item_id numérico: {raw_item_id!r}",
             )
         item_id = int(raw_item_id)
+        # Duas chaves brutas distintas podem colapsar no mesmo inteiro após
+        # normalização (ex.: "007" e "7") — rejeitado explicitamente, nunca
+        # a segunda sobrescreve a primeira silenciosamente.
+        if item_id in seen_ids:
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=f"item_id {item_id} duplicado após normalização da chave bruta",
+            )
+        seen_ids.add(item_id)
         if not isinstance(raw_item, dict):
             raise SourceSchemaError(
                 code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} não é um objeto"
@@ -102,16 +200,23 @@ def curate_data_dragon_items(
         # Achado real (Data Dragon 16.17.1, rede pública, fora da CI):
         # alguns itens legítimos do payload real têm name="" (ex.: item
         # 2008, inStore=false, sem mapa legal algum) — artefatos internos/
-        # legados do provedor, não um schema quebrado. Nunca inventamos um
-        # nome nem tratamos isso como falha do catálogo inteiro: excluído
-        # com motivo explícito, mesma política de specialRecipe.
+        # legados do provedor, não um schema quebrado. Distinção deliberada
+        # (revisão): tipo errado (não string, inclusive ausente) é falha
+        # estrutural do documento; só uma string VAZIA (tipo certo, valor
+        # legitimamente ausente) é excluída como artefato conhecido — nunca
+        # tratamos as duas situações como a mesma coisa.
         name = raw_item.get("name")
-        if not isinstance(name, str) or not name:
+        if not isinstance(name, str):
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=f"item {item_id} com name de tipo inválido: {type(name).__name__}",
+            )
+        if not name:
             excluded.append(
                 ExcludedCatalogItem(
                     item_id=item_id,
                     reason_code=_REASON_MISSING_NAME,
-                    detail="item sem name (string vazia ou ausente) — artefato não curável",
+                    detail="item sem name (string vazia) — artefato não curável",
                 )
             )
             continue
@@ -129,24 +234,9 @@ def curate_data_dragon_items(
                 detail=f"item {item_id} gold.purchasable não é booleano",
             )
 
-        maps_field = raw_item.get("maps")
-        if not isinstance(maps_field, dict):
-            raise SourceSchemaError(
-                code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} sem campo maps"
-            )
-        legal_maps = sorted(int(map_id) for map_id, legal in maps_field.items() if legal is True)
-
-        tags = raw_item.get("tags", [])
-        if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
-            raise SourceSchemaError(
-                code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} tags inválidas"
-            )
-
-        stats = raw_item.get("stats", {})
-        if not isinstance(stats, dict):
-            raise SourceSchemaError(
-                code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} stats inválido"
-            )
+        legal_maps = _parse_legal_maps(raw_item.get("maps"), item_id)
+        tags = _parse_tags(raw_item.get("tags", []), item_id)
+        stats = _parse_stats(raw_item.get("stats", {}), item_id)
 
         # Itens com specialRecipe (ex.: upgrades Ornn, Muramana) não têm uma
         # lista de componentes reconciliável do mesmo jeito que o resto do
@@ -164,16 +254,7 @@ def curate_data_dragon_items(
             )
             continue
 
-        raw_from = raw_item.get("from", [])
-        if not isinstance(raw_from, list) or not all(isinstance(c, str) for c in raw_from):
-            raise SourceSchemaError(
-                code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} campo from inválido"
-            )
-        component_counts = Counter(raw_from)
-        recipe = [
-            {"itemId": int(component_id), "quantity": quantity}
-            for component_id, quantity in sorted(component_counts.items(), key=lambda kv: kv[0])
-        ]
+        recipe = _parse_recipe(raw_item.get("from", []), item_id)
 
         flags: dict[str, Any] = {"purchasable": purchasable, "maps": legal_maps}
         required_champion = raw_item.get("requiredChampion")

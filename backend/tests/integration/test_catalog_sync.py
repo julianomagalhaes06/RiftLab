@@ -14,7 +14,12 @@ from riftlab.catalog.application import (
     resolve_catalog_for_match,
     sync_catalog,
 )
-from riftlab.catalog.domain import CatalogItemSourceDTO, CatalogSourceResult, CatalogVersion
+from riftlab.catalog.domain import (
+    CatalogItemSourceDTO,
+    CatalogSourceResult,
+    CatalogVersion,
+    ExcludedCatalogItem,
+)
 from riftlab.catalog.infrastructure.catalog_mapping import parse_catalog_mapping_document
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.shared.db import unit_of_work
@@ -130,6 +135,8 @@ async def test_concurrent_add_catalog_version_same_content_only_one_wins(
         data_dragon_version="16.17.1",
         sha256=content_hash,
         mapping_version="v1",
+        raw_hash="a" * 64,
+        curation_rules_version="v1",
     )
     catalog_b = CatalogVersion(
         id=catalog_id_b,
@@ -137,6 +144,8 @@ async def test_concurrent_add_catalog_version_same_content_only_one_wins(
         data_dragon_version="16.17.1",
         sha256=content_hash,
         mapping_version="v1",
+        raw_hash="a" * 64,
+        curation_rules_version="v1",
     )
 
     a_inserted = asyncio.Event()
@@ -209,3 +218,137 @@ async def test_resolve_catalog_for_match_after_sync_finds_exact_catalog(session_
 
     assert resolved is not None
     assert resolved.id == synced.id
+
+
+async def test_sync_persists_raw_hash_and_curation_rules_version(session_factory) -> None:
+    """Achado real da revisão: sync_catalog persistia só o hash combinado,
+    nunca a proveniência (raw_hash/curation_rules_version) separadamente —
+    irrecuperável depois, já que sha256 não é reversível."""
+    raw_hash = uuid.uuid4().hex + uuid.uuid4().hex
+    source = _FakeCatalogSource(_result(raw_hash=raw_hash, curation_rules_version="v7-teste"))
+
+    catalog = await sync_catalog(session_factory, source, "16.17")
+
+    assert catalog.raw_hash == raw_hash
+    assert catalog.curation_rules_version == "v7-teste"
+
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        reloaded = await repo.get_catalog_version(catalog.id)
+    assert reloaded is not None
+    assert reloaded.raw_hash == raw_hash
+    assert reloaded.curation_rules_version == "v7-teste"
+
+
+async def test_sync_persists_excluded_items_with_reason(session_factory) -> None:
+    """Achado real da revisão: excluded_items existia no DTO mas nunca era
+    persistido — sem isso, um consumidor futuro não distingue item
+    inexistente de item conhecido e explicitamente não suportado."""
+    raw_hash = uuid.uuid4().hex + uuid.uuid4().hex
+    result_with_excluded = CatalogSourceResult(
+        game_patch="16.17",
+        origin=SourceOrigin.COMPLETED_MATCH,
+        schema_version="test_v1",
+        raw_hash=raw_hash,
+        data_dragon_version="16.17.1",
+        mapping_version="v1",
+        curation_rules_version="v1",
+        items=(CatalogItemSourceDTO(item_id=1001, price=400),),
+        excluded_items=(
+            ExcludedCatalogItem(
+                item_id=9999,
+                reason_code="SPECIAL_RECIPE_UNSUPPORTED",
+                detail="item sintético com specialRecipe",
+            ),
+        ),
+    )
+    source = _FakeCatalogSource(result_with_excluded)
+
+    catalog = await sync_catalog(session_factory, source, "16.17")
+
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        excluded = await repo.list_excluded_items(catalog.id)
+    assert len(excluded) == 1
+    assert excluded[0].item_id == 9999
+    assert excluded[0].reason_code == "SPECIAL_RECIPE_UNSUPPORTED"
+
+
+async def test_resync_different_content_same_identity_switches_canonical(session_factory) -> None:
+    """Achado real da revisão: resolução usava ORDER BY created_at (empate
+    possível, escolha incidental por data). Duas variantes de conteúdo para
+    a MESMA identidade (patch/dataDragon/mapping — ex.: correção de
+    curadoria ou mudança real do raw) precisam de seleção determinística: a
+    sincronização mais recente vira canônica explicitamente, a anterior
+    continua consultável por ID exato, intacta, nunca sobrescrita."""
+    mapping = parse_catalog_mapping_document(_MAPPING_1617_YAML)
+
+    raw_hash_a = uuid.uuid4().hex + uuid.uuid4().hex
+    source_a = _FakeCatalogSource(_result(raw_hash=raw_hash_a, price=400))
+    catalog_a = await sync_catalog(session_factory, source_a, "16.17")
+    resolved_after_a = await resolve_catalog_for_match(session_factory, mapping, "16.17")
+    assert resolved_after_a is not None
+    assert resolved_after_a.id == catalog_a.id
+
+    raw_hash_b = uuid.uuid4().hex + uuid.uuid4().hex
+    source_b = _FakeCatalogSource(_result(raw_hash=raw_hash_b, price=999))
+    catalog_b = await sync_catalog(session_factory, source_b, "16.17")
+    resolved_after_b = await resolve_catalog_for_match(session_factory, mapping, "16.17")
+    assert resolved_after_b is not None
+    assert resolved_after_b.id == catalog_b.id
+    assert resolved_after_b.id != catalog_a.id  # canônico mudou de linha
+
+    # Catálogo antigo permanece consultável por ID exato, com o preço
+    # original intacto — nunca uma UPDATE retroativa de item referenciado.
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        old_item = await repo.get_item(catalog_a.id, 1001)
+    assert old_item is not None
+    assert old_item.price == 400
+
+
+async def test_concurrent_sync_catalog_service_calls_same_content_converge(
+    session_factory,
+) -> None:
+    """Achado real da revisão: o teste de concorrência existente exercitava
+    só add_catalog_version no nível do repositório. Este exercita o SERVIÇO
+    sync_catalog completo (busca+valida+persiste+marca canônico) com duas
+    chamadas reais e concorrentes de verdade — não sequencial: um
+    asyncio.Event libera as duas ao mesmo tempo depois de ambas já estarem
+    bloqueadas, forçando sobreposição real das transações. As duas
+    precisam devolver a identidade completa (id/sha256/raw_hash/
+    curation_rules_version) da mesma linha vencedora, sem exceção
+    propagada nem persistência parcial."""
+    raw_hash = uuid.uuid4().hex + uuid.uuid4().hex
+    shared_result = _result(raw_hash=raw_hash, curation_rules_version="v-concorrencia")
+    release = asyncio.Event()
+
+    class _SlowFakeCatalogSource:
+        def __init__(self, result: CatalogSourceResult) -> None:
+            self._result = result
+
+        async def load_catalog(self, game_patch: str) -> CatalogSourceResult:
+            await asyncio.wait_for(release.wait(), timeout=5)
+            return self._result
+
+    async def _sync(source: _SlowFakeCatalogSource) -> CatalogVersion:
+        return await sync_catalog(session_factory, source, "16.17")
+
+    task_a = asyncio.ensure_future(_sync(_SlowFakeCatalogSource(shared_result)))
+    task_b = asyncio.ensure_future(_sync(_SlowFakeCatalogSource(shared_result)))
+    await asyncio.sleep(0.2)  # garante que as duas já estão bloqueadas em release.wait()
+    release.set()
+
+    catalog_a, catalog_b = await asyncio.wait_for(asyncio.gather(task_a, task_b), timeout=15)
+
+    assert catalog_a.id == catalog_b.id
+    expected_hash = compute_catalog_content_hash(shared_result)
+    assert catalog_a.sha256 == catalog_b.sha256 == expected_hash
+    assert catalog_a.raw_hash == catalog_b.raw_hash == raw_hash
+    assert catalog_a.curation_rules_version == catalog_b.curation_rules_version == "v-concorrencia"
+
+    # Conjunto completo de itens persistido de verdade, não só a identidade.
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        item = await repo.get_item(catalog_a.id, 1001)
+    assert item is not None

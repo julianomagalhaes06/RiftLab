@@ -44,6 +44,27 @@ class DataDragonCatalogSource:
                 code="CATALOG_SOURCE_MISSING_FIELD", detail="documento raiz não é objeto JSON"
             )
 
+        # Achado real da revisão: a URL correta não prova que o corpo é
+        # correto (proxy/cache/versão trocada). Confere a identidade
+        # estrutural do próprio documento — type/version declarados dentro
+        # do corpo — contra a versão exata solicitada, antes de qualquer
+        # curadoria/persistência; nunca rotula o resultado com a versão
+        # pedida sem confirmar que o corpo realmente é dessa versão.
+        if document.get("type") != "item":
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=f"documento com type inesperado: {document.get('type')!r}",
+            )
+        payload_version = document.get("version")
+        if payload_version != entry.data_dragon_version:
+            raise SourceSchemaError(
+                code="DATA_DRAGON_VERSION_MISMATCH",
+                detail=(
+                    f"corpo do Data Dragon declara version={payload_version!r}, "
+                    f"esperado {entry.data_dragon_version!r} (mapping para {game_patch!r})"
+                ),
+            )
+
         items, excluded = curate_data_dragon_items(document.get("data"))
 
         result = CatalogSourceResult(
