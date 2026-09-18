@@ -117,6 +117,25 @@ class SqlAlchemyIngestionRepository:
             subject_hash=row.subject_hash,
         )
 
+    async def list_participants(self, match_id: str) -> list[Participant]:
+        stmt = (
+            select(ParticipantModel)
+            .where(ParticipantModel.match_id == match_id)
+            .order_by(ParticipantModel.participant_id)
+        )
+        result = await self._session.execute(stmt)
+        return [
+            Participant(
+                match_id=row.match_id,
+                participant_id=row.participant_id,
+                champion_id=row.champion_id,
+                team=row.team,
+                role=row.role,
+                subject_hash=row.subject_hash,
+            )
+            for row in result.scalars()
+        ]
+
     async def get_import_job(self, job_id: uuid.UUID) -> ImportJob | None:
         row = await self._session.get(ImportJobModel, job_id)
         if row is None:

@@ -83,14 +83,31 @@ class SqlAlchemyTimelineRepository:
         result = await self._session.execute(stmt)
         return [_decision_state_from_row(row) for row in result.scalars()]
 
-    async def get_match_reconstruction(self, match_id: str) -> MatchReconstructionMarker | None:
-        row = await self._session.get(MatchReconstructionModel, match_id)
+    async def get_match_reconstruction(
+        self, match_id: str, reconstruction_version: int
+    ) -> MatchReconstructionMarker | None:
+        row = await self._session.get(
+            MatchReconstructionModel,
+            {"match_id": match_id, "reconstruction_version": reconstruction_version},
+        )
         if row is None:
             return None
-        return MatchReconstructionMarker(match_id=row.match_id, catalog_id=row.catalog_id)
+        return MatchReconstructionMarker(
+            match_id=row.match_id,
+            reconstruction_version=row.reconstruction_version,
+            catalog_id=row.catalog_id,
+        )
 
-    async def add_match_reconstruction(self, match_id: str, catalog_id: uuid.UUID | None) -> None:
-        self._session.add(MatchReconstructionModel(match_id=match_id, catalog_id=catalog_id))
+    async def add_match_reconstruction(
+        self, match_id: str, reconstruction_version: int, catalog_id: uuid.UUID | None
+    ) -> None:
+        self._session.add(
+            MatchReconstructionModel(
+                match_id=match_id,
+                reconstruction_version=reconstruction_version,
+                catalog_id=catalog_id,
+            )
+        )
 
 
 def _event_from_row(row: TimelineEventModel) -> TimelineEvent:

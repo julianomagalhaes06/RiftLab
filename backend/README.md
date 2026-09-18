@@ -97,21 +97,46 @@ multiconjunto de itens com trinket em slot separada (achado real: todo item com 
 possuída inclusive por subcomponentes transitivos nunca comprados diretamente (compra
 direta paga o restante, nunca exige posse total), 6 slots normais verificados contra as
 regras de empilhamento do catálogo (`flags.consumed`/`flags.stacks`), venda, undo
-(restaura o multiconjunto exato de uma correlação comprovada — inclusive o `afterId`
-declarado, nunca só o item — nunca um palpite) e ouro estimado a partir do último frame
-estritamente anterior ao evento (nunca interpolado, nunca negativo). Ambiguidade (item
-desconhecido do catálogo, destruição não reconciliada, capacidade excedida, regra de
-empilhamento desconhecida, undo sem correlação única, catálogo ausente para o patch)
-fica marcada como incerta de forma explícita e datada, nunca escondida nem "reparada"
-pelo inventário final. Persistência idempotente por uma marca atômica própria
-(`match_reconstructions`): reconstruir a mesma partida de novo devolve os mesmos
-estados, nunca duplica, independente de qual participante teve compra.
+(restaura o multiconjunto exato de uma correlação verificada por invariante interno —
+`beforeId` E `afterId` conferidos contra a operação reversível mais recente, nunca um
+palpite) e ouro estimado a partir do último frame estritamente anterior ao evento (nunca
+interpolado, nunca negativo). Ambiguidade (item desconhecido do catálogo, destruição não
+reconciliada, capacidade excedida, regra de empilhamento desconhecida, undo sem
+correlação única, catálogo ausente para o patch) fica marcada como incerta de forma
+explícita e datada, nunca escondida nem "reparada" pelo inventário final. Persistência
+idempotente por uma marca atômica própria e versionada (`match_reconstructions`,
+`RECONSTRUCTION_ALGORITHM_VERSION`): reconstruir a mesma partida de novo devolve os
+mesmos estados, nunca duplica, independente de qual participante teve compra; uma
+versão anterior do algoritmo nunca é apagada nem confundida com a atual.
 
-**Limitação registrada, não resolvida**: a reconciliação entre uma compra de receita e
-os `ITEM_DESTROYED` que ela dispara usa uma correlação por instante/item/quantidade —
-nunca validada contra o corpus de partidas reais auditado no CC-105 (indisponível neste
-ambiente). `DecisionState.quality.destroyReconciliationHeuristic` propaga essa
-limitação de forma explícita em todo estado persistido, nunca como certeza.
+**Evidência empírica e limites**: a reconciliação entre uma compra de receita e os
+`ITEM_DESTROYED` que ela dispara, e a correlação de `ITEM_UNDO`, usam regras internas
+sobre semântica que a Riot não documenta. Foram examinadas offline num corpus real
+pequeno — 10 partidas dos patches 14.20 e 15.1, com os catálogos históricos
+correspondentes do Data Dragon público — e o resultado orientou o reducer: nesse corpus,
+todos os 851 `ITEM_DESTROYED` que têm compra no mesmo timestamp precedem a compra (os
+componentes são destruídos antes de o item composto aparecer), e 759 dos 783 destroys
+compatíveis por ID com a receita de uma compra co-temporal foram alocados à compra
+correspondente; um undo de venda usa `beforeId=0`/`afterId=<item vendido>`, forma oposta
+à do undo de compra. Isso é consistência com uma amostra pequena e de dois patches, não
+semântica oficial: os patches do recorte congelado (16.16/16.17) não foram avaliados, os
+dados brutos não são versionados, e o que não pôde ser reconciliado continua marcado
+como incerto. Bater com uma regra interna não comprova a semântica real: fora do modo
+demo (dado sintético, verificado pela suíte de testes), aplicar qualquer uma das duas
+regras sempre marca `quality.uncertain=true` a partir dali — nunca apenas documentado,
+sempre um gate operacional (`UNVALIDATED_DESTROY_RECONCILIATION`/
+`UNVALIDATED_DESTROY_ORDER_RECONCILIATION`/`UNVALIDATED_UNDO_SEMANTICS` em
+`quality.reasons`).
+
+**Consumo pré-decisão** (para quem usa os `DecisionState`s, como a geração de candidatos
+e features): `quality.uncertain`/`quality.reasons` são cumulativos e incluem diagnósticos
+que só existem por causa do item escolhido (item desconhecido, capacidade excedida,
+reconciliações); não devem alimentar elegibilidade, features ou máscaras de ausência
+anteriores à decisão. Para isso existe `quality.preDecisionQuality`, calculada antes de
+processar a compra e independente do alvo — inclui catálogo ausente desde a primeira
+compra. Como as versões anteriores do algoritmo são preservadas (nunca apagadas),
+`list_decision_states` devolve estados de todas as versões: o consumidor deve filtrar por
+`state_version == RECONSTRUCTION_ALGORITHM_VERSION`.
 
 ## Migrações
 

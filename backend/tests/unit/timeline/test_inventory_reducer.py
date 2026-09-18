@@ -3,12 +3,13 @@ reconstruct_participant_purchases. Sem I/O, sem Postgres, sem rede — testa
 comportamento e falha do reducer em isolamento, não a persistência
 (ver tests/integration/test_timeline_reconstruction.py para o orquestrador).
 
-Corpus real local (data/raw/cc-105/) não está disponível neste ambiente
-(BLOCKED, ver .private/validation/sprint-2/CC-203/) — sequências de
+Os dados brutos reais não são versionados: as sequências de
 compra+destroy/empate temporal abaixo são sintéticas, construídas a partir
-do schema confirmado pela auditoria CC-105 (beforeId/afterId presentes em
-100% dos ITEM_UNDO reais; eventos repetidos com mesma assinatura ocorrem de
-verdade), não de partidas reais observadas."""
+do schema confirmado por uma auditoria de dados reais (beforeId/afterId
+presentes em 100% dos ITEM_UNDO reais; eventos repetidos com mesma assinatura
+ocorrem de verdade) e da forma dos eventos observada num corpus real pequeno
+(10 partidas, patches 14.20 e 15.1). Não são partidas reais nem provam
+semântica oficial da Riot."""
 
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from typing import Any
 import pytest
 
 from riftlab.catalog.domain import Item
+from riftlab.shared.domain import SourceOrigin
 from riftlab.timeline.application import reconstruct_participant_purchases
 from riftlab.timeline.domain import TimelineEvent, TimelineReplayError
 
@@ -57,6 +59,7 @@ def _reduce(
     events: list[TimelineEvent],
     *,
     participant_id: int = P1,
+    origin: SourceOrigin = SourceOrigin.CURATED_DEMO,
     catalog_id: uuid.UUID | None = CATALOG_ID,
     catalog_items: dict[int, Item] | None = None,
     excluded_item_ids: frozenset[int] = frozenset(),
@@ -64,6 +67,7 @@ def _reduce(
     return reconstruct_participant_purchases(
         participant_id=participant_id,
         events=events,
+        origin=origin,
         catalog_id=catalog_id,
         catalog_items=catalog_items,
         excluded_item_ids=excluded_item_ids,
@@ -441,9 +445,8 @@ def test_trinket_purchase_never_occupies_the_six_slots() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Regressões da revisão de aa3e304 (.private/handoffs/CC-203-REVIEW.md,
-# review_cc203_probe.py) — cada achado reproduzido e testado isoladamente,
-# não só o probe espelhado.
+# Regressões de falhas encontradas em revisão do reducer — cada uma
+# reproduzida e testada isoladamente.
 # ---------------------------------------------------------------------------
 
 
@@ -478,8 +481,35 @@ def test_undo_with_afterid_matching_consumed_component_is_accepted() -> None:
 
 
 def test_undo_of_sale_restores_sold_item() -> None:
-    """Achado 1: venda sempre apagava o ledger, deixando undo de venda sem
-    caminho suportado — plano explicitamente exige "venda/undo"."""
+    """Undo de venda restaura o item vendido (venda é uma operação
+    reversível, como a compra).
+
+    Forma do evento: um undo de VENDA observado em 16/16 casos no corpus
+    real analisado (10 partidas, patches 14.20 e 15.1) usa beforeId=0/
+    afterId=<item vendido> — a forma OPOSTA de um undo de COMPRA
+    (beforeId=<item>/afterId=0). goldGain nesses 16 casos é
+    majoritariamente negativo (14/16), mas 2/16 têm goldGain=0 — goldGain
+    não é parte da forma estrutural correlacionada (beforeId/afterId),
+    nunca usado como condição de correlação. Ver
+    test_undo_of_sale_purchase_shaped_event_never_correlates logo abaixo
+    para o contraste explícito."""
+    catalog = {1: _item(1), 9: _item(9)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_SOLD", participantId=P1, itemId=1, goldGain=50),
+        _event(2, 3000, "ITEM_UNDO", participantId=P1, beforeId=0, afterId=1, goldGain=-50),
+        _event(3, 4000, "ITEM_PURCHASED", participantId=P1, itemId=9),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].inventory_before.owned(1) == 1  # venda desfeita, item restaurado
+    assert purchases[-1].uncertain is False
+
+
+def test_undo_of_sale_purchase_shaped_event_never_correlates() -> None:
+    """Contraste explícito com o teste acima: o MESMO cenário, mas o evento
+    ITEM_UNDO usa a forma de undo de COMPRA (beforeId=<item>, afterId=0) em
+    vez da forma de venda observada no dado real -- nunca deve correlacionar
+    contra uma venda, mesmo com o item certo em beforeId."""
     catalog = {1: _item(1), 9: _item(9)}
     events = [
         _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
@@ -488,8 +518,60 @@ def test_undo_of_sale_restores_sold_item() -> None:
         _event(3, 4000, "ITEM_PURCHASED", participantId=P1, itemId=9),
     ]
     purchases = _reduce(events, catalog_items=catalog)
-    assert purchases[-1].inventory_before.owned(1) == 1  # venda desfeita, item restaurado
-    assert purchases[-1].uncertain is False
+    assert purchases[-1].inventory_before.owned(1) == 0  # venda NÃO desfeita
+    assert any(r.code == "UNDO_UNCORRELATED" for r in purchases[-1].reasons)
+
+
+def test_undo_of_sale_gates_eligibility_for_real_origin() -> None:
+    """Mesmo princípio de test_undo_correlation_gates_eligibility_for_real_
+    origin, agora para a forma de venda: correlacionar (pela regra interna)
+    em dado real também marca incerto, nunca alegado como comprovado."""
+    catalog = {1: _item(1), 9: _item(9)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_SOLD", participantId=P1, itemId=1, goldGain=50),
+        _event(2, 3000, "ITEM_UNDO", participantId=P1, beforeId=0, afterId=1, goldGain=-50),
+        _event(3, 4000, "ITEM_PURCHASED", participantId=P1, itemId=9),
+    ]
+    purchases = _reduce(events, origin=SourceOrigin.COMPLETED_MATCH, catalog_items=catalog)
+    final = purchases[-1]
+    assert final.inventory_before.owned(1) == 1  # restauração continua correta
+    assert final.uncertain is True
+    assert any(r.code == "UNVALIDATED_UNDO_SEMANTICS" for r in final.reasons)
+
+
+def test_undo_of_sale_intervening_purchase_invalidates_ledger() -> None:
+    """ "Operações intervenientes" (mesmo princípio de
+    test_undo_intervening_unrelated_purchase_invalidates_earlier_ledger),
+    agora para venda: vender X, comprar Y, tentar desfazer a venda de X
+    (beforeId=0, afterId=X) -- a operação reversível mais recente é a
+    compra de Y, não a venda de X, então correlacionar é ambíguo."""
+    catalog = {1: _item(1), 2: _item(2), 9: _item(9)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_SOLD", participantId=P1, itemId=1, goldGain=50),
+        _event(2, 3000, "ITEM_PURCHASED", participantId=P1, itemId=2),
+        _event(3, 4000, "ITEM_UNDO", participantId=P1, beforeId=0, afterId=1, goldGain=-50),
+        _event(4, 5000, "ITEM_PURCHASED", participantId=P1, itemId=9),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].inventory_before.owned(1) == 0  # venda de 1 NÃO desfeita
+    assert any(r.code == "UNDO_UNCORRELATED" for r in purchases[-1].reasons)
+
+
+def test_undo_of_sale_contradictory_after_id_never_applied() -> None:
+    """beforeId=0 batendo com a forma de venda não basta -- afterId precisa
+    ser exatamente o item vendido, nunca aplicado às cegas com outro item."""
+    catalog = {1: _item(1), 2: _item(2), 9: _item(9)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_SOLD", participantId=P1, itemId=1, goldGain=50),
+        _event(2, 3000, "ITEM_UNDO", participantId=P1, beforeId=0, afterId=2, goldGain=-50),
+        _event(3, 4000, "ITEM_PURCHASED", participantId=P1, itemId=9),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].inventory_before.owned(1) == 0
+    assert any(r.code == "UNDO_UNCORRELATED" for r in purchases[-1].reasons)
 
 
 def test_undo_intervening_unrelated_purchase_invalidates_earlier_ledger() -> None:
@@ -662,10 +744,13 @@ def test_stack_rule_unknown_for_consumable_without_declared_stacks() -> None:
     assert any(r.code == "ITEM_STACK_RULE_UNKNOWN" for r in purchases[-1].reasons)
 
 
-def test_destroy_reconciliation_heuristic_flag_propagates_forward_only() -> None:
-    """Achado 3: reconciliação de destroy é sempre uma estimativa (corpus
-    ausente), propagada explicitamente em toda decisão a partir do ponto em
-    que ocorre — nunca contamina uma decisão anterior."""
+def test_destroy_reconciliation_heuristic_flag_propagates_forward_only_demo() -> None:
+    """Reconciliação de destroy é sempre uma estimativa, propagada
+    explicitamente em toda decisão a partir do ponto em que ocorre — nunca
+    contamina uma decisão anterior. EM DEMO (origin default deste helper),
+    a regra sintética é verificada por este próprio teste, então pode
+    ficar uncertain=False; em dado real NUNCA (ver
+    test_destroy_reconciliation_heuristic_gates_eligibility_for_real_origin)."""
     catalog = {1: _item(1), 2: _item(2, recipe=[{"itemId": 1, "quantity": 1}]), 9: _item(9)}
     events = [
         _event(
@@ -679,8 +764,68 @@ def test_destroy_reconciliation_heuristic_flag_propagates_forward_only() -> None
     assert purchases[0].destroy_reconciliation_heuristic_used is False
     assert purchases[1].destroy_reconciliation_heuristic_used is False  # ainda antes do destroy
     assert purchases[2].destroy_reconciliation_heuristic_used is True
-    # reconciliação em si nunca bloqueia recomendação sozinha (distinto de uncertain)
+    # em DEMO, reconciliação não bloqueia sozinha (regra sintética verificada aqui mesmo)
     assert purchases[2].uncertain is False
+
+
+def test_destroy_reconciliation_heuristic_gates_eligibility_for_real_origin() -> None:
+    """Um sinalizador só de documentação não basta: compra A, compra B
+    consome A, destroy A no mesmo timestamp, compra C, com
+    origin=COMPLETED_MATCH — bater com a heurística de reconciliação NUNCA
+    é certeza fora de DEMO. Dupla contagem continua prevenida
+    (owned(1)==0), mas o participante fica marcado incerto a partir da
+    reconciliação."""
+    catalog = {1: _item(1), 2: _item(2, recipe=[{"itemId": 1, "quantity": 1}]), 9: _item(9)}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1),
+        _event(1, 2000, "ITEM_PURCHASED", participantId=P1, itemId=2),
+        _event(2, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1),
+        _event(3, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9),
+    ]
+    purchases = _reduce(events, origin=SourceOrigin.COMPLETED_MATCH, catalog_items=catalog)
+    assert purchases[1].uncertain is False  # antes da reconciliação, ainda certo
+    assert purchases[2].destroy_reconciliation_heuristic_used is True
+    assert purchases[2].uncertain is True  # gate operacional, não só documental
+    assert any(r.code == "UNVALIDATED_DESTROY_RECONCILIATION" for r in purchases[2].reasons)
+    assert purchases[2].inventory_before.owned(1) == 0  # dupla contagem continua prevenida
+
+
+def test_undo_correlation_gates_eligibility_for_real_origin() -> None:
+    """Validar afterId por conjunto {0, componentes} não comprova semântica
+    real por si só — um undo CORRELACIONADO (pela regra interna) em dado
+    real também marca incerto, nunca alegado como comprovado fora da
+    evidência."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+        _event(2, 1002, "ITEM_UNDO", participantId=P1, beforeId=3035, afterId=0),
+        _event(3, 1003, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, origin=SourceOrigin.COMPLETED_MATCH, catalog_items=catalog)
+    final = purchases[-1]
+    assert final.inventory_before.owned(1042) == 1  # restauração continua correta
+    assert final.inventory_before.owned(3035) == 0
+    assert final.uncertain is True  # correlacionado pela regra interna, mas nunca comprovado
+    assert any(r.code == "UNVALIDATED_UNDO_SEMANTICS" for r in final.reasons)
+
+
+def test_undo_correlation_stays_certain_for_demo_origin() -> None:
+    """Contraste direto com o teste acima: mesmo cenário, origin=CURATED_DEMO
+    (default deste helper) — a regra sintética é verificada por
+    test_undo_restores_proven_state_including_consumed_components, então
+    pode ficar uncertain=False."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+        _event(2, 1002, "ITEM_UNDO", participantId=P1, beforeId=3035, afterId=0),
+        _event(3, 1003, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, catalog_items=catalog)
+    assert purchases[-1].uncertain is False
 
 
 def test_unknown_items_also_count_toward_six_slot_capacity() -> None:
@@ -693,3 +838,441 @@ def test_unknown_items_also_count_toward_six_slot_capacity() -> None:
     ]
     purchases = _reduce(events, catalog_items=catalog)
     assert any(r.code == "INVENTORY_CAPACITY_EXCEEDED" for r in purchases[-1].reasons)
+
+
+# ---------------------------------------------------------------------------
+# Destroy dos componentes ANTES da compra composta, no mesmo timestamp (no
+# corpus real analisado, 851/851 destroys com compra co-temporal precedem a
+# compra).
+# ---------------------------------------------------------------------------
+
+
+def test_destroy_before_purchase_reconciles_repeated_components() -> None:
+    """Compra 2x A, destroy A, destroy A, compra B (precisa 2xA) no mesmo
+    timestamp -- nunca remove a mesma unidade duas vezes, reconhece a
+    operação composta observada."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 2}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(3, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(4, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+        _event(5, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    compound = purchases[2]  # snapshot da compra de 3035 (idx4)
+    assert compound.purchased_item_id == 3035
+    assert compound.inventory_before.owned(1042) == 0  # já removido pelos destroys
+    assert compound.destroy_order_reconciliation_used is True
+    assert any(r.code == "UNVALIDATED_DESTROY_ORDER_RECONCILIATION" for r in compound.reasons)
+    # Identidade por EVENTO, não só contagem por compra --
+    # UNVALIDATED_DESTROY_ORDER_RECONCILIATION é emitido UMA vez
+    # por COMPRA (não uma vez por unidade), então contar reason codes NUNCA
+    # mede quantos destroys/unidades foram alocados; destroy_order_claimed_
+    # source_indexes é o dado correto para essa contagem (2 unidades aqui,
+    # 1 reason code só).
+    assert set(compound.destroy_order_claimed_source_indexes) == {2, 3}
+    assert (
+        sum(1 for r in compound.reasons if r.code == "UNVALIDATED_DESTROY_ORDER_RECONCILIATION")
+        == 1
+    )
+    # nunca removida duas vezes: a compra seguinte (idx5) só vê 3035 no
+    # inventário, nunca 1042 residual nem contagem negativa/duplicada.
+    final = purchases[-1]
+    assert final.inventory_before.owned(1042) == 0
+    assert final.inventory_before.owned(3035) == 1
+
+
+def test_destroy_before_purchase_never_removes_surviving_unit() -> None:
+    """Possuir 2xA, destruir SÓ 1, comprar B (precisa 1xA) -- a unidade
+    SOBREVIVENTE (nunca destruída) deve permanecer intocada; só a unidade
+    JÁ destruída conta como consumo de B. Resultado incorreto seria zero A
+    restantes (a unidade sobrevivente consumida também: dupla remoção)."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    catalog[9999] = _item(9999)
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(3, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+        _event(4, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    compound = purchases[2]
+    assert compound.destroy_order_claimed_source_indexes == (2,)
+    final = purchases[-1]
+    assert final.inventory_before.owned(1042) == 1  # unidade sobrevivente, intocada
+    assert final.inventory_before.owned(3035) == 1
+
+
+def test_destroy_before_purchase_excess_ownership_never_consumed() -> None:
+    """Mesmo princípio com posse ainda maior: 3xA possuídas, só 1 destruída,
+    B precisa de 1xA -- as outras 2 unidades sobreviventes permanecem
+    intocadas, tanto ANTES quanto DEPOIS de B ser aplicada."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    catalog[9999] = _item(9999)
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(2, 1002, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(3, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(4, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+        _event(5, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    compound = purchases[3]  # snapshot da própria compra de 3035 (ANTES dela)
+    assert compound.inventory_before.owned(1042) == 2
+    final = purchases[-1]  # snapshot de 9999 (DEPOIS de 3035 aplicada)
+    assert final.inventory_before.owned(1042) == 2
+    assert final.inventory_before.owned(3035) == 1
+
+
+def test_destroy_before_purchase_partial_quantity_never_overclaims() -> None:
+    """Só 1 unidade destruída, receita precisa de 2 -- reivindica só o que
+    existe de verdade, nunca inventa a segunda unidade."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 2}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+        _event(3, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    compound = purchases[1]
+    assert compound.destroy_order_reconciliation_used is True  # 1 unidade reivindicada
+    assert any(r.code == "UNVALIDATED_DESTROY_ORDER_RECONCILIATION" for r in compound.reasons)
+    assert compound.destroy_order_claimed_source_indexes == (1,)  # só 1 unidade, nunca 2
+
+
+def test_destroy_before_purchase_ancestral_component() -> None:
+    """Destroy do componente de PRIMEIRO nível (A), compra de um item que
+    precisa de um item INTERMEDIÁRIO (C, nunca comprado) cuja receita
+    precisa de A -- a reivindicação atravessa a recursão de _consume_recipe
+    normalmente, sem tratamento especial."""
+    catalog = {
+        1042: _item(1042),
+        5001: _item(5001, recipe=[{"itemId": 1042, "quantity": 2}]),  # C
+        5002: _item(5002, recipe=[{"itemId": 5001, "quantity": 1}]),  # B, precisa de C
+    }
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(3, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(4, 2000, "ITEM_PURCHASED", participantId=P1, itemId=5002),
+        _event(5, 3000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    compound = purchases[2]
+    assert compound.destroy_order_reconciliation_used is True
+    assert compound.inventory_before.owned(1042) == 0
+    assert compound.inventory_before.owned(5001) == 0  # nunca comprado à parte
+
+
+def test_destroy_before_purchase_conflict_between_multiple_compound_purchases() -> None:
+    """Duas compras compostas concorrendo pelo mesmo pool de destroys no
+    mesmo instante -- primeiro-a-chegar (ordem real de source_index) leva,
+    nunca reivindica a mesma unidade para as duas."""
+    catalog = {
+        1042: _item(1042),
+        3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}]),
+        3036: _item(3036, recipe=[{"itemId": 1042, "quantity": 1}]),
+        3037: _item(3037, recipe=[{"itemId": 1042, "quantity": 1}]),
+    }
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(3, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(4, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+        _event(5, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3036),
+        _event(6, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3037),
+    ]
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    first, second, third = purchases[2], purchases[3], purchases[4]
+    # destroy_order_reconciliation_used é CUMULATIVO (mesmo padrão de
+    # destroy_reconciliation_heuristic_used) -- uma vez True, permanece True
+    # nas compras seguintes mesmo quando ELAS não reivindicam nada. O sinal
+    # específico de quantas vezes a reivindicação de fato ocorreu é a
+    # contagem do reason code, que precisa ser exatamente 2 (nunca 3) --
+    # prova que a terceira compra não inventou uma terceira unidade.
+    assert first.destroy_order_reconciliation_used is True
+    assert second.destroy_order_reconciliation_used is True
+    assert third.destroy_order_reconciliation_used is True  # cumulativo, herdado
+    claim_count = sum(
+        1 for r in third.reasons if r.code == "UNVALIDATED_DESTROY_ORDER_RECONCILIATION"
+    )
+    assert claim_count == 2  # só as duas primeiras reivindicaram de verdade
+    # Identidade por EVENTO, nunca por compra -- as
+    # duas unidades destruídas (source_index 2 e 3) são reivindicadas uma
+    # vez cada, nunca a mesma para as duas compras.
+    assert first.destroy_order_claimed_source_indexes != second.destroy_order_claimed_source_indexes
+    assert set(first.destroy_order_claimed_source_indexes) | set(
+        second.destroy_order_claimed_source_indexes
+    ) == {2, 3}
+    assert third.destroy_order_claimed_source_indexes == ()  # nada sobrou para reivindicar
+
+
+def test_destroy_before_purchase_isolated_per_participant() -> None:
+    """Destroy de OUTRO participante no mesmo timestamp nunca é reivindicado
+    -- reconstruct_participant_purchases filtra por dono antes de tudo, o
+    pool é local a cada chamada."""
+    P2 = 2
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 2}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P2, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P2, itemId=1042),
+        _event(2, 2000, "ITEM_DESTROYED", participantId=P2, itemId=1042),
+        _event(3, 2000, "ITEM_DESTROYED", participantId=P2, itemId=1042),
+        _event(4, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+    ]
+    purchases_p1 = _reduce(
+        events, participant_id=P1, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH
+    )
+    assert purchases_p1[-1].destroy_order_reconciliation_used is False
+
+
+def test_destroy_before_purchase_trinket_never_enters_backward_pool() -> None:
+    """Destroy de trinket nunca alimenta o pool -- trinket não é receita."""
+    catalog = {
+        4001: _item(4001, tags=("Trinket",)),
+        3035: _item(3035, recipe=[{"itemId": 4001, "quantity": 1}]),
+    }
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=4001),
+        _event(1, 2000, "ITEM_DESTROYED", participantId=P1, itemId=4001),
+        _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+    ]
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    assert purchases[-1].destroy_order_reconciliation_used is False
+
+
+def test_destroy_without_ownership_never_enters_backward_pool() -> None:
+    """Destroy sem posse real (DESTROY_WITHOUT_OWNERSHIP) nunca alimenta o
+    pool -- nada de real para redirecionar."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    events = [
+        _event(0, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),  # nunca possuído
+        _event(1, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+    ]
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    assert purchases[-1].destroy_order_reconciliation_used is False
+    assert any(r.code == "DESTROY_WITHOUT_OWNERSHIP" for r in purchases[-1].reasons)
+
+
+def test_destroy_before_purchase_never_crosses_timestamp_boundary() -> None:
+    """Fronteira temporal provada: destroy em T1, compra que precisaria do
+    componente em T2 > T1 -- pool é resetado a cada mudança de timestamp,
+    nunca reivindicado além do mesmo instante."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(2, 2001, "ITEM_PURCHASED", participantId=P1, itemId=3035),  # timestamp DIFERENTE
+    ]
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    assert purchases[-1].destroy_order_reconciliation_used is False
+
+
+def test_destroy_order_reconciliation_gates_eligibility_for_real_origin() -> None:
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+    ]
+    purchases = _reduce(events, origin=SourceOrigin.COMPLETED_MATCH, catalog_items=catalog)
+    final = purchases[-1]
+    assert final.destroy_order_reconciliation_used is True
+    assert final.uncertain is True
+    assert any(r.code == "UNVALIDATED_DESTROY_ORDER_RECONCILIATION" for r in final.reasons)
+
+
+def test_destroy_order_reconciliation_gate_stays_off_for_demo_origin() -> None:
+    """Contraste direto: mesmo cenário, origin=CURATED_DEMO (default) -- o
+    GATE específico desta heurística (UNVALIDATED_DESTROY_ORDER_
+    RECONCILIATION) nunca dispara em DEMO, igual às outras duas.
+
+    Diferença real e deliberada em relação às outras duas heurísticas: o
+    destroy já foi marcado UNRECONCILED_ITEM_DESTROYED no PRÓPRIO momento em
+    que foi processado (antes de qualquer compra composta existir) -- essa
+    marca nunca é retroativamente desfeita quando uma compra futura acaba
+    reivindicando a unidade (decisão já tomada, nunca revivida com base no
+    futuro). Por isso `uncertain` geral não fica False neste cenário mesmo
+    em DEMO -- o que fica desligado é só o gate NOVO, específico da
+    reivindicação retroativa."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+    ]
+    purchases = _reduce(events, catalog_items=catalog)
+    final = purchases[-1]
+    assert final.destroy_order_reconciliation_used is True
+    assert not any(r.code == "UNVALIDATED_DESTROY_ORDER_RECONCILIATION" for r in final.reasons)
+    assert any(r.code == "UNRECONCILED_ITEM_DESTROYED" for r in final.reasons)
+
+
+def test_destroy_before_purchase_undo_restores_prior_state() -> None:
+    """Undo da compra composta que reivindicou destroys anteriores restaura
+    o snapshot exato anterior a ela -- nunca revive/reaplica os destroys."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    events = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035),
+        _event(3, 3000, "ITEM_UNDO", participantId=P1, beforeId=3035, afterId=0),
+        _event(4, 4000, "ITEM_PURCHASED", participantId=P1, itemId=9999),
+    ]
+    catalog[9999] = _item(9999)
+    purchases = _reduce(events, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    final = purchases[-1]
+    assert any(r.code == "UNVALIDATED_UNDO_SEMANTICS" for r in final.reasons)
+    assert final.inventory_before.owned(3035) == 0
+    assert final.inventory_before.owned(1042) == 0  # destroy não é revivido pelo undo
+
+
+def test_destroy_before_purchase_metamorphic_prior_purchase_is_preserved() -> None:
+    """Prefixo fixo, futuro variado: a compra ANTERIOR aos destroys nunca
+    muda, independente do que é comprado depois (checagem de sufixo/prefixo
+    original, mantida ao lado da checagem da MESMA posição de decisão
+    abaixo -- as duas propriedades são diferentes, uma não substitui a
+    outra)."""
+    catalog = {
+        1042: _item(1042),
+        3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 2}]),
+        9999: _item(9999),
+    }
+    prefix = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 1001, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(2, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+        _event(3, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+    ]
+    variant_a = [*prefix, _event(4, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035)]
+    variant_b = [*prefix, _event(4, 2000, "ITEM_PURCHASED", participantId=P1, itemId=9999)]
+    purchases_a = _reduce(variant_a, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    purchases_b = _reduce(variant_b, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    prior_a, prior_b = purchases_a[1], purchases_b[1]
+    assert prior_a.inventory_before == prior_b.inventory_before
+    assert prior_a.gold_estimate == prior_b.gold_estimate
+    assert prior_a.uncertain == prior_b.uncertain
+    assert prior_a.reasons == prior_b.reasons
+
+
+def test_destroy_before_purchase_metamorphic_same_decision_position() -> None:
+    """CRÍTICO: compara a MESMA posição de decisão (a PRÓPRIA compra cujo alvo muda), excluindo só
+    purchased_item_id. inventory_before e a qualidade PRÉ-decisão
+    (pre_decision_uncertain/pre_decision_reasons) precisam ser idênticas
+    mesmo quando o alvo tem receita (reivindica os destroys) versus quando
+    não tem nenhuma relação -- só uncertain/reasons/destroy_order_
+    reconciliation_used (pós-transição, dependentes do alvo) podem
+    divergir. Comparar apenas uma compra ANTES dos destroys seria
+    trivialmente verdadeiro e não testaria a decisão cujo alvo mudou."""
+    catalog = {1042: _item(1042), 3035: _item(3035, recipe=[{"itemId": 1042, "quantity": 1}])}
+    catalog[9999] = _item(9999)
+    prefix = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+    ]
+    variant_b = [*prefix, _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=3035)]
+    variant_c = [*prefix, _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=9999)]
+    purchases_b = _reduce(variant_b, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    purchases_c = _reduce(variant_c, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH)
+    target_b, target_c = purchases_b[-1], purchases_c[-1]
+
+    # inventário e qualidade pré-decisão iguais -- os dois precisam valer.
+    assert target_b.inventory_before == target_c.inventory_before
+    assert target_b.gold_estimate == target_c.gold_estimate
+    assert target_b.pre_decision_uncertain == target_c.pre_decision_uncertain
+    assert target_b.pre_decision_reasons == target_c.pre_decision_reasons
+
+    # divergência LEGÍTIMA, só pós-transição (dependente do alvo escolhido):
+    assert target_b.destroy_order_reconciliation_used is True
+    assert target_c.destroy_order_reconciliation_used is False
+    assert any(r.code == "UNVALIDATED_DESTROY_ORDER_RECONCILIATION" for r in target_b.reasons)
+    assert not any(r.code == "UNVALIDATED_DESTROY_ORDER_RECONCILIATION" for r in target_c.reasons)
+
+
+def test_pre_decision_quality_excludes_unknown_item_and_capacity_alerts() -> None:
+    """Alertas de capacidade e de item desconhecido são calculados após
+    aplicar o alvo -- não é só o código de destroy-order que é
+    pós-transição; ITEM_UNKNOWN/INVENTORY_CAPACITY_EXCEEDED também
+    dependem do item ESCOLHIDO e nunca devem aparecer em
+    pre_decision_reasons."""
+    catalog = {1042: _item(1042)}
+    prefix = [
+        _event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1042),
+        _event(1, 2000, "ITEM_DESTROYED", participantId=P1, itemId=1042),
+    ]
+    variant_known = [*prefix, _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=1042)]
+    variant_unknown = [*prefix, _event(2, 2000, "ITEM_PURCHASED", participantId=P1, itemId=7777)]
+    purchases_known = _reduce(
+        variant_known, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH
+    )
+    purchases_unknown = _reduce(
+        variant_unknown, catalog_items=catalog, origin=SourceOrigin.COMPLETED_MATCH
+    )
+    target_known, target_unknown = purchases_known[-1], purchases_unknown[-1]
+
+    assert target_known.pre_decision_uncertain == target_unknown.pre_decision_uncertain
+    assert target_known.pre_decision_reasons == target_unknown.pre_decision_reasons
+    assert not any(r.code == "ITEM_UNKNOWN" for r in target_known.pre_decision_reasons)
+    assert not any(r.code == "ITEM_UNKNOWN" for r in target_unknown.pre_decision_reasons)
+
+    # divergência pós-transição: só o item desconhecido dispara ITEM_UNKNOWN.
+    assert any(r.code == "ITEM_UNKNOWN" for r in target_unknown.reasons)
+    assert not any(r.code == "ITEM_UNKNOWN" for r in target_known.reasons)
+
+
+def test_pre_decision_quality_flags_missing_catalog_from_first_purchase() -> None:
+    """Catálogo ausente (catalog_id=None) é uma condição do PATCH da
+    partida inteira, conhecida ANTES de qualquer evento -- nunca depende do
+    item escolhido. A PRIMEIRA compra precisa refletir isso em
+    pre_decision_uncertain/pre_decision_reasons, nunca só a partir do
+    histórico acumulado (vazio na primeira compra, o que esconderia a
+    condição já conhecida desde antes do replay)."""
+    events = [_event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1001)]
+    [first] = _reduce(events, origin=SourceOrigin.COMPLETED_MATCH, catalog_id=None)
+    assert first.pre_decision_uncertain is True
+    assert any(r.code == "NO_CATALOG" for r in first.pre_decision_reasons)
+    # a versão cumulativa continua marcando o item específico, sem mudança.
+    assert any(r.code == "NO_CATALOG" and r.item_id == 1001 for r in first.reasons)
+    # a versão pré-decisão não atribui o código a um item específico -- é
+    # uma condição do patch/partida, não do alvo.
+    assert any(r.code == "NO_CATALOG" and r.item_id is None for r in first.pre_decision_reasons)
+
+
+def test_pre_decision_quality_missing_catalog_independent_of_target() -> None:
+    """Mesmo prefixo (catálogo ausente desde o início), dois alvos
+    alternativos na primeira decisão -- pre_decision_uncertain/
+    pre_decision_reasons idênticos, apesar de purchased_item_id divergir."""
+    events_b = [_event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1001)]
+    events_c = [_event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=9999)]
+    [first_b] = _reduce(events_b, origin=SourceOrigin.COMPLETED_MATCH, catalog_id=None)
+    [first_c] = _reduce(events_c, origin=SourceOrigin.COMPLETED_MATCH, catalog_id=None)
+    assert first_b.pre_decision_uncertain == first_c.pre_decision_uncertain is True
+    assert first_b.pre_decision_reasons == first_c.pre_decision_reasons
+    assert first_b.purchased_item_id != first_c.purchased_item_id
+
+
+def test_pre_decision_quality_persisted_projection_flags_missing_catalog() -> None:
+    """A projeção persistida (_decision_state_from_purchase) precisa
+    refletir o mesmo gate desde a primeira compra -- quality.
+    preDecisionQuality não pode ficar {"uncertain": False, "reasons": []}
+    quando o catálogo já é sabidamente ausente."""
+    from riftlab.timeline.application import _decision_state_from_purchase
+
+    events = [_event(0, 1000, "ITEM_PURCHASED", participantId=P1, itemId=1001)]
+    [first] = _reduce(events, origin=SourceOrigin.COMPLETED_MATCH, catalog_id=None)
+    state = _decision_state_from_purchase(
+        match_id=MATCH_ID, catalog_id=None, origin=SourceOrigin.COMPLETED_MATCH, purchase=first
+    )
+    pre_quality = state.quality["preDecisionQuality"]
+    assert pre_quality["uncertain"] is True
+    assert any(r["code"] == "NO_CATALOG" for r in pre_quality["reasons"])

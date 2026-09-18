@@ -46,9 +46,20 @@ class MatchReconstructionMarker:
     reinserir estados já existentes. catalog_id aqui é o valor REALMENTE
     usado quando a reconstrução foi computada — reexecuções idempotentes
     nunca reresolve o canônico atual (que pode ter mudado desde então) e o
-    reportam como se fosse o valor usado para os estados já persistidos."""
+    reportam como se fosse o valor usado para os estados já persistidos.
+
+    reconstruction_version identifica QUAL algoritmo produziu os
+    `DecisionState`s associados (`state_version` compartilha o mesmo
+    número) — nunca inferido do estado do banco. Uma marca de versão
+    antiga (ou ausente) nunca é tratada como "já feita para a versão
+    atual": a chave primária é (match_id, reconstruction_version), então
+    uma partida reconstruída por uma versão anterior do algoritmo (com ou
+    sem marca) nunca colide com os `DecisionState`s da versão corrente nem
+    é apagada — cada versão tem sua própria linha de dados e sua própria
+    marca, histórico completo preservado."""
 
     match_id: str
+    reconstruction_version: int
     catalog_id: uuid.UUID | None
 
 
@@ -86,17 +97,24 @@ class TimelineRepository(Protocol):
         self, match_id: str, participant_id: int
     ) -> list[DecisionState]: ...
 
-    async def get_match_reconstruction(self, match_id: str) -> MatchReconstructionMarker | None:
-        """None = partida nunca reconstruída (ou reconstrução anterior não
-        chegou a commitar). Existência da marca é a única fonte de verdade
-        de idempotência — nunca inferida a partir de contagem de estados de
-        um participante específico."""
+    async def get_match_reconstruction(
+        self, match_id: str, reconstruction_version: int
+    ) -> MatchReconstructionMarker | None:
+        """None = partida nunca reconstruída NESSA VERSÃO do algoritmo (ou
+        reconstrução anterior não chegou a commitar) — uma marca de versão
+        diferente nunca conta como "já feita" (sem isto, um upgrade de
+        algoritmo colidiria com `DecisionState`s antigos em vez de tratá-los
+        como legado preservado). Existência da marca NESSA versão é a única
+        fonte de verdade de idempotência, nunca inferida a partir de
+        contagem de estados de um participante específico."""
         ...
 
-    async def add_match_reconstruction(self, match_id: str, catalog_id: uuid.UUID | None) -> None:
-        """Gravado na MESMA transação dos `DecisionState`s produzidos — tudo
-        ou nada (revisão CC-203). Levanta ConflictError (via IntegrityError
-        traduzido pelo chamador) se já existe marca para este match_id:
-        reconstrução concorrente da mesma partida, nunca uma segunda marca
-        silenciosa."""
+    async def add_match_reconstruction(
+        self, match_id: str, reconstruction_version: int, catalog_id: uuid.UUID | None
+    ) -> None:
+        """Gravado na MESMA transação dos `DecisionState`s produzidos dessa
+        versão — tudo ou nada. Levanta ConflictError (via
+        IntegrityError traduzido pelo chamador) se já existe marca para
+        este (match_id, reconstruction_version): reconstrução concorrente
+        da mesma partida/versão, nunca uma segunda marca silenciosa."""
         ...

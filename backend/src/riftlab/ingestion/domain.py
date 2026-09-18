@@ -90,6 +90,13 @@ class IngestionRepository(Protocol):
 
     async def get_participant(self, match_id: str, participant_id: int) -> Participant | None: ...
 
+    async def list_participants(self, match_id: str) -> list[Participant]:
+        """Devolve os participantes já persistidos (CC-201) sem reler a
+        fonte — usado pelo caminho idempotente de `reconstruct_match` para
+        nunca depender de reabrir `raw`/fixture só para listar quem
+        participou de uma partida já reconstruída."""
+        ...
+
     async def get_import_job(self, job_id: uuid.UUID) -> ImportJob | None: ...
 
     async def list_active_import_jobs(

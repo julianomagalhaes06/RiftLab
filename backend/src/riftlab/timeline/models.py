@@ -35,8 +35,12 @@ class TimelineEventModel(Base):
 
 
 class MatchReconstructionModel(CreatedAtMixin, Base):
-    """Marca de conclusão atômica de uma reconstrução (CC-203, revisão):
-    existe independente de contagem de compra de qualquer participante."""
+    """Marca de conclusão atômica de uma reconstrução (CC-203): existe
+    independente de contagem de compra de qualquer participante. Chave
+    primária inclui reconstruction_version: uma marca de versão antiga nunca
+    é tratada como "já feita" para a versão atual, e versões diferentes
+    nunca colidem entre si — histórico completo preservado, nenhum
+    DecisionState de uma versão anterior é apagado."""
 
     __tablename__ = "match_reconstructions"
     __table_args__ = (
@@ -49,6 +53,7 @@ class MatchReconstructionModel(CreatedAtMixin, Base):
     )
 
     match_id: Mapped[str] = mapped_column(String, primary_key=True)
+    reconstruction_version: Mapped[int] = mapped_column(Integer, primary_key=True)
     catalog_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
 
 

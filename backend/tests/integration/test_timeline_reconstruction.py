@@ -26,8 +26,8 @@ from riftlab.ingestion.models import ImportJobModel, MatchModel, ParticipantMode
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import NotFoundError
-from riftlab.timeline.application import reconstruct_match
-from riftlab.timeline.domain import TimelineReplayError
+from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION, reconstruct_match
+from riftlab.timeline.domain import DecisionState, TimelineReplayError
 from riftlab.timeline.models import DecisionStateModel, MatchReconstructionModel, TimelineEventModel
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
@@ -191,7 +191,9 @@ async def test_reconstruct_match_idempotent_marker_independent_of_purchase_count
         session_factory, _DEMO_1_MAPPING, DemoMatchSource(), "DEMO-0007"
     )
     async with unit_of_work(session_factory) as session:
-        marker = await SqlAlchemyTimelineRepository(session).get_match_reconstruction("DEMO-0007")
+        marker = await SqlAlchemyTimelineRepository(session).get_match_reconstruction(
+            "DEMO-0007", RECONSTRUCTION_ALGORITHM_VERSION
+        )
     assert marker is not None
     assert marker.catalog_id == first.catalog_id
 
@@ -253,4 +255,146 @@ async def test_reconstruct_match_without_catalog_mapping_persists_uncertain_stat
     assert all(s.quality["uncertain"] is True for s in result.decision_states)
     assert all(
         any(r["code"] == "NO_CATALOG" for r in s.quality["reasons"]) for s in result.decision_states
+    )
+
+
+class _SourceForbiddenIfCalled:
+    """Fonte que lança se chamada — prova direta de que o caminho
+    idempotente nunca reabre a fonte (fixture/raw), nem para listar
+    participantes."""
+
+    async def load_match(self, match_id: str):
+        raise AssertionError(
+            f"match_source.load_match({match_id!r}) chamado no caminho idempotente — "
+            "resultado já persistido nunca deveria reabrir a fonte"
+        )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_reconstruct_match_idempotent_path_never_reopens_source(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    match_id = "DEMO-0002"
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, match_id)
+
+    first = await reconstruct_match(session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id)
+    assert first.decision_states
+
+    # Segunda chamada: fonte que levanta AssertionError se load_match for
+    # invocado — se o caminho idempotente reabrisse a fonte, este teste
+    # falharia com o AssertionError da fonte, não com uma asserção nossa.
+    second = await reconstruct_match(
+        session_factory, _DEMO_1_MAPPING, _SourceForbiddenIfCalled(), match_id
+    )
+    assert sorted(str(s.id) for s in second.decision_states) == sorted(
+        str(s.id) for s in first.decision_states
+    )
+    assert second.catalog_id == first.catalog_id
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0004"], indirect=True)
+async def test_reconstruct_match_preserves_pre_correction_decision_states(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    """Tratamento não destrutivo de legado: simula uma partida já
+    reconstruída por uma versão ANTERIOR do algoritmo (state_version=1, sem
+    marca alguma — a marca versionada só existe desde a versão 2) inserindo
+    um DecisionState "legado" diretamente. A reconstrução nova nunca
+    apaga/sobrescreve essa linha nem colide com ela (versão diferente),
+    grava sua própria marca e seus próprios estados em
+    RECONSTRUCTION_ALGORITHM_VERSION, e uma reexecução permanece
+    idempotente."""
+    match_id = "DEMO-0004"
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, match_id)
+
+    legacy_state = DecisionState(
+        id=uuid.uuid4(),
+        match_id=match_id,
+        participant_id=1,
+        event_source_index=0,
+        state_version=1,  # versão anterior do algoritmo, sem marca versionada
+        snapshot={"inventory": {"items": {}, "trinketItemId": None}, "purchasedItemId": 100002},
+        features={},
+        quality={"uncertain": False, "reasons": [], "goldEstimate": {}},
+        catalog_id=None,
+    )
+    async with unit_of_work(session_factory) as session:
+        await SqlAlchemyTimelineRepository(session).add_decision_state(legacy_state)
+
+    result = await reconstruct_match(session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id)
+    assert result.decision_states  # reconstrução nova aconteceu de verdade
+    assert all(s.state_version == RECONSTRUCTION_ALGORITHM_VERSION for s in result.decision_states)
+
+    async with unit_of_work(session_factory) as session:
+        all_states = await SqlAlchemyTimelineRepository(session).list_decision_states(match_id, 1)
+    legacy_still_present = [s for s in all_states if s.state_version == 1]
+    assert len(legacy_still_present) == 1
+    assert legacy_still_present[0].id == legacy_state.id  # linha legada intacta, nunca apagada
+
+    # Reexecução permanece idempotente (marca da versão atual já existe).
+    second = await reconstruct_match(session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id)
+    assert sorted(str(s.id) for s in second.decision_states) == sorted(
+        str(s.id) for s in result.decision_states
+    )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0004"], indirect=True)
+async def test_reconstruct_match_preserves_previous_version_marker_and_states(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    """Versão anterior COM marca (v3) -> versão corrente (v4), sem limpeza:
+    a marca e os estados v3 permanecem intactos, a versão corrente grava a
+    sua própria marca/estados, e a consulta idempotente da versão corrente
+    devolve só os estados da versão corrente."""
+    previous_version = RECONSTRUCTION_ALGORITHM_VERSION - 1
+    match_id = "DEMO-0004"
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, match_id)
+
+    previous_state = DecisionState(
+        id=uuid.uuid4(),
+        match_id=match_id,
+        participant_id=1,
+        event_source_index=0,
+        state_version=previous_version,
+        snapshot={"inventory": {"items": {}, "trinketItemId": None}, "purchasedItemId": 100002},
+        features={},
+        quality={"uncertain": False, "reasons": [], "goldEstimate": {}},
+        catalog_id=None,
+    )
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyTimelineRepository(session)
+        await repo.add_decision_state(previous_state)
+        await repo.add_match_reconstruction(match_id, previous_version, None)
+
+    # A marca da versão anterior nunca conta como "já feita" para a corrente.
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyTimelineRepository(session)
+        assert (
+            await repo.get_match_reconstruction(match_id, RECONSTRUCTION_ALGORITHM_VERSION) is None
+        )
+
+    result = await reconstruct_match(session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id)
+    assert result.decision_states
+    assert all(s.state_version == RECONSTRUCTION_ALGORITHM_VERSION for s in result.decision_states)
+
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyTimelineRepository(session)
+        previous_marker = await repo.get_match_reconstruction(match_id, previous_version)
+        current_marker = await repo.get_match_reconstruction(
+            match_id, RECONSTRUCTION_ALGORITHM_VERSION
+        )
+        all_states = await repo.list_decision_states(match_id, 1)
+    assert previous_marker is not None  # marca anterior intacta, nunca apagada
+    assert current_marker is not None  # marca corrente própria, sem colisão
+    previous_rows = [s for s in all_states if s.state_version == previous_version]
+    assert [s.id for s in previous_rows] == [previous_state.id]  # linha anterior intacta
+
+    # Reexecução: caminho idempotente devolve só os estados da versão corrente.
+    second = await reconstruct_match(session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id)
+    assert all(s.state_version == RECONSTRUCTION_ALGORITHM_VERSION for s in second.decision_states)
+    assert sorted(str(s.id) for s in second.decision_states) == sorted(
+        str(s.id) for s in result.decision_states
     )

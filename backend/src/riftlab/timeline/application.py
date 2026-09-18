@@ -25,6 +25,7 @@ from riftlab.ingestion.domain import MatchSource
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.api.enums import BudgetSource
 from riftlab.shared.db import unit_of_work
+from riftlab.shared.domain import SourceOrigin
 from riftlab.shared.errors import ConflictError, NotFoundError
 from riftlab.timeline.domain import (
     CURRENT_DECISION_STATE_SCHEMA_VERSION,
@@ -37,6 +38,27 @@ from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 SessionFactory = async_sessionmaker[AsyncSession]
 
 STALE_FRAME_THRESHOLD_MS = 90_000
+
+# Identifica o algoritmo que produziu DecisionState.state_version e
+# MatchReconstructionMarker.reconstruction_version. Uma marca ou estado de
+# versão anterior nunca é apagado nem reescrito: continua no banco, não
+# colide com o que a versão corrente grava (a identidade do estado inclui
+# state_version) e não conta como "já reconstruído" para a versão corrente.
+# Qualquer alteração que mude o RESULTADO computado exige incrementar este
+# número.
+#
+# Histórico:
+#   1 — primeira implementação, sem marca versionada.
+#   2 — marca de reconstrução passa a ser versionada; heurísticas de destroy
+#       e undo viram gate operacional em dado real.
+#   3 — o consumo de receita pode reivindicar unidades destruídas ANTES da
+#       compra composta, no mesmo timestamp (observado em dado real; ver
+#       `_consume_recipe`). Muda o inventário calculado em alguns cenários.
+#   4 — `quality.preDecisionQuality` da PRIMEIRA compra de um participante
+#       passa a refletir catálogo ausente, condição do patch inteiro
+#       conhecida antes de qualquer evento. Estados persistidos na versão 3
+#       têm essa projeção incompleta e por isso não são reaproveitados.
+RECONSTRUCTION_ALGORITHM_VERSION = 4
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens
@@ -202,7 +224,31 @@ def select_gold_estimate(
 class ReconstructedPurchase:
     """Uma compra elegível: snapshot é o estado ANTES de aplicar o alvo (o
     item comprado nunca aparece no próprio snapshot). Saída do reducer puro;
-    a persistência (DecisionState) é responsabilidade do orquestrador."""
+    a persistência (DecisionState) é responsabilidade do orquestrador.
+
+    `uncertain`/`reasons` são CUMULATIVOS (todo o histórico até e incluindo
+    esta compra, inclusive diagnósticos que dependem da identidade/receita
+    DESTA MESMA compra, ex.: ITEM_UNKNOWN/ITEM_EXCLUDED_UNSUPPORTED/
+    INVENTORY_CAPACITY_EXCEEDED/UNVALIDATED_DESTROY_ORDER_RECONCILIATION,
+    além de NO_CATALOG marcado por evento igual às outras) -- úteis para
+    transparência total e para decisões SEGUINTES, mas nunca devem ser
+    usados como elegibilidade/feature/máscara PRÉ-decisão, porque contêm
+    diagnósticos que só existem por causa do item ESCOLHIDO.
+
+    `pre_decision_uncertain`/`pre_decision_reasons` são a qualidade
+    ANTES de processar esta compra especificamente -- capturados no
+    exato instante em que a compra começa a ser processada (mesmo ponto de
+    `inventory_before`), nunca influenciados pela identidade/receita DESTE
+    alvo. Inclui tanto o histórico acumulado ATÉ aqui quanto condições
+    conhecidas ANTES de qualquer evento: catálogo ausente (`NO_CATALOG`)
+    é uma condição do PATCH da partida inteira, fixa desde antes do replay
+    começar e independente do item escolhido; por isso é injetada aqui
+    mesmo na PRIMEIRA compra, nunca só a partir do que já foi acumulado.
+    É isto que deve alimentar elegibilidade/feature/máscara pré-compra;
+    comparar a MESMA posição de decisão com alvos diferentes (mesmo
+    prefixo) preserva estes dois campos byte-a-byte, mesmo quando
+    `uncertain`/`reasons`/`destroy_order_reconciliation_used`
+    legitimamente divergem por causa do alvo escolhido."""
 
     event_source_index: int
     participant_id: int
@@ -212,22 +258,44 @@ class ReconstructedPurchase:
     uncertain: bool
     reasons: tuple[UncertainReason, ...]
     destroy_reconciliation_heuristic_used: bool
+    destroy_order_reconciliation_used: bool = False
+    pre_decision_uncertain: bool = False
+    pre_decision_reasons: tuple[UncertainReason, ...] = ()
+    destroy_order_claimed_source_indexes: tuple[int, ...] = ()
+
+
+_REVERSIBLE_OP_PURCHASE = "PURCHASE"
+_REVERSIBLE_OP_SALE = "SALE"
 
 
 @dataclass(frozen=True, slots=True)
 class _ReversibleOp:
     """Ledger da última OPERAÇÃO reversível do participante (compra OU
-    venda — revisão: venda sempre apagava o ledger, então undo de venda
-    nunca tinha caminho suportado, contradizendo o plano). Guarda o
-    multiconjunto EXATO anterior à operação, não uma reconstrução
-    aproximada a partir de beforeId/afterId — undo restaura esse valor
-    diretamente quando a correlação é única, nunca "repara" a partir do
-    inventário final. consumed_components (vazio para venda/item sem
-    receita) é o conjunto de invariantes que afterId precisa respeitar
-    (revisão: comparar só beforeId não comprova correlação — beforeId=999
-    era aceito mesmo sem nenhum componente 999 envolvido)."""
+    venda). Guarda o multiconjunto EXATO anterior à operação, não uma
+    reconstrução aproximada a partir de beforeId/afterId — undo restaura
+    esse valor diretamente quando a correlação é única, nunca "repara" a
+    partir do inventário final. consumed_components (vazio para venda/item
+    sem receita) é o conjunto de invariantes que afterId precisa respeitar
+    quando operation_type é PURCHASE: comparar só beforeId não comprova
+    correlação (beforeId=999 seria aceito mesmo sem nenhum componente 999
+    envolvido).
+
+    operation_type existe porque, no pequeno corpus real analisado
+    (10 partidas, patches 14.20 e 15.1), undo de compra e undo de venda
+    usam formas OPOSTAS de beforeId/afterId — undo de compra:
+    beforeId=<item comprado>, afterId=0 (ou componente consumido); undo de
+    venda: beforeId=0, afterId=<item vendido>. Comparar sempre contra
+    beforeId nunca correlacionaria um undo de venda: os 16 undos de venda
+    observados ficariam todos sem correlação por essa cegueira estrutural.
+    Guardar o tipo explicitamente no ledger (em vez de inferir só por
+    resulting_item_id) permite comparar cada tipo pela sua própria forma.
+    Isso descreve a forma encontrada nessa amostra; NÃO é a semântica
+    oficial da Riot nem foi verificado para outros patches, por isso a
+    correlação continua marcando uncertain=True em dado REAL (ver
+    reconstruct_participant_purchases)."""
 
     resulting_item_id: int
+    operation_type: str
     prior_inventory: InventorySnapshot
     consumed_components: tuple[tuple[int, int], ...] = ()
     timestamp_ms: int = 0
@@ -251,29 +319,71 @@ def _consume_recipe(
     item: Item,
     catalog_items: Mapping[int, Item],
     consumed_log: list[tuple[int, int]],
+    backward_destroy_pool: dict[int, list[int]],
+    backward_claimed_log: list[tuple[int, int]],
 ) -> InventorySnapshot:
-    """Consome a receita de `item` recursivamente (revisão, achado 2): prefere
-    sempre um componente já PRONTO possuído diretamente; só decompõe um
-    componente faltante em SEUS PRÓPRIOS subcomponentes quando ele tem
-    receita conhecida no catálogo (fechamento transitivo carregado pelo
-    orquestrador) — nunca consome o mesmo ancestral duas vezes, pois cada
-    remoção já muta `inventory` antes do próximo componente ser avaliado.
-    Sem receita conhecida para decompor, o restante é só pago em ouro (não
-    modelado aqui), igual à compra direta de um item base."""
+    """Consome a receita de `item` recursivamente. Nunca consome o mesmo
+    ancestral duas vezes, pois cada remoção já muta `inventory` antes do
+    próximo componente ser avaliado. Sem receita conhecida para decompor, o
+    restante é só pago em ouro (não modelado aqui), igual à compra direta
+    de um item base.
+
+    `backward_destroy_pool`: por item_id, a lista (em ordem, FIFO) de
+    `source_index` de unidades destruídas MAIS CEDO no MESMO timestamp
+    (populada por `reconstruct_participant_purchases`, nunca por esta
+    função) e ainda não reivindicadas por nenhuma outra compra composta
+    deste mesmo instante. Existe porque, no corpus real analisado (10
+    partidas, patches 14.20 e 15.1), todos os 851 ITEM_DESTROYED que têm
+    compra no mesmo timestamp precedem essa compra na ordem dos eventos:
+    os componentes são destruídos primeiro, o item composto surge depois.
+
+    O pool é consultado PRIMEIRO: reivindicar uma unidade já destruída
+    (evidência mais específica, destruída exatamente neste instante) é
+    preferido a consumir uma unidade que segue possuída e intocada; do
+    contrário a mesma unidade seria removida duas vezes e o inventário
+    ficaria menor do que a evidência sustenta. Só consulta `inventory`
+    para a quantidade AINDA faltante depois de esgotar o pool -- nunca
+    assume que todo destroy co-temporal pertence à receita (só reivindica
+    até `needed`, nunca mais, e só do `item_id` exato). Nunca remove nada
+    de `inventory` pela reivindicação em si (essas unidades já foram
+    removidas quando o destroy foi processado) -- só esvazia a lista do
+    pool e registra `(component_id, destroy_source_index)` por UNIDADE
+    reivindicada, para contar cobertura por evento e não só por compra.
+    Reivindicação nunca gera uma nova expectativa de destroy futura via
+    `pending_destroys` (`backward_claimed_log` é distinto de
+    `consumed_log`) -- o destroy já aconteceu, no passado."""
     for component in item.recipe:
         component_id = int(component["itemId"])
         needed = int(component["quantity"])
-        have = inventory.owned(component_id)
-        direct_take = min(have, needed)
-        if direct_take > 0:
-            inventory = inventory.with_removed(component_id, direct_take)
-            consumed_log.append((component_id, direct_take))
-            needed -= direct_take
+
+        available = backward_destroy_pool.get(component_id) or []
+        backward_take = min(len(available), needed)
+        if backward_take > 0:
+            claimed, remaining = available[:backward_take], available[backward_take:]
+            backward_destroy_pool[component_id] = remaining
+            backward_claimed_log.extend((component_id, source_index) for source_index in claimed)
+            needed -= backward_take
+
+        if needed > 0:
+            have = inventory.owned(component_id)
+            direct_take = min(have, needed)
+            if direct_take > 0:
+                inventory = inventory.with_removed(component_id, direct_take)
+                consumed_log.append((component_id, direct_take))
+                needed -= direct_take
+
         if needed > 0:
             sub_item = catalog_items.get(component_id)
             if sub_item is not None and sub_item.recipe:
                 for _ in range(needed):
-                    inventory = _consume_recipe(inventory, sub_item, catalog_items, consumed_log)
+                    inventory = _consume_recipe(
+                        inventory,
+                        sub_item,
+                        catalog_items,
+                        consumed_log,
+                        backward_destroy_pool,
+                        backward_claimed_log,
+                    )
     return inventory
 
 
@@ -312,6 +422,7 @@ def reconstruct_participant_purchases(
     *,
     participant_id: int,
     events: Sequence[TimelineEvent],
+    origin: SourceOrigin,
     frames: Sequence[FrameLike] = (),
     catalog_id: uuid.UUID | None,
     catalog_items: Mapping[int, Item] | None = None,
@@ -324,9 +435,25 @@ def reconstruct_participant_purchases(
     explícito (sem catálogo resolvido para o patch da partida): toda compra
     vira INVENTORY_UNCERTAIN (NO_CATALOG), mas o replay continua
     melhor-esforço por item_id literal — sem catálogo não há receita
-    conhecida para consumir, então nenhum componente é removido."""
+    conhecida para consumir, então nenhum componente é removido.
+
+    origin distingue dado sintético (SourceOrigin.CURATED_DEMO) de dado real
+    (COMPLETED_MATCH) — obrigatório, nunca um default silencioso:
+    reconciliação de ITEM_DESTROYED por timestamp/item/quantidade e
+    correlação de ITEM_UNDO por beforeId/afterId são HIPÓTESES próprias
+    sobre semântica não documentada da Riot. Foram examinadas num corpus
+    real pequeno (10 partidas, patches 14.20 e 15.1) e são consistentes
+    com ele, mas não foram confirmadas como semântica oficial nem
+    verificadas em outros patches. Um resultado DEMO pode legitimamente
+    ficar `uncertain=False` quando essas hipóteses se aplicam de forma
+    limpa — a regra é sintética e sua correção É verificada pela suíte de
+    testes. Um resultado de dado REAL nunca pode: aplicar qualquer uma das
+    hipóteses em dado real sempre marca o participante incerto a partir
+    dali, mesmo quando a correlação "bate" segundo a regra interna — bater
+    com uma regra interna não comprova a semântica real."""
     catalog_items = catalog_items if catalog_items is not None else {}
     catalog_available = catalog_id is not None
+    is_demo = origin is SourceOrigin.CURATED_DEMO
 
     owned_events = sorted(
         (
@@ -342,11 +469,24 @@ def reconstruct_participant_purchases(
     uncertain = False
     reasons: list[UncertainReason] = []
     destroy_heuristic_used = False
+    destroy_order_heuristic_used = False
     last_reversible: _ReversibleOp | None = None
     # pending_destroys[timestamp_ms][component_item_id] = unidades consumidas
     # por uma compra de receita neste mesmo instante, ainda não confirmadas
     # por um ITEM_DESTROYED real — nunca remove a mesma unidade duas vezes.
     pending_destroys: dict[int, dict[int, int]] = {}
+    # backward_destroy_pool[item_id] = source_index (em ordem) das unidades
+    # destruídas MAIS CEDO no timestamp_ms ATUAL (current_timestamp_ms),
+    # ainda não reivindicadas por nenhuma compra composta deste mesmo
+    # instante. Resetado sempre que timestamp_ms muda -- nunca cruza
+    # fronteira de instante, então só contém destroys anteriores no
+    # processamento (por construção: só populado quando um ITEM_DESTROYED
+    # é processado, e eventos são processados em ordem) a qualquer compra
+    # que o consulte. Lista (não contagem): precisa da IDENTIDADE de cada
+    # unidade destruída para contar cobertura por evento/unidade, nunca só
+    # um total por compra.
+    backward_destroy_pool: dict[int, list[int]] = {}
+    current_timestamp_ms: int | None = None
     results: list[ReconstructedPurchase] = []
 
     def _mark_uncertain(code: str, event: TimelineEvent, item_id: int | None = None) -> None:
@@ -377,17 +517,58 @@ def reconstruct_participant_purchases(
                 bucket[component_id] = max(0, bucket[component_id] - qty)
 
     for event in owned_events:
+        if event.timestamp_ms != current_timestamp_ms:
+            current_timestamp_ms = event.timestamp_ms
+            backward_destroy_pool = {}
+
         if event.type == "ITEM_PURCHASED":
             item_id = _require_int_field(event, "itemId")
             before = inventory
+            # Qualidade ANTES de processar esta compra, capturada no MESMO
+            # instante de `before` -- nunca influenciada pela
+            # identidade/receita DESTE alvo. ITEM_UNKNOWN/
+            # ITEM_EXCLUDED_UNSUPPORTED/INVENTORY_CAPACITY_EXCEEDED/
+            # UNVALIDATED_DESTROY_ORDER_RECONCILIATION abaixo dependem do
+            # item ESCOLHIDO (pós-transição, nunca elegibilidade/feature/
+            # máscara pré-decisão).
+            #
+            # `catalog_available` é uma condição do PATCH/catálogo resolvido
+            # para a partida inteira -- fixa para toda a chamada, conhecida
+            # ANTES de qualquer evento ser processado, nunca dependente de
+            # qual item é comprado. Por isso é injetada aqui
+            # INCONDICIONALMENTE quando ausente -- inclusive na PRIMEIRA
+            # compra, nunca só a partir do que já foi acumulado em
+            # `reasons` até agora (que seria vazio na primeira compra,
+            # escondendo uma condição já conhecida desde antes do replay
+            # começar).
+            pre_decision_uncertain = uncertain or not catalog_available
+            pre_decision_reasons = tuple(reasons)
+            if not catalog_available:
+                pre_decision_reasons = (
+                    *pre_decision_reasons,
+                    UncertainReason(
+                        code="NO_CATALOG",
+                        event_source_index=event.source_index,
+                        timestamp_ms=event.timestamp_ms,
+                        item_id=None,
+                    ),
+                )
             consumed: list[tuple[int, int]] = []
+            backward_claimed: list[tuple[int, int]] = []
 
             if not catalog_available:
                 _mark_uncertain("NO_CATALOG", event, item_id)
                 inventory = inventory.with_added(item_id, 1)
             elif item_id in catalog_items:
                 item = catalog_items[item_id]
-                new_inventory = _consume_recipe(inventory, item, catalog_items, consumed)
+                new_inventory = _consume_recipe(
+                    inventory,
+                    item,
+                    catalog_items,
+                    consumed,
+                    backward_destroy_pool,
+                    backward_claimed,
+                )
                 is_trinket = "Trinket" in item.attributes.get("tags", ())
                 new_inventory = (
                     new_inventory.with_trinket(item_id)
@@ -416,6 +597,25 @@ def reconstruct_participant_purchases(
             elif slots > _MAX_NORMAL_SLOTS:
                 _mark_uncertain("INVENTORY_CAPACITY_EXCEEDED", event, item_id)
 
+            if backward_claimed:
+                # Componente(s) reivindicado(s) de destroy(s) anteriores no
+                # MESMO timestamp -- mesma disciplina de gate das outras
+                # heurísticas: bater com esta hipótese não comprova a
+                # semântica real, então dado REAL sempre marca incerto a
+                # partir daqui via este código; DEMO nunca marca este código
+                # específico se a regra é sintética e testada. Diferença
+                # real em relação às outras duas heurísticas: o(s)
+                # destroy(s) já foram marcados UNRECONCILED_ITEM_DESTROYED
+                # no PRÓPRIO momento em que ocorreram (antes de qualquer
+                # compra composta existir) -- essa marca NUNCA é
+                # retroativamente desfeita, então `uncertain` geral pode
+                # continuar True em DEMO mesmo quando este gate específico
+                # não dispara (um estado já calculado nunca é revivido com
+                # base no futuro).
+                destroy_order_heuristic_used = True
+                if not is_demo:
+                    _mark_uncertain("UNVALIDATED_DESTROY_ORDER_RECONCILIATION", event, item_id)
+
             results.append(
                 ReconstructedPurchase(
                     event_source_index=event.source_index,
@@ -426,10 +626,17 @@ def reconstruct_participant_purchases(
                     uncertain=uncertain,
                     reasons=tuple(reasons),
                     destroy_reconciliation_heuristic_used=destroy_heuristic_used,
+                    destroy_order_reconciliation_used=destroy_order_heuristic_used,
+                    pre_decision_uncertain=pre_decision_uncertain,
+                    pre_decision_reasons=pre_decision_reasons,
+                    destroy_order_claimed_source_indexes=tuple(
+                        source_index for _, source_index in backward_claimed
+                    ),
                 )
             )
             last_reversible = _ReversibleOp(
                 resulting_item_id=item_id,
+                operation_type=_REVERSIBLE_OP_PURCHASE,
                 prior_inventory=before,
                 consumed_components=tuple(consumed),
                 timestamp_ms=event.timestamp_ms,
@@ -442,6 +649,7 @@ def reconstruct_participant_purchases(
                 inventory = inventory.with_trinket(None)
                 last_reversible = _ReversibleOp(
                     resulting_item_id=item_id,
+                    operation_type=_REVERSIBLE_OP_SALE,
                     prior_inventory=before,
                     timestamp_ms=event.timestamp_ms,
                 )
@@ -449,10 +657,12 @@ def reconstruct_participant_purchases(
                 inventory = inventory.with_removed(item_id, 1)
                 # venda também é reversível (revisão: "venda sempre apaga o
                 # ledger" deixava undo de venda sem caminho suportado, contra
-                # o plano) — resulting_item_id é o item vendido (o mesmo que
-                # beforeId de um ITEM_UNDO correlacionado precisa bater).
+                # o plano) — resulting_item_id é o item vendido; a forma real
+                # de beforeId/afterId de um undo de venda é distinta da de
+                # compra (ver operation_type em _ReversibleOp).
                 last_reversible = _ReversibleOp(
                     resulting_item_id=item_id,
+                    operation_type=_REVERSIBLE_OP_SALE,
                     prior_inventory=before,
                     timestamp_ms=event.timestamp_ms,
                 )
@@ -463,21 +673,35 @@ def reconstruct_participant_purchases(
             item_id = _require_int_field(event, "itemId")
             pending = pending_destroys.get(event.timestamp_ms)
             if pending and pending.get(item_id, 0) > 0:
-                # Reconciliado por heurística de timestamp/item/quantidade
-                # (revisão, achado 3): NUNCA removido de novo (evita dupla
-                # contagem), mas isto é uma ESTIMATIVA, nunca comprovada
-                # contra o corpus real (CC-105 ausente nesta sessão) —
-                # propagado explicitamente em quality, nunca junto de
-                # `uncertain` (que bloqueia recomendação; aqui não bloqueia,
-                # só desconta o crédito de certeza empírica).
+                # Reconciliado por heurística de timestamp/item/quantidade:
+                # NUNCA removido de novo (evita dupla contagem — correto
+                # independente de a correlação ser semanticamente real ou
+                # não, então preservado incondicionalmente). Mas bater com
+                # esta regra interna não comprova a semântica real: um
+                # sinalizador só de documentação não bloqueia nada, então em
+                # dado REAL aplicar esta hipótese sempre marca o
+                # participante incerto a partir daqui; em DEMO, a regra é
+                # sintética e verificada pela suíte de testes, então pode
+                # ficar certa.
                 pending[item_id] -= 1
                 destroy_heuristic_used = True
+                if not is_demo:
+                    _mark_uncertain("UNVALIDATED_DESTROY_RECONCILIATION", event, item_id)
             else:
                 _mark_uncertain("UNRECONCILED_ITEM_DESTROYED", event, item_id)
                 if inventory.trinket_item_id == item_id:
                     inventory = inventory.with_trinket(None)
                 elif inventory.owned(item_id) > 0:
                     inventory = inventory.with_removed(item_id, 1)
+                    # Unidade real, possuída e removida agora (nunca para
+                    # trinket, nunca sem posse) fica disponível para uma
+                    # compra composta POSTERIOR no MESMO timestamp
+                    # reivindicar (_consume_recipe). Nunca reivindicada duas
+                    # vezes -- removida da lista no momento da
+                    # reivindicação, resetada a cada mudança de timestamp.
+                    # Identidade (source_index) preservada, não só uma
+                    # contagem.
+                    backward_destroy_pool.setdefault(item_id, []).append(event.source_index)
                 else:
                     _mark_uncertain("DESTROY_WITHOUT_OWNERSHIP", event, item_id)
                 last_reversible = None
@@ -485,38 +709,59 @@ def reconstruct_participant_purchases(
         elif event.type == "ITEM_UNDO":
             before_id = _require_int_field(event, "beforeId")
             after_id = _require_int_field(event, "afterId")
-            valid_after_ids = {0}
+            correlated = False
             if last_reversible is not None:
-                valid_after_ids |= {
-                    component_id for component_id, _ in last_reversible.consumed_components
-                }
-            if (
-                last_reversible is None
-                or last_reversible.resulting_item_id != before_id
-                or after_id not in valid_after_ids
-            ):
-                # Revisão, achado 1: comparar só beforeId não comprova
-                # correlação — beforeId batendo com afterId contraditório
-                # (ex.: item nunca consumido por esta operação) nunca é
-                # aplicado às cegas, mesmo com beforeId correto.
+                if last_reversible.operation_type == _REVERSIBLE_OP_PURCHASE:
+                    valid_after_ids = {0} | {
+                        component_id for component_id, _ in last_reversible.consumed_components
+                    }
+                    # Comparar só beforeId não comprova correlação — beforeId
+                    # batendo com afterId contraditório (ex.: item nunca
+                    # consumido por esta operação) nunca é aplicado às
+                    # cegas, mesmo com beforeId correto.
+                    correlated = (
+                        before_id == last_reversible.resulting_item_id
+                        and after_id in valid_after_ids
+                    )
+                elif last_reversible.operation_type == _REVERSIBLE_OP_SALE:
+                    # Forma observada no corpus real analisado (ver
+                    # _ReversibleOp): undo de venda usa beforeId=0/
+                    # afterId=<item vendido>, nunca a forma de undo de
+                    # compra.
+                    correlated = before_id == 0 and after_id == last_reversible.resulting_item_id
+            if not correlated:
                 _mark_uncertain("UNDO_UNCORRELATED", event, before_id)
             else:
+                # correlated só é True dentro do bloco `if last_reversible is
+                # not None` acima -- nunca alcançável com last_reversible=None.
+                assert last_reversible is not None
                 inventory = last_reversible.prior_inventory
                 _discard_pending(last_reversible.consumed_components, last_reversible.timestamp_ms)
                 last_reversible = None
+                # Validar afterId contra {0, componentes consumidos} é um
+                # invariante interno deste reducer, não uma semântica real
+                # confirmada — bater com a regra não comprova a correlação de
+                # verdade. Em dado REAL, todo undo aplicado (mesmo
+                # "correlacionado") marca incerto a partir daqui; em DEMO, a
+                # regra é sintética e testada.
+                if not is_demo:
+                    _mark_uncertain("UNVALIDATED_UNDO_SEMANTICS", event, before_id)
 
     return results
 
 
 def _decision_state_from_purchase(
-    match_id: str, catalog_id: uuid.UUID | None, purchase: ReconstructedPurchase
+    match_id: str,
+    catalog_id: uuid.UUID | None,
+    origin: SourceOrigin,
+    purchase: ReconstructedPurchase,
 ) -> DecisionState:
     return DecisionState(
         id=uuid.uuid4(),
         match_id=match_id,
         participant_id=purchase.participant_id,
         event_source_index=purchase.event_source_index,
-        state_version=1,
+        state_version=RECONSTRUCTION_ALGORITHM_VERSION,
         snapshot={
             "inventory": purchase.inventory_before.to_payload(),
             "purchasedItemId": purchase.purchased_item_id,
@@ -526,23 +771,59 @@ def _decision_state_from_purchase(
             "uncertain": purchase.uncertain,
             "reasons": [reason.to_payload() for reason in purchase.reasons],
             "goldEstimate": purchase.gold_estimate.to_payload(),
-            # Revisão, achado 3: reconciliação de ITEM_DESTROYED por
-            # timestamp/item/quantidade é uma HEURÍSTICA nunca validada
-            # contra o corpus real (data/raw/cc-105/ ausente nesta sessão,
-            # BLOCKED — .private/validation/sprint-2/CC-203/01-corpus-
-            # investigation-blocked.txt). Propagado sempre, mesmo quando não
-            # aplicado (validated=False é uma propriedade do MÉTODO, não do
-            # resultado desta compra específica) — nunca confundido com
-            # `uncertain` (que bloqueia recomendação; isto só desconta
-            # certeza empírica de uma estimativa que continua sendo o
-            # melhor esforço disponível).
+            "sourceOrigin": origin.value,
+            # `uncertain`/`reasons` acima são CUMULATIVOS e incluem
+            # diagnósticos que dependem da identidade/receita DESTE alvo
+            # (ITEM_UNKNOWN/ITEM_EXCLUDED_UNSUPPORTED/
+            # INVENTORY_CAPACITY_EXCEEDED/
+            # UNVALIDATED_DESTROY_ORDER_RECONCILIATION) — nunca devem
+            # alimentar elegibilidade/feature/máscara PRÉ-decisão.
+            # `preDecisionQuality` é a qualidade ANTES de processar esta
+            # compra especificamente, nunca influenciada pelo alvo — é isto
+            # que elegibilidade/feature/máscara pré-compra deve consultar.
+            # Inclui catálogo ausente desde a PRIMEIRA compra (NO_CATALOG é
+            # condição do patch da partida inteira, conhecida antes de
+            # qualquer evento, nunca dependente do item escolhido).
+            "preDecisionQuality": {
+                "uncertain": purchase.pre_decision_uncertain,
+                "reasons": [reason.to_payload() for reason in purchase.pre_decision_reasons],
+            },
+            # Bater com a heurística de reconciliação NUNCA é certeza fora de
+            # DEMO — em dado real, um destroy reconciliado também aparece em
+            # `reasons` (UNVALIDATED_DESTROY_RECONCILIATION) e marca
+            # `uncertain=True` a partir daqui; este bloco é só a
+            # documentação factual de QUE a heurística foi usada, nunca o
+            # único lugar que bloqueia elegibilidade.
             "destroyReconciliationHeuristic": {
                 "appliedToThisParticipant": purchase.destroy_reconciliation_heuristic_used,
                 "validatedAgainstRealCorpus": False,
                 "note": (
                     "correlação por timestamp_ms/item_id/quantidade entre compra de "
-                    "receita e ITEM_DESTROYED; nunca confirmada contra dado real "
-                    "(corpus CC-105 indisponível nesta sessão) — estimativa, não certeza"
+                    "receita e ITEM_DESTROYED — examinada num corpus real pequeno "
+                    "(10 partidas, patches 14.20/15.1), nunca confirmada como "
+                    "semântica oficial da Riot nem verificada nos patches 16.16/16.17 "
+                    "do recorte congelado — estimativa, não certeza. Fora do modo demo, "
+                    "aplicar esta heurística também marca o participante "
+                    "uncertain=True (ver reasons)."
+                ),
+            },
+            # Mesma disciplina da heurística acima, para destroy ANTES da
+            # compra composta no mesmo timestamp (no corpus real analisado,
+            # 851/851 destroys com compra co-temporal precedem a compra).
+            # `claimedDestroySourceIndexes` são os source_index dos
+            # ITEM_DESTROYED efetivamente reivindicados POR ESTA compra
+            # (nunca cumulativo, nunca outra compra) — usar para contar
+            # cobertura por EVENTO/unidade, nunca por compra (uma compra
+            # pode reivindicar várias unidades, ou nenhuma, então contar
+            # compras não mede destroys).
+            "destroyOrderReconciliationHeuristic": {
+                "appliedToThisParticipant": purchase.destroy_order_reconciliation_used,
+                "claimedDestroySourceIndexes": list(purchase.destroy_order_claimed_source_indexes),
+                "validatedAgainstRealCorpus": False,
+                "note": (
+                    "unidade destruída ANTES da compra composta, no mesmo timestamp, "
+                    "reivindicada como consumo de receita — mesma investigação empírica "
+                    "e mesmas ressalvas de destroyReconciliationHeuristic acima."
                 ),
             },
         },
@@ -613,10 +894,16 @@ async def reconstruct_match(
     """Orquestrador (CC-203): busca (banco+fonte local, fora de transação de
     escrita) -> reduz (puro, um participante por vez) -> persiste (uma única
     transação, todos os participantes juntos ou nada). Idempotente via marca
-    explícita `match_reconstructions` (revisão, achado 5: checar só
-    `list_decision_states` do primeiro participante falhava quando esse
-    participante especificamente não tinha compra alguma). Catálogo é
-    resolvido e fixado uma única vez aqui; a reexecução idempotente devolve o
+    explícita `match_reconstructions` (checar só `list_decision_states` de um
+    participante falharia quando esse participante não tivesse compra
+    alguma) versionada por `RECONSTRUCTION_ALGORITHM_VERSION`: uma marca de
+    versão antiga nunca conta como "já feita" para a versão atual, e
+    `DecisionState`s de uma versão anterior nunca são apagados/sobrescritos.
+    A marca é consultada ANTES de qualquer I/O de fonte: um resultado já
+    persistido nunca depende de reabrir raw/fixture — só a reconstrução
+    FRESCA (marca ausente) precisa da fonte, para
+    frames/participantes/conferência de integridade. Catálogo é resolvido e
+    fixado uma única vez aqui; a reexecução idempotente devolve o
     catalog_id REALMENTE usado (da marca persistida), nunca um valor
     reresolvido na hora — mesmo que uma sincronização concorrente já tenha
     trocado o canônico atual (catalog_id obtido continua consultável por ID
@@ -630,13 +917,39 @@ async def reconstruct_match(
     if match is None:
         raise NotFoundError(f"match {match_id!r} não encontrado; importar antes de reconstruir")
 
-    # Fonte local (fixture demo ou raw imutável real já persistido pelo
-    # CC-201): nunca coleta nova, só re-leitura — LocalRawMatchSource é
-    # estruturalmente incapaz de emitir rede (revisão, achado 4). Frames não
-    # são persistidos pelo CC-201 (só eventos), então esta é a única forma
-    # de obtê-los aqui; raw_hash é conferido contra o já persistido — nunca
-    # mistura uma releitura divergente (fonte trocada/corrompida) com os
-    # eventos já persistidos da mesma partida.
+    async with unit_of_work(session_factory) as session:
+        marker = await timeline_repo_factory(session).get_match_reconstruction(
+            match_id, RECONSTRUCTION_ALGORITHM_VERSION
+        )
+    if marker is not None:
+        # Caminho idempotente: nunca reabre a fonte (fixture/raw) — lista
+        # participantes já persistidos (CC-201) e os estados já computados
+        # NESSA versão do algoritmo, sem tocar match_source (testado com uma
+        # fonte que levanta se chamada).
+        async with unit_of_work(session_factory) as session:
+            participants = await ingestion_repo_factory(session).list_participants(match_id)
+            repo = timeline_repo_factory(session)
+            all_existing: list[DecisionState] = []
+            for participant in participants:
+                all_existing.extend(
+                    state
+                    for state in await repo.list_decision_states(
+                        match_id, participant.participant_id
+                    )
+                    if state.state_version == RECONSTRUCTION_ALGORITHM_VERSION
+                )
+        return MatchReconstruction(
+            match_id=match_id, catalog_id=marker.catalog_id, decision_states=all_existing
+        )
+
+    # Reconstrução FRESCA (marca ausente para esta versão): agora sim
+    # precisa da fonte local (fixture demo ou raw imutável real já
+    # persistido pelo CC-201) — nunca coleta nova, só re-leitura;
+    # LocalRawMatchSource é estruturalmente incapaz de emitir rede. Frames
+    # não são persistidos pelo CC-201 (só eventos), então
+    # esta é a única forma de obtê-los; raw_hash é conferido contra o já
+    # persistido — nunca mistura uma releitura divergente (fonte
+    # trocada/corrompida) com os eventos já persistidos da mesma partida.
     source_result = await match_source.load_match(match_id)
     if source_result.raw_hash != match.raw_hash:
         raise TimelineReplayError(
@@ -648,18 +961,6 @@ async def reconstruct_match(
             ),
         )
     participant_ids = [p.participant_id for p in source_result.participants]
-
-    async with unit_of_work(session_factory) as session:
-        marker = await timeline_repo_factory(session).get_match_reconstruction(match_id)
-    if marker is not None:
-        all_existing: list[DecisionState] = []
-        async with unit_of_work(session_factory) as session:
-            repo = timeline_repo_factory(session)
-            for participant_id in participant_ids:
-                all_existing.extend(await repo.list_decision_states(match_id, participant_id))
-        return MatchReconstruction(
-            match_id=match_id, catalog_id=marker.catalog_id, decision_states=all_existing
-        )
 
     catalog_id: uuid.UUID | None = None
     entry = mapping.resolve(match.patch)
@@ -689,13 +990,15 @@ async def reconstruct_match(
         purchases = reconstruct_participant_purchases(
             participant_id=participant_id,
             events=events,
+            origin=source_result.origin,
             frames=source_result.frames,
             catalog_id=catalog_id,
             catalog_items=catalog_items,
             excluded_item_ids=excluded_item_ids,
         )
         all_decision_states.extend(
-            _decision_state_from_purchase(match_id, catalog_id, purchase) for purchase in purchases
+            _decision_state_from_purchase(match_id, catalog_id, source_result.origin, purchase)
+            for purchase in purchases
         )
 
     try:
@@ -703,7 +1006,9 @@ async def reconstruct_match(
             repo = timeline_repo_factory(session)
             for state in all_decision_states:
                 await repo.add_decision_state(state)
-            await repo.add_match_reconstruction(match_id, catalog_id)
+            await repo.add_match_reconstruction(
+                match_id, RECONSTRUCTION_ALGORITHM_VERSION, catalog_id
+            )
     except IntegrityError as exc:
         raise ConflictError(
             f"reconstrução concorrente de {match_id!r} já em andamento/concluída"
