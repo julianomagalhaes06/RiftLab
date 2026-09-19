@@ -207,6 +207,16 @@ def _patch_from_game_version(game_version: str) -> str:
     return f"{parts[0]}.{parts[1]}"
 
 
+def parse_raw_pair(
+    match_id: str, match_body: bytes, timeline_body: bytes, subject_hash_secret: str | None
+) -> MatchSourceResult:
+    """Valida e converte um par match+timeline BRUTO em DTOs (a mesma validação do
+    importador, sem rede e sem banco). Usado pelo coletor (CC-206) para só gravar no
+    armazenamento local pares que o importador aceitaria. Exige o segredo de hash:
+    sem ele levanta SubjectHashSecretMissingError, nunca gera um."""
+    return _parse_riot_match_and_timeline(match_id, match_body, timeline_body, subject_hash_secret)
+
+
 def _parse_riot_match_and_timeline(
     match_id: str,
     match_body: bytes,

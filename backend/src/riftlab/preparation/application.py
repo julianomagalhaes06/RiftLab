@@ -35,6 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from riftlab.catalog.application import resolve_catalog_for_match, sync_catalog
 from riftlab.catalog.domain import CatalogSource
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_catalog_mapping
+from riftlab.catalog.infrastructure.curation import CURATION_RULES_VERSION
 from riftlab.catalog.infrastructure.data_dragon_source import DataDragonCatalogSource
 from riftlab.catalog.infrastructure.data_dragon_transport import DataDragonTransport
 from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource, demo_catalog_mapping
@@ -128,7 +129,15 @@ async def _ensure_catalog(
 ) -> CatalogMapping:
     """Garante o catálogo do patch e devolve o mapping que a reconstrução deve
     usar. DEMO: sync local da fixture, sem rede. REAL: só há rede se o patch
-    tiver entrada explícita no mapping E ainda não houver canônico."""
+    tiver entrada explícita no mapping E o canônico não existe ou foi curado por
+    uma regra que NÃO é a corrente.
+
+    Achado da coleta real (CC-206, rodada 2a): um canônico sincronizado antes da
+    curadoria `data_dragon_v5` (ex.: `LEGACY_UNKNOWN`, do CC-202) era tratado como
+    suficiente; o classificador então rejeitava TODOS os itens
+    (`CLASSIFICATION_UNSUPPORTED_CURATION`) e nenhum ponto podia ser elegível, em
+    silêncio. Agora o canônico só serve se tem a curadoria corrente; senão sincroniza
+    de novo (conteúdo novo = linha nova e canônica; a antiga fica preservada)."""
     if job.mode == ImportMode.DEMO:
         demo_mapping = demo_catalog_mapping()
         if demo_mapping.resolve(patch) is not None:
@@ -144,7 +153,8 @@ async def _ensure_catalog(
     mapping = load_catalog_mapping(mapping_path)
     if mapping.resolve(patch) is None:
         return mapping  # sem entrada: nenhuma rede, catálogo ausente (MISSING_CATALOG)
-    if await resolve_catalog_for_match(session_factory, mapping, patch) is None:
+    canonical = await resolve_catalog_for_match(session_factory, mapping, patch)
+    if canonical is None or canonical.curation_rules_version != CURATION_RULES_VERSION:
         async with catalog_source_factory(mapping) as source:
             await sync_catalog(session_factory, source, patch)
     return mapping

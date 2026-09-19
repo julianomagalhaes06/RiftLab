@@ -24,6 +24,8 @@ COPY configs/feature-schema-v1.json ./configs/feature-schema-v1.json
 FROM base AS test
 RUN uv sync --frozen
 COPY backend/tests ./tests
+# Exemplo público da lista de sementes (CC-206): um teste garante que ele acompanha o carregador.
+COPY configs/collection-seeds.example.yaml ./configs/collection-seeds.example.yaml
 COPY backend/openapi.json ./openapi.json
 ENV PATH="/app/.venv/bin:$PATH"
 CMD ["pytest"]

@@ -11,7 +11,7 @@ from riftlab.config import get_settings
 
 app = typer.Typer(
     help="RiftLab CLI (cc). Comandos implementados nesta etapa: "
-    "api, worker, health, db, riot, openapi, catalog, timeline, decisions.",
+    "api, worker, health, db, riot, openapi, catalog, timeline, decisions, collect, report.",
     no_args_is_help=True,
 )
 
@@ -42,6 +42,11 @@ def openapi_export(
     out.write_text(json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
     typer.echo(f"OpenAPI exportado para {out}")
 
+
+from riftlab.cli.collect import collect_app, report_app  # noqa: E402  (CC-206)
+
+app.add_typer(collect_app, name="collect")
+app.add_typer(report_app, name="report")
 
 riot_app = typer.Typer(
     help="Spike administrativo de auditoria de acesso real (CC-105). Não é o "

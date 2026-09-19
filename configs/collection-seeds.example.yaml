@@ -1,0 +1,19 @@
+# Lista PERMITIDA de sementes da coleta incremental (`cc collect run --seeds-file ...`).
+# Copie para um diretório local fora do Git (git-ignorado) e ajuste.
+#
+# Uma semente é uma conta de uma pessoa que CONSENTIU de forma explícita em ter as
+# próprias partidas coletadas. A coleta só lista partidas dessas contas: nunca percorre
+# adversários, colegas de time, ligas ou descobertas derivadas.
+#
+# - label: pseudônimo estável (aparece em manifesto e relatórios; nunca o Riot ID).
+# - accountFile: arquivo de conta privado (fora do Git) com gameName, tagLine, platform
+#   BR1 e regionalRouting americas; caminho relativo a ESTE arquivo ou absoluto.
+# - consent: precisa ser o booleano true. Nenhum dado de conta pode ficar aqui.
+schemaVersion: v1
+seeds:
+  - label: seed-01
+    accountFile: accounts/seed-01.json
+    consent: true
+  - label: seed-02
+    accountFile: accounts/seed-02.json
+    consent: true

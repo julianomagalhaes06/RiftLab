@@ -70,9 +70,23 @@ class _JsonLogFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False)
 
 
+_HTTP_CLIENT_LOGGERS = ("httpx", "httpcore")
+
+
+def quiet_http_client_logs() -> None:
+    """Silencia o INFO do cliente HTTP (`httpx`/`httpcore`): ele registra a URL COMPLETA de
+    cada requisição, e as URLs da Riot carregam identificadores pessoais (Riot ID em
+    Account-V1, PUUID na listagem de partidas). Idempotente; chamado por
+    `configure_logging` e por todo transporte da Riot (CC-206: achado do teste de
+    varredura de dado pessoal — sem isto uma coleta real gravaria Riot ID e PUUID no log)."""
+    for name in _HTTP_CLIENT_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 def configure_logging(level: str) -> None:
     """Logs estruturados em JSON com requestId; nunca inclui payload bruto,
     DSN ou segredo — chamadores devem logar apenas identificadores e codigos."""
+    quiet_http_client_logs()
     root = logging.getLogger()
     root.setLevel(level.upper())
     handler = logging.StreamHandler(stream=sys.stdout)

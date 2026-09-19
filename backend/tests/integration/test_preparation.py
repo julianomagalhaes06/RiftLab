@@ -28,8 +28,10 @@ from pipeline_helpers import (
 from sqlalchemy import func, select, update
 
 from riftlab.api.app import create_app
-from riftlab.catalog.application import resolve_catalog_for_match
+from riftlab.catalog.application import resolve_catalog_for_match, sync_catalog
 from riftlab.catalog.infrastructure.catalog_mapping import load_catalog_mapping
+from riftlab.catalog.infrastructure.curation import CURATION_RULES_VERSION
+from riftlab.catalog.models import CatalogVersionModel
 from riftlab.config import Settings
 from riftlab.decisions.models import DecisionExtractionModel, DecisionPointModel
 from riftlab.ingestion.domain import MAX_TRANSIENT_ATTEMPTS, ImportJob, ImportJobState, JobKind
@@ -290,6 +292,63 @@ async def test_real_patch_with_mapping_syncs_catalog_once_through_stub(
     # outra partida do mesmo patch: o canônico já existe, nenhuma nova sincronização
     other = f"BR1_{uuid.uuid4().int % 10**10}"
     try:
+        await import_real_match(session_factory, raw_store, other, patch, ((120_000, 3006),))
+        assert await process_next_preparation(session_factory, raw_store, settings, factory) is True
+        assert stub.loads == [patch] and factory.opened == 1
+    finally:
+        await reset_match(session_factory, other)
+
+
+async def test_canonical_catalog_with_a_non_current_curation_is_resynced_not_reused_silently(
+    session_factory, tmp_path, real_match
+) -> None:
+    """Achado da coleta real (CC-206, rodada 2a): um canônico sincronizado ANTES da curadoria
+    corrente (ex.: LEGACY_UNKNOWN, do CC-202) era tratado como suficiente e o classificador
+    rejeitava todos os itens em silêncio. Agora a preparação ressincroniza."""
+    patch = unique_patch()
+    settings = write_prepare_configs(tmp_path, scope_patch=patch, mapped_patches=(patch,))
+    raw_store = DurableRawMatchStore(tmp_path / "raw")
+    await import_real_match(session_factory, raw_store, real_match, patch, ((120_000, 3006),))
+    mapping = load_catalog_mapping(tmp_path / "catalog-mappings.yaml")
+    legacy = await sync_catalog(
+        session_factory,
+        StubCatalogSource(curation_rules_version="LEGACY_UNKNOWN"),
+        patch,
+    )
+    canonical = await resolve_catalog_for_match(session_factory, mapping, patch)
+    assert canonical is not None and canonical.id == legacy.id  # o legado é o canônico
+
+    stub = StubCatalogSource()
+    factory = stub_catalog_factory(stub)
+    assert await process_next_preparation(session_factory, raw_store, settings, factory) is True
+
+    assert stub.loads == [patch] and factory.opened == 1  # ressincronizou (rede só do catálogo)
+    current = await resolve_catalog_for_match(session_factory, mapping, patch)
+    assert current is not None and current.id != legacy.id
+    assert current.curation_rules_version == CURATION_RULES_VERSION
+    async with unit_of_work(session_factory) as session:
+        versions = list(
+            await session.scalars(
+                select(CatalogVersionModel.curation_rules_version).where(
+                    CatalogVersionModel.game_patch == patch
+                )
+            )
+        )
+        points = list(
+            await session.scalars(
+                select(DecisionPointModel).where(DecisionPointModel.match_id == real_match)
+            )
+        )
+    assert sorted(versions) == sorted(
+        ["LEGACY_UNKNOWN", CURATION_RULES_VERSION]
+    )  # legado preservado
+    assert points and all(p.curation_rules_version == CURATION_RULES_VERSION for p in points)
+    assert all(
+        "CLASSIFICATION_UNSUPPORTED_CURATION" not in str(p.reasons) for p in points
+    )  # o alvo agora é classificável
+
+    other = f"BR1_{uuid.uuid4().int % 10**10}"
+    try:  # e a partida seguinte do mesmo patch NÃO ressincroniza
         await import_real_match(session_factory, raw_store, other, patch, ((120_000, 3006),))
         assert await process_next_preparation(session_factory, raw_store, settings, factory) is True
         assert stub.loads == [patch] and factory.opened == 1

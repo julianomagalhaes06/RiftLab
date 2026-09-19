@@ -260,6 +260,66 @@ docker compose run --rm api db upgrade
 python3 scripts/smoke_import_flow.py --base-url http://127.0.0.1:8000
 ```
 
+## Coleta incremental e relatórios (CC-206)
+
+```sh
+# 1) coleta (rede; chave e segredo só por .env/ambiente, nunca por argumento)
+uv run cc collect run --seeds-file <sementes.yaml> --patches 16.16,16.17 --since 2026-08-10 \
+    --max-matches 70 --max-matches-per-seed 35 --max-requests 250 --max-duration-seconds 1800
+# 2) importar do armazenamento local (sem rede) e preparar; --no-drain só enfileira para o worker
+uv run cc collect import [--no-drain]
+# 3) relatórios (sem dado pessoal)
+uv run cc collect report [--run N] [--json]                       # manifesto: sem rede, sem banco
+uv run cc report reconstruction|diversity|integrity --only-collected [--json]
+```
+
+No Docker Compose o entrypoint já é `cc`: `docker compose run --rm worker collect run ...`.
+O exemplo público da lista de sementes é `configs/collection-seeds.example.yaml`.
+
+- **Sementes (lista permitida).** Só contas de pessoas que consentiram de forma explícita,
+  com rótulo pseudônimo e `consent: true`; o arquivo só aponta para arquivos de conta
+  locais (fora do Git) e recusa dado de conta inline. Nada percorre adversários, colegas
+  de time, ligas ou descobertas derivadas. Ao montar a lista num contêiner, monte somente
+  leitura apenas o que a coleta lê (o arquivo de sementes e as contas), não a pasta toda.
+- **Filtros com contagem de perdas.** Plataforma BR1, fila 420, mapa 11, partida
+  concluída, patches de `configs/scope.yaml` (`--patches` só estreita), a semente
+  participa, documento válido e o PAR partida+timeline aceito pelo mesmo parser do
+  importador. Cada partida coletada ou excluída (com motivo) fica no manifesto.
+- **Tetos e limitação.** Requisições, partidas novas, duração e partidas por semente, por
+  execução. O limitador global aprende as janelas dos headers `X-App-Rate-Limit` e
+  `X-Method-Rate-Limit` (e das contagens) e respeita `Retry-After`; toda tentativa,
+  inclusive retry do transporte, conta no orçamento. `--since`/`--until` viram
+  `startTime`/`endTime` da listagem.
+- **Paradas seguras.** 401/403 bloqueiam novas execuções até `--resume-after-auth-failure`
+  (confirmação humana de que a chave foi trocada); 429 grava um cooldown que as execuções
+  seguintes respeitam antes de qualquer requisição. Códigos de saída de `collect run`: `0`
+  terminou ou parou num teto, `1` recusou antes de qualquer requisição, `3` credencial,
+  `4` limite de taxa, `5` parcial (semente pulada ou servidor instável).
+- **Retomada sem reiniciar a coleta.** Manifesto durável (JSON atômico, uma execução por
+  vez, dentro de `<raw-dir>/collection/`). Uma partida só vira `FETCHED` depois de gravada
+  de forma durável (par partida+timeline validado); queda entre buscar e gravar reaproveita
+  o que já está em disco. A listagem da Riot cresce pela cabeça, então **cada passada
+  recomeça da posição 0** (um índice guardado pularia partidas jogadas entre execuções ou
+  ao mudar a janela): as partidas conhecidas custam 0 requisição e só a página de listagem
+  é paga de novo (1 por 100 ids).
+- **Da coleta à análise.** `collect import` enfileira a importação a partir do raw local
+  (nunca busca de novo; o worker também prefere o raw local quando completo) e cada
+  importação enfileira a preparação automática do CC-205. `report integrity` sai com `1`
+  se alguma partida parcial for analisável (READY sem extração, partida sem
+  participantes ou eventos, órfã, ou sem o par bruto).
+- **Relatórios.** `collect report`: rodadas, requisições, partidas novas/duplicadas/
+  excluídas por motivo, causa de parada, comportamento observado (janelas de limite,
+  nomes de header, maior página) e o estado da passada por semente. `report
+  reconstruction`: estados, pontos, elegíveis, motivos e sub-motivos, na visão geral e
+  DENTRO DO RECORTE (mesmo código do CC-204). `report diversity`: concentração por jogador
+  pseudonimizado e cobertura por patch/campeão, só agregados. `--only-collected` restringe
+  à amostra do manifesto. Nenhum relatório imprime Riot ID, PUUID, hash de jogador,
+  `matchId` ou chave.
+- **Viés e limites.** A amostra é de conveniência: as contas se sobrepõem, um jogador
+  aparece em muitas partidas e amostra grande não é amostra representativa. Sem MMR nem
+  elo. `Retry-After` real e `count` acima de 100 não foram observados. Os dados coletados
+  não entram no Git.
+
 ## Migrações
 
 ```sh

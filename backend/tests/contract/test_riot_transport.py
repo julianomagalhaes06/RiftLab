@@ -466,3 +466,155 @@ async def test_request_timeout_uses_configured_value_when_budget_has_plenty_of_t
 
     used_timeout = fake_client.calls[0]["timeout"]
     assert used_timeout == pytest.approx(10.0, abs=0.5)
+
+
+# ---------------------------------------------------------------------------
+# CC-206: limitação global opcional e janela de datas na listagem
+# ---------------------------------------------------------------------------
+
+
+class _FakeClock:
+    def __init__(self) -> None:
+        self.now = 5000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    async def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def _limited_transport(handler, limiter, budget: RiotFetchBudget | None = None):
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return RiotHttpTransport(
+        api_key=_FAKE_API_KEY,
+        budget=budget or _budget(),
+        client=client,
+        sleep=_no_sleep,
+        rate_limiter=limiter,
+    )
+
+
+async def test_list_match_ids_sends_time_window_only_when_given() -> None:
+    seen: list[dict[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(dict(request.url.params))
+        return httpx.Response(200, content=b"[]")
+
+    transport = _transport(handler)
+    await transport.list_match_ids_by_puuid("p", queue=420, start=0, count=100)
+    await transport.list_match_ids_by_puuid(
+        "p", queue=420, start=100, count=100, start_time=1_700_000_000, end_time=1_700_100_000
+    )
+
+    assert seen[0] == {"queue": "420", "start": "0", "count": "100"}
+    assert seen[1]["startTime"] == "1700000000" and seen[1]["endTime"] == "1700100000"
+
+
+async def test_global_limiter_paces_every_kind_of_call_and_learns_headers() -> None:
+    from riftlab.ingestion.infrastructure.riot_rate_limiter import RateWindow, RiotRateLimiter
+
+    clock = _FakeClock()
+    limiter = RiotRateLimiter(
+        app_windows=(RateWindow(1000, 1.0),), safety_margin=1.0, clock=clock, sleep=clock.sleep
+    )
+    times: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        times.append(clock.now)
+        return httpx.Response(
+            200,
+            content=b"[]",
+            headers={"X-App-Rate-Limit": "2:10", "X-App-Rate-Limit-Count": "1:10"},
+        )
+
+    transport = _limited_transport(handler, limiter)
+    for _ in range(3):
+        await transport.list_match_ids_by_puuid("p", queue=420, start=0, count=5)
+
+    assert times[1] - times[0] < 1  # 2 por 10 s: as duas primeiras seguem juntas
+    assert times[2] - times[0] >= 9.9  # a 3ª espera a janela aprendida do header
+    assert transport.requests_made == 3
+
+
+async def test_429_retry_after_penalizes_all_later_calls_not_only_the_retry() -> None:
+    from riftlab.ingestion.infrastructure.riot_rate_limiter import RateWindow, RiotRateLimiter
+
+    clock = _FakeClock()
+    limiter = RiotRateLimiter(app_windows=(RateWindow(1000, 1.0),), clock=clock, sleep=clock.sleep)
+    responses = iter(
+        [httpx.Response(429, headers={"Retry-After": "40"}), httpx.Response(200, content=b"[]")]
+    )
+    sent_at: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent_at.append(clock.now)
+        return next(responses)
+
+    transport = _limited_transport(handler, limiter)
+    await transport.list_match_ids_by_puuid(
+        "p", queue=420, start=0, count=5
+    )  # 429 -> espera -> 200
+
+    assert sent_at[1] - sent_at[0] >= 40  # o limitador segurou a nova tentativa
+    assert transport.requests_made == 2  # a nova tentativa CONTOU no orçamento
+
+
+async def test_limiter_wait_beyond_remaining_time_stops_resumably_without_a_request() -> None:
+    from riftlab.ingestion.infrastructure.riot_rate_limiter import RateWindow, RiotRateLimiter
+
+    clock = _FakeClock()
+    limiter = RiotRateLimiter(app_windows=(RateWindow(1000, 1.0),), clock=clock, sleep=clock.sleep)
+    limiter.penalize(600)
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(200, content=b"[]")
+
+    transport = _limited_transport(handler, limiter, _budget(max_total_seconds=30.0))
+
+    with pytest.raises(SourceRateLimitedError) as excinfo:
+        await transport.list_match_ids_by_puuid("p", queue=420, start=0, count=5)
+
+    assert excinfo.value.retry_after_seconds and excinfo.value.retry_after_seconds >= 600
+    assert calls == [] and transport.requests_made == 0  # nenhuma requisição gasta
+
+
+async def test_transport_silences_the_http_client_url_logging(caplog) -> None:
+    """Achado do CC-206: o INFO do httpx registra a URL COMPLETA (Riot ID em Account-V1,
+    PUUID na listagem). Todo transporte da Riot o silencia, mesmo se o log raiz estiver em
+    DEBUG — o identificador nunca chega a nenhum handler."""
+    import logging
+
+    caplog.set_level(logging.DEBUG)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"puuid": "puuid-sintetico-secreto"})
+
+    transport = _transport(handler)
+    await transport.resolve_account_puuid("NomeSinteticoSecreto", "TAG")
+
+    assert "NomeSinteticoSecreto" not in caplog.text
+    assert "by-riot-id" not in caplog.text
+
+
+async def test_transport_counts_http_statuses_per_call_kind_without_identifiers() -> None:
+    statuses = iter([429, 200, 404])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        status = next(statuses)
+        return httpx.Response(
+            status, content=b"[]", headers={"Retry-After": "1"} if status == 429 else {}
+        )
+
+    transport = _transport(handler)
+    await transport.list_match_ids_by_puuid("p", queue=420, start=0, count=5)  # 429 -> 200
+    with pytest.raises(SourceNotFoundError):
+        await transport.fetch_match("BR1_1000000001")
+
+    counts = transport.status_counts()
+
+    assert counts == {"match:404": 1, "match-list:200": 1, "match-list:429": 1}
+    assert "p" not in str(counts) and "BR1_1000000001" not in str(counts)

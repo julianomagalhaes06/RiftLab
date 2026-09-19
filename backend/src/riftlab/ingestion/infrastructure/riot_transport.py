@@ -13,6 +13,8 @@ from urllib.parse import quote
 
 import httpx
 
+from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
+from riftlab.observability import quiet_http_client_logs
 from riftlab.shared.errors import (
     SourceAuthError,
     SourceError,
@@ -111,18 +113,30 @@ class RiotHttpTransport:
         budget: RiotFetchBudget,
         client: httpx.AsyncClient | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        rate_limiter: RiotRateLimiter | None = None,
     ) -> None:
+        quiet_http_client_logs()  # a URL da Riot carrega Riot ID/PUUID: nunca no log
         self._api_key = api_key
         self._budget = budget
+        # CC-206: limitação GLOBAL opcional (janelas de app/método, contagem do
+        # servidor e Retry-After para todas as chamadas). O worker do CC-201 não
+        # passa nenhum: o job é o dono do retry lá.
+        self._rate_limiter = rate_limiter
         self._client = client or httpx.AsyncClient(follow_redirects=False)
         self._owns_client = client is None
         self._sleep = sleep
         self._requests_made = 0
+        self._status_counts: dict[str, int] = {}
         self._started_at = time.monotonic()
 
     @property
     def requests_made(self) -> int:
         return self._requests_made
+
+    def status_counts(self) -> dict[str, int]:
+        """Respostas HTTP por 'tipo:status' (ex.: 'match:200', 'list:429'): diagnóstico
+        agregado do comportamento real, sem nenhum identificador."""
+        return dict(sorted(self._status_counts.items()))
 
     async def aclose(self) -> None:
         if self._owns_client:
@@ -158,16 +172,26 @@ class RiotHttpTransport:
         return puuid
 
     async def list_match_ids_by_puuid(
-        self, puuid: str, *, queue: int, start: int, count: int
+        self,
+        puuid: str,
+        *,
+        queue: int,
+        start: int,
+        count: int,
+        start_time: int | None = None,
+        end_time: int | None = None,
     ) -> list[str]:
         """Só esta conta pode originar sementes (CC-105); o chamador nunca deve
-        repassar um puuid vindo de outro lugar. Nunca loga o puuid."""
+        repassar um puuid vindo de outro lugar. Nunca loga o puuid.
+        `start_time`/`end_time` (epoch em segundos) restringem a janela de datas da
+        listagem (CC-206); sem eles a chamada é idêntica à anterior."""
         path = f"/lol/match/v5/matches/by-puuid/{quote(puuid, safe='')}/ids"
-        body = await self._request_raw(
-            "match-list",
-            path,
-            params={"queue": str(queue), "start": str(start), "count": str(count)},
-        )
+        params = {"queue": str(queue), "start": str(start), "count": str(count)}
+        if start_time is not None:
+            params["startTime"] = str(start_time)
+        if end_time is not None:
+            params["endTime"] = str(end_time)
+        body = await self._request_raw("match-list", path, params=params)
         document = _parse_json_body("match-list", body)
         if not isinstance(document, list) or not all(isinstance(item, str) for item in document):
             raise SourceSchemaError(
@@ -212,6 +236,12 @@ class RiotHttpTransport:
                     detail="orçamento local de requisições desta execução esgotado",
                 )
 
+            if self._rate_limiter is not None:
+                # Espera (ou encerra retomável) ANTES de gastar uma requisição do
+                # orçamento; nunca dorme além do tempo que resta.
+                await self._rate_limiter.acquire(kind, max_wait_seconds=remaining)
+                remaining = self._remaining_budget_seconds()
+
             self._requests_made += 1
             request_timeout = min(self._budget.request_timeout_seconds, remaining)
             try:
@@ -230,6 +260,10 @@ class RiotHttpTransport:
                 await self._sleep_within_budget(_backoff_seconds(attempt))
                 continue
 
+            key = f"{kind}:{response.status_code}"
+            self._status_counts[key] = self._status_counts.get(key, 0) + 1
+            if self._rate_limiter is not None:
+                self._rate_limiter.observe(kind, response.headers)
             if response.status_code == 200:
                 return response.content
             if response.status_code in (401, 403):
@@ -240,6 +274,8 @@ class RiotHttpTransport:
                 raise SourceNotFoundError(code="RIOT_NOT_FOUND", detail=f"{kind} não encontrado")
             if response.status_code == 429:
                 retry_after = _parse_retry_after(response.headers.get("Retry-After"))
+                if retry_after is not None and self._rate_limiter is not None:
+                    self._rate_limiter.penalize(retry_after)  # vale para TODAS as chamadas
                 if retry_after is None or attempt >= self._budget.max_attempts_per_request:
                     raise SourceRateLimitedError(
                         code="RIOT_RATE_LIMITED",

@@ -19,6 +19,7 @@ from sqlalchemy import delete
 from riftlab.catalog.application import sync_catalog
 from riftlab.catalog.domain import CatalogItemSourceDTO, CatalogSourceResult
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
+from riftlab.catalog.infrastructure.curation import CURATION_RULES_VERSION
 from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource, demo_catalog_mapping
 from riftlab.config import Settings
 from riftlab.decisions.models import DecisionExtractionModel, DecisionPointModel
@@ -254,9 +255,12 @@ class StubCatalogSource:
     """Fonte de catálogo sem I/O para o modo REAL (nunca rede real); conta as
     chamadas. `with_names=False` devolve itens sem `attributes.name`."""
 
-    def __init__(self, *, with_names: bool = True) -> None:
+    def __init__(
+        self, *, with_names: bool = True, curation_rules_version: str = CURATION_RULES_VERSION
+    ) -> None:
         self.loads: list[str] = []
         self._with_names = with_names
+        self._curation = curation_rules_version
 
     async def load_catalog(self, game_patch: str) -> CatalogSourceResult:
         self.loads.append(game_patch)
@@ -268,7 +272,9 @@ class StubCatalogSource:
             raw_hash=uuid.uuid4().hex + uuid.uuid4().hex,
             data_dragon_version=f"{game_patch}.1",
             mapping_version="v1",
-            curation_rules_version="v1",
+            # a mesma curadoria que a fonte REAL emite: com outra, a preparação (que só aceita
+            # o canônico com a curadoria corrente) sincronizaria de novo a cada partida
+            curation_rules_version=self._curation,
             items=(
                 CatalogItemSourceDTO(
                     item_id=3006, price=1100, attributes=attributes, flags={"completed": True}

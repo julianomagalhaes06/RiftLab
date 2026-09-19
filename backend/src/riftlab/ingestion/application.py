@@ -30,8 +30,8 @@ from riftlab.ingestion.domain import (
     Participant,
 )
 from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
-from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
-from riftlab.ingestion.infrastructure.riot_source import RiotMatchSource
+from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore, RawStoreCorruptedError
+from riftlab.ingestion.infrastructure.riot_source import LocalRawMatchSource, RiotMatchSource
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import SubjectHashSecretMissingError
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
@@ -206,14 +206,35 @@ def _default_riot_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(follow_redirects=False)
 
 
+def raw_pair_available(raw_store: DurableRawMatchStore, match_id: str) -> bool:
+    """True se match E timeline já estão íntegros no armazenamento local (CC-206). Par
+    incompleto ou corrompido é False: quem decide o que fazer com ele é a fonte
+    (que reporta RAW_STORE_CORRUPTED / RAW_MATCH_NOT_CACHED), nunca uma suposição aqui."""
+    try:
+        return all(
+            raw_store.read_if_valid(match_id, kind) is not None for kind in ("match", "timeline")
+        )
+    except (RawStoreCorruptedError, ValueError):
+        return False
+
+
 async def _load_from_source(
     job: ImportJob,
     raw_store: DurableRawMatchStore,
     settings: Settings,
     riot_client_factory: Callable[[], httpx.AsyncClient],
+    *,
+    local: bool = False,
 ) -> MatchSourceResult:
     if job.mode == ImportMode.DEMO:
         return await DemoMatchSource().load_match(job.requested_match_id)
+    if local:
+        # Raw local completo (ou `local_only`): a fonte é estruturalmente incapaz de rede,
+        # não constrói transporte nem exige chave (CC-206: importar o que foi coletado
+        # SEM buscar de novo).
+        return await LocalRawMatchSource(raw_store, settings.subject_hash_secret).load_match(
+            job.requested_match_id
+        )
 
     client = riot_client_factory()
     try:
@@ -344,19 +365,30 @@ async def process_next_job(
     raw_store: DurableRawMatchStore,
     settings: Settings,
     riot_client_factory: Callable[[], httpx.AsyncClient] | None = None,
+    *,
+    local_only: bool = False,
 ) -> bool:
     """Um ciclo do worker. True se um job foi processado (mesmo que tenha
     falhado) — o chamador não espera antes de tentar o próximo; False se não
     havia trabalho elegível agora — o chamador espera o intervalo de poll.
     riot_client_factory é injetável só para teste (httpx.MockTransport, sem
-    rede real); cc worker nunca passa isto, usa sempre o cliente real."""
+    rede real); cc worker nunca passa isto, usa sempre o cliente real.
+
+    CC-206 — "local primeiro": um job RIOT cujo par match+timeline já está íntegro no
+    armazenamento local (coletado antes) é importado por `LocalRawMatchSource`, sem
+    transporte, sem chave e sem esperar o cooldown de rede (ele nunca toca a rede).
+    `local_only=True` (usado pela CLI de importação da coleta) vai além: NUNCA busca; sem
+    o raw completo o job falha de forma permanente com RAW_MATCH_NOT_CACHED."""
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         job = await repo.reserve_next_job(datetime.now(UTC))
     if job is None:
         return False
 
-    if job.mode == ImportMode.RIOT:
+    local = job.mode == ImportMode.RIOT and (
+        local_only or raw_pair_available(raw_store, job.requested_match_id)
+    )
+    if job.mode == ImportMode.RIOT and not local:
         # Cooldown compartilhado entre TODOS os jobs RIOT (achado real da
         # revisão CC-201: um 429 só adiava o job atual; a fila continuava
         # chamando a API com outros matchId). Nunca toca rede nem constrói
@@ -375,7 +407,7 @@ async def process_next_job(
     )
     try:
         result = await _load_from_source(
-            job, raw_store, settings, riot_client_factory or _default_riot_client
+            job, raw_store, settings, riot_client_factory or _default_riot_client, local=local
         )
     except SubjectHashSecretMissingError:
         await _finalize_failed(session_factory, job, "SUBJECT_HASH_SECRET_MISSING")
