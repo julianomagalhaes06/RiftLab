@@ -10,6 +10,17 @@ class NotFoundError(DomainError):
     """Agregado solicitado não existe."""
 
 
+class DecisionsNotPreparedError(DomainError):
+    """A partida existe, mas as decisões da versão CORRENTE ainda não foram
+    extraídas (`cc timeline reconstruct` + `cc decisions extract`). Distinto de
+    "extraída com zero pontos". Nunca carrega detalhe interno."""
+
+
+class InvalidCursorError(DomainError):
+    """Cursor de paginação malformado, adulterado, de outro escopo ou de uma
+    extração inexistente. Nunca ecoa o conteúdo recebido."""
+
+
 class SourceError(DomainError):
     """Erro ao carregar dados de uma fonte plugável (MatchSource/CatalogSource,
     CC-104). code é estável e seguro para diagnóstico; detail nunca ecoa corpo

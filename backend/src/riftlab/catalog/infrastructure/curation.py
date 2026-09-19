@@ -36,7 +36,18 @@ legítima); valores de `stats` precisam ser número finito, nunca bool nem
 string; `name` de tipo errado (não string) é falha estrutural — só uma
 string vazia (tipo certo, valor legitimamente ausente, achado real de
 rede) é excluída como artefato; item_id duplicado após normalização (ex.:
-chaves "007" e "7" colapsando no mesmo inteiro) é rejeitado explicitamente."""
+chaves "007" e "7" colapsando no mesmo inteiro) é rejeitado explicitamente.
+
+v5: persiste `into` (documentado no Data Dragon: itens que usam este item
+como componente) em `attributes.into`, como lista ordenada de int, com a
+mesma validação estrita de `from` (não-lista ou elemento não numérico é falha
+estrutural; campo ausente vira lista vazia, sem outro default). `into` pode
+referenciar um item excluído da curadoria — esperado, nunca erro. Preço,
+receita, flags e exclusões não mudam em relação à v4; a identidade de conteúdo
+do catálogo muda porque a versão da curadoria entra no hash. `into` é o dado
+que permite ao classificador de itens (catalog/classification.py) distinguir
+componente de item principal sem depender só do grafo curado, onde um item
+cujo destino foi excluído pareceria terminal."""
 
 from __future__ import annotations
 
@@ -47,8 +58,9 @@ from typing import Any
 
 from riftlab.catalog.domain import CatalogItemSourceDTO, ExcludedCatalogItem
 from riftlab.shared.errors import SourceSchemaError
+from riftlab.shared.numeric import is_ascii_digits
 
-CURATION_RULES_VERSION = "data_dragon_v4"
+CURATION_RULES_VERSION = "data_dragon_v5"
 
 _REASON_SPECIAL_RECIPE = "SPECIAL_RECIPE_UNSUPPORTED"
 _REASON_MISSING_NAME = "MISSING_NAME_UNSUPPORTED"
@@ -88,7 +100,7 @@ def _parse_legal_maps(maps_field: Any, item_id: int) -> list[int]:
         )
     legal_maps: list[int] = []
     for map_id, legal in maps_field.items():
-        if not isinstance(map_id, str) or not map_id.isdigit():
+        if not is_ascii_digits(map_id):
             raise SourceSchemaError(
                 code="CATALOG_SOURCE_MISSING_FIELD",
                 detail=f"item {item_id} com chave de maps não numérica: {map_id!r}",
@@ -145,7 +157,7 @@ def _parse_recipe(raw_from: Any, item_id: int) -> list[dict[str, int]]:
             code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} campo from inválido"
         )
     for component in raw_from:
-        if not isinstance(component, str) or not component.isdigit():
+        if not is_ascii_digits(component):
             raise SourceSchemaError(
                 code="CATALOG_SOURCE_MISSING_FIELD",
                 detail=f"item {item_id} com componente de from inválido: {component!r}",
@@ -155,6 +167,20 @@ def _parse_recipe(raw_from: Any, item_id: int) -> list[dict[str, int]]:
         {"itemId": int(component_id), "quantity": quantity}
         for component_id, quantity in sorted(component_counts.items(), key=lambda kv: kv[0])
     ]
+
+
+def _parse_into(raw_into: Any, item_id: int) -> list[int]:
+    if not isinstance(raw_into, list):
+        raise SourceSchemaError(
+            code="CATALOG_SOURCE_MISSING_FIELD", detail=f"item {item_id} campo into inválido"
+        )
+    for destination in raw_into:
+        if not is_ascii_digits(destination):
+            raise SourceSchemaError(
+                code="CATALOG_SOURCE_MISSING_FIELD",
+                detail=f"item {item_id} com destino de into inválido: {destination!r}",
+            )
+    return sorted(int(destination) for destination in raw_into)
 
 
 def curate_data_dragon_items(
@@ -177,7 +203,7 @@ def curate_data_dragon_items(
     seen_ids: set[int] = set()
 
     for raw_item_id, raw_item in raw_items.items():
-        if not isinstance(raw_item_id, str) or not raw_item_id.isdigit():
+        if not is_ascii_digits(raw_item_id):
             raise SourceSchemaError(
                 code="CATALOG_SOURCE_MISSING_FIELD",
                 detail=f"chave de item não é um item_id numérico: {raw_item_id!r}",
@@ -255,6 +281,7 @@ def curate_data_dragon_items(
             continue
 
         recipe = _parse_recipe(raw_item.get("from", []), item_id)
+        into = _parse_into(raw_item.get("into", []), item_id)
 
         flags: dict[str, Any] = {"purchasable": purchasable, "maps": legal_maps}
         required_champion = raw_item.get("requiredChampion")
@@ -269,7 +296,7 @@ def curate_data_dragon_items(
             item_id=item_id,
             price=price,
             recipe=recipe,
-            attributes={"name": name, "tags": sorted(tags), "stats": stats},
+            attributes={"name": name, "tags": sorted(tags), "stats": stats, "into": into},
             flags=flags,
         )
 

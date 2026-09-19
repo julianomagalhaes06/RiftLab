@@ -28,6 +28,10 @@
     "DEMO-0007": {
       "file": "matches/demo_0007_evento_repetido.json",
       "description": "Evento idêntico duplicado no mesmo timestamp; ordem original preservada, sem deduplicar."
+    },
+    "DEMO-0008": {
+      "file": "matches/demo_0008_transacao_destroy_compra.json",
+      "description": "Forma real do CC-203/204: componentes comprados; no mesmo timestamp, ITEM_DESTROYED dos componentes ANTES da compra do item composto; frames próximos (orçamento fresco)."
     }
   }
 }

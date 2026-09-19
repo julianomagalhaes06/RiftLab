@@ -1,6 +1,375 @@
 {
   "components": {
     "schemas": {
+      "BudgetSource": {
+        "description": "docs/domain-model.md: budget_source: UNKNOWN, FRAME_ESTIMATE,\nUSER_PROVIDED.",
+        "enum": [
+          "UNKNOWN",
+          "FRAME_ESTIMATE",
+          "USER_PROVIDED"
+        ],
+        "title": "BudgetSource",
+        "type": "string"
+      },
+      "CursorPage_DecisionStateSummary_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionStateSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[DecisionStateSummary]",
+        "type": "object"
+      },
+      "DecisionBudget": {
+        "additionalProperties": false,
+        "description": "Orçamento imediato, separado da elegibilidade. `value` é null quando\ndesconhecido (nunca 0). STALE_FRAME/UNKNOWN_BUDGET em `codes` impedem\nafirmar compra imediata, mas não tornam a decisão inelegível.",
+        "properties": {
+          "codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Codes",
+            "type": "array"
+          },
+          "frameAgeMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frameagems"
+          },
+          "immediatePurchaseAssertable": {
+            "title": "Immediatepurchaseassertable",
+            "type": "boolean"
+          },
+          "source": {
+            "$ref": "#/components/schemas/BudgetSource"
+          },
+          "staleFrame": {
+            "title": "Staleframe",
+            "type": "boolean"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "source",
+          "staleFrame",
+          "immediatePurchaseAssertable"
+        ],
+        "title": "DecisionBudget",
+        "type": "object"
+      },
+      "DecisionInventory": {
+        "additionalProperties": false,
+        "description": "Inventário ANTES da decisão como multiconjunto (nunca um conjunto de ids\nsoltos: dois itens iguais são quantity=2). `trinket_item_id` é uma slot\nseparada; null = slot vazia (estado conhecido).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "trinketItemId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trinketitemid"
+          }
+        },
+        "title": "DecisionInventory",
+        "type": "object"
+      },
+      "DecisionReason": {
+        "additionalProperties": false,
+        "description": "Motivo de inelegibilidade. `code` no vocabulário do contrato\n(MISSING_CATALOG, OUT_OF_SCOPE, INVENTORY_UNCERTAIN) mais o neutro\nTARGET_NOT_ELIGIBLE; `sub_reasons` preserva literalmente os códigos de\norigem. Nunca revela a classe do item comprado nem que a compra foi\ndesfeita (modo Estudo: antes de revelar, só informação pré-decisão).",
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "subReasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subreasons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "DecisionReason",
+        "type": "object"
+      },
+      "DecisionState": {
+        "additionalProperties": false,
+        "description": "GET /decisions/{id} (CC-204): \"snapshot, inventário, fonte de orçamento,\nelegibilidade\" — SÓ informação pré-decisão (ver DecisionStateSummary).",
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/DecisionBudget"
+          },
+          "decisionId": {
+            "format": "uuid",
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "eventSourceIndex": {
+            "minimum": 0.0,
+            "title": "Eventsourceindex",
+            "type": "integer"
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/DecisionInventory"
+          },
+          "level": {
+            "$ref": "#/components/schemas/ObservedLevel"
+          },
+          "mainItemOrdinal": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mainitemordinal"
+          },
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "participantId": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Participantid",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "timestampMs": {
+            "minimum": 0.0,
+            "title": "Timestampms",
+            "type": "integer"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/DecisionVersionInfo"
+          }
+        },
+        "required": [
+          "decisionId",
+          "matchId",
+          "participantId",
+          "eventSourceIndex",
+          "timestampMs",
+          "eligible",
+          "inventory",
+          "budget",
+          "level",
+          "versions"
+        ],
+        "title": "DecisionState",
+        "type": "object"
+      },
+      "DecisionStateSummary": {
+        "additionalProperties": false,
+        "description": "Item de GET /matches/{id}/decisions (CC-204): SÓ informação pré-decisão.\n`decision_id` é o id do PONTO de decisão. Proibido aqui: item comprado,\nclasse do alvo, bloco retrospectivo, features, qualidade cumulativa e\nsubject_hash.",
+        "properties": {
+          "budgetSource": {
+            "$ref": "#/components/schemas/BudgetSource"
+          },
+          "decisionId": {
+            "format": "uuid",
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "eventSourceIndex": {
+            "minimum": 0.0,
+            "title": "Eventsourceindex",
+            "type": "integer"
+          },
+          "frameAgeMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frameagems"
+          },
+          "mainItemOrdinal": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mainitemordinal"
+          },
+          "participantId": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Participantid",
+            "type": "integer"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "staleFrame": {
+            "title": "Staleframe",
+            "type": "boolean"
+          },
+          "timestampMs": {
+            "minimum": 0.0,
+            "title": "Timestampms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "decisionId",
+          "participantId",
+          "eventSourceIndex",
+          "timestampMs",
+          "eligible",
+          "budgetSource",
+          "staleFrame"
+        ],
+        "title": "DecisionStateSummary",
+        "type": "object"
+      },
+      "DecisionVersionInfo": {
+        "additionalProperties": false,
+        "description": "Todas as versões que produziram o ponto (linhas imutáveis: uma extração\nantiga continua consultável com as suas versões).",
+        "properties": {
+          "catalogId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalogid"
+          },
+          "classificationVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classificationversion"
+          },
+          "curationRulesVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Curationrulesversion"
+          },
+          "featureSchemaVersion": {
+            "title": "Featureschemaversion",
+            "type": "string"
+          },
+          "reconstructionVersion": {
+            "minimum": 1.0,
+            "title": "Reconstructionversion",
+            "type": "integer"
+          },
+          "scopeVersion": {
+            "title": "Scopeversion",
+            "type": "string"
+          },
+          "selectionVersion": {
+            "title": "Selectionversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reconstructionVersion",
+          "selectionVersion",
+          "featureSchemaVersion",
+          "scopeVersion"
+        ],
+        "title": "DecisionVersionInfo",
+        "type": "object"
+      },
       "ImportJobAccepted": {
         "additionalProperties": false,
         "description": "202 de POST /imports: job novo ou job ativo reaproveitado.",
@@ -139,6 +508,27 @@
         "title": "ImportRequest",
         "type": "object"
       },
+      "InventoryItem": {
+        "additionalProperties": false,
+        "properties": {
+          "itemId": {
+            "minimum": 1.0,
+            "title": "Itemid",
+            "type": "integer"
+          },
+          "quantity": {
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "itemId",
+          "quantity"
+        ],
+        "title": "InventoryItem",
+        "type": "object"
+      },
       "LiveStatus": {
         "properties": {
           "status": {
@@ -148,6 +538,50 @@
           }
         },
         "title": "LiveStatus",
+        "type": "object"
+      },
+      "ObservedLevel": {
+        "additionalProperties": false,
+        "description": "Nível do mesmo frame estritamente anterior usado para o ouro; ausência\nexplícita (`value` null com `absent_reason`), nunca 0.",
+        "properties": {
+          "absentReason": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absentreason"
+          },
+          "frameAgeMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frameagems"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "title": "ObservedLevel",
         "type": "object"
       },
       "ProblemDetail": {
@@ -212,6 +646,59 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/decisions/{decision_id}": {
+      "get": {
+        "operationId": "get_decision_api_v1_decisions__decision_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Partida, participante ou decisão inexistente."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "decisionId não é um UUID válido."
+          }
+        },
+        "summary": "Get Decision",
+        "tags": [
+          "decisions"
+        ]
+      }
+    },
     "/api/v1/imports": {
       "post": {
         "operationId": "create_import_api_v1_imports_post",
@@ -366,6 +853,107 @@
         "summary": "Retry Import Route",
         "tags": [
           "imports"
+        ]
+      }
+    },
+    "/api/v1/matches/{match_id}/decisions": {
+      "get": {
+        "operationId": "list_match_decisions_api_v1_matches__match_id__decisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "participantId",
+            "required": true,
+            "schema": {
+              "maximum": 10,
+              "minimum": 1,
+              "title": "Participantid",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_DecisionStateSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Partida, participante ou decisão inexistente."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Código DECISIONS_NOT_PREPARED: a partida existe, mas as decisões da versão corrente ainda não foram extraídas (cc timeline reconstruct + cc decisions extract). Distinto de 200 com items=[] (extraída com zero pontos)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado, de outra partida/participante ou de extração inexistente)."
+          }
+        },
+        "summary": "List Match Decisions",
+        "tags": [
+          "decisions"
         ]
       }
     },

@@ -501,3 +501,40 @@ async def test_concurrent_sync_different_content_switches_existing_canonical(
     assert original_item is not None and original_item.price == 1
     assert item_a is not None and item_a.price == 300
     assert item_b is not None and item_b.price == 400
+
+
+async def test_v5_curation_gets_new_identity_and_keeps_v4_row_intact(session_factory) -> None:
+    """Mesmo raw, versões de curadoria diferentes: identidades distintas
+    (a versão da curadoria entra no hash) e a linha `data_dragon_v4` já
+    persistida continua consultável por ID exato, sem `into` e inalterada."""
+    raw_hash = uuid.uuid4().hex + uuid.uuid4().hex
+
+    def _versioned(curation_rules_version: str, attributes: dict) -> CatalogSourceResult:
+        return CatalogSourceResult(
+            game_patch="16.17",
+            origin=SourceOrigin.COMPLETED_MATCH,
+            schema_version="test_v1",
+            raw_hash=raw_hash,
+            data_dragon_version="16.17.1",
+            mapping_version="v1",
+            curation_rules_version=curation_rules_version,
+            items=(CatalogItemSourceDTO(item_id=1001, price=400, attributes=attributes),),
+        )
+
+    v4_result = _versioned("data_dragon_v4", {"name": "Item", "tags": [], "stats": {}})
+    v5_result = _versioned("data_dragon_v5", {"name": "Item", "tags": [], "stats": {}, "into": [7]})
+    assert compute_catalog_content_hash(v4_result) != compute_catalog_content_hash(v5_result)
+
+    v4_catalog = await sync_catalog(session_factory, _FakeCatalogSource(v4_result), "16.17")
+    v5_catalog = await sync_catalog(session_factory, _FakeCatalogSource(v5_result), "16.17")
+
+    assert v4_catalog.id != v5_catalog.id
+    assert v4_catalog.sha256 != v5_catalog.sha256
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyCatalogRepository(session)
+        stored_v4 = await repo.get_catalog_version(v4_catalog.id)
+        v4_item = await repo.get_item(v4_catalog.id, 1001)
+        v5_item = await repo.get_item(v5_catalog.id, 1001)
+    assert stored_v4 is not None and stored_v4.curation_rules_version == "data_dragon_v4"
+    assert v4_item is not None and "into" not in v4_item.attributes
+    assert v5_item is not None and v5_item.attributes["into"] == [7]

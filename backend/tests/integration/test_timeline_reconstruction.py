@@ -8,101 +8,31 @@ genuinamente persistida, não de um Match construído à mão."""
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import delete
+from pipeline_helpers import (
+    DEMO_1_MAPPING as _DEMO_1_MAPPING,
+)
+from pipeline_helpers import (
+    import_demo_match as _import_demo_match,
+)
+from pipeline_helpers import (
+    sync_demo_catalog as _sync_demo_catalog,
+)
 
-from riftlab.catalog.application import sync_catalog
+from riftlab.catalog.classification import classify_catalog
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
-from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource, demo_catalog_mapping
-from riftlab.config import Settings
-from riftlab.ingestion.application import process_next_job
-from riftlab.ingestion.domain import ImportJob, ImportJobState, ImportMode
+from riftlab.catalog.repository import SqlAlchemyCatalogRepository
+from riftlab.decisions.domain import MatchContext, ParticipantView
+from riftlab.decisions.scope import DEMO_SCOPE
+from riftlab.decisions.selection import evaluate_decision
 from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
-from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
-from riftlab.ingestion.models import ImportJobModel, MatchModel, ParticipantModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import NotFoundError
 from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION, reconstruct_match
 from riftlab.timeline.domain import DecisionState, TimelineReplayError
-from riftlab.timeline.models import DecisionStateModel, MatchReconstructionModel, TimelineEventModel
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
-
-
-async def _reset_match(session_factory, match_id: str) -> None:
-    """Achado real de higiene (mesma lição de test_worker_processing.py,
-    CC-201): DEMO-0001/0002/0003 são identidades fixas COMPARTILHADAS com
-    test_import_routes.py/test_worker_processing.py neste mesmo processo
-    pytest. Uma partida deixada SUCCEEDED por este arquivo bloqueia
-    permanentemente a criação de job desses arquivos-irmãos (índice único de
-    import_jobs cobre SUCCEEDED desde a revisão do CC-201) — limpa a árvore
-    completa da partida (marca de reconstrução, decisões, eventos,
-    participantes, match, job) na ordem que respeita as FKs."""
-    async with unit_of_work(session_factory) as session:
-        await session.execute(
-            delete(MatchReconstructionModel).where(MatchReconstructionModel.match_id == match_id)
-        )
-        await session.execute(
-            delete(DecisionStateModel).where(DecisionStateModel.match_id == match_id)
-        )
-        await session.execute(
-            delete(TimelineEventModel).where(TimelineEventModel.match_id == match_id)
-        )
-        await session.execute(
-            delete(ImportJobModel).where(ImportJobModel.requested_match_id == match_id)
-        )
-        await session.execute(delete(ParticipantModel).where(ParticipantModel.match_id == match_id))
-        await session.execute(delete(MatchModel).where(MatchModel.match_id == match_id))
-
-
-@pytest_asyncio.fixture
-async def _demo_match(session_factory, request) -> AsyncIterator[str]:
-    """Reserva uma identidade DEMO-000X para o teste: limpa antes (recupera
-    de uma rodada anterior interrompida) e SEMPRE depois, mesmo em falha de
-    asserção (finally) — nunca deixa resíduo SUCCEEDED para os arquivos-
-    irmãos que reusam a mesma identidade fixa dentro do mesmo processo
-    pytest."""
-    match_id: str = request.param
-    await _reset_match(session_factory, match_id)
-    try:
-        yield match_id
-    finally:
-        await _reset_match(session_factory, match_id)
-
-
-_FAKE_SUBJECT_HASH_SECRET = "segredo-local-de-teste-nao-real"  # noqa: S105
-
-# DEMO-1 é o gamePatch real usado pelas fixtures demo de partida (CC-104) e
-# pelo catálogo demo real (CC-202, fixtures/catalogs/demo_1.json) — os dois
-# já reconciliados: item 100010 = 2x100001 + 1x100002, exatamente o cenário
-# de demo_0002_receita_componentes.json. Derivado da própria fixture (mesmo
-# helper usado pela CLI), nunca um literal solto duplicado aqui.
-_DEMO_1_MAPPING: CatalogMapping = demo_catalog_mapping()
-
-
-async def _sync_demo_catalog(session_factory) -> uuid.UUID:
-    version = await sync_catalog(session_factory, DemoCatalogSource(), "DEMO-1")
-    return version.id
-
-
-async def _import_demo_match(session_factory, tmp_path, requested_match_id: str) -> None:
-    async with unit_of_work(session_factory) as session:
-        repo = SqlAlchemyIngestionRepository(session)
-        job = ImportJob(
-            id=uuid.uuid4(),
-            requested_match_id=requested_match_id,
-            mode=ImportMode.DEMO,
-            state=ImportJobState.QUEUED,
-        )
-        await repo.create_import_job(job)
-
-    settings = Settings(subject_hash_secret=_FAKE_SUBJECT_HASH_SECRET)
-    raw_store = DurableRawMatchStore(tmp_path / "raw")
-    processed = await process_next_job(session_factory, raw_store, settings)
-    assert processed is True
 
 
 @pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
@@ -344,32 +274,38 @@ async def test_reconstruct_match_preserves_pre_correction_decision_states(
 async def test_reconstruct_match_preserves_previous_version_marker_and_states(
     session_factory, tmp_path, _demo_match
 ) -> None:
-    """Versão anterior COM marca (v3) -> versão corrente (v4), sem limpeza:
-    a marca e os estados v3 permanecem intactos, a versão corrente grava a
-    sua própria marca/estados, e a consulta idempotente da versão corrente
-    devolve só os estados da versão corrente."""
-    previous_version = RECONSTRUCTION_ALGORITHM_VERSION - 1
+    """Versões anteriores COM marca (todas de 1 até a corrente - 1, inclusive
+    a imediatamente anterior, ex.: v4 -> v5), sem limpeza: cada marca e cada
+    estado antigo permanecem intactos, a versão corrente grava a sua própria
+    marca/estados, e a consulta idempotente da versão corrente devolve só os
+    estados da versão corrente."""
+    previous_versions = list(range(1, RECONSTRUCTION_ALGORITHM_VERSION))
+    assert previous_versions  # a versão corrente nunca é a primeira
     match_id = "DEMO-0004"
     await _sync_demo_catalog(session_factory)
     await _import_demo_match(session_factory, tmp_path, match_id)
 
-    previous_state = DecisionState(
-        id=uuid.uuid4(),
-        match_id=match_id,
-        participant_id=1,
-        event_source_index=0,
-        state_version=previous_version,
-        snapshot={"inventory": {"items": {}, "trinketItemId": None}, "purchasedItemId": 100002},
-        features={},
-        quality={"uncertain": False, "reasons": [], "goldEstimate": {}},
-        catalog_id=None,
-    )
+    previous_states = {
+        version: DecisionState(
+            id=uuid.uuid4(),
+            match_id=match_id,
+            participant_id=1,
+            event_source_index=0,
+            state_version=version,
+            snapshot={"inventory": {"items": {}, "trinketItemId": None}, "purchasedItemId": 100002},
+            features={},
+            quality={"uncertain": False, "reasons": [], "goldEstimate": {}},
+            catalog_id=None,
+        )
+        for version in previous_versions
+    }
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyTimelineRepository(session)
-        await repo.add_decision_state(previous_state)
-        await repo.add_match_reconstruction(match_id, previous_version, None)
+        for version, state in previous_states.items():
+            await repo.add_decision_state(state)
+            await repo.add_match_reconstruction(match_id, version, None)
 
-    # A marca da versão anterior nunca conta como "já feita" para a corrente.
+    # A marca de uma versão anterior nunca conta como "já feita" para a corrente.
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyTimelineRepository(session)
         assert (
@@ -382,15 +318,19 @@ async def test_reconstruct_match_preserves_previous_version_marker_and_states(
 
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyTimelineRepository(session)
-        previous_marker = await repo.get_match_reconstruction(match_id, previous_version)
         current_marker = await repo.get_match_reconstruction(
             match_id, RECONSTRUCTION_ALGORITHM_VERSION
         )
+        previous_markers = {
+            version: await repo.get_match_reconstruction(match_id, version)
+            for version in previous_versions
+        }
         all_states = await repo.list_decision_states(match_id, 1)
-    assert previous_marker is not None  # marca anterior intacta, nunca apagada
     assert current_marker is not None  # marca corrente própria, sem colisão
-    previous_rows = [s for s in all_states if s.state_version == previous_version]
-    assert [s.id for s in previous_rows] == [previous_state.id]  # linha anterior intacta
+    assert all(marker is not None for marker in previous_markers.values())  # nunca apagadas
+    for version, state in previous_states.items():
+        rows = [s for s in all_states if s.state_version == version]
+        assert [s.id for s in rows] == [state.id]  # linha anterior intacta
 
     # Reexecução: caminho idempotente devolve só os estados da versão corrente.
     second = await reconstruct_match(session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id)
@@ -398,3 +338,62 @@ async def test_reconstruct_match_preserves_previous_version_marker_and_states(
     assert sorted(str(s.id) for s in second.decision_states) == sorted(
         str(s.id) for s in result.decision_states
     )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_persisted_v5_state_round_trips_into_decision_evaluation(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    """O estado v5 gravado no PostgreSQL (JSONB) volta íntegro e alimenta o
+    módulo de decisões com o mesmo resultado do caminho em memória: campos
+    novos (eventTimestampMs, levelObservation, retrospectiveTarget)
+    preservados, chaves numéricas do inventário como strings, sem reabrir a
+    fonte."""
+    match_id = "DEMO-0002"
+    catalog_id = await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, match_id)
+    result = await reconstruct_match(session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id)
+
+    async with unit_of_work(session_factory) as session:
+        ingestion = SqlAlchemyIngestionRepository(session)
+        catalog_repo = SqlAlchemyCatalogRepository(session)
+        match = await ingestion.get_match(match_id)
+        participants = await ingestion.list_participants(match_id)
+        states = await SqlAlchemyTimelineRepository(session).list_decision_states(match_id, 1)
+        row = await catalog_repo.get_catalog_version(catalog_id)
+        items = {
+            item_id: item
+            for item_id in (100001, 100002, 100010)
+            if (item := await catalog_repo.get_item(catalog_id, item_id)) is not None
+        }
+    assert match is not None and row is not None
+    states = [s for s in states if s.state_version == RECONSTRUCTION_ALGORITHM_VERSION]
+    assert sorted(str(s.id) for s in states) == sorted(
+        str(s.id) for s in result.decision_states if s.participant_id == 1
+    )
+    for state in states:  # campos v5 sobreviveram ao JSONB
+        assert isinstance(state.snapshot["eventTimestampMs"], int)
+        assert state.quality["levelObservation"]["value"] == 1
+        assert state.quality["retrospectiveTarget"]["status"] == "COMPLETED"
+
+    table = classify_catalog(items, curation_rules_version=row.curation_rules_version)
+    points = [
+        point
+        for state in states
+        if (
+            point := evaluate_decision(
+                state,
+                participants=tuple(ParticipantView.from_participant(p) for p in participants),
+                match=MatchContext.from_match(match),
+                catalog=row,
+                classification=table,
+                scope=DEMO_SCOPE,
+            )
+        )
+        is not None
+    ]
+    assert [p.target_item_id for p in points] == [100010]
+    [point] = points
+    assert point.eligible and point.main_item_ordinal == 1
+    assert point.budget.codes == ("STALE_FRAME",) and point.budget.value == 500
+    assert point.features is not None and point.features.values["level"] == 1

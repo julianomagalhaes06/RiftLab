@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # na imagem runtime (worker/api) quanto na imagem test (CC-202).
     catalog_mappings_path: str = "/app/configs/catalog-mappings.yaml"
 
+    # Recorte real (configs/scope.yaml, CC-105), lido pela extração de decisões
+    # de origem REAL (CC-204). Mesmo racional: caminho absoluto copiado pelo
+    # Dockerfile; DEMO nunca lê este arquivo.
+    scope_path: str = "/app/configs/scope.yaml"
+
     worker_heartbeat_path: str = "/tmp/riftlab-worker.heartbeat"
     # Toque do heartbeat: a cada ciclo do worker (reserva -> busca -> persiste
     # um job), e a cada espera deste intervalo quando ocioso — substitui o

@@ -251,6 +251,14 @@ async def test_load_match_rejects_missing_champion_id_without_raw_exception(tmp_
             lambda m, t: t["info"]["frames"][0].__setitem__("participantFrames", {"bad-key": {}}),
         ),
         (
+            "frame_key_superscript_digit",  # str.isdigit() aceita, int() levanta ValueError cru
+            lambda m, t: t["info"]["frames"][0].__setitem__("participantFrames", {"²": {}}),
+        ),
+        (
+            "frame_key_non_ascii_digit",  # int("٣") == 3: virava participante 3 em silêncio
+            lambda m, t: t["info"]["frames"][0].__setitem__("participantFrames", {"٣": {}}),
+        ),
+        (
             "timestamp_overflow",
             lambda m, t: m["info"].__setitem__("gameStartTimestamp", 10**100),
         ),

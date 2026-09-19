@@ -25,7 +25,13 @@ from riftlab.shared.api.learning import (
     LearningAttemptRevealRequest,
     LearningAttemptState,
 )
-from riftlab.shared.api.matches import DecisionState
+from riftlab.shared.api.matches import (
+    DecisionBudget,
+    DecisionInventory,
+    DecisionState,
+    DecisionStateSummary,
+    InventoryItem,
+)
 from riftlab.shared.api.objectives import ObjectiveForm, ObjectiveInterpretRequest
 
 # ---------------------------------------------------------------------------
@@ -275,43 +281,72 @@ def test_feedback_request_rejects_grade_outside_0_3(grade: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_decision_state_rejects_stale_frame_false_above_threshold() -> None:
+def _budget(**overrides: object) -> DecisionBudget:
+    base: dict[str, object] = {
+        "source": BudgetSource.FRAME_ESTIMATE,
+        "frame_age_ms": 90_001,
+        "stale_frame": True,
+        "immediate_purchase_assertable": False,
+    }
+    base.update(overrides)
+    return DecisionBudget(**base)  # type: ignore[arg-type]
+
+
+def test_decision_budget_rejects_stale_frame_false_above_threshold() -> None:
     with pytest.raises(ValidationError):
-        DecisionState(
-            decision_id=uuid4(),
-            participant_id=1,
-            budget_source=BudgetSource.FRAME_ESTIMATE,
-            frame_age_ms=90_001,
-            stale_frame=False,
-            eligible=True,
-        )
+        _budget(frame_age_ms=90_001, stale_frame=False)
 
 
-def test_decision_state_accepts_stale_frame_true_above_threshold() -> None:
-    state = DecisionState(
-        decision_id=uuid4(),
-        participant_id=1,
-        budget_source=BudgetSource.FRAME_ESTIMATE,
-        frame_age_ms=90_001,
-        stale_frame=True,
-        eligible=True,
-    )
-    assert state.stale_frame is True
+def test_decision_budget_accepts_stale_frame_true_above_threshold() -> None:
+    assert _budget(frame_age_ms=90_001, stale_frame=True).stale_frame is True
+    assert _budget(frame_age_ms=90_000, stale_frame=False).stale_frame is False  # limite
 
 
-def test_decision_state_accepts_null_frame_age_without_forcing_stale() -> None:
+def test_decision_budget_accepts_null_frame_age_and_value_without_forcing_stale() -> None:
     """Sem snapshot anterior: null e mascara de ausencia (docs/domain-model.md) —
-    nao e o mesmo que STALE_FRAME."""
-    state = DecisionState(
-        decision_id=uuid4(),
-        participant_id=1,
-        budget_source=BudgetSource.UNKNOWN,
+    nao e o mesmo que STALE_FRAME, e o valor desconhecido nunca vira 0."""
+    budget = _budget(
+        source=BudgetSource.UNKNOWN,
         frame_age_ms=None,
         stale_frame=False,
-        eligible=False,
-        ineligible_reason="sem snapshot anterior ao evento",
+        value=None,
+        codes=["UNKNOWN_BUDGET"],
     )
-    assert state.frame_age_ms is None
+    assert budget.frame_age_ms is None and budget.value is None
+
+
+def test_decision_summary_stale_frame_is_consistent_with_age() -> None:
+    kwargs: dict[str, object] = {
+        "decision_id": uuid4(),
+        "participant_id": 1,
+        "event_source_index": 0,
+        "timestamp_ms": 1000,
+        "eligible": True,
+        "budget_source": BudgetSource.FRAME_ESTIMATE,
+        "frame_age_ms": 90_001,
+    }
+    with pytest.raises(ValidationError):
+        DecisionStateSummary(stale_frame=False, **kwargs)  # type: ignore[arg-type]
+    assert DecisionStateSummary(stale_frame=True, **kwargs).stale_frame is True  # type: ignore[arg-type]
+
+
+def test_decision_schemas_have_no_field_that_could_reveal_the_purchase() -> None:
+    """Modo Estudo: antes de revelar, so informacao
+    pre-decisao. Nenhum campo de item comprado, classe do alvo, bloco
+    retrospectivo, features, qualidade cumulativa ou hash pessoal."""
+    forbidden = {
+        "target_item_id",
+        "purchased_item_id",
+        "target_class",
+        "retrospective_target",
+        "features",
+        "quality",
+        "subject_hash",
+    }
+    for model in (DecisionState, DecisionStateSummary):
+        assert not set(model.model_fields) & forbidden, model.__name__
+    assert set(DecisionInventory.model_fields) == {"items", "trinket_item_id"}
+    assert set(InventoryItem.model_fields) == {"item_id", "quantity"}  # multiconjunto
 
 
 # ---------------------------------------------------------------------------

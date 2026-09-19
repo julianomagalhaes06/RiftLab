@@ -1,6 +1,7 @@
 """GET /api/v1/matches, GET /api/v1/matches/{id}, GET .../decisions,
-GET /api/v1/decisions/{id} (docs/contracts.md). Schema-only: nenhuma rota
-montada nesta etapa (CC-201/203/204/205)."""
+GET /api/v1/decisions/{id} (docs/contracts.md). As duas rotas de DECISÕES estão
+montadas desde o CC-204 (api/routes/decisions.py); MatchSummary/MatchDetail
+seguem schema-only até o CC-205."""
 
 from __future__ import annotations
 
@@ -45,39 +46,112 @@ class MatchDetail(MatchSummary):
     participants: list[MatchParticipant]
 
 
+class DecisionReason(CamelModel):
+    """Motivo de inelegibilidade. `code` no vocabulário do contrato
+    (MISSING_CATALOG, OUT_OF_SCOPE, INVENTORY_UNCERTAIN) mais o neutro
+    TARGET_NOT_ELIGIBLE; `sub_reasons` preserva literalmente os códigos de
+    origem. Nunca revela a classe do item comprado nem que a compra foi
+    desfeita (modo Estudo: antes de revelar, só informação pré-decisão)."""
+
+    code: str = Field(min_length=1, max_length=64)
+    sub_reasons: list[str] = Field(default_factory=list)
+
+
 class DecisionStateSummary(CamelModel):
-    """Item de GET /matches/{id}/decisions: "estados resumidos/qualidade"."""
+    """Item de GET /matches/{id}/decisions (CC-204): SÓ informação pré-decisão.
+    `decision_id` é o id do PONTO de decisão. Proibido aqui: item comprado,
+    classe do alvo, bloco retrospectivo, features, qualidade cumulativa e
+    subject_hash."""
 
     decision_id: UUID
     participant_id: int = Field(ge=1, le=10)
     event_source_index: int = Field(ge=0)
     timestamp_ms: int = Field(ge=0)
-    stale_frame: bool
-
-
-class DecisionState(CamelModel):
-    """GET /decisions/{id}: "snapshot, inventario, fonte de orcamento,
-    elegibilidade". snapshot/inventory tem forma concreta definida em
-    CC-203/204 (reconstrucao de inventario); aqui so o envelope e os campos ja
-    fechados pelo contrato (docs/domain-model.md: budget_source, frameAgeMs,
-    mais de 90s marca STALE_FRAME). ineligible_reason nao tem nome fechado por
-    docs/contracts.md ("elegibilidade" e citado sem forma exata) — proposta
-    deste card, a confirmar em CC-204/205."""
-
-    decision_id: UUID
-    participant_id: int = Field(ge=1, le=10)
-    inventory: list[int] = Field(default_factory=list)
+    eligible: bool
+    reason_codes: list[str] = Field(default_factory=list)
+    main_item_ordinal: int | None = Field(default=None, ge=1)
     budget_source: BudgetSource
     frame_age_ms: int | None = Field(default=None, ge=0)
     stale_frame: bool
-    eligible: bool
-    ineligible_reason: str | None = Field(default=None, min_length=1, max_length=200)
 
     @model_validator(mode="after")
-    def _stale_frame_consistent_with_age(self) -> DecisionState:
-        if self.frame_age_ms is not None and self.frame_age_ms > STALE_FRAME_THRESHOLD_MS:
-            if not self.stale_frame:
-                raise ValueError(
-                    "frameAgeMs > 90000ms deve marcar staleFrame=true (docs/domain-model.md)"
-                )
+    def _stale_frame_consistent_with_age(self) -> DecisionStateSummary:
+        _check_stale_consistent(self.frame_age_ms, self.stale_frame)
         return self
+
+
+class InventoryItem(CamelModel):
+    item_id: int = Field(ge=1)
+    quantity: int = Field(ge=1)
+
+
+class DecisionInventory(CamelModel):
+    """Inventário ANTES da decisão como multiconjunto (nunca um conjunto de ids
+    soltos: dois itens iguais são quantity=2). `trinket_item_id` é uma slot
+    separada; null = slot vazia (estado conhecido)."""
+
+    items: list[InventoryItem] = Field(default_factory=list)
+    trinket_item_id: int | None = Field(default=None, ge=1)
+
+
+class DecisionBudget(CamelModel):
+    """Orçamento imediato, separado da elegibilidade. `value` é null quando
+    desconhecido (nunca 0). STALE_FRAME/UNKNOWN_BUDGET em `codes` impedem
+    afirmar compra imediata, mas não tornam a decisão inelegível."""
+
+    value: int | None = Field(default=None, ge=0)
+    source: BudgetSource
+    frame_age_ms: int | None = Field(default=None, ge=0)
+    stale_frame: bool
+    codes: list[str] = Field(default_factory=list)
+    immediate_purchase_assertable: bool
+
+    @model_validator(mode="after")
+    def _stale_frame_consistent_with_age(self) -> DecisionBudget:
+        _check_stale_consistent(self.frame_age_ms, self.stale_frame)
+        return self
+
+
+class ObservedLevel(CamelModel):
+    """Nível do mesmo frame estritamente anterior usado para o ouro; ausência
+    explícita (`value` null com `absent_reason`), nunca 0."""
+
+    value: int | None = Field(default=None, ge=1)
+    frame_age_ms: int | None = Field(default=None, ge=0)
+    absent_reason: str | None = Field(default=None, max_length=64)
+
+
+class DecisionVersionInfo(CamelModel):
+    """Todas as versões que produziram o ponto (linhas imutáveis: uma extração
+    antiga continua consultável com as suas versões)."""
+
+    reconstruction_version: int = Field(ge=1)
+    selection_version: str
+    feature_schema_version: str
+    scope_version: str
+    catalog_id: UUID | None = None
+    curation_rules_version: str | None = None
+    classification_version: str | None = None
+
+
+class DecisionState(CamelModel):
+    """GET /decisions/{id} (CC-204): "snapshot, inventário, fonte de orçamento,
+    elegibilidade" — SÓ informação pré-decisão (ver DecisionStateSummary)."""
+
+    decision_id: UUID
+    match_id: MatchId
+    participant_id: int = Field(ge=1, le=10)
+    event_source_index: int = Field(ge=0)
+    timestamp_ms: int = Field(ge=0)
+    eligible: bool
+    main_item_ordinal: int | None = Field(default=None, ge=1)
+    reasons: list[DecisionReason] = Field(default_factory=list)
+    inventory: DecisionInventory
+    budget: DecisionBudget
+    level: ObservedLevel
+    versions: DecisionVersionInfo
+
+
+def _check_stale_consistent(frame_age_ms: int | None, stale_frame: bool) -> None:
+    if frame_age_ms is not None and frame_age_ms > STALE_FRAME_THRESHOLD_MS and not stale_frame:
+        raise ValueError("frameAgeMs > 90000ms deve marcar staleFrame=true (docs/domain-model.md)")

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 # Importa todos os modulos de modelos para que registrem suas tabelas em
 # Base.metadata antes do autogenerate/target_metadata ser usado.
 import riftlab.catalog.models  # noqa: F401
+import riftlab.decisions.models  # noqa: F401
 import riftlab.ingestion.models  # noqa: F401
 import riftlab.timeline.models  # noqa: F401
 from riftlab.config import get_settings

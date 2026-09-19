@@ -15,6 +15,10 @@ COPY backend/migrations ./migrations
 # Settings.catalog_mappings_path (CC-202) aponta para este caminho absoluto
 # em ambas as imagens (test e runtime) — mesmo racional de raw_storage_dir.
 COPY configs/catalog-mappings.yaml ./configs/catalog-mappings.yaml
+# Recorte real (scope.yaml, CC-105) e schema de features (CC-204): lidos pelo módulo de
+# decisões e pelos testes que comparam o schema com a allowlist do código.
+COPY configs/scope.yaml ./configs/scope.yaml
+COPY configs/feature-schema-v1.json ./configs/feature-schema-v1.json
 
 # ---- test: inclui dependencias de dev (pytest/ruff/mypy) e testes ----
 FROM base AS test

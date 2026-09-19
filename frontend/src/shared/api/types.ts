@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/decisions/{decision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Decision */
+        get: operations["get_decision_api_v1_decisions__decision_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/imports": {
         parameters: {
             query?: never;
@@ -55,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matches/{match_id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Match Decisions */
+        get: operations["list_match_decisions_api_v1_matches__match_id__decisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -96,6 +130,147 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * BudgetSource
+         * @description docs/domain-model.md: budget_source: UNKNOWN, FRAME_ESTIMATE,
+         *     USER_PROVIDED.
+         * @enum {string}
+         */
+        BudgetSource: "UNKNOWN" | "FRAME_ESTIMATE" | "USER_PROVIDED";
+        /** CursorPage[DecisionStateSummary] */
+        CursorPage_DecisionStateSummary_: {
+            /** Items */
+            items: components["schemas"]["DecisionStateSummary"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /**
+         * DecisionBudget
+         * @description Orçamento imediato, separado da elegibilidade. `value` é null quando
+         *     desconhecido (nunca 0). STALE_FRAME/UNKNOWN_BUDGET em `codes` impedem
+         *     afirmar compra imediata, mas não tornam a decisão inelegível.
+         */
+        DecisionBudget: {
+            /** Codes */
+            codes?: string[];
+            /** Frameagems */
+            frameAgeMs?: number | null;
+            /** Immediatepurchaseassertable */
+            immediatePurchaseAssertable: boolean;
+            source: components["schemas"]["BudgetSource"];
+            /** Staleframe */
+            staleFrame: boolean;
+            /** Value */
+            value?: number | null;
+        };
+        /**
+         * DecisionInventory
+         * @description Inventário ANTES da decisão como multiconjunto (nunca um conjunto de ids
+         *     soltos: dois itens iguais são quantity=2). `trinket_item_id` é uma slot
+         *     separada; null = slot vazia (estado conhecido).
+         */
+        DecisionInventory: {
+            /** Items */
+            items?: components["schemas"]["InventoryItem"][];
+            /** Trinketitemid */
+            trinketItemId?: number | null;
+        };
+        /**
+         * DecisionReason
+         * @description Motivo de inelegibilidade. `code` no vocabulário do contrato
+         *     (MISSING_CATALOG, OUT_OF_SCOPE, INVENTORY_UNCERTAIN) mais o neutro
+         *     TARGET_NOT_ELIGIBLE; `sub_reasons` preserva literalmente os códigos de
+         *     origem. Nunca revela a classe do item comprado nem que a compra foi
+         *     desfeita (modo Estudo: antes de revelar, só informação pré-decisão).
+         */
+        DecisionReason: {
+            /** Code */
+            code: string;
+            /** Subreasons */
+            subReasons?: string[];
+        };
+        /**
+         * DecisionState
+         * @description GET /decisions/{id} (CC-204): "snapshot, inventário, fonte de orçamento,
+         *     elegibilidade" — SÓ informação pré-decisão (ver DecisionStateSummary).
+         */
+        DecisionState: {
+            budget: components["schemas"]["DecisionBudget"];
+            /**
+             * Decisionid
+             * Format: uuid
+             */
+            decisionId: string;
+            /** Eligible */
+            eligible: boolean;
+            /** Eventsourceindex */
+            eventSourceIndex: number;
+            inventory: components["schemas"]["DecisionInventory"];
+            level: components["schemas"]["ObservedLevel"];
+            /** Mainitemordinal */
+            mainItemOrdinal?: number | null;
+            /** Matchid */
+            matchId: string;
+            /** Participantid */
+            participantId: number;
+            /** Reasons */
+            reasons?: components["schemas"]["DecisionReason"][];
+            /** Timestampms */
+            timestampMs: number;
+            versions: components["schemas"]["DecisionVersionInfo"];
+        };
+        /**
+         * DecisionStateSummary
+         * @description Item de GET /matches/{id}/decisions (CC-204): SÓ informação pré-decisão.
+         *     `decision_id` é o id do PONTO de decisão. Proibido aqui: item comprado,
+         *     classe do alvo, bloco retrospectivo, features, qualidade cumulativa e
+         *     subject_hash.
+         */
+        DecisionStateSummary: {
+            budgetSource: components["schemas"]["BudgetSource"];
+            /**
+             * Decisionid
+             * Format: uuid
+             */
+            decisionId: string;
+            /** Eligible */
+            eligible: boolean;
+            /** Eventsourceindex */
+            eventSourceIndex: number;
+            /** Frameagems */
+            frameAgeMs?: number | null;
+            /** Mainitemordinal */
+            mainItemOrdinal?: number | null;
+            /** Participantid */
+            participantId: number;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Staleframe */
+            staleFrame: boolean;
+            /** Timestampms */
+            timestampMs: number;
+        };
+        /**
+         * DecisionVersionInfo
+         * @description Todas as versões que produziram o ponto (linhas imutáveis: uma extração
+         *     antiga continua consultável com as suas versões).
+         */
+        DecisionVersionInfo: {
+            /** Catalogid */
+            catalogId?: string | null;
+            /** Classificationversion */
+            classificationVersion?: string | null;
+            /** Curationrulesversion */
+            curationRulesVersion?: string | null;
+            /** Featureschemaversion */
+            featureSchemaVersion: string;
+            /** Reconstructionversion */
+            reconstructionVersion: number;
+            /** Scopeversion */
+            scopeVersion: string;
+            /** Selectionversion */
+            selectionVersion: string;
+        };
         /**
          * ImportJobAccepted
          * @description 202 de POST /imports: job novo ou job ativo reaproveitado.
@@ -160,6 +335,13 @@ export interface components {
             matchId: string;
             mode: components["schemas"]["ImportMode"];
         };
+        /** InventoryItem */
+        InventoryItem: {
+            /** Itemid */
+            itemId: number;
+            /** Quantity */
+            quantity: number;
+        };
         /** LiveStatus */
         LiveStatus: {
             /**
@@ -167,6 +349,19 @@ export interface components {
              * @default UP
              */
             status: string;
+        };
+        /**
+         * ObservedLevel
+         * @description Nível do mesmo frame estritamente anterior usado para o ouro; ausência
+         *     explícita (`value` null com `absent_reason`), nunca 0.
+         */
+        ObservedLevel: {
+            /** Absentreason */
+            absentReason?: string | null;
+            /** Frameagems */
+            frameAgeMs?: number | null;
+            /** Value */
+            value?: number | null;
         };
         /** ProblemDetail */
         ProblemDetail: {
@@ -205,6 +400,46 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_decision_api_v1_decisions__decision_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionState"];
+                };
+            };
+            /** @description Partida, participante ou decisão inexistente. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description decisionId não é um UUID válido. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     create_import_api_v1_imports_post: {
         parameters: {
             query?: never;
@@ -317,6 +552,59 @@ export interface operations {
                 };
             };
             /** @description job_id não é um UUID válido. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    list_match_decisions_api_v1_matches__match_id__decisions_get: {
+        parameters: {
+            query: {
+                participantId: number;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_DecisionStateSummary_"];
+                };
+            };
+            /** @description Partida, participante ou decisão inexistente. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Código DECISIONS_NOT_PREPARED: a partida existe, mas as decisões da versão corrente ainda não foram extraídas (cc timeline reconstruct + cc decisions extract). Distinto de 200 com items=[] (extraída com zero pontos). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado, de outra partida/participante ou de extração inexistente). */
             422: {
                 headers: {
                     [name: string]: unknown;

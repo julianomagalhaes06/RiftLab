@@ -205,3 +205,19 @@ def test_parse_match_source_document_never_echoes_raw_body_in_error() -> None:
         parse_match_source_document("DEMO-X", secret_looking_body)
 
     assert "sk-should-never-leak" not in str(excinfo.value)
+
+
+async def test_demo_0008_has_the_real_destroy_before_purchase_form() -> None:
+    """DEMO-0008 (CC-204): os ITEM_DESTROYED dos componentes vêm ANTES da compra
+    composta, no MESMO timestamp, com a ordem original preservada; frame
+    próximo (20 s) do instante da compra."""
+    result = await DemoMatchSource().load_match("DEMO-0008")
+    at_470 = [e for e in result.events if e.timestamp_ms == 470_000]
+    assert [(e.type, e.payload["itemId"]) for e in at_470] == [
+        ("ITEM_DESTROYED", 100001),
+        ("ITEM_DESTROYED", 100001),
+        ("ITEM_DESTROYED", 100002),
+        ("ITEM_PURCHASED", 100010),
+    ]
+    assert [e.source_index for e in at_470] == sorted(e.source_index for e in at_470)
+    assert max(f.timestamp_ms for f in result.frames if f.timestamp_ms < 470_000) == 450_000

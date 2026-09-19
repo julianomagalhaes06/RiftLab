@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "v1",
+  "matchId": "DEMO-0008",
+  "queue": 420,
+  "mapId": 11,
+  "patch": "DEMO-1",
+  "startAt": "2026-01-01T00:00:00+00:00",
+  "durationSeconds": 1800,
+  "participants": [
+    {
+      "participantId": 1,
+      "championId": 9001,
+      "team": 100,
+      "role": "BOTTOM"
+    },
+    {
+      "participantId": 6,
+      "championId": 9002,
+      "team": 200,
+      "role": "BOTTOM"
+    }
+  ],
+  "frames": [
+    {
+      "timestampMs": 0,
+      "participantFrames": {
+        "1": {
+          "currentGold": 500,
+          "totalGold": 500,
+          "level": 1,
+          "xp": 0
+        },
+        "6": {
+          "currentGold": 500,
+          "totalGold": 500,
+          "level": 1,
+          "xp": 0
+        }
+      },
+      "events": []
+    },
+    {
+      "timestampMs": 450000,
+      "participantFrames": {
+        "1": {
+          "currentGold": 640,
+          "totalGold": 2100,
+          "level": 7,
+          "xp": 4300
+        },
+        "6": {
+          "currentGold": 800,
+          "totalGold": 1900,
+          "level": 7,
+          "xp": 4100
+        }
+      },
+      "events": [
+        {
+          "timestampMs": 400000,
+          "type": "ITEM_PURCHASED",
+          "participantId": 1,
+          "itemId": 100001
+        },
+        {
+          "timestampMs": 401000,
+          "type": "ITEM_PURCHASED",
+          "participantId": 1,
+          "itemId": 100001
+        },
+        {
+          "timestampMs": 402000,
+          "type": "ITEM_PURCHASED",
+          "participantId": 1,
+          "itemId": 100002
+        }
+      ]
+    },
+    {
+      "timestampMs": 480000,
+      "participantFrames": {
+        "1": {
+          "currentGold": 40,
+          "totalGold": 3200,
+          "level": 8,
+          "xp": 5100
+        },
+        "6": {
+          "currentGold": 950,
+          "totalGold": 2600,
+          "level": 8,
+          "xp": 4900
+        }
+      },
+      "events": [
+        {
+          "timestampMs": 470000,
+          "type": "ITEM_DESTROYED",
+          "participantId": 1,
+          "itemId": 100001
+        },
+        {
+          "timestampMs": 470000,
+          "type": "ITEM_DESTROYED",
+          "participantId": 1,
+          "itemId": 100001
+        },
+        {
+          "timestampMs": 470000,
+          "type": "ITEM_DESTROYED",
+          "participantId": 1,
+          "itemId": 100002
+        },
+        {
+          "timestampMs": 470000,
+          "type": "ITEM_PURCHASED",
+          "participantId": 1,
+          "itemId": 100010
+        }
+      ]
+    }
+  ]
+}

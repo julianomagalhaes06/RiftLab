@@ -136,6 +136,20 @@ class SqlAlchemyIngestionRepository:
             for row in result.scalars()
         ]
 
+    async def get_match_import_mode(self, match_id: str) -> ImportMode | None:
+        stmt = (
+            select(ImportJobModel.mode)
+            .where(
+                ImportJobModel.match_id == match_id,
+                ImportJobModel.state == ImportJobState.SUCCEEDED.value,
+            )
+            .order_by(ImportJobModel.created_at)
+            .limit(1)
+        )
+        result = await self._session.execute(stmt)
+        mode = result.scalar_one_or_none()
+        return ImportMode(mode) if mode is not None else None
+
     async def get_import_job(self, job_id: uuid.UUID) -> ImportJob | None:
         row = await self._session.get(ImportJobModel, job_id)
         if row is None:

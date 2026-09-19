@@ -83,6 +83,18 @@ class SqlAlchemyTimelineRepository:
         result = await self._session.execute(stmt)
         return [_decision_state_from_row(row) for row in result.scalars()]
 
+    async def list_source_origins(self, match_id: str, state_version: int) -> list[str]:
+        stmt = (
+            select(DecisionStateModel.quality["sourceOrigin"].astext)
+            .where(
+                DecisionStateModel.match_id == match_id,
+                DecisionStateModel.state_version == state_version,
+            )
+            .distinct()
+        )
+        result = await self._session.execute(stmt)
+        return [value for value in result.scalars() if isinstance(value, str)]
+
     async def get_match_reconstruction(
         self, match_id: str, reconstruction_version: int
     ) -> MatchReconstructionMarker | None:

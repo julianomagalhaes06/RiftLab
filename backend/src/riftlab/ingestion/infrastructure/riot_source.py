@@ -25,6 +25,7 @@ from riftlab.ingestion.infrastructure.riot_transport import RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
 from riftlab.shared.domain import SourceOrigin
 from riftlab.shared.errors import SourceNotFoundError, SourceSchemaError
+from riftlab.shared.numeric import is_ascii_digits
 
 # endOfGameResult real (auditado em CC-105, data-audit.md): só este valor
 # confirma conclusão normal. Qualquer outro (remake/abandono/ausente) não é
@@ -367,7 +368,7 @@ def _build_match_source_result(
             )
         participant_frames: dict[int, dict[str, Any]] = {}
         for pid, pf in raw_participant_frames.items():
-            if not isinstance(pid, str) or not pid.isdigit():
+            if not is_ascii_digits(pid):
                 raise SourceSchemaError(
                     code="MATCH_SOURCE_MISSING_FIELD",
                     detail="chave de participantFrames não é um participantId numérico",

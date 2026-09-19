@@ -11,7 +11,7 @@ from riftlab.config import get_settings
 
 app = typer.Typer(
     help="RiftLab CLI (cc). Comandos implementados nesta etapa: "
-    "api, worker, health, db, riot, openapi, catalog, timeline.",
+    "api, worker, health, db, riot, openapi, catalog, timeline, decisions.",
     no_args_is_help=True,
 )
 
@@ -234,6 +234,64 @@ def timeline_reconstruct(
     try:
         asyncio.run(_run())
     except (SourceError, DomainError) as exc:
+        code = getattr(exc, "code", exc.__class__.__name__)
+        typer.echo(f"BLOCKED: {code} - {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+decisions_app = typer.Typer(
+    help="Extração de pontos de decisão e features (CC-204).",
+    no_args_is_help=True,
+)
+app.add_typer(decisions_app, name="decisions")
+
+
+@decisions_app.command("extract")
+def decisions_extract(
+    match_id: str = typer.Option(
+        ..., help="Identificador da partida já importada E reconstruída (versão corrente)."
+    ),
+    scope_file: Path = typer.Option(
+        None,
+        help="Caminho do recorte real (padrão: RIFTLAB_SCOPE_PATH/Settings.scope_path). "
+        "Só lido para dados de origem real; a origem demo usa o recorte sintético.",
+    ),
+    env_file: Path = typer.Option(
+        None, help="Caminho do .env a carregar (padrão: raiz do repositório)."
+    ),
+) -> None:
+    """Lê os estados já reconstruídos (só banco: nunca reconstrói, abre fonte
+    nem acessa rede), seleciona os pontos de decisão, avalia elegibilidade e
+    features e grava marca + pontos numa transação. Idempotente por partida e
+    tupla de versões. Fluxo local completo: `cc catalog sync` -> importação
+    (POST /api/v1/imports) -> `cc timeline reconstruct` -> `cc decisions
+    extract`. A saída é um resumo sem dado pessoal."""
+    import asyncio
+    import json
+
+    from riftlab.cli.env_file import load_settings
+    from riftlab.db import build_engine
+    from riftlab.decisions.application import extract_decisions
+    from riftlab.shared.db import build_session_factory
+    from riftlab.shared.errors import DomainError
+
+    settings = load_settings(env_file)
+    resolved_scope_file = scope_file or Path(settings.scope_path)
+
+    async def _run() -> None:
+        engine = build_engine(settings.database_url)
+        session_factory = build_session_factory(engine)
+        try:
+            extraction = await extract_decisions(
+                session_factory, match_id, scope_path=resolved_scope_file
+            )
+            typer.echo(json.dumps(extraction.summary(), indent=2, sort_keys=True))
+        finally:
+            await engine.dispose()
+
+    try:
+        asyncio.run(_run())
+    except DomainError as exc:
         code = getattr(exc, "code", exc.__class__.__name__)
         typer.echo(f"BLOCKED: {code} - {exc}", err=True)
         raise typer.Exit(code=1) from exc

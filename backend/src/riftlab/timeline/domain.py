@@ -97,6 +97,11 @@ class TimelineRepository(Protocol):
         self, match_id: str, participant_id: int
     ) -> list[DecisionState]: ...
 
+    async def list_source_origins(self, match_id: str, state_version: int) -> list[str]:
+        """Valores DISTINTOS de `quality.sourceOrigin` dos estados da partida na
+        versão dada (sem carregar os estados). Vazio = nenhum estado."""
+        ...
+
     async def get_match_reconstruction(
         self, match_id: str, reconstruction_version: int
     ) -> MatchReconstructionMarker | None:

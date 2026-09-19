@@ -88,6 +88,12 @@ class CatalogRepository(Protocol):
 
     async def get_item(self, catalog_id: uuid.UUID, item_id: int) -> Item | None: ...
 
+    async def list_items(self, catalog_id: uuid.UUID) -> list[Item]:
+        """Catálogo COMPLETO de uma versão exata (ordenado por item_id): a
+        classificação de itens (catalog/classification.py) exige o catálogo
+        inteiro ou o fechamento de receita dos itens pedidos."""
+        ...
+
     async def find_catalog_version_by_content_hash(self, sha256: str) -> CatalogVersion | None:
         """Reconsulta após ConflictError de add_catalog_version, ou checagem
         de idempotência antes de tentar persistir de novo."""

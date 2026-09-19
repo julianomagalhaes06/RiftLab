@@ -84,6 +84,24 @@ class SqlAlchemyCatalogRepository:
         row = await self._session.get(CatalogVersionModel, catalog_id)
         return _catalog_version_from_row(row) if row is not None else None
 
+    async def list_items(self, catalog_id: uuid.UUID) -> list[Item]:
+        stmt = (
+            select(ItemModel).where(ItemModel.catalog_id == catalog_id).order_by(ItemModel.item_id)
+        )
+        result = await self._session.execute(stmt)
+        return [
+            Item(
+                catalog_id=row.catalog_id,
+                item_id=row.item_id,
+                price=row.price,
+                recipe=row.recipe,
+                attributes=row.attributes,
+                flags=row.flags,
+                schema_version=row.schema_version,
+            )
+            for row in result.scalars()
+        ]
+
     async def get_item(self, catalog_id: uuid.UUID, item_id: int) -> Item | None:
         row = await self._session.get(ItemModel, {"catalog_id": catalog_id, "item_id": item_id})
         if row is None:

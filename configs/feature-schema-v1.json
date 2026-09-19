@@ -1,0 +1,229 @@
+{
+  "schemaVersion": "v1",
+  "featureSchemaVersion": "feature_schema_v1",
+  "description": "Schema compartilhado de features pré-decisão (CC-204). O código (riftlab/decisions/features.py: FEATURE_SPECS) e este arquivo descrevem os mesmos campos e são testados um contra o outro. Só entra o que é conhecido no instante da decisão; null nunca vira zero: ausência sempre carrega uma máscara.",
+  "maskValues": {
+    "PRESENT": "valor observado",
+    "NO_PRIOR_FRAME": "nenhum frame estritamente anterior à decisão",
+    "FIELD_ABSENT": "havia frame anterior, mas o campo não veio (ou veio inválido)",
+    "UNAVAILABLE_IN_SCHEMA": "o schema v1 não tem fonte curada para este campo"
+  },
+  "staleFrameThresholdMs": 90000,
+  "fields": [
+    {
+      "name": "self_champion_id",
+      "type": "int",
+      "nullable": false,
+      "provenance": "participants.champion_id",
+      "observability": "CHAMPION_SELECT_PUBLIC",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "self_role",
+      "type": "str",
+      "nullable": true,
+      "provenance": "participants.role",
+      "observability": "CHAMPION_SELECT_PUBLIC",
+      "masks": [
+        "PRESENT",
+        "FIELD_ABSENT"
+      ]
+    },
+    {
+      "name": "self_team",
+      "type": "int",
+      "nullable": false,
+      "provenance": "participants.team",
+      "observability": "CHAMPION_SELECT_PUBLIC",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "ally_champion_ids",
+      "type": "list[int]",
+      "nullable": false,
+      "provenance": "participants.champion_id (mesmo time, exclui o próprio, ordem crescente)",
+      "observability": "CHAMPION_SELECT_PUBLIC",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "enemy_champion_ids",
+      "type": "list[int]",
+      "nullable": false,
+      "provenance": "participants.champion_id (time adversário, ordem crescente)",
+      "observability": "CHAMPION_SELECT_PUBLIC",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "ally_composition_aggregates",
+      "type": "null",
+      "nullable": true,
+      "provenance": "indisponível: não existe catálogo curado de campeões",
+      "observability": "UNAVAILABLE",
+      "masks": [
+        "UNAVAILABLE_IN_SCHEMA"
+      ]
+    },
+    {
+      "name": "enemy_composition_aggregates",
+      "type": "null",
+      "nullable": true,
+      "provenance": "indisponível: não existe catálogo curado de campeões",
+      "observability": "UNAVAILABLE",
+      "masks": [
+        "UNAVAILABLE_IN_SCHEMA"
+      ]
+    },
+    {
+      "name": "game_time_ms",
+      "type": "int",
+      "nullable": false,
+      "provenance": "snapshot.eventTimestampMs (instante da decisão)",
+      "observability": "OWN_STATE_EVENT_REPLAY",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "level",
+      "type": "int",
+      "nullable": true,
+      "provenance": "quality.levelObservation.value (último frame estritamente anterior)",
+      "observability": "OWN_STATE_FRAME_OBSERVATION",
+      "masks": [
+        "PRESENT",
+        "NO_PRIOR_FRAME",
+        "FIELD_ABSENT"
+      ]
+    },
+    {
+      "name": "level_age_ms",
+      "type": "int",
+      "nullable": true,
+      "provenance": "quality.levelObservation.ageMs (idade do frame)",
+      "observability": "OWN_STATE_FRAME_OBSERVATION",
+      "masks": [
+        "PRESENT",
+        "NO_PRIOR_FRAME"
+      ]
+    },
+    {
+      "name": "gold_estimate",
+      "type": "int",
+      "nullable": true,
+      "provenance": "quality.goldEstimate.value (último frame estritamente anterior)",
+      "observability": "OWN_STATE_FRAME_OBSERVATION",
+      "masks": [
+        "PRESENT",
+        "NO_PRIOR_FRAME",
+        "FIELD_ABSENT"
+      ]
+    },
+    {
+      "name": "gold_origin",
+      "type": "str",
+      "nullable": false,
+      "provenance": "quality.goldEstimate.origin (vocabulário budget_source)",
+      "observability": "OWN_STATE_FRAME_OBSERVATION",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "gold_age_ms",
+      "type": "int",
+      "nullable": true,
+      "provenance": "quality.goldEstimate.ageMs (idade do frame)",
+      "observability": "OWN_STATE_FRAME_OBSERVATION",
+      "masks": [
+        "PRESENT",
+        "NO_PRIOR_FRAME"
+      ]
+    },
+    {
+      "name": "gold_stale",
+      "type": "bool",
+      "nullable": true,
+      "provenance": "derivado de quality.goldEstimate.ageMs > 90000",
+      "observability": "OWN_STATE_FRAME_OBSERVATION",
+      "masks": [
+        "PRESENT",
+        "NO_PRIOR_FRAME"
+      ]
+    },
+    {
+      "name": "inventory_items",
+      "type": "list[list[int]]",
+      "nullable": false,
+      "provenance": "snapshot.inventory.items (multiconjunto antes da compra; pares [item_id, quantidade])",
+      "observability": "OWN_STATE_EVENT_REPLAY",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "inventory_trinket_item_id",
+      "type": "int",
+      "nullable": true,
+      "provenance": "snapshot.inventory.trinketItemId (null = slot vazio)",
+      "observability": "OWN_STATE_EVENT_REPLAY",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "main_item_ordinal",
+      "type": "int",
+      "nullable": false,
+      "provenance": "unidades de item principal em snapshot.inventory.items + item_classification",
+      "observability": "OWN_STATE_EVENT_REPLAY",
+      "masks": [
+        "PRESENT"
+      ]
+    },
+    {
+      "name": "patch",
+      "type": "str",
+      "nullable": false,
+      "provenance": "match.patch",
+      "observability": "MATCH_METADATA",
+      "masks": [
+        "PRESENT"
+      ]
+    }
+  ],
+  "forbiddenFieldNames": [
+    "assists",
+    "damage",
+    "deaths",
+    "duration",
+    "duration_seconds",
+    "final_gold",
+    "final_inventory",
+    "final_items",
+    "kills",
+    "outcome",
+    "purchasedItemId",
+    "purchased_item_id",
+    "puuid",
+    "quality_reasons",
+    "reasons",
+    "result",
+    "retrospectiveTarget",
+    "retrospective_target",
+    "riot_id",
+    "subject_hash",
+    "summoner_name",
+    "target_item_id",
+    "total_gold",
+    "uncertain",
+    "win"
+  ]
+}

@@ -20,9 +20,10 @@ def _current_schema() -> dict:
 
 
 def test_openapi_only_announces_real_routes() -> None:
-    """Rotas de sprints futuras (matches, analyses, learning-attempts, ...)
-    continuam schema-only em riftlab.shared.api; nenhuma delas pode aparecer
-    aqui. imports (POST/GET/retry) passou a real no CC-201."""
+    """Rotas de sprints futuras (GET /matches e /matches/{id}, analyses,
+    learning-attempts, ...) continuam schema-only em riftlab.shared.api; nenhuma
+    delas pode aparecer aqui. imports (POST/GET/retry) passou a real no CC-201;
+    as duas rotas de DECISOES (lista por partida e detalhe) no CC-204."""
     schema = _current_schema()
     assert set(schema["paths"].keys()) == {
         "/health/live",
@@ -30,6 +31,8 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/imports",
         "/api/v1/imports/{job_id}",
         "/api/v1/imports/{job_id}/retry",
+        "/api/v1/matches/{match_id}/decisions",
+        "/api/v1/decisions/{decision_id}",
     }
 
 
@@ -70,3 +73,38 @@ def test_committed_openapi_json_matches_current_app_schema() -> None:
     )
     committed = json.loads(COMMITTED_OPENAPI_PATH.read_text())
     assert committed == _current_schema()
+
+
+def test_decisions_routes_are_read_only_and_document_their_errors() -> None:
+    schema = _current_schema()
+    listing = schema["paths"]["/api/v1/matches/{match_id}/decisions"]
+    detail = schema["paths"]["/api/v1/decisions/{decision_id}"]
+    assert set(listing) == {"get"} and set(detail) == {"get"}  # nenhuma escrita
+    assert set(listing["get"]["responses"]) == {"200", "404", "409", "422"}
+    assert set(detail["get"]["responses"]) == {"200", "404", "422"}
+    params = {p["name"]: p for p in listing["get"]["parameters"]}
+    assert set(params) == {"match_id", "participantId", "cursor", "limit"}
+    assert params["participantId"]["required"] is True
+    assert (
+        params["limit"]["schema"]["default"] == 20 and params["limit"]["schema"]["maximum"] == 100
+    )
+
+
+def test_decision_response_schemas_expose_no_purchase_information() -> None:
+    """A restricao pedagogica vale no CONTRATO publicado, nao so nos schemas
+    internos: nenhum campo do OpenAPI menciona o item comprado, o alvo, o bloco
+    retrospectivo, features ou hash pessoal."""
+    schemas = _current_schema()["components"]["schemas"]
+    names = {
+        name
+        for name in schemas
+        if name.startswith(("Decision", "Inventory", "ObservedLevel", "CursorPage_Decision"))
+    }
+    assert {"DecisionState", "DecisionStateSummary", "DecisionInventory", "DecisionBudget"} <= names
+    forbidden = ("target", "purchased", "retrospective", "feature", "quality", "subject", "hash")
+    allowed = {("DecisionVersionInfo", "featureSchemaVersion")}  # só o RÓTULO da versão do schema
+    for name in names:
+        for prop in schemas[name].get("properties", {}):
+            if (name, prop) in allowed:
+                continue
+            assert not any(word in prop.lower() for word in forbidden), (name, prop)

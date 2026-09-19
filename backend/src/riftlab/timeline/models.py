@@ -67,6 +67,16 @@ class DecisionStateModel(UuidPkMixin, CreatedAtMixin, Base):
             "state_version",
             name="uq_decision_states_identity",
         ),
+        # Alvo da FK composta de decision_points (CC-204): a identidade completa
+        # do estado, incluindo o id. Só um índice; nenhuma linha é reescrita.
+        UniqueConstraint(
+            "id",
+            "match_id",
+            "participant_id",
+            "event_source_index",
+            "state_version",
+            name="uq_decision_states_id_identity",
+        ),
         ForeignKeyConstraint(
             ["match_id", "participant_id"],
             ["participants.match_id", "participants.participant_id"],

@@ -10,7 +10,10 @@ from typing import Any
 
 import pytest
 
-from riftlab.catalog.infrastructure.curation import curate_data_dragon_items
+from riftlab.catalog.infrastructure.curation import (
+    CURATION_RULES_VERSION,
+    curate_data_dragon_items,
+)
 from riftlab.shared.errors import SourceSchemaError
 
 
@@ -154,3 +157,109 @@ def test_curate_rejects_gold_purchasable_of_wrong_type() -> None:
 def test_curate_rejects_negative_gold_total() -> None:
     with pytest.raises(SourceSchemaError):
         curate_data_dragon_items(_document(gold={"total": -1, "purchasable": True}))
+
+
+def test_curation_version_is_v5() -> None:
+    assert CURATION_RULES_VERSION == "data_dragon_v5"
+
+
+def test_curate_persists_into_as_sorted_int_list() -> None:
+    items, _ = curate_data_dragon_items(_document(into=["3078", "3004", "3003"]))
+    assert items[0].attributes["into"] == [3003, 3004, 3078]
+
+
+def test_curate_missing_into_becomes_empty_list_only() -> None:
+    items, _ = curate_data_dragon_items(_document())
+    assert items[0].attributes["into"] == []  # ausente -> lista vazia, sem outro default
+
+
+def test_curate_into_may_reference_an_excluded_or_absent_item() -> None:
+    """`into` apontando para item excluído da curadoria (specialRecipe) ou
+    inexistente no payload é esperado: nunca erro, nunca removido."""
+    payload = {
+        "1042": _base_item(into=["9001", "9999"]),
+        "9001": _base_item(specialRecipe=123),
+    }
+    items, excluded = curate_data_dragon_items(payload)
+    assert [item.item_id for item in items] == [1042]
+    assert items[0].attributes["into"] == [9001, 9999]
+    assert [entry.item_id for entry in excluded] == [9001]
+
+
+@pytest.mark.parametrize("bad_into", ["3078", {"3078": True}, None, 3078])
+def test_curate_rejects_into_that_is_not_a_list(bad_into: Any) -> None:
+    with pytest.raises(SourceSchemaError) as excinfo:
+        curate_data_dragon_items(_document(into=bad_into))
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"
+
+
+@pytest.mark.parametrize("bad_destination", ["abc", 3078, "-1", "", True, None])
+def test_curate_rejects_into_with_non_numeric_destination(bad_destination: Any) -> None:
+    with pytest.raises(SourceSchemaError) as excinfo:
+        curate_data_dragon_items(_document(into=["3078", bad_destination]))
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"
+
+
+def test_curate_into_does_not_change_price_recipe_flags_or_exclusions() -> None:
+    """`into` só acrescenta um atributo: o resto do resultado é idêntico ao
+    do mesmo payload sem `into` (o resultado do reducer não pode mudar)."""
+    base = {"1042": _base_item(**{"from": ["1001", "1001"]})}
+    with_into = {"1042": _base_item(**{"from": ["1001", "1001"], "into": ["3078"]})}
+    (plain,), plain_excluded = curate_data_dragon_items(base)
+    (enriched,), enriched_excluded = curate_data_dragon_items(with_into)
+
+    assert (enriched.price, enriched.recipe, enriched.flags) == (
+        plain.price,
+        plain.recipe,
+        plain.flags,
+    )
+    assert {k: v for k, v in enriched.attributes.items() if k != "into"} == {
+        k: v for k, v in plain.attributes.items() if k != "into"
+    }
+    assert plain_excluded == enriched_excluded == ()
+
+
+# Dígitos não ASCII: str.isdigit() os aceita, int() rejeita ("²") ou converte
+# em silêncio ("٣" -> 3). Todos os quatro pontos numéricos da curadoria (chave
+# do item, chave de maps, from e into) rejeitam com SourceSchemaError.
+_NON_ASCII_DIGITS = ["²", "٣", "３", "①"]
+
+
+@pytest.mark.parametrize("bad", _NON_ASCII_DIGITS)
+def test_curate_rejects_non_ascii_digits_in_into(bad: str) -> None:
+    with pytest.raises(SourceSchemaError) as excinfo:
+        curate_data_dragon_items(_document(into=[bad]))
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"
+
+
+@pytest.mark.parametrize("bad", _NON_ASCII_DIGITS)
+def test_curate_rejects_non_ascii_digits_in_from(bad: str) -> None:
+    with pytest.raises(SourceSchemaError) as excinfo:
+        curate_data_dragon_items(_document(**{"from": [bad]}))
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"
+
+
+@pytest.mark.parametrize("bad", _NON_ASCII_DIGITS)
+def test_curate_rejects_non_ascii_digits_in_maps_key(bad: str) -> None:
+    with pytest.raises(SourceSchemaError) as excinfo:
+        curate_data_dragon_items(_document(maps={bad: True}))
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"
+
+
+@pytest.mark.parametrize("bad", _NON_ASCII_DIGITS)
+def test_curate_rejects_non_ascii_digits_in_item_key(bad: str) -> None:
+    with pytest.raises(SourceSchemaError) as excinfo:
+        curate_data_dragon_items({bad: _base_item()})
+    assert excinfo.value.code == "CATALOG_SOURCE_MISSING_FIELD"
+
+
+def test_curate_valid_ascii_digits_unchanged_by_ascii_only_check() -> None:
+    """A checagem só ASCII não altera o resultado de entrada válida (por isso
+    a versão da curadoria continua data_dragon_v5)."""
+    items, _ = curate_data_dragon_items(
+        {"1042": _base_item(**{"from": ["1001", "1001"], "into": ["3078", "3004"]})}
+    )
+    assert items[0].item_id == 1042
+    assert items[0].recipe == [{"itemId": 1001, "quantity": 2}]
+    assert items[0].attributes["into"] == [3004, 3078]
+    assert items[0].flags["maps"] == [11]

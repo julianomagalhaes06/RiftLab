@@ -97,6 +97,12 @@ class IngestionRepository(Protocol):
         participou de uma partida já reconstruída."""
         ...
 
+    async def get_match_import_mode(self, match_id: str) -> ImportMode | None:
+        """Modo (DEMO/RIOT) do import que persistiu a partida, ou None se não há
+        import concluído para ela. É a origem do dado, usada quando não há
+        nenhum estado de decisão para inferi-la."""
+        ...
+
     async def get_import_job(self, job_id: uuid.UUID) -> ImportJob | None: ...
 
     async def list_active_import_jobs(

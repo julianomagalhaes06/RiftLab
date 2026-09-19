@@ -7,25 +7,28 @@ migrations Alembic, fronteiras de domínio/repositórios para catálogo, partida
 participantes, eventos, jobs de importação e estados de decisão) e o gate de contratos
 (CC-106: erro padronizado em `application/problem+json`, OpenAPI real das rotas de saúde,
 schemas Pydantic dos contratos de sprints futuras em `src/riftlab/shared/api/`). Sprint 2
-entregou o importador real (CC-201, abaixo). Reconstrução temporal, ranking e análises
-Reconstrução pré-compra de inventário chegou no CC-203 (abaixo). Ranking, objetivos e
-modo Estudo chegam em cards posteriores.
+entregou o importador real (CC-201), o catálogo versionado (CC-202), a reconstrução
+pré-compra de inventário (CC-203) e os pontos de decisão com features versionadas e as
+rotas de leitura de decisões (CC-204), todos abaixo. Ranking, objetivos e modo Estudo
+chegam em cards posteriores.
 
 ## Contratos e OpenAPI (CC-106)
 
 ```sh
-uv run cc openapi export openapi.json   # exporta o schema real (so /health/live e /health/ready)
+uv run cc openapi export openapi.json   # exporta o schema real das rotas montadas
 ```
 
 `openapi.json` é versionado e usado pelo frontend para gerar tipos TypeScript
 (`frontend/npm run generate:api-types`); `tests/contract/test_openapi_contract.py`
 falha se o arquivo divergir da aplicação real. Erros seguem `application/problem+json`
-(`src/riftlab/errors.py`): 404 (rota/recurso inexistente), 422 (validação, nunca ecoa o
-valor bruto submetido) e 500 (falha não tratada) além do 503 de `/health/ready`. Os
-contratos de rotas futuras (importação, partidas, análises, aprendizagem) existem como
-Pydantic em `src/riftlab/shared/api/`, validados por `tests/contract/test_shared_api_contracts.py`,
-mas nenhum deles está montado como endpoint — ver `docs/contracts.md` para a matriz
-completa.
+(`src/riftlab/errors.py`): 404 (rota/recurso inexistente), 409 (conflito; para decisões,
+o código `DECISIONS_NOT_PREPARED`), 422 (validação, nunca ecoa o valor bruto submetido;
+para cursor inválido, o código `INVALID_CURSOR`) e 500 (falha não tratada) além do 503 de
+`/health/ready`. Estão montadas as rotas de saúde, de importação e as duas de decisões
+(abaixo). Os contratos das rotas futuras (lista/detalhe de partidas, análises,
+aprendizagem) existem como Pydantic em `src/riftlab/shared/api/`, validados por
+`tests/contract/test_shared_api_contracts.py`, mas nenhum deles está montado como
+endpoint.
 
 ## Importação (CC-201)
 
@@ -109,6 +112,17 @@ idempotente por uma marca atômica própria e versionada (`match_reconstructions
 mesmos estados, nunca duplica, independente de qual participante teve compra; uma
 versão anterior do algoritmo nunca é apagada nem confundida com a atual.
 
+**Transação destroy→compra (versão 6)**: na forma real observada, os `ITEM_DESTROYED` dos
+componentes vêm ANTES da compra composta, no mesmo instante. Os destroys que a compra
+reivindica fazem parte da transação dela: o ponto de decisão fica antes deles
+(`inventory_before` traz as unidades reivindicadas e a qualidade pré-decisão não carrega
+as marcas desses destroys), as marcas `UNRECONCILED_ITEM_DESTROYED` deles saem do
+cumulativo (a remoção vale só dentro do mesmo instante; estados já calculados nunca são
+alterados) e o undo da compra restaura os componentes. Um destroy que nenhuma compra
+reivindica continua conservador (removido e marcado). Em dado real, `UNVALIDATED_DESTROY_ORDER_RECONCILIATION`
+segue marcando as decisões seguintes. Nas versões 3 a 5 o snapshot omitia exatamente a
+receita do próprio alvo e toda compra composta de forma real ficava incerta.
+
 **Evidência empírica e limites**: a reconciliação entre uma compra de receita e os
 `ITEM_DESTROYED` que ela dispara, e a correlação de `ITEM_UNDO`, usam regras internas
 sobre semântica que a Riot não documenta. Foram examinadas offline num corpus real
@@ -137,6 +151,71 @@ processar a compra e independente do alvo — inclui catálogo ausente desde a p
 compra. Como as versões anteriores do algoritmo são preservadas (nunca apagadas),
 `list_decision_states` devolve estados de todas as versões: o consumidor deve filtrar por
 `state_version == RECONSTRUCTION_ALGORITHM_VERSION`.
+
+## Pontos de decisão e rotas de leitura (CC-204)
+
+Fluxo local completo (tudo em banco; nenhum passo depois da importação usa rede):
+
+```sh
+uv run cc catalog sync --mode demo --patch DEMO-1          # 1. catálogo
+# 2. importação (POST /api/v1/imports ou process_next_job)
+uv run cc timeline reconstruct --mode demo --match-id DEMO-0008   # 3. reconstrução v6
+uv run cc decisions extract --match-id DEMO-0008            # 4. extração (só banco)
+```
+
+`cc decisions extract` imprime um resumo sem dado pessoal (versões, total de pontos,
+elegíveis, contagem por motivo e se a extração foi reaproveitada). É idempotente por
+partida e tupla de versões; exige a reconstrução na versão corrente (senão
+`RECONSTRUCTION_REQUIRED`) e nunca reconstrói, abre fonte nem acessa rede.
+
+- **Catálogo e classificação**: a curadoria `data_dragon_v5` persiste `attributes.into`
+  (lista ordenada de `int`, validada como `from`; só dígitos ASCII). O classificador puro
+  `catalog/classification.py` (`item_classification_v1`) aplica regras fixas por
+  precedência (não comprável, mapa 11 ilegal, exclusivo de campeão, trinket, consumível,
+  botas por tag ou por receita transitiva, componente por `into`, básico, principal). Nunca
+  usa nome, descrição nem preço; campo ausente, receita com componente desconhecido ou
+  curadoria sem suporte resulta em `UNCLASSIFIED`. Limitação conhecida: itens de id ≥ 100000
+  que repetem o nome de um item real (ex.: `323003`) passam como principais.
+- **Seleção e elegibilidade** (`decisions/`, módulo puro `decision_selection_v1`): o alvo
+  principal gera um ponto de decisão (alvo conhecido e não principal não gera; alvo
+  desconhecido, excluído, sem classificação, sem catálogo, desfeito por undo ou de status
+  incerto gera um ponto listado como inelegível). Elegibilidade de contexto usa só
+  `preDecisionQuality`, catálogo, recorte e a posição do item principal (0 → 1º, 1 → 2º,
+  2 ou mais → `OUT_OF_SCOPE`). O recorte vem da origem: dado real usa `configs/scope.yaml`
+  (`RIFTLAB_SCOPE_PATH`), o demo usa um recorte sintético explícito. O orçamento é separado
+  (`STALE_FRAME`, `UNKNOWN_BUDGET`) e nunca torna a decisão inelegível.
+- **Features** (`configs/feature-schema-v1.json`, `feature_schema_v1`): 18 campos com tipo,
+  nulidade, proveniência, limite de observabilidade e máscara de ausência; só existem para
+  pontos elegíveis e são calculadas de uma visão que não tem o item comprado, o bloco
+  retrospectivo, a qualidade cumulativa nem identificador pessoal. A allowlist do código e o
+  arquivo são testados um contra o outro.
+- **Persistência** (migração `b8d4f1a6c3e9`): `decision_extractions` (marca por partida e
+  tupla de versões, com contagem de pontos) e `decision_points`, imutáveis (sem update no
+  código e gatilho no banco), com chave única `NULLS NOT DISTINCT` (a tupla tem colunas
+  anuláveis) e chave estrangeira composta para o estado de origem. `decision_states` não é
+  reescrita.
+- **Rotas** (só leitura, transação `READ ONLY`, nunca reconstroem, extraem, abrem fonte nem
+  usam rede): `GET /api/v1/matches/{matchId}/decisions?participantId=&cursor=&limit=`
+  (`participantId` 1..10 obrigatório; `limit` padrão 20, máximo 100; ordem estável por
+  `(timestampMs, eventSourceIndex, id)`; `nextCursor` nulo no fim) e
+  `GET /api/v1/decisions/{decisionId}`. Sem extração corrente: `409 DECISIONS_NOT_PREPARED`
+  (distinto de `200` com `items: []`, "extraída com zero pontos"). Cursor opaco fixado na
+  extração, partida e participante; cursor inválido ou de outro escopo: `422 INVALID_CURSOR`.
+  Partida, participante ou decisão inexistente: `404`. **Só informação pré-decisão** (modo
+  Estudo): inventário como multiconjunto `[{itemId, quantity}]` mais o trinket, orçamento
+  (valor nulo quando desconhecido), nível observado, motivos e versões. Nunca o item comprado,
+  a classe dele, o resultado da compra, o vetor de features, a qualidade cumulativa nem hash
+  pessoal; qualquer motivo ligado ao alvo aparece como o código neutro `TARGET_NOT_ELIGIBLE`,
+  sem sub-motivos.
+- **Demo**: `DEMO-0002` (compra composta direta) e `DEMO-0008` (forma real: destroys dos
+  componentes antes da compra, frames próximos) geram um ponto elegível, ordinal 1, com o
+  inventário anterior correto.
+
+**Limitação real**: no corpus real local examinado (10 partidas dos patches 14.20/15.1) a
+extração produziria 199 pontos de decisão e nenhum elegível: as heurísticas de dado real do
+CC-203 marcam a pré-decisão como incerta de forma cumulativa, e mecânicas de inventário ainda
+não modeladas (consumo de consumível, troca de trinket, transformações de item, aquisições
+fora de `ITEM_PURCHASED`) mantêm as marcas. O demo valida o fluxo, não o dado real.
 
 ## Migrações
 

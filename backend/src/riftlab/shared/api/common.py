@@ -26,7 +26,7 @@ class CamelModel(BaseModel):
 # Match ID real (docs/contracts.md): "^BR1_[0-9]{1,20}$"; nao aceitar host, URL
 # ou caminho local de usuario. Match ID demo: manifesto fechado do CC-104
 # (backend/src/riftlab/ingestion/infrastructure/fixtures/manifest.json), formato
-# real observado "DEMO-0001".."DEMO-0007" — o schema so verifica o formato
+# real observado "DEMO-0001".."DEMO-0008" — o schema so verifica o formato
 # (DEMO-dddd); pertencer ao manifesto de fato e responsabilidade do adapter
 # (SourceNotFoundError), nao deste contrato de borda HTTP.
 MATCH_ID_REAL_PATTERN = re.compile(r"^BR1_[0-9]{1,20}$")

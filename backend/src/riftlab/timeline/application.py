@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from sqlalchemy.exc import IntegrityError
@@ -58,7 +58,26 @@ STALE_FRAME_THRESHOLD_MS = 90_000
 #       passa a refletir catálogo ausente, condição do patch inteiro
 #       conhecida antes de qualquer evento. Estados persistidos na versão 3
 #       têm essa projeção incompleta e por isso não são reaproveitados.
-RECONSTRUCTION_ALGORITHM_VERSION = 4
+#   5 — o estado passa a registrar (a) o nível do participante observado no
+#       MESMO frame estritamente anterior usado para o ouro
+#       (`quality.levelObservation`), (b) o timestamp do próprio evento de
+#       compra (`snapshot.eventTimestampMs`) e (c) o bloco RETROSPECTIVO do
+#       alvo (`quality.retrospectiveTarget`: COMPLETED, REVERTED_BY_UNDO ou
+#       STATUS_UNCERTAIN). Frames não são persistidos, então extrair features
+#       depois não pode reabrir a fonte; estados v4 não têm esses campos e não
+#       são reaproveitados.
+#   6 — semântica de TRANSAÇÃO para a forma real destroy→compra: os
+#       ITEM_DESTROYED do participante no instante T cujas unidades a compra
+#       composta do MESMO participante em T reivindica (pool retroativo,
+#       versão 3) fazem parte da transação dessa compra. O ponto de decisão
+#       fica ANTES da transação: `inventory_before` inclui as unidades
+#       reivindicadas e a qualidade pré-decisão não carrega as marcas desses
+#       destroys; as marcas UNRECONCILED_ITEM_DESTROYED deles saem do
+#       cumulativo (a remoção só vale dentro do mesmo T; decisões já
+#       capturadas nunca são alteradas). Destroy em T NÃO reivindicado segue
+#       conservador. Antes (v3–v5) o snapshot omitia exatamente a receita do
+#       próprio alvo e toda compra composta de forma real ficava incerta.
+RECONSTRUCTION_ALGORITHM_VERSION = 6
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens
@@ -187,20 +206,27 @@ _UNKNOWN_GOLD_ESTIMATE_NO_AGE = GoldEstimate(
 )
 
 
-def select_gold_estimate(
-    frames: Sequence[FrameLike], participant_id: int, event_timestamp_ms: int
-) -> GoldEstimate:
-    """Último frame ESTRITAMENTE anterior ao evento — nunca mesmo timestamp
-    nem futuro por conveniência, nunca interpolado com o frame seguinte.
-    origin usa o vocabulário público de budget_source (docs/domain-model.md,
-    shared/api/enums.py:BudgetSource) — nunca um rótulo próprio inventado
-    (achado da revisão: "OBSERVED" não é um valor do contrato)."""
+def _select_prior_frame(frames: Sequence[FrameLike], event_timestamp_ms: int) -> FrameLike | None:
+    """ÚNICO critério de seleção de frame (ouro e nível usam o mesmo): o
+    último frame ESTRITAMENTE anterior ao evento — nunca mesmo timestamp nem
+    futuro por conveniência, nunca interpolado com o frame seguinte."""
     candidate: FrameLike | None = None
     for frame in frames:
         if frame.timestamp_ms < event_timestamp_ms and (
             candidate is None or frame.timestamp_ms > candidate.timestamp_ms
         ):
             candidate = frame
+    return candidate
+
+
+def select_gold_estimate(
+    frames: Sequence[FrameLike], participant_id: int, event_timestamp_ms: int
+) -> GoldEstimate:
+    """Ouro do último frame estritamente anterior (`_select_prior_frame`).
+    origin usa o vocabulário público de budget_source (docs/domain-model.md,
+    shared/api/enums.py:BudgetSource) — nunca um rótulo próprio inventado
+    ("OBSERVED" não é um valor do contrato)."""
+    candidate = _select_prior_frame(frames, event_timestamp_ms)
     if candidate is None:
         return _UNKNOWN_GOLD_ESTIMATE_NO_AGE
 
@@ -218,6 +244,70 @@ def select_gold_estimate(
     return GoldEstimate(
         value=gold, age_ms=age_ms, stale=stale, origin=BudgetSource.FRAME_ESTIMATE.value
     )
+
+
+_LEVEL_ORIGIN_FRAME = "FRAME_OBSERVATION"
+_LEVEL_ORIGIN_UNKNOWN = "UNKNOWN"
+
+
+@dataclass(frozen=True, slots=True)
+class LevelObservation:
+    """Nível do participante do MESMO frame estritamente anterior usado para o
+    ouro. Ausência é explícita e nunca vira 0: `value=None` com
+    `origin=UNKNOWN` e `absent_reason` (NO_PRIOR_FRAME,
+    PARTICIPANT_FRAME_MISSING, LEVEL_MISSING ou LEVEL_INVALID). Idade e
+    timestamp do frame são preservados sempre que um frame anterior existe."""
+
+    value: int | None
+    age_ms: int | None
+    frame_timestamp_ms: int | None
+    stale: bool
+    origin: str
+    absent_reason: str | None
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "value": self.value,
+            "ageMs": self.age_ms,
+            "frameTimestampMs": self.frame_timestamp_ms,
+            "stale": self.stale,
+            "origin": self.origin,
+            "absentReason": self.absent_reason,
+        }
+
+
+def select_level_observation(
+    frames: Sequence[FrameLike], participant_id: int, event_timestamp_ms: int
+) -> LevelObservation:
+    candidate = _select_prior_frame(frames, event_timestamp_ms)
+    if candidate is None:
+        return LevelObservation(None, None, None, False, _LEVEL_ORIGIN_UNKNOWN, "NO_PRIOR_FRAME")
+    age_ms = event_timestamp_ms - candidate.timestamp_ms
+    stale = age_ms > STALE_FRAME_THRESHOLD_MS
+
+    def absent(reason: str) -> LevelObservation:
+        return LevelObservation(
+            None, age_ms, candidate.timestamp_ms, stale, _LEVEL_ORIGIN_UNKNOWN, reason
+        )
+
+    participant_frame = candidate.participant_frames.get(participant_id)
+    if not participant_frame:
+        return absent("PARTICIPANT_FRAME_MISSING")
+    level = participant_frame.get("level")
+    if level is None:
+        return absent("LEVEL_MISSING")
+    if isinstance(level, bool) or not isinstance(level, int) or level < 1:
+        return absent("LEVEL_INVALID")
+    return LevelObservation(level, age_ms, candidate.timestamp_ms, stale, _LEVEL_ORIGIN_FRAME, None)
+
+
+_NO_LEVEL_OBSERVATION = LevelObservation(
+    None, None, None, False, _LEVEL_ORIGIN_UNKNOWN, "NO_PRIOR_FRAME"
+)
+
+RETROSPECTIVE_COMPLETED = "COMPLETED"
+RETROSPECTIVE_REVERTED_BY_UNDO = "REVERTED_BY_UNDO"
+RETROSPECTIVE_STATUS_UNCERTAIN = "STATUS_UNCERTAIN"
 
 
 @dataclass(frozen=True, slots=True)
@@ -248,7 +338,19 @@ class ReconstructedPurchase:
     comparar a MESMA posição de decisão com alvos diferentes (mesmo
     prefixo) preserva estes dois campos byte-a-byte, mesmo quando
     `uncertain`/`reasons`/`destroy_order_reconciliation_used`
-    legitimamente divergem por causa do alvo escolhido."""
+    legitimamente divergem por causa do alvo escolhido.
+
+    `event_timestamp_ms` e `level_observation` são conhecidos no instante da
+    decisão (o nível vem do mesmo frame estritamente anterior do ouro).
+
+    `retrospective_*` é um bloco RETROSPECTIVO, separado: registra o que
+    aconteceu com o alvo DEPOIS da decisão (`COMPLETED`, `REVERTED_BY_UNDO`
+    quando um undo correlacionado pelo reducer desfaz esta compra, ou
+    `STATUS_UNCERTAIN` quando um undo não correlacionado posterior pode ter
+    desfeito a compra mais recente ainda não revertida — conservador). Serve
+    só à seleção retrospectiva do ponto de decisão: nunca alimenta features,
+    máscaras, `pre_decision_*`, `inventory_before`, `gold_estimate` nem
+    `level_observation`, de nenhuma compra."""
 
     event_source_index: int
     participant_id: int
@@ -262,6 +364,11 @@ class ReconstructedPurchase:
     pre_decision_uncertain: bool = False
     pre_decision_reasons: tuple[UncertainReason, ...] = ()
     destroy_order_claimed_source_indexes: tuple[int, ...] = ()
+    event_timestamp_ms: int = 0
+    level_observation: LevelObservation = _NO_LEVEL_OBSERVATION
+    retrospective_status: str = RETROSPECTIVE_COMPLETED
+    retrospective_undo_source_index: int | None = None
+    retrospective_correlation_unvalidated: bool = False
 
 
 _REVERSIBLE_OP_PURCHASE = "PURCHASE"
@@ -299,6 +406,15 @@ class _ReversibleOp:
     prior_inventory: InventorySnapshot
     consumed_components: tuple[tuple[int, int], ...] = ()
     timestamp_ms: int = 0
+    purchase_source_index: int | None = None
+
+
+def _is_claimed_destroy_mark(reason: UncertainReason, claimed_indexes: set[int]) -> bool:
+    """Marca provisória de um destroy que a compra atual reivindica (v6)."""
+    return (
+        reason.code == "UNRECONCILED_ITEM_DESTROYED"
+        and reason.event_source_index in claimed_indexes
+    )
 
 
 def _require_int_field(event: TimelineEvent, field_name: str) -> int:
@@ -488,6 +604,14 @@ def reconstruct_participant_purchases(
     backward_destroy_pool: dict[int, list[int]] = {}
     current_timestamp_ms: int | None = None
     results: list[ReconstructedPurchase] = []
+    # Bloco RETROSPECTIVO do alvo (ver ReconstructedPurchase): anotado só
+    # DEPOIS da decisão, a partir da correlação de undo que este mesmo reducer
+    # já faz (fonte única) e aplicado aos resultados no fim — nunca lido por
+    # nenhum campo pré-decisão. purchase_order guarda os source_index das
+    # compras já processadas, em ordem.
+    purchase_order: list[int] = []
+    retro_status: dict[int, str] = {}
+    retro_undo_index: dict[int, int] = {}
 
     def _mark_uncertain(code: str, event: TimelineEvent, item_id: int | None = None) -> None:
         nonlocal uncertain
@@ -523,36 +647,14 @@ def reconstruct_participant_purchases(
 
         if event.type == "ITEM_PURCHASED":
             item_id = _require_int_field(event, "itemId")
-            before = inventory
-            # Qualidade ANTES de processar esta compra, capturada no MESMO
-            # instante de `before` -- nunca influenciada pela
-            # identidade/receita DESTE alvo. ITEM_UNKNOWN/
-            # ITEM_EXCLUDED_UNSUPPORTED/INVENTORY_CAPACITY_EXCEEDED/
-            # UNVALIDATED_DESTROY_ORDER_RECONCILIATION abaixo dependem do
-            # item ESCOLHIDO (pós-transição, nunca elegibilidade/feature/
-            # máscara pré-decisão).
-            #
-            # `catalog_available` é uma condição do PATCH/catálogo resolvido
-            # para a partida inteira -- fixa para toda a chamada, conhecida
-            # ANTES de qualquer evento ser processado, nunca dependente de
-            # qual item é comprado. Por isso é injetada aqui
-            # INCONDICIONALMENTE quando ausente -- inclusive na PRIMEIRA
-            # compra, nunca só a partir do que já foi acumulado em
-            # `reasons` até agora (que seria vazio na primeira compra,
-            # escondendo uma condição já conhecida desde antes do replay
-            # começar).
-            pre_decision_uncertain = uncertain or not catalog_available
-            pre_decision_reasons = tuple(reasons)
-            if not catalog_available:
-                pre_decision_reasons = (
-                    *pre_decision_reasons,
-                    UncertainReason(
-                        code="NO_CATALOG",
-                        event_source_index=event.source_index,
-                        timestamp_ms=event.timestamp_ms,
-                        item_id=None,
-                    ),
-                )
+            # Estado ao chegar nesta compra, com os ITEM_DESTROYED anteriores
+            # (inclusive os do mesmo instante T) já aplicados provisoriamente.
+            # `before` (o ponto de decisão) só é definido DEPOIS de saber quais
+            # destroys esta compra reivindica: os reivindicados fazem parte da
+            # TRANSAÇÃO da compra (v6), então o ponto de decisão fica antes
+            # deles. Os não reivindicados seguem aplicados (conservador).
+            inventory_on_arrival = inventory
+            reasons_on_arrival = tuple(reasons)
             consumed: list[tuple[int, int]] = []
             backward_claimed: list[tuple[int, int]] = []
 
@@ -587,6 +689,62 @@ def reconstruct_participant_purchases(
                 _mark_uncertain("ITEM_UNKNOWN", event, item_id)
                 inventory = inventory.with_added(item_id, 1)
 
+            # S1/S2 (v6): destroys reivindicados por esta compra fazem parte da
+            # sua transação. (S1) o ponto de decisão fica ANTES deles: as
+            # unidades reivindicadas voltam ao `before`; (S2) as marcas
+            # provisórias UNRECONCILED_ITEM_DESTROYED desses destroys saem do
+            # cumulativo — tudo no MESMO instante T, e só para o que esta
+            # compra de fato reivindica (destroy não reivindicado mantém a
+            # marca e a remoção). Decisões já capturadas nunca são alteradas:
+            # `reasons_on_arrival` e os resultados anteriores são imutáveis.
+            claimed_indexes = {source_index for _, source_index in backward_claimed}
+            before = inventory_on_arrival
+            for claimed_item_id, _ in backward_claimed:
+                before = before.with_added(claimed_item_id, 1)
+            if claimed_indexes:
+                reasons[:] = [
+                    r for r in reasons if not _is_claimed_destroy_mark(r, claimed_indexes)
+                ]
+                uncertain = bool(reasons)
+                base_pre_reasons = tuple(
+                    r
+                    for r in reasons_on_arrival
+                    if not _is_claimed_destroy_mark(r, claimed_indexes)
+                )
+            else:
+                base_pre_reasons = reasons_on_arrival
+
+            # Qualidade ANTES da transação desta compra: o histórico até aqui
+            # sem as marcas dos destroys reivindicados, nunca influenciada pela
+            # identidade/receita DESTE alvo além do que a própria transação
+            # consome. ITEM_UNKNOWN/ITEM_EXCLUDED_UNSUPPORTED/
+            # INVENTORY_CAPACITY_EXCEEDED/
+            # UNVALIDATED_DESTROY_ORDER_RECONCILIATION abaixo dependem do item
+            # ESCOLHIDO (pós-transição, nunca elegibilidade/feature/máscara
+            # pré-decisão).
+            #
+            # `catalog_available` é uma condição do PATCH/catálogo resolvido
+            # para a partida inteira -- fixa para toda a chamada, conhecida
+            # ANTES de qualquer evento ser processado, nunca dependente de
+            # qual item é comprado. Por isso é injetada aqui
+            # INCONDICIONALMENTE quando ausente -- inclusive na PRIMEIRA
+            # compra, nunca só a partir do que já foi acumulado em
+            # `reasons` até agora (que seria vazio na primeira compra,
+            # escondendo uma condição já conhecida desde antes do replay
+            # começar).
+            pre_decision_uncertain = bool(base_pre_reasons) or not catalog_available
+            pre_decision_reasons = base_pre_reasons
+            if not catalog_available:
+                pre_decision_reasons = (
+                    *pre_decision_reasons,
+                    UncertainReason(
+                        code="NO_CATALOG",
+                        event_source_index=event.source_index,
+                        timestamp_ms=event.timestamp_ms,
+                        item_id=None,
+                    ),
+                )
+
             # Capacidade verificada sempre (não só no caminho de catálogo
             # conhecido): um item desconhecido/excluído/sem catálogo também
             # ocupa uma slot normal (trinket nunca entra em `.items`, então
@@ -603,15 +761,11 @@ def reconstruct_participant_purchases(
                 # heurísticas: bater com esta hipótese não comprova a
                 # semântica real, então dado REAL sempre marca incerto a
                 # partir daqui via este código; DEMO nunca marca este código
-                # específico se a regra é sintética e testada. Diferença
-                # real em relação às outras duas heurísticas: o(s)
-                # destroy(s) já foram marcados UNRECONCILED_ITEM_DESTROYED
-                # no PRÓPRIO momento em que ocorreram (antes de qualquer
-                # compra composta existir) -- essa marca NUNCA é
-                # retroativamente desfeita, então `uncertain` geral pode
-                # continuar True em DEMO mesmo quando este gate específico
-                # não dispara (um estado já calculado nunca é revivido com
-                # base no futuro).
+                # específico se a regra é sintética e testada. Desde a v6, as
+                # marcas provisórias UNRECONCILED_ITEM_DESTROYED dos destroys
+                # reivindicados já saíram do cumulativo (acima), então em DEMO
+                # a compra fica sem nenhuma marca por eles; um destroy NÃO
+                # reivindicado mantém a sua (conservador, nunca curado).
                 destroy_order_heuristic_used = True
                 if not is_demo:
                     _mark_uncertain("UNVALIDATED_DESTROY_ORDER_RECONCILIATION", event, item_id)
@@ -632,14 +786,21 @@ def reconstruct_participant_purchases(
                     destroy_order_claimed_source_indexes=tuple(
                         source_index for _, source_index in backward_claimed
                     ),
+                    event_timestamp_ms=event.timestamp_ms,
+                    level_observation=select_level_observation(
+                        frames, participant_id, event.timestamp_ms
+                    ),
                 )
             )
+            purchase_order.append(event.source_index)
+            retro_status[event.source_index] = RETROSPECTIVE_COMPLETED
             last_reversible = _ReversibleOp(
                 resulting_item_id=item_id,
                 operation_type=_REVERSIBLE_OP_PURCHASE,
                 prior_inventory=before,
                 consumed_components=tuple(consumed),
                 timestamp_ms=event.timestamp_ms,
+                purchase_source_index=event.source_index,
             )
 
         elif event.type == "ITEM_SOLD":
@@ -731,10 +892,28 @@ def reconstruct_participant_purchases(
                     correlated = before_id == 0 and after_id == last_reversible.resulting_item_id
             if not correlated:
                 _mark_uncertain("UNDO_UNCORRELATED", event, before_id)
+                # Conservador: um undo sem correlação pode ter desfeito a
+                # compra mais recente do participante que ainda consta como
+                # COMPLETED (compras já revertidas ou já incertas ficam como
+                # estão). Só afeta o bloco retrospectivo, nunca o estado
+                # pré-decisão de nenhuma compra.
+                for candidate_index in reversed(purchase_order):
+                    if retro_status[candidate_index] == RETROSPECTIVE_COMPLETED:
+                        retro_status[candidate_index] = RETROSPECTIVE_STATUS_UNCERTAIN
+                        retro_undo_index[candidate_index] = event.source_index
+                        break
             else:
                 # correlated só é True dentro do bloco `if last_reversible is
                 # not None` acima -- nunca alcançável com last_reversible=None.
                 assert last_reversible is not None
+                if (
+                    last_reversible.operation_type == _REVERSIBLE_OP_PURCHASE
+                    and last_reversible.purchase_source_index is not None
+                ):
+                    retro_status[last_reversible.purchase_source_index] = (
+                        RETROSPECTIVE_REVERTED_BY_UNDO
+                    )
+                    retro_undo_index[last_reversible.purchase_source_index] = event.source_index
                 inventory = last_reversible.prior_inventory
                 _discard_pending(last_reversible.consumed_components, last_reversible.timestamp_ms)
                 last_reversible = None
@@ -747,7 +926,20 @@ def reconstruct_participant_purchases(
                 if not is_demo:
                     _mark_uncertain("UNVALIDATED_UNDO_SEMANTICS", event, before_id)
 
-    return results
+    return [
+        replace(
+            purchase,
+            retrospective_status=retro_status[purchase.event_source_index],
+            retrospective_undo_source_index=retro_undo_index.get(purchase.event_source_index),
+            # Em dado REAL a reversão vem de uma correlação interna nunca
+            # validada (mesma disciplina das outras heurísticas).
+            retrospective_correlation_unvalidated=(
+                retro_status[purchase.event_source_index] == RETROSPECTIVE_REVERTED_BY_UNDO
+                and not is_demo
+            ),
+        )
+        for purchase in results
+    ]
 
 
 def _decision_state_from_purchase(
@@ -765,12 +957,27 @@ def _decision_state_from_purchase(
         snapshot={
             "inventory": purchase.inventory_before.to_payload(),
             "purchasedItemId": purchase.purchased_item_id,
+            # Instante do próprio evento de compra: conhecido na decisão; útil
+            # para ordenação/paginação sem join com timeline_events.
+            "eventTimestampMs": purchase.event_timestamp_ms,
         },
         features={},  # seleção/extração de features é CC-204, não este card
         quality={
             "uncertain": purchase.uncertain,
             "reasons": [reason.to_payload() for reason in purchase.reasons],
             "goldEstimate": purchase.gold_estimate.to_payload(),
+            # Nível do MESMO frame estritamente anterior do ouro (frames não
+            # são persistidos): valor, idade, timestamp do frame e ausência
+            # explícita, nunca 0.
+            "levelObservation": purchase.level_observation.to_payload(),
+            # Bloco RETROSPECTIVO do alvo: o que aconteceu com a compra
+            # DEPOIS da decisão. Serve só à seleção retrospectiva; nunca
+            # alimenta features, máscaras nem preDecisionQuality.
+            "retrospectiveTarget": {
+                "status": purchase.retrospective_status,
+                "undoSourceIndex": purchase.retrospective_undo_source_index,
+                "correlationUnvalidated": purchase.retrospective_correlation_unvalidated,
+            },
             "sourceOrigin": origin.value,
             # `uncertain`/`reasons` acima são CUMULATIVOS e incluem
             # diagnósticos que dependem da identidade/receita DESTE alvo

@@ -11,7 +11,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from riftlab.observability import safe_exception_description
-from riftlab.shared.errors import ConflictError, NotFoundError
+from riftlab.shared.errors import (
+    ConflictError,
+    DecisionsNotPreparedError,
+    InvalidCursorError,
+    NotFoundError,
+)
 
 logger = logging.getLogger("riftlab.api")
 
@@ -23,6 +28,8 @@ PROBLEM_MEDIA_TYPE = "application/problem+json"
 # citado literalmente no contrato de erros de dominio, mas e o generico de
 # infraestrutura ja usado desde o CC-101 para excecao nao tratada.
 DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
+DECISIONS_NOT_PREPARED = "DECISIONS_NOT_PREPARED"
+INVALID_CURSOR = "INVALID_CURSOR"
 IMPORT_ACTIVE = "IMPORT_ACTIVE"
 INTERNAL_ERROR = "INTERNAL_ERROR"
 RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
@@ -178,6 +185,32 @@ def register_exception_handlers(app: FastAPI) -> None:
             code=IMPORT_ACTIVE,
             title="Conflito",
             detail="A requisicao conflita com o estado atual do recurso.",
+        )
+
+    @app.exception_handler(DecisionsNotPreparedError)
+    async def decisions_not_prepared_handler(
+        request: Request, exc: DecisionsNotPreparedError
+    ) -> JSONResponse:
+        # CC-204: a partida existe, mas as decisoes da versao corrente ainda nao
+        # foram extraidas — distinto de 200 com items=[] ("extraida com zero
+        # pontos"). Texto fixo: nunca repassa mensagem de exc.
+        return problem_response(
+            request,
+            status_code=409,
+            code=DECISIONS_NOT_PREPARED,
+            title="Decisoes nao preparadas",
+            detail="As decisoes desta partida ainda nao foram extraidas para a versao corrente.",
+        )
+
+    @app.exception_handler(InvalidCursorError)
+    async def invalid_cursor_handler(request: Request, exc: InvalidCursorError) -> JSONResponse:
+        # Nunca ecoa o cursor recebido (nem parte dele).
+        return problem_response(
+            request,
+            status_code=422,
+            code=INVALID_CURSOR,
+            title="Cursor invalido",
+            detail="O cursor de paginacao e invalido para esta consulta.",
         )
 
     @app.exception_handler(Exception)
