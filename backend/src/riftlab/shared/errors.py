@@ -21,6 +21,11 @@ class InvalidCursorError(DomainError):
     extração inexistente. Nunca ecoa o conteúdo recebido."""
 
 
+class RiotKeyMissingError(DomainError):
+    """Importação no modo RIOT pedida a um servidor sem chave da Riot configurada
+    (modo demonstração). Recusada antes de qualquer job. Nunca carrega detalhe."""
+
+
 class SourceError(DomainError):
     """Erro ao carregar dados de uma fonte plugável (MatchSource/CatalogSource,
     CC-104). code é estável e seguro para diagnóstico; detail nunca ecoa corpo

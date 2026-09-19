@@ -31,6 +31,10 @@ from riftlab.shared.api.matches import (
     DecisionState,
     DecisionStateSummary,
     InventoryItem,
+    MatchDetail,
+    MatchParticipant,
+    MatchPreparation,
+    MatchSummary,
 )
 from riftlab.shared.api.objectives import ObjectiveForm, ObjectiveInterpretRequest
 
@@ -346,7 +350,65 @@ def test_decision_schemas_have_no_field_that_could_reveal_the_purchase() -> None
     for model in (DecisionState, DecisionStateSummary):
         assert not set(model.model_fields) & forbidden, model.__name__
     assert set(DecisionInventory.model_fields) == {"items", "trinket_item_id"}
-    assert set(InventoryItem.model_fields) == {"item_id", "quantity"}  # multiconjunto
+    # multiconjunto; `name` vem do catálogo fixado pelo ponto (null sem catálogo)
+    assert set(InventoryItem.model_fields) == {"item_id", "quantity", "name"}
+    assert InventoryItem(item_id=3006, quantity=1).name is None
+
+
+# ---------------------------------------------------------------------------
+# Partidas (CC-205): lista/detalhe sem identificador pessoal e com preparação
+# ---------------------------------------------------------------------------
+
+_MATCH_SUMMARY = {
+    "matchId": "DEMO-0008",
+    "queue": 420,
+    "map": 11,
+    "patch": "16.17.1",
+    "startAt": "2026-09-01T12:00:00Z",
+    "preparationStatus": "READY",
+}
+
+
+def test_match_summary_requires_preparation_status_and_rejects_personal_fields() -> None:
+    assert MatchSummary.model_validate(_MATCH_SUMMARY).preparation_status == "READY"
+    with pytest.raises(ValidationError):
+        MatchSummary.model_validate(
+            {k: v for k, v in _MATCH_SUMMARY.items() if k != "preparationStatus"}
+        )
+    with pytest.raises(ValidationError):
+        MatchSummary.model_validate({**_MATCH_SUMMARY, "subjectHash": "x" * 64})
+    with pytest.raises(ValidationError):
+        MatchSummary.model_validate({**_MATCH_SUMMARY, "preparationStatus": "DONE"})
+
+
+def test_match_detail_has_participants_without_hash_and_a_preparation_block() -> None:
+    detail = MatchDetail.model_validate(
+        {
+            **_MATCH_SUMMARY,
+            "preparationStatus": "FAILED",
+            "participants": [{"participantId": 1, "championId": 22, "team": 100, "role": None}],
+            "preparation": {
+                "status": "FAILED",
+                "errorCode": "TIMELINE_REPLAY_ERROR",
+                "attempts": 1,
+            },
+        }
+    )
+    assert detail.participants[0].role is None  # ausente ≠ inventado
+    assert detail.preparation.error_code == "TIMELINE_REPLAY_ERROR"
+    assert set(MatchParticipant.model_fields) == {"participant_id", "champion_id", "team", "role"}
+    with pytest.raises(ValidationError):
+        MatchParticipant.model_validate(
+            {"participantId": 1, "championId": 22, "team": 100, "subjectHash": "x" * 64}
+        )
+    with pytest.raises(ValidationError):
+        MatchDetail.model_validate({**_MATCH_SUMMARY, "participants": []})  # sem preparation
+
+
+def test_match_preparation_defaults_are_neutral() -> None:
+    preparation = MatchPreparation.model_validate({"status": "NOT_REQUESTED"})
+    assert preparation.error_code is None and preparation.retry_at is None
+    assert preparation.attempts == 0
 
 
 # ---------------------------------------------------------------------------

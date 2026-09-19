@@ -24,6 +24,7 @@ from riftlab.ingestion.domain import (
     ImportJob,
     ImportJobState,
     ImportMode,
+    JobKind,
     Match,
     MatchSourceResult,
     Participant,
@@ -105,7 +106,7 @@ async def get_import_job(session_factory: SessionFactory, job_id: uuid.UUID) -> 
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         job = await repo.get_import_job(job_id)
-    if job is None:
+    if job is None or job.kind != JobKind.IMPORT:  # preparação tem rotas próprias
         raise NotFoundError(f"import job {job_id} não encontrado")
     return job
 
@@ -127,7 +128,7 @@ async def retry_import(
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         target = await repo.get_import_job(job_id)
-        if target is None:
+        if target is None or target.kind != JobKind.IMPORT:
             raise NotFoundError(f"import job {job_id} não encontrado")
         if target.state != ImportJobState.FAILED:
             raise ConflictError(
@@ -331,6 +332,11 @@ async def _persist_result(
         )
         if not ok:
             raise _LeaseLostDuringPersistError(f"posse do job {job.id} perdida antes de finalizar")
+        # CC-205: a preparação (catálogo -> reconstrução -> extração) é
+        # enfileirada na MESMA transação do sucesso da importação — tudo ou
+        # nada: nunca há partida importada sem preparação registrada, e nunca
+        # uma preparação de partida que não foi importada.
+        await ingestion_repo.enqueue_preparation(result.match_id, job.mode)
 
 
 async def process_next_job(

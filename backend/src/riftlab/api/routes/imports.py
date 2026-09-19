@@ -8,7 +8,6 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Request
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from riftlab.errors import ProblemDetail
 from riftlab.ingestion.application import get_import_job, request_import, retry_import
@@ -16,6 +15,7 @@ from riftlab.ingestion.domain import ImportJob
 from riftlab.ingestion.domain import ImportMode as DomainImportMode
 from riftlab.shared.api.enums import ImportJobKind, ImportJobState
 from riftlab.shared.api.imports import ImportJobAccepted, ImportJobStatus, ImportRequest
+from riftlab.shared.errors import RiotKeyMissingError
 
 router = APIRouter(prefix="/api/v1/imports", tags=["imports"])
 
@@ -30,15 +30,23 @@ _INVALID_JOB_ID_RESPONSE = {
     "",
     status_code=202,
     response_model=ImportJobAccepted,
-    responses={422: {"model": ProblemDetail, "description": "Requisição inválida."}},
+    responses={
+        422: {
+            "model": ProblemDetail,
+            "description": (
+                "VALIDATION_ERROR (payload inválido) ou RIOT_KEY_MISSING (modo RIOT pedido a "
+                "um servidor sem chave da Riot configurada; nenhum job é criado)."
+            ),
+        }
+    },
 )
 async def create_import(payload: ImportRequest, request: Request) -> ImportJobAccepted:
     mode = DomainImportMode(payload.mode.value)
     if mode == DomainImportMode.RIOT and request.app.state.settings.demo_mode:
-        # 422, não 409/500: a requisição em si é inválida para este servidor
-        # (nenhuma chave configurada), não um conflito de estado nem uma
-        # falha interna — mesma família do contrato de validação.
-        raise StarletteHTTPException(status_code=422, detail="RIOT mode indisponível sem chave")
+        # 422 com código próprio RIOT_KEY_MISSING (errors.py), não 409/500: a
+        # requisição em si é inválida para este servidor (nenhuma chave
+        # configurada), não um conflito de estado nem uma falha interna.
+        raise RiotKeyMissingError()
     job = await request_import(request.app.state.session_factory, payload.match_id, mode)
     return _to_accepted(job)
 

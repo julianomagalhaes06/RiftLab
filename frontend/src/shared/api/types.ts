@@ -72,6 +72,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lista partidas importadas
+         * @description Somente partidas já importadas. Ordem estável e documentada: `startAt` decrescente, desempate por `matchId` decrescente; paginação por cursor opaco sobre essa dupla. Nenhum identificador pessoal é exposto.
+         */
+        get: operations["list_imported_matches_api_v1_matches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalhe de uma partida importada */
+        get: operations["get_imported_match_api_v1_matches__match_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/matches/{match_id}/decisions": {
         parameters: {
             query?: never;
@@ -83,6 +120,26 @@ export interface paths {
         get: operations["list_match_decisions_api_v1_matches__match_id__decisions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}/preparation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pede nova tentativa de preparação da partida
+         * @description Caminho mínimo de nova tentativa quando a preparação terminou em FAILED. Idempotente: se já há preparação ativa (PENDING/RUNNING) devolve-a; se está READY com decisões das versões correntes, devolve-a (200); caso contrário enfileira uma nova tentativa (202), preservando o histórico. Não coleta a partida de novo e não chama a Riot.
+         */
+        post: operations["prepare_match_api_v1_matches__match_id__preparation_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -141,6 +198,13 @@ export interface components {
         CursorPage_DecisionStateSummary_: {
             /** Items */
             items: components["schemas"]["DecisionStateSummary"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
+        /** CursorPage[MatchSummary] */
+        CursorPage_MatchSummary_: {
+            /** Items */
+            items: components["schemas"]["MatchSummary"][];
             /** Nextcursor */
             nextCursor?: string | null;
         };
@@ -335,10 +399,17 @@ export interface components {
             matchId: string;
             mode: components["schemas"]["ImportMode"];
         };
-        /** InventoryItem */
+        /**
+         * InventoryItem
+         * @description `name` vem do catálogo FIXADO pelas versões do ponto (linha imutável),
+         *     nunca do canônico atual; null quando não há catálogo ou o item não consta
+         *     nele (a interface mostra o ID com rótulo honesto). Nunca revela o alvo.
+         */
         InventoryItem: {
             /** Itemid */
             itemId: number;
+            /** Name */
+            name?: string | null;
             /** Quantity */
             quantity: number;
         };
@@ -349,6 +420,88 @@ export interface components {
              * @default UP
              */
             status: string;
+        };
+        /**
+         * MatchDetail
+         * @description GET /matches/{id}: patch, queue, map, participantes (sem identificador
+         *     pessoal) e estado de preparação; 404 desconhecido.
+         */
+        MatchDetail: {
+            /** Map */
+            map: number;
+            /** Matchid */
+            matchId: string;
+            /** Participants */
+            participants: components["schemas"]["MatchParticipant"][];
+            /** Patch */
+            patch: string;
+            preparation: components["schemas"]["MatchPreparation"];
+            preparationStatus: components["schemas"]["PreparationStatus"];
+            /** Queue */
+            queue: number;
+            /**
+             * Startat
+             * Format: date-time
+             */
+            startAt: string;
+        };
+        /**
+         * MatchParticipant
+         * @description docs/domain-model.md: participants tem subject_hash isolado dos dados
+         *     publicos — nunca exposto aqui. A codificacao exata de "team" (ex.: 100/200
+         *     estilo Riot vs 1/2 simplificado) ainda nao foi decidida (CC-201/202); o
+         *     contrato so garante inteiro nao negativo nesta etapa.
+         */
+        MatchParticipant: {
+            /** Championid */
+            championId: number;
+            /** Participantid */
+            participantId: number;
+            /** Role */
+            role?: string | null;
+            /** Team */
+            team: number;
+        };
+        /**
+         * MatchPreparation
+         * @description Estado da preparação da partida (catálogo -> reconstrução -> extração de
+         *     decisões). `error_code` só existe em FAILED (falha final) e em PENDING
+         *     aguardando nova tentativa (falha transitória); `retry_at` só em PENDING
+         *     aguardando nova tentativa. READY = decisões extraídas.
+         */
+        MatchPreparation: {
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts: number;
+            /** Errorcode */
+            errorCode?: string | null;
+            /** Retryat */
+            retryAt?: string | null;
+            status: components["schemas"]["PreparationStatus"];
+        };
+        /**
+         * MatchSummary
+         * @description Item de GET /matches: "partidas prontas, sem PUUID" — nenhum campo
+         *     pessoal (subject_hash, Riot ID) aparece aqui por design, so o necessario
+         *     para a lista.
+         */
+        MatchSummary: {
+            /** Map */
+            map: number;
+            /** Matchid */
+            matchId: string;
+            /** Patch */
+            patch: string;
+            preparationStatus: components["schemas"]["PreparationStatus"];
+            /** Queue */
+            queue: number;
+            /**
+             * Startat
+             * Format: date-time
+             */
+            startAt: string;
         };
         /**
          * ObservedLevel
@@ -363,6 +516,17 @@ export interface components {
             /** Value */
             value?: number | null;
         };
+        /**
+         * PreparationStatus
+         * @description Estado da preparação de uma partida importada (CC-205): catálogo ->
+         *     reconstrução -> extração de decisões. PENDING = na fila ou aguardando
+         *     nova tentativa (ver `retryAt`); RUNNING = em execução por um worker;
+         *     READY = decisões extraídas para as versões correntes; FAILED = falhou
+         *     (ver `errorCode`; pode ser retentada); NOT_REQUESTED = partida importada
+         *     sem preparação registrada (POST /matches/{id}/preparation a inicia).
+         * @enum {string}
+         */
+        PreparationStatus: "NOT_REQUESTED" | "PENDING" | "RUNNING" | "READY" | "FAILED";
         /** ProblemDetail */
         ProblemDetail: {
             /** Code */
@@ -462,7 +626,7 @@ export interface operations {
                     "application/json": components["schemas"]["ImportJobAccepted"];
                 };
             };
-            /** @description Requisição inválida. */
+            /** @description VALIDATION_ERROR (payload inválido) ou RIOT_KEY_MISSING (modo RIOT pedido a um servidor sem chave da Riot configurada; nenhum job é criado). */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -562,6 +726,78 @@ export interface operations {
             };
         };
     };
+    list_imported_matches_api_v1_matches_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_MatchSummary_"];
+                };
+            };
+            /** @description VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado ou de versão desconhecida). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_imported_match_api_v1_matches__match_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchDetail"];
+                };
+            };
+            /** @description Partida inexistente (ou sem importação concluída, no POST). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado ou de versão desconhecida). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     list_match_decisions_api_v1_matches__match_id__decisions_get: {
         parameters: {
             query: {
@@ -605,6 +841,46 @@ export interface operations {
                 };
             };
             /** @description VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado, de outra partida/participante ou de extração inexistente). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    prepare_match_api_v1_matches__match_id__preparation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchPreparation"];
+                };
+            };
+            /** @description Partida inexistente (ou sem importação concluída, no POST). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado ou de versão desconhecida). */
             422: {
                 headers: {
                     [name: string]: unknown;

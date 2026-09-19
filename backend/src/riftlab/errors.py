@@ -16,6 +16,7 @@ from riftlab.shared.errors import (
     DecisionsNotPreparedError,
     InvalidCursorError,
     NotFoundError,
+    RiotKeyMissingError,
 )
 
 logger = logging.getLogger("riftlab.api")
@@ -33,6 +34,7 @@ INVALID_CURSOR = "INVALID_CURSOR"
 IMPORT_ACTIVE = "IMPORT_ACTIVE"
 INTERNAL_ERROR = "INTERNAL_ERROR"
 RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
+RIOT_KEY_MISSING = "RIOT_KEY_MISSING"
 VALIDATION_ERROR = "VALIDATION_ERROR"
 
 # exc.detail de um StarletteHTTPException/HTTPException e texto livre definido
@@ -211,6 +213,19 @@ def register_exception_handlers(app: FastAPI) -> None:
             code=INVALID_CURSOR,
             title="Cursor invalido",
             detail="O cursor de paginacao e invalido para esta consulta.",
+        )
+
+    @app.exception_handler(RiotKeyMissingError)
+    async def riot_key_missing_handler(request: Request, exc: RiotKeyMissingError) -> JSONResponse:
+        # CC-205: 422 com código próprio (antes era o HTTP_422 genérico), para o
+        # cliente mostrar a orientação certa. Texto fixo: nunca menciona chave,
+        # variável de ambiente nem caminho.
+        return problem_response(
+            request,
+            status_code=422,
+            code=RIOT_KEY_MISSING,
+            title="Modo RIOT indisponivel",
+            detail="A importacao no modo RIOT exige uma chave da Riot configurada no servidor.",
         )
 
     @app.exception_handler(Exception)

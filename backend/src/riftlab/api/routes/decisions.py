@@ -140,7 +140,11 @@ def _to_detail(detail: DecisionDetail) -> DecisionState:
         ],
         inventory=DecisionInventory(
             items=[
-                InventoryItem(item_id=int(item_id), quantity=quantity)
+                InventoryItem(
+                    item_id=int(item_id),
+                    quantity=quantity,
+                    name=detail.item_names.get(int(item_id)),
+                )
                 for item_id, quantity in sorted(items.items(), key=lambda kv: int(kv[0]))
             ],
             trinket_item_id=detail.inventory.get("trinketItemId"),

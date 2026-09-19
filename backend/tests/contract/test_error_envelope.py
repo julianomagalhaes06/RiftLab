@@ -17,6 +17,7 @@ from httpx import ASGITransport, AsyncClient
 from riftlab.errors import RESOURCE_NOT_FOUND, VALIDATION_ERROR, register_exception_handlers
 from riftlab.observability import RequestIdMiddleware
 from riftlab.shared.api.imports import ImportRequest
+from riftlab.shared.errors import RiotKeyMissingError
 
 SENTINEL_SECRET = "sentinela-sql-postgresql+asyncpg://riftlab:s3nh4-nunca-real@db/riftlab"  # noqa: S105
 SENTINEL_HTTP_DETAIL = "sentinela-http-exception-detail-nao-confiavel"  # noqa: S105
@@ -44,6 +45,10 @@ def _build_error_probe_app() -> FastAPI:
         # simula rota futura que lanca HTTPException com detail nao confiavel
         # (ex.: interpolando um valor recebido do cliente sem querer).
         raise HTTPException(status_code=400, detail=SENTINEL_HTTP_DETAIL)
+
+    @app.get("/__test__/riot-key-missing")
+    async def _riot_key_missing() -> None:
+        raise RiotKeyMissingError(f"detalhe interno com segredo: {SENTINEL_SECRET}")
 
     return app
 
@@ -192,3 +197,17 @@ async def test_method_not_allowed_preserves_allow_header_without_leaking_detail(
     assert response.status_code == 405
     assert response.headers.get("allow") == "GET"
     assert response.headers["content-type"].startswith("application/problem+json")
+
+
+async def test_riot_key_missing_has_dedicated_code_and_fixed_text(error_probe_client):
+    """CC-205 (R2-A): modo RIOT sem chave no servidor é 422 com código PRÓPRIO
+    (não o HTTP_422 genérico), texto fixo e nenhum detalhe interno."""
+    response = await error_probe_client.get("/__test__/riot-key-missing")
+
+    assert response.status_code == 422
+    assert response.headers["content-type"].startswith("application/problem+json")
+    body = response.json()
+    assert body["code"] == "RIOT_KEY_MISSING" and body["status"] == 422
+    assert set(body) == {"type", "title", "status", "code", "detail", "requestId"}
+    assert SENTINEL_SECRET not in response.text
+    assert "RIFTLAB_RIOT_API_KEY" not in response.text

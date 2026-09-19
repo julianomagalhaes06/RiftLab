@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from riftlab import db
@@ -10,6 +11,7 @@ from riftlab.config import Settings, get_settings
 from riftlab.ingestion.application import process_next_job
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.observability import configure_logging, safe_exception_description
+from riftlab.preparation.application import process_next_preparation
 from riftlab.shared.db import build_session_factory
 
 logger = logging.getLogger("riftlab.worker")
@@ -18,6 +20,30 @@ logger = logging.getLogger("riftlab.worker")
 def _touch_heartbeat(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch(exist_ok=True)
+
+
+async def _run_step(step: str, call: Callable[[], Awaitable[bool]]) -> bool:
+    """Executa UM passo do ciclo (importação ou preparação) com tratamento
+    próprio: uma exceção inesperada recorrente de um lado não pode impedir o
+    outro de ser atendido em todo ciclo (CC-205, nota N1). Erros JÁ classificados
+    (SourceError e afins) nunca chegam aqui — são tratados dentro de cada
+    process_next_*. Devolve False (nada processado) depois de logar sanitizado.
+
+    Achado real (smoke CC-201): sem isto, uma exceção inesperada (ex.: erro de
+    conectividade, bug não previsto) escapa até o sys.excepthook padrão do
+    Python, que imprime o traceback BRUTO no stderr do container — sem passar
+    pelo _JsonLogFormatter/safe_exception_description sanitizados do CC-106, e
+    derrubando o processo inteiro por uma falha que o próximo ciclo poderia
+    superar sozinho (ex.: banco momentaneamente indisponível)."""
+    try:
+        return await call()
+    except Exception as exc:
+        logger.error(
+            "ciclo do worker falhou de forma inesperada etapa=%s detalhe=%s",
+            step,
+            safe_exception_description(exc),
+        )
+        return False
 
 
 async def run(settings: Settings | None = None, stop_event: asyncio.Event | None = None) -> None:
@@ -48,24 +74,17 @@ async def run(settings: Settings | None = None, stop_event: asyncio.Event | None
 
     try:
         while not stop_event.is_set():
-            try:
-                processed = await process_next_job(session_factory, raw_store, settings)
-            except Exception as exc:
-                # Achado real (smoke CC-201): sem isto, uma excecao inesperada
-                # (ex.: erro de conectividade, bug nao previsto) escapa ate o
-                # sys.excepthook padrao do Python, que imprime o traceback
-                # BRUTO no stderr do container — sem passar pelo
-                # _JsonLogFormatter/safe_exception_description sanitizados do
-                # CC-106, e derrubando o processo inteiro por uma falha que o
-                # proximo ciclo poderia superar sozinho (ex.: banco
-                # momentaneamente indisponivel). Logar sanitizado e continuar
-                # o loop; erros JA classificados (SourceError e afins) nunca
-                # chegam aqui — sao tratados dentro de process_next_job.
-                logger.error(
-                    "ciclo do worker falhou de forma inesperada detalhe=%s",
-                    safe_exception_description(exc),
-                )
-                processed = False
+            # Cada passo é isolado: a importação e a preparação (CC-205: catálogo ->
+            # reconstrução -> extração das partidas já importadas, na mesma fila de
+            # posse por lease) rodam SEMPRE no ciclo, cada uma com seu tratamento;
+            # um ciclo processa no máximo um job de cada tipo.
+            imported = await _run_step(
+                "importacao", lambda: process_next_job(session_factory, raw_store, settings)
+            )
+            prepared = await _run_step(
+                "preparacao", lambda: process_next_preparation(session_factory, raw_store, settings)
+            )
+            processed = imported or prepared
             _touch_heartbeat(heartbeat_path)
             if not processed:
                 try:

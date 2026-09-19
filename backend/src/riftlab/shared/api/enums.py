@@ -37,6 +37,21 @@ class ImportJobKind(StrEnum):
     PURGE = "PURGE"
 
 
+class PreparationStatus(StrEnum):
+    """Estado da preparação de uma partida importada (CC-205): catálogo ->
+    reconstrução -> extração de decisões. PENDING = na fila ou aguardando
+    nova tentativa (ver `retryAt`); RUNNING = em execução por um worker;
+    READY = decisões extraídas para as versões correntes; FAILED = falhou
+    (ver `errorCode`; pode ser retentada); NOT_REQUESTED = partida importada
+    sem preparação registrada (POST /matches/{id}/preparation a inicia)."""
+
+    NOT_REQUESTED = "NOT_REQUESTED"
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
 class Priority(StrEnum):
     """docs/contracts.md: formulario de objetivo {priority:
     BALANCED|SURVIVAL|DAMAGE|UTILITY}."""

@@ -16,7 +16,10 @@ import asyncio
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import func, select
+
 from riftlab.ingestion.domain import ImportJobState
+from riftlab.ingestion.models import ImportJobModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.db import unit_of_work
 
@@ -94,7 +97,9 @@ async def test_create_import_rejects_malformed_match_id(app_client) -> None:
     assert response.json()["code"] == "VALIDATION_ERROR"
 
 
-async def test_create_import_riot_mode_rejected_without_server_key(app_client) -> None:
+async def test_create_import_riot_mode_rejected_without_server_key(
+    app_client, session_factory
+) -> None:
     """app_client (tests/conftest.py) roda sem RIFTLAB_RIOT_API_KEY (modo
     demo do servidor) — RIOT é recusado antes de qualquer job, nunca cria
     algo que o worker descobriria mais tarde que não pode processar."""
@@ -102,6 +107,20 @@ async def test_create_import_riot_mode_rejected_without_server_key(app_client) -
         _IMPORTS_PATH, json={"matchId": "BR1_1234567890", "mode": "RIOT"}
     )
     assert response.status_code == 422
+    assert response.headers["content-type"].startswith("application/problem+json")
+    body = response.json()
+    # código dedicado (CC-205, R2-A), não o HTTP_422 genérico; texto fixo, sem eco
+    assert body["code"] == "RIOT_KEY_MISSING" and body["status"] == 422
+    assert set(body) == {"type", "title", "status", "code", "detail", "requestId"}
+    assert "BR1_1234567890" not in response.text
+    # e nenhum job foi criado para a identidade recusada
+    async with unit_of_work(session_factory) as session:
+        created = await session.scalar(
+            select(func.count())
+            .select_from(ImportJobModel)
+            .where(ImportJobModel.requested_match_id == "BR1_1234567890")
+        )
+    assert created == 0
 
 
 async def test_retry_rejected_when_job_still_active(app_client, session_factory) -> None:

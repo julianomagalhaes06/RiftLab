@@ -20,10 +20,11 @@ def _current_schema() -> dict:
 
 
 def test_openapi_only_announces_real_routes() -> None:
-    """Rotas de sprints futuras (GET /matches e /matches/{id}, analyses,
-    learning-attempts, ...) continuam schema-only em riftlab.shared.api; nenhuma
-    delas pode aparecer aqui. imports (POST/GET/retry) passou a real no CC-201;
-    as duas rotas de DECISOES (lista por partida e detalhe) no CC-204."""
+    """Rotas de sprints futuras (analyses, learning-attempts, ...) continuam
+    schema-only em riftlab.shared.api; nenhuma delas pode aparecer aqui. imports
+    (POST/GET/retry) passou a real no CC-201; as duas rotas de DECISOES (lista por
+    partida e detalhe) no CC-204; as de PARTIDAS (lista, detalhe e nova tentativa
+    de preparação) no CC-205."""
     schema = _current_schema()
     assert set(schema["paths"].keys()) == {
         "/health/live",
@@ -31,6 +32,9 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/imports",
         "/api/v1/imports/{job_id}",
         "/api/v1/imports/{job_id}/retry",
+        "/api/v1/matches",
+        "/api/v1/matches/{match_id}",
+        "/api/v1/matches/{match_id}/preparation",
         "/api/v1/matches/{match_id}/decisions",
         "/api/v1/decisions/{decision_id}",
     }
@@ -108,3 +112,56 @@ def test_decision_response_schemas_expose_no_purchase_information() -> None:
             if (name, prop) in allowed:
                 continue
             assert not any(word in prop.lower() for word in forbidden), (name, prop)
+
+
+def test_match_routes_document_order_pagination_and_errors() -> None:
+    schema = _current_schema()
+    listing = schema["paths"]["/api/v1/matches"]
+    detail = schema["paths"]["/api/v1/matches/{match_id}"]
+    prepare = schema["paths"]["/api/v1/matches/{match_id}/preparation"]
+    assert set(listing) == {"get"} and set(detail) == {"get"}  # leituras não escrevem
+    assert set(prepare) == {"post"}  # único caminho de escrita: nova tentativa de preparação
+    assert set(listing["get"]["responses"]) == {"200", "422"}
+    assert set(detail["get"]["responses"]) == {"200", "404", "422"}
+    assert set(prepare["post"]["responses"]) == {"202", "404", "422"}
+    params = {p["name"]: p for p in listing["get"]["parameters"]}
+    assert set(params) == {"cursor", "limit"}
+    assert (
+        params["limit"]["schema"]["default"] == 20 and params["limit"]["schema"]["maximum"] == 100
+    )
+    # a ordem estável é parte do contrato publicado
+    assert "startAt" in listing["get"]["description"] and "matchId" in listing["get"]["description"]
+
+
+def test_match_response_schemas_expose_no_personal_identifier() -> None:
+    """A lista e o detalhe não carregam identificador pessoal nem a classe/item
+    comprado: o hash do participante nunca sai da API."""
+    schemas = _current_schema()["components"]["schemas"]
+    for name in ("MatchSummary", "MatchDetail", "MatchParticipant", "MatchPreparation"):
+        for prop in schemas[name]["properties"]:
+            assert not any(w in prop.lower() for w in ("subject", "hash", "puuid", "riotid")), (
+                name,
+                prop,
+            )
+    assert set(schemas["MatchParticipant"]["properties"]) == {
+        "participantId",
+        "championId",
+        "team",
+        "role",
+    }
+    assert "preparationStatus" in schemas["MatchSummary"]["properties"]
+    assert set(schemas["PreparationStatus"]["enum"]) == {
+        "NOT_REQUESTED",
+        "PENDING",
+        "RUNNING",
+        "READY",
+        "FAILED",
+    }
+    assert "name" in schemas["InventoryItem"]["properties"]
+
+
+def test_create_import_documents_the_dedicated_riot_key_missing_code() -> None:
+    """R2-A (CC-205): o 422 de POST /imports anuncia os dois códigos possíveis."""
+    post = _current_schema()["paths"]["/api/v1/imports"]["post"]
+    description = post["responses"]["422"]["description"]
+    assert "RIOT_KEY_MISSING" in description and "VALIDATION_ERROR" in description

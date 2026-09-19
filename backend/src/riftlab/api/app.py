@@ -10,6 +10,7 @@ from riftlab import db
 from riftlab.api.routes.decisions import router as decisions_router
 from riftlab.api.routes.health import router as health_router
 from riftlab.api.routes.imports import router as imports_router
+from riftlab.api.routes.matches import router as matches_router
 from riftlab.config import Settings, get_settings
 from riftlab.errors import register_exception_handlers
 from riftlab.observability import RequestIdMiddleware, configure_logging
@@ -37,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router)
     app.include_router(imports_router)
+    app.include_router(matches_router)
     app.include_router(decisions_router)
     register_exception_handlers(app)
 

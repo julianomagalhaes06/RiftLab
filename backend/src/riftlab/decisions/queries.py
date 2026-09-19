@@ -14,15 +14,13 @@ import base64
 import binascii
 import json
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.decisions.application import resolve_current_versions
 from riftlab.decisions.domain import (
     REASON_TARGET_NOT_CLASSIFIABLE,
@@ -33,7 +31,7 @@ from riftlab.decisions.domain import (
 )
 from riftlab.decisions.repository import SqlAlchemyDecisionRepository
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
-from riftlab.shared.db import unit_of_work
+from riftlab.shared.db import read_only_unit_of_work
 from riftlab.shared.errors import DecisionsNotPreparedError, InvalidCursorError, NotFoundError
 
 SessionFactory = async_sessionmaker[AsyncSession]
@@ -164,15 +162,13 @@ class DecisionDetail:
     point: StoredDecisionPoint
     inventory: dict[str, Any]
     level: dict[str, Any]
+    # nome de cada item do inventário, lido do catálogo FIXADO pelas versões do
+    # ponto (linha imutável), nunca do canônico atual; None = sem catálogo ou
+    # item ausente dele
+    item_names: dict[int, str | None]
 
 
-@asynccontextmanager
-async def _read_only(session_factory: SessionFactory) -> AsyncIterator[AsyncSession]:
-    """Transação READ ONLY: o próprio PostgreSQL rejeita qualquer escrita. A
-    instrução precisa ser a primeira da transação."""
-    async with unit_of_work(session_factory) as session:
-        await session.execute(text("SET TRANSACTION READ ONLY"))
-        yield session
+_read_only = read_only_unit_of_work  # transação READ ONLY compartilhada (shared/db.py)
 
 
 async def list_decision_points(
@@ -243,4 +239,12 @@ async def get_decision_detail(
         if point is None:
             raise NotFoundError(f"decisão {decision_id} não encontrada")
         inventory, level = await decisions.get_pre_decision_context(point.decision_state_id)
-    return DecisionDetail(point, inventory, level)
+        item_names: dict[int, str | None] = {}
+        catalog_id = point.versions.catalog_id
+        catalog_repo = SqlAlchemyCatalogRepository(session)
+        for raw_item_id in inventory.get("items", {}):
+            item_id = int(raw_item_id)
+            item = await catalog_repo.get_item(catalog_id, item_id) if catalog_id else None
+            name = item.attributes.get("name") if item is not None else None
+            item_names[item_id] = name if isinstance(name, str) and name else None
+    return DecisionDetail(point, inventory, level, item_names)

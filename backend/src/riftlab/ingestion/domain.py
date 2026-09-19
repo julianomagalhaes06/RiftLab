@@ -22,6 +22,16 @@ class ImportJobState(StrEnum):
     FAILED = "FAILED"
 
 
+class JobKind(StrEnum):
+    """Tipo do job na tabela `import_jobs`. IMPORT = importação da partida
+    (CC-201); PREPARE = preparação durável pós-importação (CC-205: catálogo ->
+    reconstrução -> extração de decisões), que reaproveita a mesma maquinaria de
+    lease/token/retry. Uma preparação READY é um PREPARE SUCCEEDED."""
+
+    IMPORT = "IMPORT"
+    PREPARE = "PREPARE"
+
+
 ACTIVE_IMPORT_JOB_STATES: frozenset[ImportJobState] = frozenset(
     {ImportJobState.QUEUED, ImportJobState.RUNNING, ImportJobState.RETRY_WAIT}
 )
@@ -77,6 +87,7 @@ class ImportJob:
     retry_at: datetime | None = None
     error_code: str | None = None
     retry_of_job_id: uuid.UUID | None = None
+    kind: JobKind = JobKind.IMPORT
 
 
 class IngestionRepository(Protocol):

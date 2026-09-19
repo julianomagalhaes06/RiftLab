@@ -90,7 +90,7 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Smoke e2e (Playwright, sucesso e indisponibilidade)
+      - name: E2E com API simulada (Playwright, health, falhas recuperáveis, 360 px, teclado e protótipo)
         working-directory: frontend
         run: npm run test:e2e
 
@@ -118,6 +118,40 @@ jobs:
           curl -sf http://127.0.0.1:8000/health/live
           curl -sf http://127.0.0.1:8000/health/ready
           curl -sf http://127.0.0.1:5173/ > /dev/null
+
+      - name: Aplicar migrations no banco da stack
+        run: docker compose run --rm api db upgrade
+
+      - name: Fluxo import demo -> partida preparada -> decisões (só API)
+        run: python3 scripts/smoke_import_flow.py --base-url http://127.0.0.1:8000 --timeout 180
+
+      - name: Deep links do frontend (fallback SPA) e proxy da API
+        run: |
+          for path in "/matches/DEMO-0008?participant=1" "/imports/688bd44d-39b7-4f7b-956b-0fd4a63cfafd" "/decisions/0f92d8d8-319c-4fa4-bca3-49157a1f9e00" "/prototipo"; do
+            curl -sf -H 'Accept: text/html' "http://127.0.0.1:5173$path" | grep -q 'id="root"'
+          done
+          curl -sf http://127.0.0.1:5173/api/v1/matches | python3 -c 'import json,sys; assert "items" in json.load(sys.stdin)'
+
+      # E2E da demonstração contra a stack REAL: roda AQUI (e não no job `frontend`) porque este
+      # é o único job com api + worker + PostgreSQL + frontend no ar e já migrados; o job
+      # `frontend` mantém os specs com API simulada, rápidos e sem backend.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.2"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias e navegador do Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: E2E da demonstração na stack real (Playwright, projeto real-stack)
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://127.0.0.1:5173
+        run: npm run test:e2e:stack
 
       - name: Readiness acompanha o banco
         run: |

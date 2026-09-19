@@ -1,0 +1,297 @@
+"""Preparação durável de uma partida importada (CC-205): garantir o catálogo,
+reconstruir (v6) e extrair as decisões, para o fluxo "sem console".
+
+Reaproveita a maquinaria de jobs do CC-201 (`import_jobs` com `kind=PREPARE`):
+posse por lease com token de geração, heartbeat, backoff com teto, contagem de
+tentativas e retomada depois de crash (lease vencido → outro worker reclama).
+Estados públicos: PENDING (QUEUED ou aguardando nova tentativa), RUNNING,
+READY (SUCCEEDED) e FAILED (com código seguro).
+
+Fronteiras:
+- NUNCA coleta a partida de novo: a reconstrução só relê a fixture demo ou o raw
+  local já importado (`LocalRawMatchSource`, estruturalmente incapaz de rede).
+- Rede só para o catálogo público do Data Dragon, e só quando o patch tem
+  entrada explícita em `configs/catalog-mappings.yaml` e ainda não há catálogo
+  canônico. Sem entrada no mapping não há rede: a partida é preparada sem
+  catálogo e os pontos saem inelegíveis com MISSING_CATALOG.
+- Idempotente pelas marcas existentes (reconstrução e extração): repetir a
+  preparação não duplica nada.
+- Erro estrutural → FAILED permanente com código seguro; erro transitório →
+  RETRY_WAIT com backoff (e FAILED `RETRY_LIMIT_EXCEEDED` depois do limite)."""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import logging
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from riftlab.catalog.application import resolve_catalog_for_match, sync_catalog
+from riftlab.catalog.domain import CatalogSource
+from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_catalog_mapping
+from riftlab.catalog.infrastructure.data_dragon_source import DataDragonCatalogSource
+from riftlab.catalog.infrastructure.data_dragon_transport import DataDragonTransport
+from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource, demo_catalog_mapping
+from riftlab.config import Settings
+from riftlab.decisions.application import extract_decisions, resolve_current_versions
+from riftlab.decisions.domain import DecisionError
+from riftlab.ingestion.application import _renew_lease_periodically, _transient_retry_delay
+from riftlab.ingestion.domain import ImportJob, ImportJobState, ImportMode, JobKind
+from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
+from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+from riftlab.ingestion.infrastructure.riot_source import LocalRawMatchSource
+from riftlab.ingestion.infrastructure.subject_hash import SubjectHashSecretMissingError
+from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.observability import safe_exception_description
+from riftlab.shared.api.enums import PreparationStatus
+from riftlab.shared.db import unit_of_work
+from riftlab.shared.errors import (
+    ConflictError,
+    DomainError,
+    NotFoundError,
+    SourceAuthError,
+    SourceError,
+    SourceNotFoundError,
+    SourceRateLimitedError,
+    SourceSchemaError,
+)
+from riftlab.timeline.application import reconstruct_match
+from riftlab.timeline.domain import TimelineReplayError
+
+SessionFactory = async_sessionmaker[AsyncSession]
+CatalogSourceFactory = Callable[[CatalogMapping], AbstractAsyncContextManager[CatalogSource]]
+
+logger = logging.getLogger("riftlab.worker")
+
+CODE_MATCH_NOT_FOUND = "MATCH_NOT_FOUND"
+CODE_MAPPING_MISSING = "CATALOG_MAPPING_FILE_MISSING"
+CODE_CONFLICT = "PREPARATION_CONFLICT"
+CODE_UNEXPECTED = "PREPARATION_UNEXPECTED_ERROR"
+
+
+@dataclass(frozen=True, slots=True)
+class PreparationInfo:
+    """Visão pública da preparação de uma partida."""
+
+    status: PreparationStatus
+    error_code: str | None
+    retry_at: datetime | None
+    attempts: int
+
+
+def preparation_info(job: ImportJob | None) -> PreparationInfo:
+    """QUEUED e RETRY_WAIT aparecem como PENDING (RETRY_WAIT com `retry_at` e o
+    código da última falha transitória); SUCCEEDED é READY."""
+    if job is None:
+        return PreparationInfo(PreparationStatus.NOT_REQUESTED, None, None, 0)
+    match job.state:
+        case ImportJobState.QUEUED:
+            status = PreparationStatus.PENDING
+        case ImportJobState.RETRY_WAIT:
+            status = PreparationStatus.PENDING
+        case ImportJobState.RUNNING:
+            status = PreparationStatus.RUNNING
+        case ImportJobState.SUCCEEDED:
+            status = PreparationStatus.READY
+        case ImportJobState.FAILED:
+            status = PreparationStatus.FAILED
+    keep_error = job.state in (ImportJobState.FAILED, ImportJobState.RETRY_WAIT)
+    return PreparationInfo(
+        status,
+        job.error_code if keep_error else None,
+        job.retry_at if job.state == ImportJobState.RETRY_WAIT else None,
+        job.attempts,
+    )
+
+
+@asynccontextmanager
+async def _default_catalog_source(mapping: CatalogMapping) -> AsyncIterator[CatalogSource]:
+    transport = DataDragonTransport()
+    try:
+        yield DataDragonCatalogSource(transport, mapping)
+    finally:
+        await transport.aclose()
+
+
+async def _ensure_catalog(
+    session_factory: SessionFactory,
+    settings: Settings,
+    job: ImportJob,
+    patch: str,
+    catalog_source_factory: CatalogSourceFactory,
+) -> CatalogMapping:
+    """Garante o catálogo do patch e devolve o mapping que a reconstrução deve
+    usar. DEMO: sync local da fixture, sem rede. REAL: só há rede se o patch
+    tiver entrada explícita no mapping E ainda não houver canônico."""
+    if job.mode == ImportMode.DEMO:
+        demo_mapping = demo_catalog_mapping()
+        if demo_mapping.resolve(patch) is not None:
+            await sync_catalog(session_factory, DemoCatalogSource(), patch)
+        return demo_mapping
+
+    mapping_path = Path(settings.catalog_mappings_path)
+    if not mapping_path.is_file():
+        raise SourceSchemaError(
+            code=CODE_MAPPING_MISSING,
+            detail="mapping de catálogo não encontrado no caminho configurado",
+        )
+    mapping = load_catalog_mapping(mapping_path)
+    if mapping.resolve(patch) is None:
+        return mapping  # sem entrada: nenhuma rede, catálogo ausente (MISSING_CATALOG)
+    if await resolve_catalog_for_match(session_factory, mapping, patch) is None:
+        async with catalog_source_factory(mapping) as source:
+            await sync_catalog(session_factory, source, patch)
+    return mapping
+
+
+async def _prepare(
+    session_factory: SessionFactory,
+    raw_store: DurableRawMatchStore,
+    settings: Settings,
+    job: ImportJob,
+    catalog_source_factory: CatalogSourceFactory,
+) -> None:
+    match_id = job.requested_match_id
+    async with unit_of_work(session_factory) as session:
+        match = await SqlAlchemyIngestionRepository(session).get_match(match_id)
+    if match is None:
+        raise NotFoundError(f"match {match_id!r} não encontrado")
+
+    mapping = await _ensure_catalog(
+        session_factory, settings, job, match.patch, catalog_source_factory
+    )
+    source = (
+        DemoMatchSource()
+        if job.mode == ImportMode.DEMO
+        else LocalRawMatchSource(raw_store, settings.subject_hash_secret)
+    )
+    await reconstruct_match(session_factory, mapping, source, match_id)
+    await extract_decisions(session_factory, match_id, scope_path=Path(settings.scope_path))
+
+
+async def _finalize(
+    session_factory: SessionFactory,
+    job: ImportJob,
+    *,
+    failed: str | None = None,
+    retry: tuple[str, datetime] | None = None,
+) -> None:
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        if failed is not None:
+            await repo.mark_import_failed(job.id, job.lease_generation, failed)
+        elif retry is not None:
+            await repo.mark_import_retry_wait(job.id, job.lease_generation, retry[1], retry[0])
+        else:
+            ok = await repo.mark_import_succeeded(
+                job.id, job.lease_generation, job.requested_match_id
+            )
+            if not ok:
+                logger.warning("worker perdeu a posse da preparação %s antes de concluir", job.id)
+
+
+def _retry_at(job: ImportJob, retry_after_seconds: float | None = None) -> datetime:
+    return datetime.now(UTC) + timedelta(
+        seconds=_transient_retry_delay(job.attempts, retry_after_seconds)
+    )
+
+
+async def process_next_preparation(
+    session_factory: SessionFactory,
+    raw_store: DurableRawMatchStore,
+    settings: Settings,
+    catalog_source_factory: CatalogSourceFactory | None = None,
+) -> bool:
+    """Um ciclo do worker para PREPARE. True se uma preparação foi processada
+    (mesmo que tenha falhado); False se não havia trabalho elegível.
+    `catalog_source_factory` é injetável só para teste (fonte stub, sem rede
+    real); o worker nunca passa isto."""
+    async with unit_of_work(session_factory) as session:
+        job = await SqlAlchemyIngestionRepository(session).reserve_next_job(
+            datetime.now(UTC), JobKind.PREPARE
+        )
+    if job is None:
+        return False
+
+    heartbeat = asyncio.create_task(
+        _renew_lease_periodically(session_factory, job.id, job.lease_generation)
+    )
+    try:
+        await _prepare(
+            session_factory,
+            raw_store,
+            settings,
+            job,
+            catalog_source_factory or _default_catalog_source,
+        )
+    except SubjectHashSecretMissingError:
+        await _finalize(session_factory, job, failed="SUBJECT_HASH_SECRET_MISSING")
+    except SourceRateLimitedError as exc:
+        await _finalize(
+            session_factory, job, retry=(exc.code, _retry_at(job, exc.retry_after_seconds))
+        )
+    except (SourceAuthError, SourceNotFoundError, SourceSchemaError) as exc:
+        await _finalize(session_factory, job, failed=exc.code)  # estrutural
+    except SourceError as exc:  # transitório (rede, 5xx, indisponibilidade)
+        await _finalize(session_factory, job, retry=(exc.code, _retry_at(job)))
+    except (TimelineReplayError, DecisionError) as exc:  # estrutural
+        await _finalize(session_factory, job, failed=exc.code)
+    except NotFoundError:
+        await _finalize(session_factory, job, failed=CODE_MATCH_NOT_FOUND)
+    except ConflictError:  # ex.: extração/reconstrução concorrente: tenta de novo
+        await _finalize(session_factory, job, retry=(CODE_CONFLICT, _retry_at(job)))
+    except Exception as exc:
+        logger.error(
+            "preparação %s falhou de forma inesperada detalhe=%s",
+            job.id,
+            safe_exception_description(exc),
+        )
+        await _finalize(session_factory, job, retry=(CODE_UNEXPECTED, _retry_at(job)))
+    else:
+        await _finalize(session_factory, job)
+    finally:
+        heartbeat.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await heartbeat
+    return True
+
+
+async def request_preparation(
+    session_factory: SessionFactory, match_id: str, *, scope_path: Path
+) -> ImportJob:
+    """POST /matches/{matchId}/preparation: idempotente. Preparação ativa →
+    devolve-a; FAILED ou inexistente → nova tentativa (histórico preservado,
+    ligada à anterior); READY → devolve-a, exceto se as decisões das versões
+    CORRENTES já não existem (ex.: nova versão de reconstrução), caso em que
+    enfileira uma nova. Nunca coleta a partida de novo."""
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        if await repo.get_match(match_id) is None:
+            raise NotFoundError(f"match {match_id!r} não encontrado")
+        mode = await repo.get_match_import_mode(match_id)
+        if mode is None:
+            raise NotFoundError(f"match {match_id!r} sem importação concluída")
+        latest = await repo.get_latest_preparation_job(match_id)
+        force = False
+        if latest is not None and latest.state == ImportJobState.SUCCEEDED:
+            force = not await _decisions_are_current(session, match_id, scope_path)
+        return await repo.enqueue_preparation(match_id, mode, force=force)
+
+
+async def _decisions_are_current(session: AsyncSession, match_id: str, scope_path: Path) -> bool:
+    from riftlab.decisions.repository import SqlAlchemyDecisionRepository
+
+    try:
+        current = await resolve_current_versions(session, match_id, scope_path)
+    except DomainError:
+        return False
+    extraction = await SqlAlchemyDecisionRepository(session).get_extraction(
+        match_id, current.versions
+    )
+    return extraction is not None

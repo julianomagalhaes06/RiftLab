@@ -49,6 +49,7 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
         CheckConstraint("attempts >= 0", name="attempts_non_negative"),
         CheckConstraint("lease_generation >= 0", name="lease_generation_non_negative"),
         CheckConstraint("mode IN ('DEMO','RIOT')", name="mode_valid"),
+        CheckConstraint("kind IN ('IMPORT','PREPARE')", name="kind_valid"),
         CheckConstraint(
             "state IN ('QUEUED','RUNNING','RETRY_WAIT','SUCCEEDED','FAILED')",
             name="state_valid",
@@ -68,7 +69,21 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
             "requested_match_id",
             "mode",
             unique=True,
-            postgresql_where=text("state IN ('QUEUED','RUNNING','RETRY_WAIT','SUCCEEDED')"),
+            postgresql_where=text(
+                "kind = 'IMPORT' AND state IN ('QUEUED','RUNNING','RETRY_WAIT','SUCCEEDED')"
+            ),
+        ),
+        # Preparação (CC-205): no máximo UMA preparação ativa por partida.
+        # SUCCEEDED (= READY) fica de fora de propósito: uma nova preparação
+        # pode ser enfileirada depois (ex.: nova versão de reconstrução), e é
+        # barata porque as marcas existentes tornam cada passo idempotente.
+        Index(
+            "ux_prepare_jobs_active_match",
+            "requested_match_id",
+            unique=True,
+            postgresql_where=text(
+                "kind = 'PREPARE' AND state IN ('QUEUED','RUNNING','RETRY_WAIT')"
+            ),
         ),
         Index("ix_import_jobs_state_retry_at", "state", "retry_at"),
     )
@@ -76,6 +91,9 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
     requested_match_id: Mapped[str] = mapped_column(String, nullable=False)
     match_id: Mapped[str | None] = mapped_column(ForeignKey("matches.match_id"), nullable=True)
     mode: Mapped[str] = mapped_column(String, nullable=False)
+    kind: Mapped[str] = mapped_column(
+        String, nullable=False, default="IMPORT", server_default="IMPORT"
+    )
     state: Mapped[str] = mapped_column(String, nullable=False)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import Update, or_, select, update
+from sqlalchemy import DateTime, String, Update, literal, or_, select, tuple_, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,7 @@ from riftlab.ingestion.domain import (
     ImportJob,
     ImportJobState,
     ImportMode,
+    JobKind,
     Match,
     Participant,
 )
@@ -75,6 +76,7 @@ class SqlAlchemyIngestionRepository:
                 retry_at=job.retry_at,
                 error_code=job.error_code,
                 retry_of_job_id=job.retry_of_job_id,
+                kind=job.kind.value,
             )
         )
         try:
@@ -92,15 +94,7 @@ class SqlAlchemyIngestionRepository:
         row = await self._session.get(MatchModel, match_id)
         if row is None:
             return None
-        return Match(
-            match_id=row.match_id,
-            queue=row.queue,
-            map_id=row.map_id,
-            patch=row.patch,
-            start_at=row.start_at,
-            duration_seconds=row.duration_seconds,
-            raw_hash=row.raw_hash,
-        )
+        return _match_from_row(row)
 
     async def get_participant(self, match_id: str, participant_id: int) -> Participant | None:
         row = await self._session.get(
@@ -141,6 +135,7 @@ class SqlAlchemyIngestionRepository:
             select(ImportJobModel.mode)
             .where(
                 ImportJobModel.match_id == match_id,
+                ImportJobModel.kind == JobKind.IMPORT.value,
                 ImportJobModel.state == ImportJobState.SUCCEEDED.value,
             )
             .order_by(ImportJobModel.created_at)
@@ -162,6 +157,7 @@ class SqlAlchemyIngestionRepository:
         stmt = select(ImportJobModel).where(
             ImportJobModel.requested_match_id == requested_match_id,
             ImportJobModel.mode == mode.value,
+            ImportJobModel.kind == JobKind.IMPORT.value,
             ImportJobModel.state.in_(tuple(s.value for s in ACTIVE_IMPORT_JOB_STATES)),
         )
         result = await self._session.execute(stmt)
@@ -175,6 +171,7 @@ class SqlAlchemyIngestionRepository:
             .where(
                 ImportJobModel.requested_match_id == requested_match_id,
                 ImportJobModel.mode == mode.value,
+                ImportJobModel.kind == JobKind.IMPORT.value,
             )
             .order_by(ImportJobModel.created_at.desc())
             .limit(1)
@@ -183,7 +180,100 @@ class SqlAlchemyIngestionRepository:
         row = result.scalars().first()
         return _job_from_row(row) if row is not None else None
 
-    async def reserve_next_job(self, now: datetime) -> ImportJob | None:
+    async def get_latest_preparation_job(self, match_id: str) -> ImportJob | None:
+        stmt = (
+            select(ImportJobModel)
+            .where(
+                ImportJobModel.requested_match_id == match_id,
+                ImportJobModel.kind == JobKind.PREPARE.value,
+            )
+            .order_by(ImportJobModel.created_at.desc(), ImportJobModel.id.desc())
+            .limit(1)
+        )
+        result = await self._session.execute(stmt)
+        row = result.scalars().first()
+        return _job_from_row(row) if row is not None else None
+
+    async def list_latest_preparation_jobs(self, match_ids: list[str]) -> dict[str, ImportJob]:
+        """A preparação mais recente de cada partida (uma consulta, DISTINCT ON)."""
+        if not match_ids:
+            return {}
+        stmt = (
+            select(ImportJobModel)
+            .where(
+                ImportJobModel.requested_match_id.in_(match_ids),
+                ImportJobModel.kind == JobKind.PREPARE.value,
+            )
+            .distinct(ImportJobModel.requested_match_id)
+            .order_by(
+                ImportJobModel.requested_match_id,
+                ImportJobModel.created_at.desc(),
+                ImportJobModel.id.desc(),
+            )
+        )
+        result = await self._session.execute(stmt)
+        return {row.requested_match_id: _job_from_row(row) for row in result.scalars()}
+
+    async def enqueue_preparation(
+        self,
+        match_id: str,
+        mode: ImportMode,
+        *,
+        retry_of_job_id: uuid.UUID | None = None,
+        force: bool = False,
+    ) -> ImportJob:
+        """Enfileira uma preparação (PREPARE QUEUED) da partida e devolve o job
+        vigente. Sem `force`, uma preparação já ATIVA ou já concluída (READY) é
+        devolvida como está, nunca duplicada. Com `force` (nova preparação
+        explícita, ex.: retentativa ou nova versão de reconstrução), só uma
+        preparação ATIVA impede a criação. A inserção usa SAVEPOINT: se outra
+        transação enfileirou no mesmo instante, o índice único parcial rejeita
+        esta e a vencedora é devolvida, sem abortar a transação do chamador
+        (a importação, quando chamada de dentro dela)."""
+        latest = await self.get_latest_preparation_job(match_id)
+        if latest is not None:
+            active = latest.state in ACTIVE_IMPORT_JOB_STATES
+            done = latest.state == ImportJobState.SUCCEEDED
+            if active or (done and not force):
+                return latest
+            retry_of_job_id = retry_of_job_id or latest.id
+        job = ImportJob(
+            id=uuid.uuid4(),
+            requested_match_id=match_id,
+            match_id=match_id,
+            mode=mode,
+            state=ImportJobState.QUEUED,
+            retry_of_job_id=retry_of_job_id,
+            kind=JobKind.PREPARE,
+        )
+        try:
+            async with self._session.begin_nested():
+                await self.create_import_job(job)
+        except ConflictError:
+            winner = await self.get_latest_preparation_job(match_id)
+            if winner is None:  # pragma: no cover - defensivo
+                raise
+            return winner
+        return job
+
+    async def list_matches_page(
+        self, after: tuple[datetime, str] | None, limit: int
+    ) -> list[Match]:
+        """Partidas importadas, da mais recente para a mais antiga: ordem
+        estável (start_at DESC, match_id DESC), keyset sobre essa dupla."""
+        stmt = select(MatchModel)
+        if after is not None:
+            stmt = stmt.where(
+                tuple_(MatchModel.start_at, MatchModel.match_id)
+                < tuple_(literal(after[0], DateTime(timezone=True)), literal(after[1], String))
+            )
+        stmt = stmt.order_by(MatchModel.start_at.desc(), MatchModel.match_id.desc()).limit(limit)
+        result = await self._session.execute(stmt)
+        return [_match_from_row(row) for row in result.scalars()]
+
+    async def reserve_next_job(
+        self, now: datetime, kind: JobKind = JobKind.IMPORT
+    ) -> ImportJob | None:
         # Lote pequeno: jobs esgotados (attempts >= MAX_TRANSIENT_ATTEMPTS) sao
         # marcados FAILED nesta mesma transacao e pulados, sem devolver ao
         # chamador — evita reservar um job que so vai falhar de novo, sem
@@ -191,13 +281,14 @@ class SqlAlchemyIngestionRepository:
         stmt = (
             select(ImportJobModel)
             .where(
+                ImportJobModel.kind == kind.value,
                 or_(
                     ImportJobModel.state == ImportJobState.QUEUED.value,
                     (ImportJobModel.state == ImportJobState.RUNNING.value)
                     & (ImportJobModel.lease_until < now),
                     (ImportJobModel.state == ImportJobState.RETRY_WAIT.value)
                     & (ImportJobModel.retry_at <= now),
-                )
+                ),
             )
             .order_by(ImportJobModel.created_at)
             .limit(5)
@@ -328,4 +419,17 @@ def _job_from_row(row: ImportJobModel) -> ImportJob:
         retry_at=row.retry_at,
         error_code=row.error_code,
         retry_of_job_id=row.retry_of_job_id,
+        kind=JobKind(row.kind),
+    )
+
+
+def _match_from_row(row: MatchModel) -> Match:
+    return Match(
+        match_id=row.match_id,
+        queue=row.queue,
+        map_id=row.map_id,
+        patch=row.patch,
+        start_at=row.start_at,
+        duration_seconds=row.duration_seconds,
+        raw_hash=row.raw_hash,
     )

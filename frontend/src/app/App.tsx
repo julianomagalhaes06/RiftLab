@@ -1,78 +1,107 @@
-import { useEffect, useState } from "react";
-import { fetchHealthState, type HealthState } from "../api/health";
+import { useEffect, useRef, type ReactNode } from "react";
+import { DecisionDetailPage } from "../features/matches/DecisionDetailPage";
+import { EntryPage } from "../features/imports/EntryPage";
+import { ImportProgressPage } from "../features/imports/ImportProgressPage";
+import { MatchPage } from "../features/matches/MatchPage";
 import { ReviewPrototype } from "../features/review/ReviewPrototype";
 import "../features/review/review.css";
+import { useRouter } from "../shared/router/context";
+import { Link } from "../shared/router/Link";
+import { RouterProvider } from "../shared/router/RouterProvider";
+import type { Route } from "../shared/router/routes";
+import { HealthStatus } from "./HealthStatus";
 import "./App.css";
 
-type View = "home" | "prototype";
-
-const STATUS_LABEL: Record<HealthState["kind"], string> = {
-  loading: "Verificando disponibilidade...",
-  available: "Serviço disponível",
-  degraded: "Serviço com suporte limitado",
-  unavailable: "Serviço indisponível",
+const TITLES: Record<Route["name"], string> = {
+  home: "RiftLab",
+  import: "Importação — RiftLab",
+  match: "Partida — RiftLab",
+  decision: "Decisão — RiftLab",
+  prototype: "Protótipo (dados ilustrativos) — RiftLab",
+  notFound: "Página não encontrada — RiftLab",
 };
 
-function StatusBanner({ state }: { state: HealthState }) {
-  const detail = state.kind === "degraded" || state.kind === "unavailable" ? state.detail : null;
+function renderPage(route: Route): ReactNode {
+  switch (route.name) {
+    case "home":
+      return (
+        <>
+          <HealthStatus />
+          <EntryPage />
+        </>
+      );
+    case "import":
+      return <ImportProgressPage key={route.jobId} jobId={route.jobId} />;
+    case "match":
+      return <MatchPage key={route.matchId} matchId={route.matchId} participantId={route.participantId} />;
+    case "decision":
+      return <DecisionDetailPage key={route.decisionId} decisionId={route.decisionId} />;
+    case "notFound":
+      return (
+        <section className="section" aria-labelledby="not-found-heading">
+          <h2 id="not-found-heading">Página não encontrada</h2>
+          <p className="muted">O endereço não corresponde a nenhuma tela do RiftLab.</p>
+          <p>
+            <Link to="/">Voltar ao início</Link>
+          </p>
+        </section>
+      );
+    case "prototype":
+      return null; // renderizado fora do layout principal
+  }
+}
+
+function AppShell() {
+  const { route, navigate, href } = useRouter();
+  const mainRef = useRef<HTMLElement>(null);
+  // Só o CAMINHO conta: trocar de participante (?participant=N) não devolve o foco ao
+  // topo da página, senão quem navega por teclado perderia o lugar a cada seleção.
+  const pathKey = href.split("?")[0];
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    document.title = TITLES[route.name];
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    // Navegação por link: leva o foco ao conteúdo novo (teclado/leitor de tela).
+    mainRef.current?.focus();
+  }, [pathKey, route.name]);
+
+  if (route.name === "prototype") {
+    return <ReviewPrototype onExit={() => navigate("/")} />;
+  }
+
   return (
-    <div className={`status-banner status-banner--${state.kind}`} role="status" aria-live="polite">
-      <span className="status-banner__label">{STATUS_LABEL[state.kind]}</span>
-      {detail ? <span className="status-banner__detail">{detail}</span> : null}
-    </div>
+    <>
+      <a className="skip-link" href="#conteudo">
+        Ir para o conteúdo
+      </a>
+      <div className="app">
+        <header>
+          <h1>
+            <Link to="/" className="app__brand">
+              RiftLab
+            </Link>
+          </h1>
+          <p className="app__subtitle">
+            Aprendizagem estratégica por revisão pós-partida de decisões de compra em League of
+            Legends.
+          </p>
+        </header>
+        <main id="conteudo" ref={mainRef} tabIndex={-1} className="app__main">
+          {renderPage(route)}
+        </main>
+      </div>
+    </>
   );
 }
 
 export default function App() {
-  const [healthState, setHealthState] = useState<HealthState>({ kind: "loading" });
-  const [view, setView] = useState<View>("home");
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchHealthState().then((state) => {
-      if (!cancelled) {
-        setHealthState(state);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (view === "prototype") {
-    return <ReviewPrototype onExit={() => setView("home")} />;
-  }
-
   return (
-    <main className="app">
-      <header>
-        <h1>RiftLab</h1>
-        <p className="app__subtitle">
-          Aprendizagem estratégica por revisão pós-partida de decisões de compra em
-          League of Legends.
-        </p>
-      </header>
-
-      <StatusBanner state={healthState} />
-
-      <section className="app__notice">
-        <p>
-          Ambiente em modo demonstração: nenhuma partida real foi importada ainda.
-          Importação, revisão de compras e o modo Estudo chegam nas próximas
-          entregas.
-        </p>
-      </section>
-
-      <section className="app__prototype-entry">
-        <h2>Protótipo de jornadas</h2>
-        <p>
-          Protótipo navegável de baixa/média fidelidade das jornadas de revisão e do
-          modo Estudo, com dados ilustrativos — sem importação real.
-        </p>
-        <button type="button" onClick={() => setView("prototype")}>
-          Abrir protótipo (dados ilustrativos)
-        </button>
-      </section>
-    </main>
+    <RouterProvider>
+      <AppShell />
+    </RouterProvider>
   );
 }

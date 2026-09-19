@@ -11,6 +11,10 @@ const proxy = {
 
 export default defineConfig({
   plugins: [react()],
+  // Roteamento por History API (CC-205): qualquer caminho de navegação que não seja
+  // arquivo nem proxy (/api, /health) devolve index.html, para deep link, recarregar
+  // e voltar/avançar não darem 404 — no dev server, no `vite preview` e no container.
+  appType: "spa",
   server: {
     host: true,
     port: 5173,

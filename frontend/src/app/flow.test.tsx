@@ -1,0 +1,328 @@
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createMockApi,
+  decisionState,
+  decisionSummary,
+  json,
+  matchDetail,
+  matchSummary,
+  preparation,
+  problem,
+  type MockApi,
+} from "../test/mockApi";
+import App from "./App";
+
+const JOB_ID = "688bd44d-39b7-4f7b-956b-0fd4a63cfafd";
+const DECISION_1 = "0f92d8d8-319c-4fa4-bca3-49157a1f9e00";
+const DECISION_2 = "0f92d8d8-319c-4fa4-bca3-49157a1f9e01";
+const DECISION_3 = "0f92d8d8-319c-4fa4-bca3-49157a1f9e02";
+
+function job(overrides: Record<string, unknown> = {}) {
+  return {
+    status: "QUEUED",
+    kind: "IMPORT",
+    attempts: 0,
+    errorCode: null,
+    retryAt: null,
+    matchId: null,
+    ...overrides,
+  };
+}
+
+/** Responde em ordem; a última resposta se repete (estado estável). */
+function sequence(...responses: Array<() => Response>) {
+  let index = 0;
+  return () => responses[Math.min(index++, responses.length - 1)]();
+}
+
+let api: MockApi;
+
+function setup(path = "/", configure?: (mock: MockApi) => void) {
+  api = createMockApi();
+  api.on("GET", /^\/api\/v1\/matches$/, () => json(200, { items: [], nextCursor: null }));
+  configure?.(api);
+  vi.stubGlobal("fetch", api.fetch);
+  window.history.replaceState(null, "", path);
+  return render(<App />);
+}
+
+const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+const status = () => screen.getAllByRole("status").map((el) => el.textContent ?? "").join(" | ");
+
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  window.history.replaceState(null, "", "/");
+});
+
+describe("fluxo principal: demonstração → importação → partida → decisão", () => {
+  it("percorre a jornada inteira só pela interface, sem console", async () => {
+    setup("/", (mock) => {
+      mock.on("POST", /^\/api\/v1\/imports$/, () =>
+        json(202, { jobId: JOB_ID, status: "QUEUED", statusUrl: `/api/v1/imports/${JOB_ID}` }),
+      );
+      mock.on(
+        "GET",
+        /^\/api\/v1\/imports\/.+$/,
+        sequence(
+          () => json(200, job({ status: "QUEUED" })),
+          () => json(200, job({ status: "RUNNING", attempts: 1 })),
+          () => json(200, job({ status: "SUCCEEDED", attempts: 1, matchId: "DEMO-0008" })),
+        ),
+      );
+      mock.on(
+        "GET",
+        /^\/api\/v1\/matches\/DEMO-0008$/,
+        sequence(
+          () => json(200, matchDetail({ preparation: preparation({ status: "PENDING", attempts: 0 }) })),
+          () => json(200, matchDetail({ preparation: preparation({ status: "RUNNING", attempts: 1 }) })),
+          () => json(200, matchDetail()),
+        ),
+      );
+      mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008\/decisions$/, (call) =>
+        call.search.get("cursor")
+          ? json(200, {
+              items: [decisionSummary({ decisionId: DECISION_3, timestampMs: 900_000 })],
+              nextCursor: null,
+            })
+          : json(200, {
+              items: [
+                decisionSummary({ decisionId: DECISION_1 }),
+                decisionSummary({
+                  decisionId: DECISION_2,
+                  timestampMs: 600_000,
+                  eligible: false,
+                  reasonCodes: ["INVENTORY_UNCERTAIN"],
+                  budgetSource: "UNKNOWN",
+                  frameAgeMs: null,
+                  mainItemOrdinal: 2,
+                }),
+              ],
+              nextCursor: "PROXIMA_PAGINA",
+            }),
+      );
+      mock.on("GET", /^\/api\/v1\/decisions\/.+$/, () => json(200, decisionState()));
+    });
+
+    // Entrada: aviso pós-partida, sem botão de acompanhar ao vivo.
+    expect(
+      await screen.findByText("Analise partidas concluídas. O RiftLab não acompanha jogos em andamento."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ao vivo|acompanhar/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Explorar demonstração" }));
+
+    // Progresso da importação com aria-live.
+    await screen.findByRole("heading", { name: "Importação da partida" });
+    expect(api.callsTo("POST", /\/api\/v1\/imports$/)[0].body).toEqual({
+      matchId: "DEMO-0008",
+      mode: "DEMO",
+    });
+    expect(window.location.pathname).toBe(`/imports/${JOB_ID}`);
+    await waitFor(() => expect(status()).toMatch(/Na fila para importar/));
+    await advance(1_000);
+    await waitFor(() => expect(status()).toMatch(/Importando a partida/));
+    await advance(2_000);
+
+    // SUCCEEDED leva à página da partida (replace: sem voltar para o progresso).
+    await screen.findByRole("heading", { name: "Partida DEMO-0008" });
+    expect(window.location.pathname).toBe("/matches/DEMO-0008");
+    await waitFor(() => expect(status()).toMatch(/aguardando na fila/i));
+    await advance(1_000);
+    await waitFor(() => expect(status()).toMatch(/reconstruindo o inventário/i));
+    await advance(2_000);
+    await waitFor(() => expect(status()).toMatch(/Partida pronta/));
+
+    // Participantes → seleção → decisões.
+    expect(screen.getByText("Time 100")).toBeInTheDocument();
+    expect(screen.getByText("Atirador (bot)")).toBeInTheDocument();
+    expect(screen.getByText("Função não informada")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: /Participante 1 — Campeão #9001/ }));
+    await screen.findByRole("heading", { name: "Decisões do participante 1" });
+    expect(window.location.search).toBe("?participant=1");
+    expect(api.callsTo("GET", /decisions$/)[0].search.get("participantId")).toBe("1");
+
+    expect(await screen.findByText("Decisão em 7:52")).toBeInTheDocument();
+    expect(screen.getByText("Elegível")).toBeInTheDocument();
+    expect(screen.getByText("Inelegível")).toBeInTheDocument();
+    expect(screen.getByText("Orçamento aproximado (quadro há 20 s)")).toBeInTheDocument();
+    expect(screen.getByText("Orçamento desconhecido")).toBeInTheDocument();
+    expect(screen.getByText(/O inventário anterior à decisão é incerto/)).toBeInTheDocument();
+    expect(screen.getByText("2º item principal")).toBeInTheDocument();
+
+    // "Carregar mais" usa o cursor devolvido pela API.
+    fireEvent.click(screen.getByRole("button", { name: "Carregar mais decisões" }));
+    expect(await screen.findByText("Decisão em 15:00")).toBeInTheDocument();
+    expect(api.callsTo("GET", /decisions$/)[1].search.get("cursor")).toBe("PROXIMA_PAGINA");
+    expect(screen.queryByRole("button", { name: "Carregar mais decisões" })).not.toBeInTheDocument();
+
+    // Detalhe da decisão.
+    fireEvent.click(screen.getByRole("link", { name: "Decisão em 7:52" }));
+    await screen.findByRole("heading", { name: /Decisão em 7:52 — participante 1/ });
+    expect(window.location.pathname).toBe(`/decisions/${DECISION_1}`);
+    expect(await screen.findByText("Componente Sintético A")).toBeInTheDocument();
+    expect(screen.getByText("×2")).toBeInTheDocument();
+    expect(screen.getByText("Item #100002, nome indisponível")).toBeInTheDocument();
+    expect(screen.getByText("Trinket: Vazio")).toBeInTheDocument();
+    expect(screen.getByText("Nível 4 (quadro há 20 s)")).toBeInTheDocument();
+    expect(screen.getByText(/Aproximadamente 640 de ouro/)).toBeInTheDocument();
+
+    // Volta às decisões do mesmo participante.
+    fireEvent.click(screen.getByRole("link", { name: /Voltar às decisões da partida DEMO-0008/ }));
+    await screen.findByRole("heading", { name: "Decisões do participante 1" });
+    expect(window.location.search).toBe("?participant=1");
+
+    // Nada consulta o progresso da importação depois do SUCCEEDED, nem a partida depois de READY.
+    const importPolls = api.callsTo("GET", /\/api\/v1\/imports\//).length;
+    const matchPolls = api.callsTo("GET", /\/api\/v1\/matches\/DEMO-0008$/).length;
+    await advance(120_000);
+    expect(api.callsTo("GET", /\/api\/v1\/imports\//).length).toBe(importPolls);
+    expect(api.callsTo("GET", /\/api\/v1\/matches\/DEMO-0008$/).length).toBe(matchPolls);
+    expect(importPolls).toBe(3);
+  });
+});
+
+describe("entrada: formulário de partida real", () => {
+  it("valida o padrão BR1 no cliente antes de qualquer requisição", async () => {
+    setup("/");
+    const input = await screen.findByLabelText(/ID da partida/);
+
+    fireEvent.change(input, { target: { value: "DEMO-0001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Analisar partida" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/formato BR1_ seguido de números/);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(api.callsTo("POST", /imports/)).toHaveLength(0);
+  });
+
+  it("envia o ID válido no modo RIOT e vai para o progresso", async () => {
+    setup("/", (mock) =>
+      mock.on("POST", /^\/api\/v1\/imports$/, () =>
+        json(202, { jobId: JOB_ID, status: "QUEUED", statusUrl: `/api/v1/imports/${JOB_ID}` }),
+      ),
+    );
+    fireEvent.change(await screen.findByLabelText(/ID da partida/), {
+      target: { value: " BR1_3120345678 " },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Analisar partida" }));
+
+    await screen.findByRole("heading", { name: "Importação da partida" });
+    expect(api.callsTo("POST", /imports$/)[0].body).toEqual({
+      matchId: "BR1_3120345678",
+      mode: "RIOT",
+    });
+  });
+
+  it("422 do servidor no modo RIOT sem chave mostra o texto útil, sem corpo remoto", async () => {
+    setup("/", (mock) =>
+      mock.on("POST", /^\/api\/v1\/imports$/, () => problem(422, "RIOT_KEY_MISSING", "RIOT mode indisponível sem chave")),
+    );
+    fireEvent.change(await screen.findByLabelText(/ID da partida/), {
+      target: { value: "BR1_1" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Analisar partida" }));
+
+    const alert = await screen.findByText(/este ambiente não tem chave da Riot configurada/);
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText(/Explore a demonstração/)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent("RIOT mode indisponível sem chave");
+    expect(screen.getByRole("button", { name: "Analisar partida" })).toBeEnabled();
+  });
+
+  it("VALIDATION_ERROR do servidor também é tratado", async () => {
+    setup("/", (mock) =>
+      mock.on("POST", /^\/api\/v1\/imports$/, () => problem(422, "VALIDATION_ERROR")),
+    );
+    fireEvent.change(await screen.findByLabelText(/ID da partida/), { target: { value: "BR1_1" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Analisar partida" }));
+
+    expect(await screen.findByText(/Os dados enviados não são válidos/)).toBeInTheDocument();
+    expect(screen.getByText(/ID da requisição: req-123/)).toBeInTheDocument();
+  });
+
+  it("API fora do ar ao enviar mostra a mensagem de rede", async () => {
+    setup("/", (mock) =>
+      mock.on("POST", /^\/api\/v1\/imports$/, () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Explorar demonstração" }));
+
+    expect(await screen.findByText(/Não foi possível falar com a API do RiftLab/)).toBeInTheDocument();
+  });
+});
+
+describe("entrada: partidas importadas (retomar)", () => {
+  it("lista as partidas com o estado da preparação e link para retomar", async () => {
+    setup("/", (mock) =>
+      mock.on("GET", /^\/api\/v1\/matches$/, () =>
+        json(200, {
+          items: [
+            matchSummary({ matchId: "DEMO-0008", preparationStatus: "READY" }),
+            matchSummary({ matchId: "BR1_3120345678", patch: "16.17", preparationStatus: "FAILED" }),
+            matchSummary({ matchId: "BR1_9", preparationStatus: "NOT_REQUESTED" }),
+            matchSummary({ matchId: "BR1_10", preparationStatus: "RUNNING" }),
+          ],
+          nextCursor: null,
+        }),
+      ),
+    );
+
+    const heading = await screen.findByRole("heading", { name: "Partidas importadas" });
+    const section = heading.closest("section") as HTMLElement;
+    await within(section).findByRole("link", { name: /DEMO-0008/ });
+
+    expect(within(section).getByText("Pronta")).toBeInTheDocument();
+    expect(within(section).getByText("Preparação falhou")).toBeInTheDocument();
+    expect(within(section).getByText("Não preparada")).toBeInTheDocument();
+    expect(within(section).getByText("Preparando")).toBeInTheDocument();
+    expect(within(section).getAllByText("Demonstração")).toHaveLength(1);
+    expect(within(section).getByRole("link", { name: /BR1_3120345678/ })).toHaveAttribute(
+      "href",
+      "/matches/BR1_3120345678",
+    );
+    expect(section).not.toHaveTextContent(/subject|hash|puuid/i);
+  });
+
+  it("lista vazia tem texto próprio e erro tem 'Recarregar lista'", async () => {
+    setup("/", (mock) =>
+      mock.on(
+        "GET",
+        /^\/api\/v1\/matches$/,
+        sequence(
+          () => problem(500, "INTERNAL_ERROR"),
+          () => json(200, { items: [], nextCursor: null }),
+        ),
+      ),
+    );
+
+    expect(await screen.findByText(/Ocorreu um erro interno no servidor/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Recarregar lista" }));
+
+    expect(await screen.findByText(/Nenhuma partida importada ainda/)).toBeInTheDocument();
+  });
+
+  it("carrega mais páginas de partidas pelo cursor", async () => {
+    setup("/", (mock) =>
+      mock.on("GET", /^\/api\/v1\/matches$/, (call) =>
+        call.search.get("cursor")
+          ? json(200, { items: [matchSummary({ matchId: "BR1_2" })], nextCursor: null })
+          : json(200, { items: [matchSummary({ matchId: "BR1_1" })], nextCursor: "P2" }),
+      ),
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Carregar mais partidas" }));
+
+    expect(await screen.findByRole("link", { name: /BR1_2/ })).toBeInTheDocument();
+    expect(api.callsTo("GET", /matches$/)[1].search.get("cursor")).toBe("P2");
+  });
+});

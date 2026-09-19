@@ -1,7 +1,6 @@
 """GET /api/v1/matches, GET /api/v1/matches/{id}, GET .../decisions,
-GET /api/v1/decisions/{id} (docs/contracts.md). As duas rotas de DECISÕES estão
-montadas desde o CC-204 (api/routes/decisions.py); MatchSummary/MatchDetail
-seguem schema-only até o CC-205."""
+GET /api/v1/decisions/{id} (docs/contracts.md). As rotas de DECISÕES (CC-204) e de
+PARTIDAS (CC-205: lista, detalhe e preparação) estão montadas."""
 
 from __future__ import annotations
 
@@ -11,7 +10,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from riftlab.shared.api.common import CamelModel, MatchId
-from riftlab.shared.api.enums import BudgetSource
+from riftlab.shared.api.enums import BudgetSource, PreparationStatus
 
 STALE_FRAME_THRESHOLD_MS = 90_000
 
@@ -26,6 +25,7 @@ class MatchSummary(CamelModel):
     map: int = Field(ge=0)
     patch: str = Field(min_length=1, max_length=20)
     start_at: datetime
+    preparation_status: PreparationStatus
 
 
 class MatchParticipant(CamelModel):
@@ -37,13 +37,27 @@ class MatchParticipant(CamelModel):
     participant_id: int = Field(ge=1, le=10)
     champion_id: int = Field(ge=1)
     team: int = Field(ge=0)
-    role: str = Field(min_length=1, max_length=20)
+    role: str | None = Field(default=None, min_length=1, max_length=20)
+
+
+class MatchPreparation(CamelModel):
+    """Estado da preparação da partida (catálogo -> reconstrução -> extração de
+    decisões). `error_code` só existe em FAILED (falha final) e em PENDING
+    aguardando nova tentativa (falha transitória); `retry_at` só em PENDING
+    aguardando nova tentativa. READY = decisões extraídas."""
+
+    status: PreparationStatus
+    error_code: str | None = Field(default=None, max_length=64)
+    retry_at: datetime | None = None
+    attempts: int = Field(default=0, ge=0)
 
 
 class MatchDetail(MatchSummary):
-    """GET /matches/{id}: "participantes e patch; 404 desconhecido"."""
+    """GET /matches/{id}: patch, queue, map, participantes (sem identificador
+    pessoal) e estado de preparação; 404 desconhecido."""
 
     participants: list[MatchParticipant]
+    preparation: MatchPreparation
 
 
 class DecisionReason(CamelModel):
@@ -81,8 +95,13 @@ class DecisionStateSummary(CamelModel):
 
 
 class InventoryItem(CamelModel):
+    """`name` vem do catálogo FIXADO pelas versões do ponto (linha imutável),
+    nunca do canônico atual; null quando não há catálogo ou o item não consta
+    nele (a interface mostra o ID com rótulo honesto). Nunca revela o alvo."""
+
     item_id: int = Field(ge=1)
     quantity: int = Field(ge=1)
+    name: str | None = Field(default=None, max_length=200)
 
 
 class DecisionInventory(CamelModel):

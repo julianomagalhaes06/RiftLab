@@ -1,17 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createMockApi, json as jsonResponse } from "../test/mockApi";
 import App from "./App";
-
-function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  window.history.replaceState(null, "", "/");
 });
+
+/** A entrada agora também lista as partidas importadas: além do health, há GET /matches. */
+function stubApi(configure?: (api: ReturnType<typeof createMockApi>) => void) {
+  const api = createMockApi();
+  api.on("GET", /^\/api\/v1\/matches$/, () => jsonResponse(200, { items: [], nextCursor: null }));
+  configure?.(api);
+  vi.stubGlobal("fetch", api.fetch);
+  return api;
+}
 
 describe("App", () => {
   it("mostra RiftLab e identifica o modo demonstração antes do health resolver", () => {
@@ -25,13 +29,7 @@ describe("App", () => {
   });
 
   it("mostra serviço disponível quando live e ready respondem 200", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce(jsonResponse(200, { status: "UP" }))
-        .mockResolvedValueOnce(jsonResponse(200, { status: "UP", database: "UP" })),
-    );
+    stubApi();
 
     render(<App />);
 

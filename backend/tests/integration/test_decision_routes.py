@@ -144,7 +144,10 @@ async def test_demo_0002_list_and_detail_through_the_api(
     assert body["decisionId"] == item["decisionId"] and body["matchId"] == "DEMO-0002"
     assert body["eligible"] is True and body["reasons"] == []
     assert body["inventory"] == {  # multiconjunto: dois itens iguais = quantity 2
-        "items": [{"itemId": 100001, "quantity": 2}, {"itemId": 100002, "quantity": 1}],
+        "items": [  # nome do catálogo fixado pelo ponto (CC-205, E3)
+            {"itemId": 100001, "quantity": 2, "name": "Componente Sintético A"},
+            {"itemId": 100002, "quantity": 1, "name": "Componente Sintético B"},
+        ],
         "trinketItemId": None,
     }
     assert body["budget"] == {
@@ -173,8 +176,8 @@ async def test_demo_0008_real_form_through_the_api(
     assert item["eligible"] is True and item["staleFrame"] is False and item["frameAgeMs"] == 20_000
     body = (await app_client.get(f"/api/v1/decisions/{item['decisionId']}")).json()
     assert body["inventory"]["items"] == [
-        {"itemId": 100001, "quantity": 2},
-        {"itemId": 100002, "quantity": 1},
+        {"itemId": 100001, "quantity": 2, "name": "Componente Sintético A"},
+        {"itemId": 100002, "quantity": 1, "name": "Componente Sintético B"},
     ]
     assert body["budget"]["value"] == 640 and body["budget"]["codes"] == []
     assert body["budget"]["immediatePurchaseAssertable"] is True
@@ -436,9 +439,8 @@ async def test_target_related_reasons_are_neutral_and_context_reasons_stay_liter
     [reason] = context["reasons"]
     assert reason["code"] == "INVENTORY_UNCERTAIN"
     assert reason["subReasons"] == ["ITEM_UNKNOWN", "OWNED_ITEM_UNCLASSIFIABLE"]
-    assert {"itemId": 999_999, "quantity": 1} in context["inventory"][
-        "items"
-    ]  # inventário, não alvo
+    # inventário, não alvo; item fora do catálogo fixado: nome null (nunca inventado)
+    assert {"itemId": 999_999, "quantity": 1, "name": None} in context["inventory"]["items"]
     _assert_pre_decision_only(context)
 
 

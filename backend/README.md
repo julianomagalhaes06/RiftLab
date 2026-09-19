@@ -217,6 +217,49 @@ CC-203 marcam a pré-decisão como incerta de forma cumulativa, e mecânicas de 
 não modeladas (consumo de consumível, troca de trinket, transformações de item, aquisições
 fora de `ITEM_PURCHASED`) mantêm as marcas. O demo valida o fluxo, não o dado real.
 
+## Navegação de partidas e preparação automática (CC-205)
+
+Depois de uma importação bem-sucedida o worker prepara a partida sozinho, sem console:
+catálogo → reconstrução v6 → extração de decisões. A preparação é um job durável em
+`import_jobs` com `kind=PREPARE` (migração `c5e9a2d7f1b8`), enfileirado na mesma transação
+que conclui a importação, e reaproveita a maquinaria do importador: posse por lease com
+token de geração, retomada depois de crash, backoff e teto de tentativas. No máximo uma
+preparação ativa por partida (índice único parcial). É idempotente pelas marcas de
+reconstrução e extração: repetir não duplica nada. Nunca coleta a partida de novo (só a
+fixture demo ou o dado bruto local já importado).
+
+- **Catálogo**: no modo demo, a fixture local, sem rede. No modo real, rede só para o
+  Data Dragon público, e somente se o patch tem entrada em `configs/catalog-mappings.yaml`
+  e ainda não há catálogo canônico; sem entrada não há rede e os pontos saem `MISSING_CATALOG`.
+- **Estados** (`preparationStatus`): `NOT_REQUESTED`, `PENDING` (na fila ou aguardando nova
+  tentativa transitória, com `errorCode` e `retryAt`), `RUNNING`, `READY` e `FAILED`
+  (falha permanente com código seguro, sem payload nem stack). Erro estrutural (dado
+  inválido, dado bruto ausente, mapping ausente) falha na hora; erro transitório (rede, 5xx,
+  429) tenta de novo com backoff até o limite.
+- **Rotas**: `GET /api/v1/matches?cursor=&limit=` (só partidas importadas; ordem estável
+  `startAt` decrescente e `matchId` decrescente; cursor opaco; sem identificador pessoal),
+  `GET /api/v1/matches/{matchId}` (patch, fila, mapa, participantes sem identificador pessoal e
+  estado de preparação; `404` desconhecida) e `POST /api/v1/matches/{matchId}/preparation`
+  (nova tentativa mínima: `202` ao enfileirar ou se já há uma ativa, `200` se já está `READY`
+  com as versões correntes, `404` sem importação concluída; idempotente, histórico preservado).
+  As leituras usam transação `READ ONLY` e nunca preparam nem usam rede.
+- **Nome do item**: `inventory.items[].name` no detalhe da decisão vem do catálogo fixado
+  pelas versões do ponto, nunca do canônico atual; `null` sem catálogo ou item sem nome.
+
+- **Laço do worker**: a cada ciclo o worker tenta um job de importação e um de preparação, cada
+  um com tratamento de exceção próprio; uma falha inesperada recorrente de um lado é logada
+  (sanitizada, com a etapa) e nunca impede o outro de ser atendido.
+- **Modo RIOT sem chave**: `POST /api/v1/imports` com `mode=RIOT` num servidor sem
+  `RIFTLAB_RIOT_API_KEY` responde `422` com o código dedicado `RIOT_KEY_MISSING`
+  (problem+json, texto fixo, nenhum job criado), distinto de `VALIDATION_ERROR`.
+
+Fumaça ponta a ponta pela API, sem console (a stack não migra o banco sozinha):
+
+```sh
+docker compose run --rm api db upgrade
+python3 scripts/smoke_import_flow.py --base-url http://127.0.0.1:8000
+```
+
 ## Migrações
 
 ```sh

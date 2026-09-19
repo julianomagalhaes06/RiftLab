@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from sqlalchemy import DateTime, MetaData, Uuid, func
+from sqlalchemy import DateTime, MetaData, Uuid, func, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -33,6 +33,17 @@ class UuidPkMixin:
 
 class CreatedAtMixin:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+@asynccontextmanager
+async def read_only_unit_of_work(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[AsyncSession]:
+    """Transação READ ONLY: o próprio PostgreSQL rejeita qualquer escrita feita
+    por este caminho. A instrução precisa ser a primeira da transação."""
+    async with unit_of_work(session_factory) as session:
+        await session.execute(text("SET TRANSACTION READ ONLY"))
+        yield session
 
 
 def build_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
