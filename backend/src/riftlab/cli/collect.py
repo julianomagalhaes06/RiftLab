@@ -33,6 +33,28 @@ report_app = typer.Typer(
     no_args_is_help=True,
 )
 
+
+@report_app.command("gate")
+def report_gate(
+    frozen_dir: Path = typer.Option(..., help="Diretório dos agregados congelados do CC-207."),
+    catalog_dir: Path = typer.Option(..., help="Diretório local dos item.json 16.16.1/16.17.1."),
+    rules_dir: Path = typer.Option(..., help="Diretório dos manifests versionados de itens."),
+    mapping_file: Path = typer.Option(..., help="Mapping explícito patch → Data Dragon."),
+) -> None:
+    """Diagnóstico offline: somente leitura de agregados e catálogos indicados.
+
+    Não carrega .env nem abre banco, raw de partidas, Riot ou auditor congelado.
+    """
+    from riftlab.reports.gate_diagnostic import GateDiagnosticError, diagnose_frozen_gate
+
+    try:
+        data = diagnose_frozen_gate(frozen_dir, catalog_dir, rules_dir, mapping_file)
+    except (GateDiagnosticError, OSError, ValueError, KeyError, TypeError) as exc:
+        typer.echo(f"BLOCKED: diagnóstico incompatível ({type(exc).__name__}).", err=True)
+        raise typer.Exit(code=EXIT_BLOCKED) from exc
+    typer.echo(json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False))
+
+
 # backend/src/riftlab/cli/collect.py -> parents[4] é a raiz do repositório.
 DEFAULT_SCOPE_FILE = Path(__file__).resolve().parents[4] / "configs" / "scope.yaml"
 
