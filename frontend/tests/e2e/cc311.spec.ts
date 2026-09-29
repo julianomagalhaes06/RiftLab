@@ -56,6 +56,9 @@ for (const width of [360, 390, 1280, 1440]) {
     await page.keyboard.press("Enter");
     await expect(select).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#history-selection")).toContainText("DEMO-0008");
+    if (width < 700) {
+      await expect(page.locator("#history-selection")).toBeFocused();
+    }
     expect(calls.count("GET /api/v1/matches")).toBe(2);
     await layoutIsClear(page, width);
     await page.screenshot({ path: `${evidence}/historico-dados-${width}.png`, fullPage: true });
