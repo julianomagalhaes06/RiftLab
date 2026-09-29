@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # DEMO nunca depende disso (fixtures não tem PUUID real algum).
     subject_hash_secret: str | None = None
 
+    # CC-310: arquivo local montado explicitamente na API, fora da imagem/Git.
+    # No checkout host, configurar RIFTLAB_RANKED_ACCOUNT_FILE para o caminho local.
+    ranked_account_file: str = "/app/.private/riot-account.json"
+
     # Caminho absoluto por padrao (analogo a database_url, que ja assume a
     # rede do compose): corresponde ao WORKDIR /app da imagem runtime
     # (backend/Dockerfile). Para dev fora de container, sobrescrever via env

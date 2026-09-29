@@ -40,6 +40,59 @@
         "title": "ChampionAsset",
         "type": "object"
       },
+      "Change": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "NOT_COMPARABLE",
+              "CORRECTION",
+              "TRANSITION",
+              "SAME_DIVISION"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "leaguePointsDelta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaguepointsdelta"
+          },
+          "ownMatchAssociation": {
+            "enum": [
+              "NONE",
+              "ONE",
+              "MULTIPLE"
+            ],
+            "title": "Ownmatchassociation",
+            "type": "string"
+          },
+          "since": {
+            "format": "date-time",
+            "title": "Since",
+            "type": "string"
+          },
+          "until": {
+            "format": "date-time",
+            "title": "Until",
+            "type": "string"
+          }
+        },
+        "required": [
+          "since",
+          "until",
+          "kind",
+          "leaguePointsDelta",
+          "ownMatchAssociation"
+        ],
+        "title": "Change",
+        "type": "object"
+      },
       "CursorPage_DecisionStateSummary_": {
         "additionalProperties": false,
         "properties": {
@@ -906,6 +959,104 @@
         "title": "ObservedLevel",
         "type": "object"
       },
+      "Position": {
+        "properties": {
+          "division": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          },
+          "leaguePoints": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaguepoints"
+          },
+          "losses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Losses"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "title": "Observedat",
+            "type": "string"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "queue": {
+            "title": "Queue",
+            "type": "string"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "READY",
+              "UNRANKED"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "wins": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wins"
+          }
+        },
+        "required": [
+          "queue",
+          "season",
+          "observedAt",
+          "origin",
+          "state",
+          "tier",
+          "division",
+          "leaguePoints",
+          "wins",
+          "losses"
+        ],
+        "title": "Position",
+        "type": "object"
+      },
       "PreparationStatus": {
         "description": "Estado da preparação de uma partida importada (CC-205): catálogo ->\nreconstrução -> extração de decisões. PENDING = na fila ou aguardando\nnova tentativa (ver `retryAt`); RUNNING = em execução por um worker;\nREADY = decisões extraídas para as versões correntes; FAILED = falhou\n(ver `errorCode`; pode ser retentada); NOT_REQUESTED = partida importada\nsem preparação registrada (POST /matches/{id}/preparation a inicia).",
         "enum": [
@@ -954,6 +1105,59 @@
           "requestId"
         ],
         "title": "ProblemDetail",
+        "type": "object"
+      },
+      "RankedMe": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Change"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Position"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "enum": [
+              "READY",
+              "UNRANKED",
+              "UNAVAILABLE",
+              "STALE"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "position",
+          "change"
+        ],
+        "title": "RankedMe",
         "type": "object"
       },
       "ReadyStatus": {
@@ -1455,6 +1659,28 @@
         "summary": "Pede nova tentativa de preparação da partida",
         "tags": [
           "matches"
+        ]
+      }
+    },
+    "/api/v1/ranked/me": {
+      "get": {
+        "description": "Somente banco e conta local configurada; nenhuma chamada à Riot.",
+        "operationId": "get_ranked_me_api_v1_ranked_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankedMe"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Posição Solo/Duo da conta local",
+        "tags": [
+          "ranked"
         ]
       }
     },

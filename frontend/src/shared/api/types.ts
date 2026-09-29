@@ -146,6 +146,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ranked/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Posição Solo/Duo da conta local
+         * @description Somente banco e conta local configurada; nenhuma chamada à Riot.
+         */
+        get: operations["get_ranked_me_api_v1_ranked_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -208,6 +228,31 @@ export interface components {
             imageFile: string;
             /** Name */
             name: string;
+        };
+        /** Change */
+        Change: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "NOT_COMPARABLE" | "CORRECTION" | "TRANSITION" | "SAME_DIVISION";
+            /** Leaguepointsdelta */
+            leaguePointsDelta: number | null;
+            /**
+             * Ownmatchassociation
+             * @enum {string}
+             */
+            ownMatchAssociation: "NONE" | "ONE" | "MULTIPLE";
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
         };
         /** CursorPage[DecisionStateSummary] */
         CursorPage_DecisionStateSummary_: {
@@ -550,6 +595,35 @@ export interface components {
             /** Value */
             value?: number | null;
         };
+        /** Position */
+        Position: {
+            /** Division */
+            division: string | null;
+            /** Leaguepoints */
+            leaguePoints: number | null;
+            /** Losses */
+            losses: number | null;
+            /**
+             * Observedat
+             * Format: date-time
+             */
+            observedAt: string;
+            /** Origin */
+            origin: string;
+            /** Queue */
+            queue: string;
+            /** Season */
+            season: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "READY" | "UNRANKED";
+            /** Tier */
+            tier: string | null;
+            /** Wins */
+            wins: number | null;
+        };
         /**
          * PreparationStatus
          * @description Estado da preparação de uma partida importada (CC-205): catálogo ->
@@ -575,6 +649,18 @@ export interface components {
             title: string;
             /** Type */
             type: string;
+        };
+        /** RankedMe */
+        RankedMe: {
+            change: components["schemas"]["Change"] | null;
+            position: components["schemas"]["Position"] | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "READY" | "UNRANKED" | "UNAVAILABLE" | "STALE";
         };
         /** ReadyStatus */
         ReadyStatus: {
@@ -921,6 +1007,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_ranked_me_api_v1_ranked_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RankedMe"];
                 };
             };
         };

@@ -1,0 +1,1 @@
+Emblemas de ranque League of Legends © Riot Games. Fonte oficial: https://static.developer.riotgames.com/docs/lol/ranked-emblems-latest.zip (consultado em 29/09/2026). Redimensionados para 240 × 240 px e convertidos para WebP. Uso contextual no produto; sem alegação de endosso ou licença livre.

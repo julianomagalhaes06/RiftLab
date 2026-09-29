@@ -8,6 +8,7 @@ import type { components } from "./types";
  */
 type Schemas = components["schemas"];
 
+export type RankedMe = Schemas["RankedMe"];
 export type ImportMode = Schemas["ImportMode"];
 export type ImportJobAccepted = Schemas["ImportJobAccepted"];
 export type ImportJobStatus = Schemas["ImportJobStatus"];
@@ -38,6 +39,7 @@ interface RequestOptions {
 }
 
 export interface ApiClient {
+  getRankedMe(signal?: AbortSignal): Promise<RankedMe>;
   createImport(matchId: string, mode: ImportMode, signal?: AbortSignal): Promise<ImportJobAccepted>;
   getImport(jobId: string, signal?: AbortSignal): Promise<ImportJobStatus>;
   retryImport(jobId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
@@ -100,6 +102,7 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
   const enc = encodeURIComponent;
 
   return {
+    getRankedMe: (signal) => request("GET", "/api/v1/ranked/me", { signal }),
     // Modo RIOT sem chave no servidor: 422 com code=RIOT_KEY_MISSING (tabela de mensagens).
     createImport: (matchId, mode, signal) =>
       request("POST", "/api/v1/imports", { body: { matchId, mode }, signal }),

@@ -14,6 +14,7 @@ from riftlab.api.routes.matches import router as matches_router
 from riftlab.config import Settings, get_settings
 from riftlab.errors import register_exception_handlers
 from riftlab.observability import RequestIdMiddleware, configure_logging
+from riftlab.ranked.api import router as ranked_router
 from riftlab.shared.db import build_session_factory
 
 logger = logging.getLogger("riftlab.api")
@@ -40,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(imports_router)
     app.include_router(matches_router)
     app.include_router(decisions_router)
+    app.include_router(ranked_router)
     register_exception_handlers(app)
 
     return app

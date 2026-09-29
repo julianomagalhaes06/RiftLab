@@ -590,3 +590,41 @@ def health(
 
 if __name__ == "__main__":
     app()
+
+
+ranked_app = typer.Typer(help="Atualização explícita da posição da conta local.")
+app.add_typer(ranked_app, name="ranked")
+
+
+@ranked_app.command("refresh")
+def ranked_refresh(
+    season: str = typer.Option(..., help="Temporada explícita, ex.: 2026 ou 2026-3."),
+    account_file: Path = typer.Option(None, help="Arquivo privado da conta local."),
+    env_file: Path = typer.Option(None, help="Arquivo .env local; valores nunca impressos."),
+) -> None:
+    import asyncio
+
+    from riftlab.cli.env_file import load_settings
+    from riftlab.db import build_engine
+    from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfigError
+    from riftlab.ranked.application import refresh_ranked
+    from riftlab.shared.db import build_session_factory
+    from riftlab.shared.errors import SourceError
+
+    settings = load_settings(env_file)
+    if account_file is not None:
+        settings.ranked_account_file = str(account_file)
+
+    async def _run() -> dict[str, str]:
+        engine = build_engine(settings.database_url)
+        try:
+            return await refresh_ranked(build_session_factory(engine), settings, season)
+        finally:
+            await engine.dispose()
+
+    try:
+        result = asyncio.run(_run())
+    except (SourceError, ValueError, RiotAccountConfigError, OSError) as exc:
+        typer.echo(f"BLOCKED: {getattr(exc, 'code', type(exc).__name__)}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"estado={result['state']} fila={result['queue']} temporada={result['season']}")

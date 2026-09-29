@@ -32,10 +32,11 @@ from riftlab.shared.errors import (
 # `.private/validation/sprint-1/CC-105/riot-policy-research.md`.
 API_KEY_HEADER = "X-Riot-Token"
 
-# Match-V5/Account-V1 usam roteamento regional (não por plataforma); só a
-# região usada pelo recorte deste projeto (BR1 -> Americas, docs/architecture.md)
-# é permitida. Nenhuma URL vinda de fora do processo chega a este cliente.
-ALLOWED_HOSTS = frozenset({"americas.api.riotgames.com"})
+# Match-V5/Account-V1 usam Americas; League-V4 usa BR1 (CC-310). Ambos
+# fechados no código; nenhuma URL de entrada pública chega a este cliente.
+AMERICAS_HOST = "americas.api.riotgames.com"
+BR1_HOST = "br1.api.riotgames.com"
+ALLOWED_HOSTS = frozenset({AMERICAS_HOST, BR1_HOST})
 
 # Mesmo padrão de match ID de docs/contracts.md; a fonte real nunca aceita host,
 # URL ou caminho arbitrário de usuário.
@@ -98,7 +99,7 @@ def _parse_json_body(kind: str, body: bytes) -> Any:
 class RiotHttpTransport:
     """Cliente HTTP mínimo e sequencial para o spike de auditoria (CC-105) — não é
     o importador durável/worker do CC-201: sem fila, sem persistência em banco,
-    sem concorrência. Host fechado à região Americas do Match-V5/Account-V1,
+    sem concorrência. Hosts fechados em Americas (Match/Account) e BR1 (League),
     chave só em header (nunca em URL/log/erro), sem seguir redirect (evita
     vazar a chave para outro host), TLS nunca relaxado, execução sequencial com
     orçamento explícito de requisições/tentativas/tempo — compartilhado entre
@@ -171,6 +172,20 @@ class RiotHttpTransport:
             )
         return puuid
 
+    async def fetch_league_entries_by_puuid(self, puuid: str) -> list[Any]:
+        """League-V4 por PUUID no host fixo BR1; nunca devolve URL/headers."""
+        if not puuid or "/" in puuid or "?" in puuid:
+            raise SourceSchemaError(code="SCHEMA_UNSUPPORTED", detail="puuid inválido")
+        body = await self._request_raw(
+            "league", f"/lol/league/v4/entries/by-puuid/{quote(puuid, safe='')}", host=BR1_HOST
+        )
+        document = _parse_json_body("league", body)
+        if not isinstance(document, list):
+            raise SourceSchemaError(
+                code="SCHEMA_UNSUPPORTED", detail="resposta de league com formato inesperado"
+            )
+        return document
+
     async def list_match_ids_by_puuid(
         self,
         puuid: str,
@@ -216,9 +231,15 @@ class RiotHttpTransport:
         )
 
     async def _request_raw(
-        self, kind: str, path: str, params: dict[str, str] | None = None
+        self,
+        kind: str,
+        path: str,
+        params: dict[str, str] | None = None,
+        *,
+        host: str = AMERICAS_HOST,
     ) -> bytes:
-        host = next(iter(ALLOWED_HOSTS))
+        if host not in ALLOWED_HOSTS:
+            raise SourceSchemaError(code="SCHEMA_UNSUPPORTED", detail="host fora da allowlist")
         url = f"https://{host}{path}"
 
         attempt = 0

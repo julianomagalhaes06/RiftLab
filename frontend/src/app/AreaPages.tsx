@@ -1,4 +1,5 @@
 import { Link } from "../shared/router/Link";
+import { MyRank } from "../features/ranked/MyRank";
 
 export function PanelPage() {
   return (
@@ -6,7 +7,7 @@ export function PanelPage() {
       <div className="page-intro">
         <p className="page-intro__kicker">Revisão pós-partida</p>
         <h2>Entenda a partida.<br />Evolua a decisão.</h2>
-        <p>O estudo começa no contexto de uma partida concluída. Os indicadores pessoais ainda não estão disponíveis.</p>
+        <p>O estudo começa no contexto de uma partida concluída. A posição da conta é exibida quando existe observação oficial.</p>
       </div>
       <div className="panel-layout">
         <section className="feature-surface" aria-labelledby="panel-study-heading">
@@ -21,10 +22,7 @@ export function PanelPage() {
             <p>Importe um ID de partida concluída ou percorra a demonstração sintética.</p>
             <Link to="/">Importar ou abrir demonstração</Link>
           </section>
-          <section className="quiet-surface">
-            <h3>Indicadores pessoais</h3>
-            <p>Taxa de vitória, KDA e partidas da sua conta dependem de um vínculo verificável. Não há valores para mostrar nesta etapa.</p>
-          </section>
+          <MyRank compact />
         </div>
       </div>
     </div>
@@ -54,13 +52,9 @@ export function PositionPage() {
       <div className="page-intro">
         <p className="page-intro__kicker">Minha posição</p>
         <h2>Classificação da conta própria</h2>
-        <p>O RiftLab ainda não vinculou uma conta própria nem consultou o elo oficial dela.</p>
+        <p>Observações da fila Solo/Duo da conta configurada localmente. Nas divisões até Diamante, a promoção ocorre ao alcançar 100 PDL; pontos excedentes podem seguir para a próxima divisão. Atualizações exigem o comando administrativo de refresh.</p>
       </div>
-      <section className="quiet-surface quiet-surface--wide">
-        <h3>Classificação não disponível</h3>
-        <p>Quando essa conexão existir, esta área mostrará apenas o elo da conta vinculada. Não há ranking de outros jogadores.</p>
-        <Link to="/historico">Ir para o Histórico</Link>
-      </section>
+      <MyRank />
     </div>
   );
 }

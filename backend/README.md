@@ -331,3 +331,15 @@ uv run cc db current                # mostra a revisão atual do banco configura
 Requer `RIFTLAB_DATABASE_URL` apontando para um PostgreSQL real (SQLite não é
 suportado). Em produção/dev via Compose: `docker compose run --rm api db upgrade`
 (o entrypoint da imagem já é `cc` — não repetir o nome do comando).
+
+
+### Minha posição (CC-310)
+
+Atualização explícita da fila Solo/Duo da conta local:
+
+```bash
+cd backend
+uv run cc ranked refresh --season 2026-3 --account-file ../.private/riot-account.json
+```
+
+O comando exige `RIFTLAB_RIOT_API_KEY`, `RIFTLAB_SUBJECT_HASH_SECRET` e o banco configurados no ambiente ou `.env`. A temporada é informada pelo operador porque League-V4 não retorna temporada. A conta fica fora da imagem; para a API em container, montar o arquivo privado somente para leitura e definir `RIFTLAB_RANKED_ACCOUNT_FILE` com o caminho montado. `GET /api/v1/ranked/me` usa exclusivamente banco e identidade local HMAC, sem rede, PUUID ou Riot ID na resposta. A atualização registra tentativas válidas e falhas separadamente, sem apagar a posição anterior; `UNRANKED` exige resposta válida da Riot. O limitador Riot desta CLI coordena chamadas **desta execução**, não entre processos; 429 e `Retry-After` são respeitados. Nenhuma atualização real ocorreu na validação do CC-310.

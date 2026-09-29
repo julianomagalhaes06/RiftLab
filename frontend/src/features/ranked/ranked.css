@@ -1,0 +1,35 @@
+.my-rank { --tier-accent: #b9a6ff; --tier-glow: #564185; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 184px; gap: 18px; min-width: 0; overflow: hidden; padding: clamp(22px, 3vw, 38px); border: 1px solid var(--nline); border-left: 3px solid var(--tier-accent); background: radial-gradient(circle at 95% 15%, var(--tier-glow), transparent 42%), var(--n1); }
+.my-rank[data-tier="IRON"] { --tier-accent: #c6c9d0; --tier-glow: #34383e; }
+.my-rank[data-tier="BRONZE"] { --tier-accent: #ddaa83; --tier-glow: #513323; }
+.my-rank[data-tier="SILVER"] { --tier-accent: #d3dce8; --tier-glow: #39434d; }
+.my-rank[data-tier="GOLD"] { --tier-accent: #f5cf85; --tier-glow: #54401f; }
+.my-rank[data-tier="PLATINUM"] { --tier-accent: #9ed8d8; --tier-glow: #264546; }
+.my-rank[data-tier="EMERALD"] { --tier-accent: #9fe2ba; --tier-glow: #1d4b37; }
+.my-rank[data-tier="DIAMOND"] { --tier-accent: #afc9ff; --tier-glow: #2f3e68; }
+.my-rank[data-tier="MASTER"] { --tier-accent: #d2b9fa; --tier-glow: #45315b; }
+.my-rank[data-tier="GRANDMASTER"] { --tier-accent: #ffadae; --tier-glow: #5b2b35; }
+.my-rank[data-tier="CHALLENGER"] { --tier-accent: #f7dea6; --tier-glow: #554022; }
+.my-rank__copy { position: relative; z-index: 1; min-width: 0; }
+.my-rank__eyebrow { color: var(--tier-accent); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; }
+.my-rank h3 { font: 600 clamp(1.5rem, 3vw, 2.3rem)/1.15 'Chakra Petch', Inter, sans-serif; margin: 0 0 14px; }
+.my-rank__title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 22px; color: var(--ntext); font: 600 clamp(1.8rem, 4vw, 3rem)/1.2 'Chakra Petch', Inter, sans-serif; margin: 0 0 15px; }
+.my-rank__title strong { color: var(--tier-accent); white-space: nowrap; }
+.my-rank__title strong span { font-size: .46em; }
+.my-rank__track { max-width: 420px; height: 10px; border-radius: 10px; background: #474b55; overflow: hidden; border: 1px solid #777d88; }
+.my-rank__track span { display: block; height: 100%; background: var(--tier-accent); }
+.my-rank__record, .my-rank__time, .my-rank__change, .my-rank__stale { color: var(--ntext-muted); line-height: 1.5; }
+.my-rank__record { margin: 10px 0 16px; }
+.my-rank__time { font-size: .83rem; }
+.my-rank__change { border-top: 1px solid var(--nline); padding-top: 12px; margin-top: 18px; }
+.my-rank__change p { margin: 0 0 6px; }
+.my-rank__change small { font-size: .78rem; }
+.my-rank__stale { border-left: 3px solid #f0ce8d; padding-left: 12px; }
+.my-rank__emblem { display: grid; place-items: start center; min-height: 180px; color: var(--tier-accent); font: 600 3rem 'Chakra Petch', sans-serif; }
+.my-rank__emblem img { width: min(100%, 180px); height: auto; aspect-ratio: 1; object-fit: contain; }
+.my-rank--compact { grid-template-columns: minmax(0, 1fr) 100px; padding: 22px; }
+.my-rank--compact .my-rank__emblem { min-height: 100px; }
+.my-rank--compact .my-rank__emblem img { width: 100px; }
+.my-rank--compact .my-rank__title { font-size: 1.8rem; }
+@media (max-width: 600px) { .my-rank { grid-template-columns: minmax(0, 1fr) 90px; gap: 8px; } .my-rank__emblem { min-height: 90px; } .my-rank__emblem img { width: 90px; } }
+@media (max-width: 380px) { .my-rank { grid-template-columns: 1fr; } .my-rank__emblem { position: absolute; top: 12px; right: 12px; opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .my-rank *, .my-rank *::before, .my-rank *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }

@@ -109,7 +109,7 @@ function AppShell() {
             <Link to="/" className="app__import-link">Importar partida</Link>
           </div>
           <div className="app__source-banner" role="note">
-            Partidas DEMO são sintéticas e identificadas. Partidas RIOT importadas não são vinculadas a uma conta própria.
+            Partidas DEMO são sintéticas e identificadas. A posição da conta local vem de observações da Riot e não atribui resultados às partidas importadas.
           </div>
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className="app__main">
@@ -118,7 +118,7 @@ function AppShell() {
         <footer className="app__footer">
           <p>
             Revisão de partidas concluídas; o RiftLab não acompanha partidas ao vivo. Nomes e
-            retratos de campeões: Data Dragon, da Riot Games.
+            retratos de campeões: Data Dragon, da Riot Games. Emblemas de elo: pacote Ranked Emblems da Riot Games.
           </p>
           <p lang="en">
             RiftLab isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or

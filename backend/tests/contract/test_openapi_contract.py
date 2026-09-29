@@ -37,6 +37,7 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/matches/{match_id}/preparation",
         "/api/v1/matches/{match_id}/decisions",
         "/api/v1/decisions/{decision_id}",
+        "/api/v1/ranked/me",
     }
 
 

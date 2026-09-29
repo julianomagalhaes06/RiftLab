@@ -154,7 +154,8 @@ export type RouteKey =
   | "GET /api/v1/matches/:id"
   | "POST /api/v1/matches/:id/preparation"
   | "GET /api/v1/matches/:id/decisions"
-  | "GET /api/v1/decisions/:id";
+  | "GET /api/v1/decisions/:id"
+  | "GET /api/v1/ranked/me";
 
 const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["POST /api/v1/imports", "POST", /^\/api\/v1\/imports$/],
@@ -165,6 +166,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/matches/:id/decisions", "GET", /^\/api\/v1\/matches\/[^/]+\/decisions$/],
   ["GET /api/v1/matches/:id", "GET", /^\/api\/v1\/matches\/[^/]+$/],
   ["GET /api/v1/decisions/:id", "GET", /^\/api\/v1\/decisions\/[^/]+$/],
+  ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
 ];
 
 /** Fluxo feliz padrão: demonstração importada e pronta, com decisões e detalhe. */
@@ -197,6 +199,7 @@ export const happyPath: Record<RouteKey, Handler> = {
           nextCursor: "PROXIMA_PAGINA",
         }),
   "GET /api/v1/decisions/:id": () => ok(decisionState()),
+  "GET /api/v1/ranked/me": () => ok({ status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }),
 };
 
 export interface CallLog {
