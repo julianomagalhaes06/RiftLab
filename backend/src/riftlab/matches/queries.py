@@ -36,6 +36,7 @@ MAX_CURSOR_CHARS = 256
 class MatchListItem:
     match: Match
     preparation: PreparationInfo
+    champions_present: tuple[tuple[int, str | None], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,7 +92,11 @@ def decode_match_cursor(raw: str) -> tuple[datetime, str]:
 
 
 async def list_matches(
-    session_factory: SessionFactory, *, limit: int, cursor: str | None
+    session_factory: SessionFactory,
+    *,
+    limit: int,
+    cursor: str | None,
+    mapping: CatalogMapping | None = None,
 ) -> MatchPage:
     after = decode_match_cursor(cursor) if cursor else None
     async with read_only_unit_of_work(session_factory) as session:
@@ -99,7 +104,36 @@ async def list_matches(
         rows = await repo.list_matches_page(after, limit + 1)
         page = rows[:limit]
         jobs = await repo.list_latest_preparation_jobs([m.match_id for m in page])
-    items = [MatchListItem(m, preparation_info(jobs.get(m.match_id))) for m in page]
+        champion_ids = await repo.list_champion_ids_for_matches([m.match_id for m in page])
+        assets_by_patch: dict[str, dict[int, ChampionAsset]] = {}
+        for patch in sorted(
+            {m.patch for m in page if not MATCH_ID_DEMO_PATTERN.fullmatch(m.match_id)}
+        ):
+            patch_matches = [
+                m
+                for m in page
+                if m.patch == patch and not MATCH_ID_DEMO_PATTERN.fullmatch(m.match_id)
+            ]
+            ids = [item_id for m in patch_matches for item_id in champion_ids[m.match_id]]
+            assets_by_patch[patch] = await champion_assets(
+                session, mapping, patch_matches[0].match_id, patch, ids
+            )
+
+    def present(m: Match) -> tuple[tuple[int, str | None], ...]:
+        assets = assets_by_patch.get(m.patch, {})
+        return tuple(
+            (champion_id, assets[champion_id].name if champion_id in assets else None)
+            for champion_id in champion_ids[m.match_id]
+        )
+
+    items = [
+        MatchListItem(
+            m,
+            preparation_info(jobs.get(m.match_id)),
+            present(m),
+        )
+        for m in page
+    ]
     next_cursor = (
         encode_match_cursor(page[-1].start_at, page[-1].match_id) if len(rows) > limit else None
     )

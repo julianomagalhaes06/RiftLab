@@ -437,11 +437,25 @@ export interface components {
             status: string;
         };
         /**
+         * MatchChampion
+         * @description Campeão de qualquer participante da partida; não identifica conta própria.
+         */
+        MatchChampion: {
+            /** Championid */
+            championId: number;
+            /** Name */
+            name?: string | null;
+        };
+        /**
          * MatchDetail
          * @description GET /matches/{id}: patch, queue, map, participantes (sem identificador
          *     pessoal) e estado de preparação; 404 desconhecido.
          */
         MatchDetail: {
+            /** Championspresent */
+            championsPresent?: components["schemas"]["MatchChampion"][];
+            /** Durationseconds */
+            durationSeconds: number;
             /** Map */
             map: number;
             /** Matchid */
@@ -500,11 +514,14 @@ export interface components {
         };
         /**
          * MatchSummary
-         * @description Item de GET /matches: "partidas prontas, sem PUUID" — nenhum campo
-         *     pessoal (subject_hash, Riot ID) aparece aqui por design, so o necessario
-         *     para a lista.
+         * @description Item de GET /matches: sem identificador de conta própria ou PUUID.
+         *     `champions_present` abrange qualquer participante, nunca o jogador local.
          */
         MatchSummary: {
+            /** Championspresent */
+            championsPresent?: components["schemas"]["MatchChampion"][];
+            /** Durationseconds */
+            durationSeconds: number;
             /** Map */
             map: number;
             /** Matchid */

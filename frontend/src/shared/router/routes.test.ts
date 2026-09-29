@@ -6,6 +6,13 @@ const UUID = "688bd44d-39b7-4f7b-956b-0fd4a63cfafd";
 describe("parseRoute", () => {
   it("reconhece as quatro rotas da jornada e o protótipo", () => {
     expect(parseRoute("/")).toEqual({ name: "home" });
+    expect(parseRoute("/painel")).toEqual({ name: "panel" });
+    expect(parseRoute("/campeoes")).toEqual({ name: "champions" });
+    expect(parseRoute("/minha-posicao")).toEqual({ name: "position" });
+    expect(parseRoute("/historico")).toEqual({ name: "history" });
+    expect(parseRoute("/historico/DEMO-0008", "?participant=3")).toEqual({
+      name: "historyMatch", matchId: "DEMO-0008", participantId: 3,
+    });
     expect(parseRoute(`/imports/${UUID}`)).toEqual({ name: "import", jobId: UUID });
     expect(parseRoute("/matches/DEMO-0008", "?participant=3")).toEqual({
       name: "match",
@@ -56,6 +63,11 @@ describe("routeToPath", () => {
   it("faz o caminho inverso de parseRoute (ida e volta)", () => {
     const paths = [
       "/",
+      "/painel",
+      "/campeoes",
+      "/minha-posicao",
+      "/historico",
+      "/historico/DEMO-0008?participant=3",
       `/imports/${UUID}`,
       "/matches/DEMO-0008",
       "/matches/DEMO-0008?participant=7",

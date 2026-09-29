@@ -35,9 +35,11 @@ function formatDate(iso: string): string {
 function Participants({
   match,
   selected,
+  fromHistory,
 }: {
   match: MatchDetail;
   selected: number | null;
+  fromHistory: boolean;
 }) {
   return (
     <section aria-labelledby="participants-heading" className="section">
@@ -55,7 +57,7 @@ function Participants({
                   <li key={participant.participantId} className="list__item">
                     <Link
                       to={{
-                        name: "match",
+                        name: fromHistory ? "historyMatch" : "match",
                         matchId: match.matchId,
                         participantId: participant.participantId,
                       }}
@@ -83,9 +85,11 @@ function Participants({
 export function MatchPage({
   matchId,
   participantId,
+  fromHistory = false,
 }: {
   matchId: string;
   participantId: number | null;
+  fromHistory?: boolean;
 }) {
   const newController = useAbortScope();
   const [preparing, setPreparing] = useState(false);
@@ -124,6 +128,7 @@ export function MatchPage({
 
   return (
     <section className="section" aria-labelledby="match-heading">
+      {fromHistory ? <Link to="/historico">Voltar ao Histórico</Link> : null}
       <h2 id="match-heading">Partida {matchId}</h2>
 
       {match === null && polling.phase === "polling" ? (
@@ -176,7 +181,7 @@ export function MatchPage({
 
           {match.preparation.status === "READY" ? (
             <>
-              <Participants match={match} selected={participantId} />
+              <Participants match={match} selected={participantId} fromHistory={fromHistory} />
               {participantId === null ? (
                 <p className="muted">Selecione um participante para listar as decisões dele.</p>
               ) : selectedParticipant === null ? (
@@ -191,9 +196,7 @@ export function MatchPage({
         </>
       ) : null}
 
-      <p>
-        <Link to="/">Voltar ao início</Link>
-      </p>
+      {!fromHistory ? <p><Link to="/">Voltar ao início</Link></p> : null}
     </section>
   );
 }

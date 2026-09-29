@@ -210,6 +210,12 @@ async def test_match_detail_reads_champions_from_the_database_only(
         async with _client(settings) as client:
             before = (await client.get(f"/api/v1/matches/{real_match}")).json()
             assert set(_champions_by_participant(before).values()) == {None}  # ainda sem catálogo
+            before_list = (await client.get("/api/v1/matches?limit=100")).json()
+            before_champions = next(
+                item for item in before_list["items"] if item["matchId"] == real_match
+            )["championsPresent"]
+            assert {entry["championId"] for entry in before_champions} >= {51, 89}
+            assert {entry["name"] for entry in before_champions} == {None}
 
             mapping = load_catalog_mapping(tmp_path / "catalog-mappings.yaml")
             fetch = FakeFetch({version: _synthetic_body(version, drop=("89",))})
@@ -222,6 +228,15 @@ async def test_match_detail_reads_champions_from_the_database_only(
                 "imageFile": "Caitlyn.png",
             }
             assert by_champion[89] is None  # ausente do catálogo: rótulo numérico na interface
+            after_list = (await client.get("/api/v1/matches?limit=100")).json()
+            champions = {
+                entry["championId"]: entry["name"]
+                for entry in next(
+                    item for item in after_list["items"] if item["matchId"] == real_match
+                )["championsPresent"]
+            }
+            assert champions[51] == "Caitlyn"
+            assert champions[89] is None
             assert len(fetch.calls) == 1  # os GET não buscaram nada
     finally:
         await _purge_versions(session_factory, [version])

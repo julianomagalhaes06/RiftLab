@@ -68,6 +68,8 @@ export function matchSummary(overrides: Record<string, unknown> = {}) {
     patch: "DEMO-1",
     startAt: "2026-09-01T12:00:00Z",
     preparationStatus: "READY",
+    durationSeconds: 1800,
+    championsPresent: [{ championId: 9000, name: null }],
     ...overrides,
   };
 }

@@ -610,10 +610,51 @@
         "title": "LiveStatus",
         "type": "object"
       },
+      "MatchChampion": {
+        "additionalProperties": false,
+        "description": "Campeão de qualquer participante da partida; não identifica conta própria.",
+        "properties": {
+          "championId": {
+            "minimum": 1.0,
+            "title": "Championid",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "championId"
+        ],
+        "title": "MatchChampion",
+        "type": "object"
+      },
       "MatchDetail": {
         "additionalProperties": false,
         "description": "GET /matches/{id}: patch, queue, map, participantes (sem identificador\npessoal) e estado de preparação; 404 desconhecido.",
         "properties": {
+          "championsPresent": {
+            "items": {
+              "$ref": "#/components/schemas/MatchChampion"
+            },
+            "title": "Championspresent",
+            "type": "array"
+          },
+          "durationSeconds": {
+            "minimum": 0.0,
+            "title": "Durationseconds",
+            "type": "integer"
+          },
           "map": {
             "minimum": 0.0,
             "title": "Map",
@@ -659,6 +700,7 @@
           "map",
           "patch",
           "startAt",
+          "durationSeconds",
           "preparationStatus",
           "participants",
           "preparation"
@@ -765,8 +807,20 @@
       },
       "MatchSummary": {
         "additionalProperties": false,
-        "description": "Item de GET /matches: \"partidas prontas, sem PUUID\" — nenhum campo\npessoal (subject_hash, Riot ID) aparece aqui por design, so o necessario\npara a lista.",
+        "description": "Item de GET /matches: sem identificador de conta própria ou PUUID.\n`champions_present` abrange qualquer participante, nunca o jogador local.",
         "properties": {
+          "championsPresent": {
+            "items": {
+              "$ref": "#/components/schemas/MatchChampion"
+            },
+            "title": "Championspresent",
+            "type": "array"
+          },
+          "durationSeconds": {
+            "minimum": 0.0,
+            "title": "Durationseconds",
+            "type": "integer"
+          },
           "map": {
             "minimum": 0.0,
             "title": "Map",
@@ -802,6 +856,7 @@
           "map",
           "patch",
           "startAt",
+          "durationSeconds",
           "preparationStatus"
         ],
         "title": "MatchSummary",

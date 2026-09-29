@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { DecisionDetailPage } from "../features/matches/DecisionDetailPage";
+import { HistoryPage } from "../features/history/HistoryPage";
 import { EntryPage } from "../features/imports/EntryPage";
 import { ImportProgressPage } from "../features/imports/ImportProgressPage";
 import { MatchPage } from "../features/matches/MatchPage";
@@ -10,10 +11,18 @@ import { Link } from "../shared/router/Link";
 import { RouterProvider } from "../shared/router/RouterProvider";
 import type { Route } from "../shared/router/routes";
 import { HealthStatus } from "./HealthStatus";
+import { ChampionsPage, PanelPage, PositionPage } from "./AreaPages";
+import { MainNav } from "./MainNav";
 import "./App.css";
+import "../design/concept-c.css";
 
 const TITLES: Record<Route["name"], string> = {
   home: "RiftLab",
+  panel: "Painel — RiftLab",
+  champions: "Campeões — RiftLab",
+  position: "Minha posição — RiftLab",
+  history: "Histórico — RiftLab",
+  historyMatch: "Contexto da partida — RiftLab",
   import: "Importação — RiftLab",
   match: "Partida — RiftLab",
   decision: "Decisão — RiftLab",
@@ -30,6 +39,16 @@ function renderPage(route: Route): ReactNode {
           <EntryPage />
         </>
       );
+    case "panel":
+      return <PanelPage />;
+    case "champions":
+      return <ChampionsPage />;
+    case "position":
+      return <PositionPage />;
+    case "history":
+      return <HistoryPage />;
+    case "historyMatch":
+      return <MatchPage key={route.matchId} matchId={route.matchId} participantId={route.participantId} fromHistory />;
     case "import":
       return <ImportProgressPage key={route.jobId} jobId={route.jobId} />;
     case "match":
@@ -80,15 +99,18 @@ function AppShell() {
       </a>
       <div className="app">
         <header>
-          <h1>
-            <Link to="/" className="app__brand">
-              RiftLab
-            </Link>
-          </h1>
-          <p className="app__subtitle">
-            Aprendizagem estratégica por revisão pós-partida de decisões de compra em League of
-            Legends.
-          </p>
+          <div className="app__topbar">
+            <h1>
+              <Link to="/painel" className="app__brand">
+                <span className="app__mark" aria-hidden="true">R</span>RiftLab
+              </Link>
+            </h1>
+            <MainNav route={route} />
+            <Link to="/" className="app__import-link">Importar partida</Link>
+          </div>
+          <div className="app__source-banner" role="note">
+            Partidas DEMO são sintéticas e identificadas. Partidas RIOT importadas não são vinculadas a uma conta própria.
+          </div>
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className="app__main">
           {renderPage(route)}

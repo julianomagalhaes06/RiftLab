@@ -130,6 +130,20 @@ class SqlAlchemyIngestionRepository:
             for row in result.scalars()
         ]
 
+    async def list_champion_ids_for_matches(self, match_ids: list[str]) -> dict[str, list[int]]:
+        """Projeção pública em lote; nunca seleciona subject_hash."""
+        if not match_ids:
+            return {}
+        rows = await self._session.execute(
+            select(ParticipantModel.match_id, ParticipantModel.champion_id)
+            .where(ParticipantModel.match_id.in_(match_ids))
+            .order_by(ParticipantModel.match_id, ParticipantModel.participant_id)
+        )
+        champions: dict[str, list[int]] = {match_id: [] for match_id in match_ids}
+        for match_id, champion_id in rows:
+            champions[match_id].append(champion_id)
+        return champions
+
     async def get_match_import_mode(self, match_id: str) -> ImportMode | None:
         stmt = (
             select(ImportJobModel.mode)

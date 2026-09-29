@@ -194,7 +194,9 @@ async def test_list_items_have_no_personal_field_and_report_not_requested_withou
             "map": 11,
             "patch": "16.17",
             "startAt": (_LATE + timedelta(days=30)).isoformat().replace("+00:00", "Z"),
+            "durationSeconds": 1800,
             "preparationStatus": "NOT_REQUESTED",
+            "championsPresent": [],
         }
     finally:
         await _delete_matches(session_factory, [match_id])
@@ -274,6 +276,10 @@ async def test_detail_shows_match_participants_and_preparation_without_personal_
     assert response.status_code == 200
     body = response.json()
     assert body["matchId"] == "DEMO-0002" and body["patch"] == "DEMO-1"
+    assert body["durationSeconds"] == 1800
+    assert body["championsPresent"] == [
+        {"championId": p["championId"], "name": None} for p in body["participants"]
+    ]
     assert (body["queue"], body["map"]) == (420, 11)
     assert body["preparation"] == {
         "status": "PENDING",
@@ -289,6 +295,9 @@ async def test_detail_shows_match_participants_and_preparation_without_personal_
     assert not any(value in response.text for value in hashes)  # o hash nunca sai
 
     listing = await app_client.get("/api/v1/matches", params={"limit": 100})
+    listed = next(item for item in listing.json()["items"] if item["matchId"] == "DEMO-0002")
+    assert listed["durationSeconds"] == body["durationSeconds"]
+    assert listed["championsPresent"] == body["championsPresent"]
     assert not any(value in listing.text for value in hashes)
     assert not any(word in key.lower() for key in _keys(listing.json()) for word in _PERSONAL)
 

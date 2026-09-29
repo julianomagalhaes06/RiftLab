@@ -35,6 +35,7 @@ from riftlab.shared.api.common import (
 from riftlab.shared.api.enums import PreparationStatus
 from riftlab.shared.api.matches import (
     ChampionAsset,
+    MatchChampion,
     MatchDetail,
     MatchParticipant,
     MatchPreparation,
@@ -73,9 +74,16 @@ async def list_imported_matches(
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=PAGINATION_MAX_LIMIT)] = PAGINATION_DEFAULT_LIMIT,
 ) -> CursorPage[MatchSummary]:
-    page = await list_matches(request.app.state.session_factory, limit=limit, cursor=cursor)
+    page = await list_matches(
+        request.app.state.session_factory,
+        limit=limit,
+        cursor=cursor,
+        mapping=_catalog_mapping_or_none(Path(request.app.state.settings.catalog_mappings_path)),
+    )
     return CursorPage[MatchSummary](
-        items=[_to_summary(item.match, item.preparation) for item in page.items],
+        items=[
+            _to_summary(item.match, item.preparation, item.champions_present) for item in page.items
+        ],
         next_cursor=page.next_cursor,
     )
 
@@ -92,7 +100,17 @@ async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail
         match_id,
         _catalog_mapping_or_none(Path(request.app.state.settings.catalog_mappings_path)),
     )
-    summary = _to_summary(detail.match, detail.preparation)
+    summary = _to_summary(
+        detail.match,
+        detail.preparation,
+        tuple(
+            (
+                p.champion_id,
+                detail.champions[p.champion_id].name if p.champion_id in detail.champions else None,
+            )
+            for p in detail.participants
+        ),
+    )
     return MatchDetail(
         **summary.model_dump(),
         participants=[_to_participant(p, detail.champions) for p in detail.participants],
@@ -127,14 +145,23 @@ async def prepare_match(
     return _to_preparation(info)
 
 
-def _to_summary(match: Match, preparation: PreparationInfo) -> MatchSummary:
+def _to_summary(
+    match: Match,
+    preparation: PreparationInfo,
+    champions_present: tuple[tuple[int, str | None], ...],
+) -> MatchSummary:
     return MatchSummary(
         match_id=match.match_id,
         queue=match.queue,
         map=match.map_id,
         patch=match.patch,
         start_at=match.start_at,
+        duration_seconds=match.duration_seconds,
         preparation_status=preparation.status,
+        champions_present=[
+            MatchChampion(champion_id=champion_id, name=name)
+            for champion_id, name in champions_present
+        ],
     )
 
 

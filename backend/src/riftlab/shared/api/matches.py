@@ -15,17 +15,25 @@ from riftlab.shared.api.enums import BudgetSource, PreparationStatus
 STALE_FRAME_THRESHOLD_MS = 90_000
 
 
+class MatchChampion(CamelModel):
+    """Campeão de qualquer participante da partida; não identifica conta própria."""
+
+    champion_id: int = Field(ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+
+
 class MatchSummary(CamelModel):
-    """Item de GET /matches: "partidas prontas, sem PUUID" — nenhum campo
-    pessoal (subject_hash, Riot ID) aparece aqui por design, so o necessario
-    para a lista."""
+    """Item de GET /matches: sem identificador de conta própria ou PUUID.
+    `champions_present` abrange qualquer participante, nunca o jogador local."""
 
     match_id: MatchId
     queue: int = Field(ge=0)
     map: int = Field(ge=0)
     patch: str = Field(min_length=1, max_length=20)
     start_at: datetime
+    duration_seconds: int = Field(ge=0)
     preparation_status: PreparationStatus
+    champions_present: list[MatchChampion] = Field(default_factory=list)
 
 
 class ChampionAsset(CamelModel):

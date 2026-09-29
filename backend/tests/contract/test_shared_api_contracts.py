@@ -365,12 +365,17 @@ _MATCH_SUMMARY = {
     "map": 11,
     "patch": "16.17.1",
     "startAt": "2026-09-01T12:00:00Z",
+    "durationSeconds": 1800,
     "preparationStatus": "READY",
 }
 
 
 def test_match_summary_requires_preparation_status_and_rejects_personal_fields() -> None:
     assert MatchSummary.model_validate(_MATCH_SUMMARY).preparation_status == "READY"
+    with pytest.raises(ValidationError):
+        MatchSummary.model_validate(
+            {k: v for k, v in _MATCH_SUMMARY.items() if k != "durationSeconds"}
+        )
     with pytest.raises(ValidationError):
         MatchSummary.model_validate(
             {k: v for k, v in _MATCH_SUMMARY.items() if k != "preparationStatus"}

@@ -11,6 +11,11 @@
  */
 export type Route =
   | { name: "home" }
+  | { name: "panel" }
+  | { name: "champions" }
+  | { name: "position" }
+  | { name: "history" }
+  | { name: "historyMatch"; matchId: string; participantId: number | null }
   | { name: "import"; jobId: string }
   | { name: "match"; matchId: string; participantId: number | null }
   | { name: "decision"; decisionId: string }
@@ -55,6 +60,10 @@ export function parseRoute(pathname: string, search = ""): Route {
   if (trimmed === "/" || trimmed === "") {
     return { name: "home" };
   }
+  if (trimmed === "/painel") return { name: "panel" };
+  if (trimmed === "/campeoes") return { name: "champions" };
+  if (trimmed === "/minha-posicao") return { name: "position" };
+  if (trimmed === "/historico") return { name: "history" };
   const parts = trimmed.split("/").slice(1).map(safeDecode);
   const [head, id, ...rest] = parts;
   if (id !== undefined && id !== null && rest.length === 0) {
@@ -63,6 +72,9 @@ export function parseRoute(pathname: string, search = ""): Route {
     }
     if (head === "matches" && isMatchId(id)) {
       return { name: "match", matchId: id, participantId: parseParticipant(search) };
+    }
+    if (head === "historico" && isMatchId(id)) {
+      return { name: "historyMatch", matchId: id, participantId: parseParticipant(search) };
     }
     if (head === "decisions" && isUuid(id)) {
       return { name: "decision", decisionId: id.toLowerCase() };
@@ -86,6 +98,18 @@ export function routeToPath(route: Route): string {
   switch (route.name) {
     case "home":
       return "/";
+    case "panel":
+      return "/painel";
+    case "champions":
+      return "/campeoes";
+    case "position":
+      return "/minha-posicao";
+    case "history":
+      return "/historico";
+    case "historyMatch": {
+      const base = `/historico/${route.matchId}`;
+      return route.participantId === null ? base : `${base}?participant=${route.participantId}`;
+    }
     case "import":
       return `/imports/${route.jobId}`;
     case "match": {
