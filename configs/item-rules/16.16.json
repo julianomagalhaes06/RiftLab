@@ -1,0 +1,11 @@
+{
+  "version": "item_rules_16_16_v1",
+  "gamePatch": "16.16",
+  "curationRulesVersion": "data_dragon_v5",
+  "excludedIds": [],
+  "exclusiveGroups": [],
+  "exclusiveCoverage": false,
+  "uniqueItemIds": false,
+  "highIdNamespaceExcluded": true,
+  "evidence": "CC-301: private Data Dragon item-16.16.1.json has 439 IDs >=100000, 36 purchasable on map 11; some repeat lower-ID names. Data Dragon has no exclusive-group or duplicate-policy field. Fail closed on those two policies pending sourced curation."
+}

@@ -20,6 +20,7 @@ COPY configs/catalog-mappings.yaml ./configs/catalog-mappings.yaml
 COPY configs/scope.yaml ./configs/scope.yaml
 COPY configs/empirical-rules.yaml ./configs/empirical-rules.yaml
 COPY configs/feature-schema-v1.json ./configs/feature-schema-v1.json
+COPY configs/item-rules ./configs/item-rules
 
 # ---- test: inclui dependencias de dev (pytest/ruff/mypy) e testes ----
 FROM base AS test
