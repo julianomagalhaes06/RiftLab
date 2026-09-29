@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     # Dockerfile; DEMO nunca lê este arquivo.
     scope_path: str = "/app/configs/scope.yaml"
 
+    # Registro de regras EMPÍRICAS do reducer (CC-207): estado por regra e por patch,
+    # com proveniência. Nasce tudo PENDING; só liga por patch com evidência confirmatória.
+    # Mesmo racional: caminho absoluto copiado pelo Dockerfile.
+    empirical_rules_path: str = "/app/configs/empirical-rules.yaml"
+
     worker_heartbeat_path: str = "/tmp/riftlab-worker.heartbeat"
     # Toque do heartbeat: a cada ciclo do worker (reserva -> busca -> persiste
     # um job), e a cada espera deste intervalo quando ocioso — substitui o

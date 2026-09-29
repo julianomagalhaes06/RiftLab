@@ -62,8 +62,9 @@ from riftlab.shared.errors import (
     SourceRateLimitedError,
     SourceSchemaError,
 )
-from riftlab.timeline.application import reconstruct_match
+from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION, reconstruct_match
 from riftlab.timeline.domain import TimelineReplayError
+from riftlab.timeline.empirical_rules import load_empirical_rules_or_disabled
 
 SessionFactory = async_sessionmaker[AsyncSession]
 CatalogSourceFactory = Callable[[CatalogMapping], AbstractAsyncContextManager[CatalogSource]]
@@ -181,7 +182,10 @@ async def _prepare(
         if job.mode == ImportMode.DEMO
         else LocalRawMatchSource(raw_store, settings.subject_hash_secret)
     )
-    await reconstruct_match(session_factory, mapping, source, match_id)
+    rules = load_empirical_rules_or_disabled(
+        Path(settings.empirical_rules_path), reconstruction_version=RECONSTRUCTION_ALGORITHM_VERSION
+    )
+    await reconstruct_match(session_factory, mapping, source, match_id, empirical_rules=rules)
     await extract_decisions(session_factory, match_id, scope_path=Path(settings.scope_path))
 
 

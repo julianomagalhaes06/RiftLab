@@ -1,0 +1,77 @@
+# Registro de regras EMPÍRICAS do reducer de reconstrução (CC-207).
+#
+# O reducer v6 marca como incerto o que não sabe modelar. Cada regra abaixo só liga nos PATCHES em que uma confirmação
+# pré-registrada a aprovou (status EMPIRICALLY_SUPPORTED + patchesValidated + evidência). Tudo nasce PENDING: fora dos
+# patches validados, e para regra reprovada ou sem amostra, o comportamento é exatamente o da v6.
+#
+# Ativar uma regra muda o resultado computado e exige nova versão de reconstrução: `activatedInVersion` precisa ser
+# igual a RECONSTRUCTION_ALGORITHM_VERSION (o carregador recusa o arquivo caso contrário).
+#
+# systemItemIds: lista da regra R4s (itens de sistema/missão que nunca ocupam slot normal: cadeia das missões de
+# função 1200-1209 e 1220-1222, Recall 2001 e Enhanced Recall 2002). Só vale com R4s ligada.
+schemaVersion: v1
+systemItemIds: [1200, 1201, 1202, 1203, 1204, 1206, 1207, 1208, 1209, 1220, 1221, 1222, 2001, 2002]
+rules:
+  R1:
+    ruleVersion: 1
+    description: destroy de consumível POSSUÍDO, sem compra composta que o reivindique, é consumo de uma unidade
+    status: PENDING
+    patchesValidated: []
+    contraRate: null
+    counterExamples: null
+    evidence: null
+    activatedInVersion: null
+  R2:
+    ruleVersion: 1
+    description: troca de trinket (destroy do trinket possuído no mesmo instante de uma compra de trinket)
+    status: PENDING
+    patchesValidated: []
+    contraRate: null
+    counterExamples: null
+    evidence: null
+    activatedInVersion: null
+  R2i:
+    ruleVersion: 1
+    description: todo participante começa com o trinket padrão 3340
+    status: PENDING
+    patchesValidated: []
+    contraRate: null
+    counterExamples: null
+    evidence: null
+    activatedInVersion: null
+  R4s:
+    ruleVersion: 1
+    description: destroy sem posse de item de sistema/missão (systemItemIds) não altera o inventário nem marca
+    status: PENDING
+    patchesValidated: []
+    contraRate: null
+    counterExamples: null
+    evidence: null
+    activatedInVersion: null
+  R4w:
+    ruleVersion: 1
+    description: compras do World Atlas (3865) do participantId 0 são o item inicial dos Apoios (falha segura)
+    status: PENDING
+    patchesValidated: []
+    contraRate: null
+    counterExamples: null
+    evidence: null
+    activatedInVersion: null
+  R5:
+    ruleVersion: 1
+    description: libera UNVALIDATED_DESTROY_ORDER_RECONCILIATION (destroy dos componentes antes da compra composta)
+    status: PENDING
+    patchesValidated: []
+    contraRate: null
+    counterExamples: null
+    evidence: null
+    activatedInVersion: null
+  R6:
+    ruleVersion: 1
+    description: undo em pilha (transação de compra transparente) e libera UNVALIDATED_UNDO_SEMANTICS
+    status: PENDING
+    patchesValidated: []
+    contraRate: null
+    counterExamples: null
+    evidence: null
+    activatedInVersion: null

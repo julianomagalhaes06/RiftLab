@@ -32,6 +32,7 @@ from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import NotFoundError
 from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION, reconstruct_match
 from riftlab.timeline.domain import DecisionState, TimelineReplayError
+from riftlab.timeline.empirical_rules import EmpiricalRules, RuleEntry
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 
@@ -397,3 +398,64 @@ async def test_persisted_v5_state_round_trips_into_decision_evaluation(
     assert point.eligible and point.main_item_ordinal == 1
     assert point.budget.codes == ("STALE_FRAME",) and point.budget.value == 500
     assert point.features is not None and point.features.values["level"] == 1
+
+
+def _supported(rule_id: str, patches: frozenset[str]) -> RuleEntry:
+    return RuleEntry(
+        rule_id,
+        1,
+        f"regra {rule_id} (teste)",
+        "EMPIRICALLY_SUPPORTED",
+        patches,
+        0.0,
+        0,
+        "evidencia-sintetica-de-teste",
+        RECONSTRUCTION_ALGORITHM_VERSION,
+    )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_reconstruct_match_records_provenance_only_for_rules_enabled_in_the_patch(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    """Regras ligadas para o patch da partida (DEMO-1) entram em `quality.empiricalRules` de cada
+    estado, persistido; regras de OUTRO patch não entram (fora dele o comportamento é o da v6)."""
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, "DEMO-0002")
+    rules = EmpiricalRules(
+        entries={
+            "R5": _supported("R5", frozenset({"DEMO-1"})),
+            "R1": _supported("R1", frozenset({"16.17"})),
+        }
+    )
+
+    result = await reconstruct_match(
+        session_factory, _DEMO_1_MAPPING, DemoMatchSource(), "DEMO-0002", empirical_rules=rules
+    )
+
+    assert result.decision_states
+    for state in result.decision_states:
+        assert state.state_version == RECONSTRUCTION_ALGORITHM_VERSION
+        assert [rule["ruleId"] for rule in state.quality["empiricalRules"]] == ["R5"]
+        assert state.quality["empiricalRules"][0]["patchesValidated"] == ["DEMO-1"]
+        assert state.quality["empiricalRules"][0]["evidence"] == "evidencia-sintetica-de-teste"
+    async with unit_of_work(session_factory) as session:
+        persisted = await SqlAlchemyTimelineRepository(session).list_decision_states("DEMO-0002", 1)
+    assert persisted and all(
+        [rule["ruleId"] for rule in s.quality["empiricalRules"]] == ["R5"] for s in persisted
+    )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0001"], indirect=True)
+async def test_reconstruct_match_without_a_registry_records_no_rules(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, "DEMO-0001")
+
+    result = await reconstruct_match(
+        session_factory, _DEMO_1_MAPPING, DemoMatchSource(), "DEMO-0001"
+    )
+
+    assert result.decision_states
+    assert all(state.quality["empiricalRules"] == [] for state in result.decision_states)

@@ -63,10 +63,11 @@ def _reduce(
     )
 
 
-def test_algorithm_version_is_six() -> None:
-    """A v6 (transação destroy→compra) mantém tudo da v5 (nível, timestamp do
-    evento, bloco retrospectivo); os testes deste arquivo seguem valendo."""
-    assert RECONSTRUCTION_ALGORITHM_VERSION == 6
+def test_algorithm_version_is_seven() -> None:
+    """A v7 (regras empíricas, desligadas por padrão) mantém tudo da v5/v6 (nível,
+    timestamp do evento, bloco retrospectivo); os testes deste arquivo seguem valendo
+    porque, com as regras desligadas, o resultado é idêntico ao da v6."""
+    assert RECONSTRUCTION_ALGORITHM_VERSION == 7
 
 
 # --- observação de nível ---------------------------------------------------

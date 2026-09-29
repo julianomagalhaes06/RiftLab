@@ -33,6 +33,19 @@ from riftlab.timeline.domain import (
     TimelineEvent,
     TimelineReplayError,
 )
+from riftlab.timeline.empirical_rules import (
+    DEFAULT_TRINKET_ITEM_ID,
+    RULE_R1,
+    RULE_R2,
+    RULE_R2I,
+    RULE_R4S,
+    RULE_R4W,
+    RULE_R5,
+    RULE_R6,
+    SUPPORT_ROLE,
+    EmpiricalRules,
+    attribute_system_purchases,
+)
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 SessionFactory = async_sessionmaker[AsyncSession]
@@ -77,7 +90,19 @@ STALE_FRAME_THRESHOLD_MS = 90_000
 #       capturadas nunca são alteradas). Destroy em T NÃO reivindicado segue
 #       conservador. Antes (v3–v5) o snapshot omitia exatamente a receita do
 #       próprio alvo e toda compra composta de forma real ficava incerta.
-RECONSTRUCTION_ALGORITHM_VERSION = 6
+#   7 — regras EMPÍRICAS do CC-207 (`timeline/empirical_rules.py`,
+#       `configs/empirical-rules.yaml`): R1 consumo de unidade possuída,
+#       R2/R2i troca de trinket e trinket inicial, R4s itens de sistema/missão,
+#       R4w World Atlas por papel, R5 libera
+#       UNVALIDATED_DESTROY_ORDER_RECONCILIATION, R6 undo em pilha e libera
+#       UNVALIDATED_UNDO_SEMANTICS. Todas DESLIGADAS por padrão e ligadas por
+#       PATCH só com evidência confirmatória registrada; com todas desligadas o
+#       resultado é IDÊNTICO ao da v6 (bit a bit). Os estados passam a gravar
+#       `quality.empiricalRules` (proveniência das regras ligadas no patch da
+#       partida). Ativar uma regra exige nova versão (o registro recusa
+#       `activatedInVersion` diferente da corrente), então estados de uma
+#       versão nunca são reaproveitados com outro conjunto de regras.
+RECONSTRUCTION_ALGORITHM_VERSION = 7
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens
@@ -103,6 +128,14 @@ class FrameLike(Protocol):
 
     @property
     def participant_frames(self) -> Mapping[int, Mapping[str, Any]]: ...
+
+
+def _has_trinket_tag(item: Item | None) -> bool:
+    return item is not None and "Trinket" in item.attributes.get("tags", ())
+
+
+def _is_consumable_item(item: Item | None) -> bool:
+    return item is not None and bool(item.flags.get("consumed"))
 
 
 def _sorted_items(counts: dict[int, int]) -> tuple[tuple[int, int], ...]:
@@ -543,6 +576,8 @@ def reconstruct_participant_purchases(
     catalog_id: uuid.UUID | None,
     catalog_items: Mapping[int, Item] | None = None,
     excluded_item_ids: frozenset[int] = frozenset(),
+    enabled_rules: frozenset[str] = frozenset(),
+    system_item_ids: frozenset[int] = frozenset(),
 ) -> list[ReconstructedPurchase]:
     """Reducer puro. events deve conter os eventos de TODOS os participantes
     da partida — a filtragem por dono acontece aqui (nunca antes de chamar),
@@ -566,7 +601,12 @@ def reconstruct_participant_purchases(
     testes. Um resultado de dado REAL nunca pode: aplicar qualquer uma das
     hipóteses em dado real sempre marca o participante incerto a partir
     dali, mesmo quando a correlação "bate" segundo a regra interna — bater
-    com uma regra interna não comprova a semântica real."""
+    com uma regra interna não comprova a semântica real.
+
+    enabled_rules (v7, CC-207): regras EMPÍRICAS ligadas para o patch desta
+    partida (`EmpiricalRules.enabled_for`); vazio = comportamento idêntico ao
+    da v6. system_item_ids só vale com R4s. O reducer continua puro: as
+    regras entram como parâmetro, nunca lidas de arquivo aqui."""
     catalog_items = catalog_items if catalog_items is not None else {}
     catalog_available = catalog_id is not None
     is_demo = origin is SourceOrigin.CURATED_DEMO
@@ -581,7 +621,24 @@ def reconstruct_participant_purchases(
         key=lambda event: (event.timestamp_ms, event.source_index),
     )
 
-    inventory = EMPTY_INVENTORY
+    # Pré-cálculos das regras empíricas (puros; sem efeito com as regras desligadas).
+    trinket_purchase_ts = {
+        event.timestamp_ms
+        for event in owned_events
+        if event.type == "ITEM_PURCHASED"
+        and isinstance(event.payload.get("itemId"), int)
+        and _has_trinket_tag(catalog_items.get(event.payload["itemId"]))
+    }
+    purchase_ts = {event.timestamp_ms for event in owned_events if event.type == "ITEM_PURCHASED"}
+    undo_stack_enabled = RULE_R6 in enabled_rules
+    rev_stack: list[_ReversibleOp] = []
+    # R2i: todo participante começa com o trinket padrão (65/66 dos que nunca
+    # compraram trinket terminaram com ele).
+    inventory = (
+        InventorySnapshot(trinket_item_id=DEFAULT_TRINKET_ITEM_ID)
+        if RULE_R2I in enabled_rules
+        else EMPTY_INVENTORY
+    )
     uncertain = False
     reasons: list[UncertainReason] = []
     destroy_heuristic_used = False
@@ -641,6 +698,7 @@ def reconstruct_participant_purchases(
                 bucket[component_id] = max(0, bucket[component_id] - qty)
 
     for event in owned_events:
+        prev_top = last_reversible
         if event.timestamp_ms != current_timestamp_ms:
             current_timestamp_ms = event.timestamp_ms
             backward_destroy_pool = {}
@@ -767,7 +825,7 @@ def reconstruct_participant_purchases(
                 # a compra fica sem nenhuma marca por eles; um destroy NÃO
                 # reivindicado mantém a sua (conservador, nunca curado).
                 destroy_order_heuristic_used = True
-                if not is_demo:
+                if not is_demo and RULE_R5 not in enabled_rules:
                     _mark_uncertain("UNVALIDATED_DESTROY_ORDER_RECONCILIATION", event, item_id)
 
             results.append(
@@ -848,8 +906,37 @@ def reconstruct_participant_purchases(
                 destroy_heuristic_used = True
                 if not is_demo:
                     _mark_uncertain("UNVALIDATED_DESTROY_RECONCILIATION", event, item_id)
+            elif (
+                RULE_R4S in enabled_rules
+                and item_id in system_item_ids
+                and inventory.owned(item_id) == 0
+                and inventory.trinket_item_id != item_id
+            ):
+                # R4s: item de SISTEMA/MISSÃO (nunca comprado, nunca em slot
+                # normal): o destroy sem posse não altera o inventário e não
+                # marca incerteza. Comprado e depois destruído (posse) segue o
+                # caminho normal.
+                last_reversible = None
             else:
-                _mark_uncertain("UNRECONCILED_ITEM_DESTROYED", event, item_id)
+                # R1: destroy de consumível POSSUÍDO, sem compra composta que o
+                # reivindique, é consumo de UMA unidade (a remoção e o pool
+                # retroativo abaixo continuam iguais). Sem posse segue marcando.
+                # R2: destroy do trinket possuído no MESMO instante de uma compra
+                # de trinket do participante é a troca de slot (só a forma
+                # observada: destroy ANTES da compra).
+                r1_consume = (
+                    RULE_R1 in enabled_rules
+                    and _is_consumable_item(catalog_items.get(item_id))
+                    and inventory.trinket_item_id != item_id
+                    and inventory.owned(item_id) > 0
+                )
+                r2_swap = (
+                    RULE_R2 in enabled_rules
+                    and event.timestamp_ms in trinket_purchase_ts
+                    and inventory.trinket_item_id == item_id
+                )
+                if not (r1_consume or r2_swap):
+                    _mark_uncertain("UNRECONCILED_ITEM_DESTROYED", event, item_id)
                 if inventory.trinket_item_id == item_id:
                     inventory = inventory.with_trinket(None)
                 elif inventory.owned(item_id) > 0:
@@ -923,8 +1010,27 @@ def reconstruct_participant_purchases(
                 # verdade. Em dado REAL, todo undo aplicado (mesmo
                 # "correlacionado") marca incerto a partir daqui; em DEMO, a
                 # regra é sintética e testada.
-                if not is_demo:
+                if not is_demo and RULE_R6 not in enabled_rules:
                     _mark_uncertain("UNVALIDATED_UNDO_SEMANTICS", event, before_id)
+
+        if undo_stack_enabled:
+            if (
+                event.type in ("ITEM_PURCHASED", "ITEM_SOLD")
+                and last_reversible is not None
+                and last_reversible is not prev_top
+            ):
+                rev_stack.append(last_reversible)
+            elif event.type == "ITEM_DESTROYED":
+                # R6: destroys no MESMO instante de uma compra do participante
+                # fazem parte da transação dela.
+                if event.timestamp_ms not in purchase_ts:
+                    rev_stack.clear()
+            elif event.type == "ITEM_UNDO" and prev_top is not None and last_reversible is None:
+                # undo correlacionado (o ramo acima zera `last_reversible`): o
+                # próximo undo se correlaciona com a operação ANTERIOR (pilha).
+                if rev_stack:
+                    rev_stack.pop()
+                last_reversible = rev_stack[-1] if rev_stack else None
 
     return [
         replace(
@@ -947,6 +1053,7 @@ def _decision_state_from_purchase(
     catalog_id: uuid.UUID | None,
     origin: SourceOrigin,
     purchase: ReconstructedPurchase,
+    empirical_rules: Sequence[dict[str, Any]] = (),
 ) -> DecisionState:
     return DecisionState(
         id=uuid.uuid4(),
@@ -979,6 +1086,10 @@ def _decision_state_from_purchase(
                 "correlationUnvalidated": purchase.retrospective_correlation_unvalidated,
             },
             "sourceOrigin": origin.value,
+            # Proveniência (CC-207, v7): regras EMPÍRICAS ligadas no patch desta
+            # partida (vazio = v6). Informativo: nada de elegibilidade/feature/
+            # máscara lê este bloco.
+            "empiricalRules": [dict(rule) for rule in empirical_rules],
             # `uncertain`/`reasons` acima são CUMULATIVOS e incluem
             # diagnósticos que dependem da identidade/receita DESTE alvo
             # (ITEM_UNKNOWN/ITEM_EXCLUDED_UNSUPPORTED/
@@ -1097,6 +1208,8 @@ async def reconstruct_match(
     mapping: CatalogMapping,
     match_source: MatchSource,
     match_id: str,
+    *,
+    empirical_rules: EmpiricalRules | None = None,
 ) -> MatchReconstruction:
     """Orquestrador (CC-203): busca (banco+fonte local, fora de transação de
     escrita) -> reduz (puro, um participante por vez) -> persiste (uma única
@@ -1114,7 +1227,12 @@ async def reconstruct_match(
     catalog_id REALMENTE usado (da marca persistida), nunca um valor
     reresolvido na hora — mesmo que uma sincronização concorrente já tenha
     trocado o canônico atual (catalog_id obtido continua consultável por ID
-    exato e imutável, docs/domain-model.md)."""
+    exato e imutável, docs/domain-model.md).
+
+    `empirical_rules` (v7): registro de regras empíricas; None = todas
+    desligadas (comportamento da v6). As regras ligadas são resolvidas pelo
+    PATCH da partida."""
+    rules = empirical_rules if empirical_rules is not None else EmpiricalRules.disabled()
     ingestion_repo_factory = SqlAlchemyIngestionRepository
     timeline_repo_factory = SqlAlchemyTimelineRepository
     catalog_repo_factory = SqlAlchemyCatalogRepository
@@ -1192,6 +1310,16 @@ async def reconstruct_match(
                 excluded.item_id for excluded in await catalog_repo.list_excluded_items(catalog_id)
             )
 
+    enabled_rules = rules.enabled_for(match.patch)
+    provenance = rules.provenance_for(match.patch)
+    if RULE_R4W in enabled_rules:
+        # R4w: pré-passo puro (reatribui as compras do World Atlas do
+        # participante 0 aos Apoios; falha segura).
+        events = attribute_system_purchases(
+            events,
+            [p.participant_id for p in source_result.participants if p.role == SUPPORT_ROLE],
+        )
+
     all_decision_states: list[DecisionState] = []
     for participant_id in participant_ids:
         purchases = reconstruct_participant_purchases(
@@ -1202,9 +1330,13 @@ async def reconstruct_match(
             catalog_id=catalog_id,
             catalog_items=catalog_items,
             excluded_item_ids=excluded_item_ids,
+            enabled_rules=enabled_rules,
+            system_item_ids=rules.system_item_ids if RULE_R4S in enabled_rules else frozenset(),
         )
         all_decision_states.extend(
-            _decision_state_from_purchase(match_id, catalog_id, source_result.origin, purchase)
+            _decision_state_from_purchase(
+                match_id, catalog_id, source_result.origin, purchase, provenance
+            )
             for purchase in purchases
         )
 

@@ -18,6 +18,7 @@ COPY configs/catalog-mappings.yaml ./configs/catalog-mappings.yaml
 # Recorte real (scope.yaml, CC-105) e schema de features (CC-204): lidos pelo módulo de
 # decisões e pelos testes que comparam o schema com a allowlist do código.
 COPY configs/scope.yaml ./configs/scope.yaml
+COPY configs/empirical-rules.yaml ./configs/empirical-rules.yaml
 COPY configs/feature-schema-v1.json ./configs/feature-schema-v1.json
 
 # ---- test: inclui dependencias de dev (pytest/ruff/mypy) e testes ----

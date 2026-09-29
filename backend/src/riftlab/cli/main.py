@@ -188,7 +188,8 @@ def timeline_reconstruct(
     from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
     from riftlab.shared.db import build_session_factory
     from riftlab.shared.errors import DomainError, SourceError
-    from riftlab.timeline.application import reconstruct_match
+    from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION, reconstruct_match
+    from riftlab.timeline.empirical_rules import load_empirical_rules_or_disabled
 
     if mode not in ("demo", "real"):
         typer.echo(f"BLOCKED: --mode deve ser 'demo' ou 'real', recebido {mode!r}.", err=True)
@@ -228,7 +229,13 @@ def timeline_reconstruct(
                 raw_store = DurableRawMatchStore(Path(settings.raw_storage_dir))
                 source = LocalRawMatchSource(raw_store, settings.subject_hash_secret)
 
-            result = await reconstruct_match(session_factory, mapping, source, match_id)
+            rules = load_empirical_rules_or_disabled(
+                Path(settings.empirical_rules_path),
+                reconstruction_version=RECONSTRUCTION_ALGORITHM_VERSION,
+            )
+            result = await reconstruct_match(
+                session_factory, mapping, source, match_id, empirical_rules=rules
+            )
             typer.echo(
                 f"matchId={result.match_id} catalogId={result.catalog_id} "
                 f"decisionStates={len(result.decision_states)}"

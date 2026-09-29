@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
+import yaml
 from httpx import ASGITransport, AsyncClient
 from pipeline_helpers import (
     FAKE_SUBJECT_HASH_SECRET,
@@ -42,7 +43,9 @@ from riftlab.preparation import application as preparation
 from riftlab.preparation.application import process_next_preparation
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import SourceError, SourceRateLimitedError
+from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION
 from riftlab.timeline.domain import TimelineEvent
+from riftlab.timeline.empirical_rules import KNOWN_RULE_IDS
 from riftlab.timeline.models import MatchReconstructionModel, TimelineEventModel
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
@@ -541,3 +544,71 @@ async def test_preparation_jobs_are_invisible_to_import_endpoints_and_the_import
             await SqlAlchemyIngestionRepository(session).mark_import_failed(
                 reserved.id, reserved.lease_generation, "TEST_CLEANUP"
             )
+
+
+def _registry_yaml(supported: dict[str, list[str]]) -> str:
+    """Registro do teste: tudo PENDING, exceto as regras dadas (nos patches dados)."""
+    rules: dict[str, Any] = {}
+    for rule_id in KNOWN_RULE_IDS:
+        entry: dict[str, Any] = {
+            "ruleVersion": 1,
+            "description": f"regra {rule_id} (teste)",
+            "status": "PENDING",
+            "patchesValidated": [],
+            "contraRate": None,
+            "counterExamples": None,
+            "evidence": None,
+            "activatedInVersion": None,
+        }
+        if rule_id in supported:
+            entry.update(
+                status="EMPIRICALLY_SUPPORTED",
+                patchesValidated=supported[rule_id],
+                contraRate=0.0,
+                counterExamples=0,
+                evidence="evidencia-sintetica-de-teste",
+                activatedInVersion=RECONSTRUCTION_ALGORITHM_VERSION,
+            )
+        rules[rule_id] = entry
+    return yaml.safe_dump({"schemaVersion": "v1", "systemItemIds": [1202], "rules": rules})
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_preparation_loads_the_empirical_rules_registry_from_the_configured_path(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    """O worker lê o registro do caminho configurado (Settings.empirical_rules_path) e grava a
+    proveniência das regras ligadas no patch da partida; sem regras ligadas, a lista fica vazia."""
+    registry = tmp_path / "empirical-rules.yaml"
+    registry.write_text(_registry_yaml({"R5": ["DEMO-1"]}))
+    settings = Settings(
+        subject_hash_secret=FAKE_SUBJECT_HASH_SECRET, empirical_rules_path=str(registry)
+    )
+    await import_demo_match(session_factory, tmp_path, "DEMO-0002")
+
+    raw_store = DurableRawMatchStore(tmp_path / "raw")
+    assert await process_next_preparation(session_factory, raw_store, settings) is True
+
+    async with unit_of_work(session_factory) as session:
+        states = await SqlAlchemyTimelineRepository(session).list_decision_states("DEMO-0002", 1)
+    assert states and all(
+        [rule["ruleId"] for rule in state.quality["empiricalRules"]] == ["R5"] for state in states
+    )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_preparation_with_a_missing_registry_file_runs_with_every_rule_disabled(
+    session_factory, tmp_path, _demo_match
+) -> None:
+    settings = Settings(
+        subject_hash_secret=FAKE_SUBJECT_HASH_SECRET,
+        empirical_rules_path=str(tmp_path / "nao-existe.yaml"),
+    )
+    await import_demo_match(session_factory, tmp_path, "DEMO-0002")
+
+    raw_store = DurableRawMatchStore(tmp_path / "raw")
+    assert await process_next_preparation(session_factory, raw_store, settings) is True
+
+    async with unit_of_work(session_factory) as session:
+        states = await SqlAlchemyTimelineRepository(session).list_decision_states("DEMO-0002", 1)
+    assert states and all(state.quality["empiricalRules"] == [] for state in states)

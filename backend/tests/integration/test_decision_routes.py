@@ -25,7 +25,7 @@ from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.db import unit_of_work
 from riftlab.timeline import application as timeline_application
-from riftlab.timeline.application import reconstruct_match
+from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION, reconstruct_match
 from riftlab.timeline.domain import TimelineEvent
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
@@ -160,7 +160,7 @@ async def test_demo_0002_list_and_detail_through_the_api(
     }
     assert body["level"] == {"value": 1, "frameAgeMs": 472_000, "absentReason": None}
     assert body["versions"]["selectionVersion"] == "decision_selection_v1"
-    assert body["versions"]["reconstructionVersion"] == 6
+    assert body["versions"]["reconstructionVersion"] == RECONSTRUCTION_ALGORITHM_VERSION
     assert body["versions"]["scopeVersion"] == "demo_scope_v1"
     assert body["versions"]["curationRulesVersion"] == "curated_demo_v1"
     assert "100010" not in detail.text and "100010" not in listing.text  # o alvo nunca aparece
