@@ -40,9 +40,11 @@ for (const width of [1280, 1440, 360, 390]) {
 
     await expect(page.getByText("2 partidas carregadas")).toBeVisible();
     await expect(page.getByText("1 RIOT · 1 DEMO")).toBeVisible();
-    await expect(page.getByText("RIOT · importada")).toBeVisible();
-    await expect(page.getByText("DEMO · sintética")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Vitórias" })).toBeDisabled();
+    const rows = page.getByRole("list", { name: "Partidas carregadas" });
+    await expect(rows.getByText("RIOT · importada")).toBeVisible();
+    await expect(rows.getByText("DEMO · sintética")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Vitórias" })).toHaveCount(0);
+    await expect(page.getByText(/Filtro de resultado indisponível/)).toBeVisible();
     await page.screenshot({ path: `${evidence}/historico-${width}.png`, fullPage: true });
 
     const metrics = await page.evaluate(() => ({
