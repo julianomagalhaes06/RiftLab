@@ -423,3 +423,43 @@ body {
 .details__title {
   font-weight: 600;
 }
+
+/* CC-208: retrato oficial com caixa de tamanho reservado (sem salto de layout). */
+.champion {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  vertical-align: middle;
+}
+
+.champion__portrait {
+  display: inline-block;
+  flex: none;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #e5e7eb;
+}
+
+.champion__portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.decision__champion {
+  min-height: 40px;
+  margin: 0 0 var(--space-2);
+}
+
+.app__footer {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid #d1d5db;
+  font-size: 0.8125rem;
+  color: #4b5563;
+}
+
+.app__footer p {
+  margin: 0 0 var(--space-1);
+}

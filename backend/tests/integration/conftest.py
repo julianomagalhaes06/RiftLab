@@ -11,8 +11,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from riftlab.config import Settings
 from riftlab.db import build_engine
 from riftlab.shared.db import build_session_factory
+from riftlab.shared.errors import SourceError
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(autouse=True)
+def _champion_cdn_offline(monkeypatch) -> list[tuple[str, str]]:
+    """CC-208: a preparação busca o catálogo de campeões no Data Dragon por padrão.
+    Nos testes nenhuma rede real é usada: o padrão vira uma falha de CDN (que a
+    preparação tolera). Testes que precisam do catálogo passam `champion_fetch`."""
+    calls: list[tuple[str, str]] = []
+
+    async def _offline(version: str, locale: str):
+        calls.append((version, locale))
+        raise SourceError(code="UPSTREAM_UNAVAILABLE", detail="rede desligada nos testes")
+
+    monkeypatch.setattr("riftlab.preparation.application._default_champion_fetch", _offline)
+    return calls
 
 
 @pytest.fixture(scope="session")

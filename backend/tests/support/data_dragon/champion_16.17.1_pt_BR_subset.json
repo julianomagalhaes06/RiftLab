@@ -1,0 +1,87 @@
+{
+ "data": {
+  "Caitlyn": {
+   "id": "Caitlyn",
+   "image": {
+    "full": "Caitlyn.png",
+    "group": "champion",
+    "h": 48,
+    "sprite": "champion0.png",
+    "w": 48,
+    "x": 0,
+    "y": 96
+   },
+   "key": "51",
+   "name": "Caitlyn",
+   "title": "a Xerife de Piltover",
+   "version": "16.17.1"
+  },
+  "Ezreal": {
+   "id": "Ezreal",
+   "image": {
+    "full": "Ezreal.png",
+    "group": "champion",
+    "h": 48,
+    "sprite": "champion1.png",
+    "w": 48,
+    "x": 96,
+    "y": 0
+   },
+   "key": "81",
+   "name": "Ezreal",
+   "title": "o Explorador Pródigo",
+   "version": "16.17.1"
+  },
+  "Kaisa": {
+   "id": "Kaisa",
+   "image": {
+    "full": "Kaisa.png",
+    "group": "champion",
+    "h": 48,
+    "sprite": "champion1.png",
+    "w": 48,
+    "x": 240,
+    "y": 96
+   },
+   "key": "145",
+   "name": "Kai'Sa",
+   "title": "a Filha do Vazio",
+   "version": "16.17.1"
+  },
+  "Leona": {
+   "id": "Leona",
+   "image": {
+    "full": "Leona.png",
+    "group": "champion",
+    "h": 48,
+    "sprite": "champion2.png",
+    "w": 48,
+    "x": 48,
+    "y": 48
+   },
+   "key": "89",
+   "name": "Leona",
+   "title": "a Alvorada Radiante",
+   "version": "16.17.1"
+  },
+  "MonkeyKing": {
+   "id": "MonkeyKing",
+   "image": {
+    "full": "MonkeyKing.png",
+    "group": "champion",
+    "h": 48,
+    "sprite": "champion2.png",
+    "w": 48,
+    "x": 240,
+    "y": 96
+   },
+   "key": "62",
+   "name": "Wukong",
+   "title": "o Macaco Rei",
+   "version": "16.17.1"
+  }
+ },
+ "format": "standAloneComplex",
+ "type": "champion",
+ "version": "16.17.1"
+}

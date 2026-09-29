@@ -9,11 +9,14 @@ para uma partida já importada; nunca coleta a partida de novo."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request, Response
 
+from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_catalog_mapping
+from riftlab.champions.application import ChampionAsset as ChampionAssetData
 from riftlab.decisions.domain import ParticipantView
 from riftlab.errors import ProblemDetail
 from riftlab.ingestion.domain import Match
@@ -31,11 +34,13 @@ from riftlab.shared.api.common import (
 )
 from riftlab.shared.api.enums import PreparationStatus
 from riftlab.shared.api.matches import (
+    ChampionAsset,
     MatchDetail,
     MatchParticipant,
     MatchPreparation,
     MatchSummary,
 )
+from riftlab.shared.errors import SourceSchemaError
 
 router = APIRouter(tags=["matches"])
 
@@ -82,11 +87,15 @@ async def list_imported_matches(
     responses={404: _NOT_FOUND, 422: _INVALID},
 )
 async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail:
-    detail = await get_match_detail(request.app.state.session_factory, match_id)
+    detail = await get_match_detail(
+        request.app.state.session_factory,
+        match_id,
+        _catalog_mapping_or_none(Path(request.app.state.settings.catalog_mappings_path)),
+    )
     summary = _to_summary(detail.match, detail.preparation)
     return MatchDetail(
         **summary.model_dump(),
-        participants=[_to_participant(p) for p in detail.participants],
+        participants=[_to_participant(p, detail.champions) for p in detail.participants],
         preparation=_to_preparation(detail.preparation),
     )
 
@@ -129,12 +138,33 @@ def _to_summary(match: Match, preparation: PreparationInfo) -> MatchSummary:
     )
 
 
-def _to_participant(view: ParticipantView) -> MatchParticipant:
+def _catalog_mapping_or_none(path: Path) -> CatalogMapping | None:
+    """Mapping explícito lido do arquivo local (sem rede). Arquivo ausente ou inválido:
+    a partida continua legível, só sem nomes/retratos (CC-208)."""
+    try:
+        return load_catalog_mapping(path) if path.is_file() else None
+    except SourceSchemaError:
+        return None
+
+
+def _to_participant(
+    view: ParticipantView, champions: Mapping[int, ChampionAssetData]
+) -> MatchParticipant:
+    asset = champions.get(view.champion_id)
     return MatchParticipant(
         participant_id=view.participant_id,
         champion_id=view.champion_id,
         team=view.team,
         role=view.role,
+        champion=(
+            ChampionAsset(
+                name=asset.name,
+                data_dragon_version=asset.data_dragon_version,
+                image_file=asset.image_file,
+            )
+            if asset is not None
+            else None
+        ),
     )
 
 

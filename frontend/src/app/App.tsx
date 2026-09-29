@@ -93,6 +93,18 @@ function AppShell() {
         <main id="conteudo" ref={mainRef} tabIndex={-1} className="app__main">
           {renderPage(route)}
         </main>
+        <footer className="app__footer">
+          <p>
+            Revisão de partidas concluídas; o RiftLab não acompanha partidas ao vivo. Nomes e
+            retratos de campeões: Data Dragon, da Riot Games.
+          </p>
+          <p lang="en">
+            RiftLab isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or
+            opinions of Riot Games or anyone officially involved in producing or managing Riot
+            Games properties. Riot Games, and all associated properties are trademarks or
+            registered trademarks of Riot Games, Inc.
+          </p>
+        </footer>
       </div>
     </>
   );

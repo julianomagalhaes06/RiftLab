@@ -8,7 +8,8 @@ import { isDemoMatchId } from "../../shared/router/routes";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { DecisionList } from "./DecisionList";
 import { PreparationPanel } from "./PreparationPanel";
-import { championLabel, roleLabel, teamLabel } from "./format";
+import { ChampionBadge } from "./ChampionBadge";
+import { roleLabel, teamLabel } from "./format";
 
 /** Preparação em andamento (PENDING/RUNNING) é o único estado não terminal. */
 function preparationSettled(match: MatchDetail): boolean {
@@ -63,7 +64,7 @@ function Participants({
                     >
                       <span className="list__title">
                         Participante {participant.participantId} —{" "}
-                        {championLabel(participant.championId)}
+                        <ChampionBadge participant={participant} />
                       </span>
                     </Link>
                     <span className="list__meta">{roleLabel(participant.role)}</span>

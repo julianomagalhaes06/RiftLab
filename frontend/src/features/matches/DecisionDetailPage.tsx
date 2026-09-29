@@ -1,4 +1,5 @@
-import type { DecisionState } from "../../shared/api/client";
+import { useEffect, useState } from "react";
+import { api, type DecisionState, type MatchParticipant } from "../../shared/api/client";
 import { Link } from "../../shared/router/Link";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import {
@@ -11,6 +12,7 @@ import {
   subReasonText,
   trinketLabel,
 } from "./format";
+import { ChampionBadge } from "./ChampionBadge";
 import { useDecision } from "./useDecision";
 
 const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
@@ -112,9 +114,37 @@ function TechnicalDetails({ decision }: { decision: DecisionState }) {
   );
 }
 
+/** Campeão do participante da decisão (CC-208), lido do detalhe da partida. Acessório:
+ * qualquer falha só omite o campeão, sem afetar a decisão. */
+function useParticipantChampion(matchId: string | null, participantId: number | null) {
+  const key = matchId !== null && participantId !== null ? `${matchId}#${participantId}` : null;
+  const [loaded, setLoaded] = useState<{ key: string; participant: MatchParticipant | null } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (key === null || matchId === null) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    api
+      .getMatch(matchId, controller.signal)
+      .then((match) =>
+        setLoaded({
+          key,
+          participant: match.participants.find((p) => p.participantId === participantId) ?? null,
+        }),
+      )
+      .catch(() => setLoaded({ key, participant: null }));
+    return () => controller.abort();
+  }, [key, matchId, participantId]);
+  return loaded !== null && loaded.key === key ? loaded.participant : null;
+}
+
 /** Detalhe de uma decisão (/decisions/:id): só informação ANTERIOR à decisão. */
 export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
   const load = useDecision(decisionId);
+  const ready = load.status === "ready" ? load.decision : null;
+  const participant = useParticipantChampion(ready?.matchId ?? null, ready?.participantId ?? null);
 
   if (load.status === "loading") {
     return (
@@ -146,6 +176,9 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
       <h2 id="decision-heading">
         Decisão em {formatGameTime(decision.timestampMs)} — participante {decision.participantId}
       </h2>
+      <p className="decision__champion">
+        {participant ? <ChampionBadge participant={participant} size={40} /> : null}
+      </p>
       <p>
         <Link
           to={{

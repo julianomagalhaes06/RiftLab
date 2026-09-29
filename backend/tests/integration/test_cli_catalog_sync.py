@@ -104,3 +104,43 @@ def test_catalog_sync_real_mode_unmapped_patch_blocks_without_network(tmp_path) 
     assert result.exit_code == 1
     assert "BLOCKED" in result.output
     assert "MISSING_CATALOG" in result.output
+
+
+def test_sync_champions_for_a_patch_without_mapping_uses_no_network(
+    _migrated_database, tmp_path, monkeypatch
+) -> None:
+    """CC-208: `cc catalog sync-champions` com patch fora do mapping termina sem rede
+    (a busca real falharia o teste se fosse chamada)."""
+    from riftlab.catalog.infrastructure import data_dragon_transport
+
+    async def _no_network(*_args, **_kwargs):
+        raise AssertionError("não deveria buscar o CDN")
+
+    monkeypatch.setattr(
+        data_dragon_transport.DataDragonTransport, "fetch_champion_catalog", _no_network
+    )
+    mapping = tmp_path / "catalog-mappings.yaml"
+    mapping.write_text(
+        "schemaVersion: v1\nmappingVersion: v1\n"
+        'mappings:\n  "16.17": {dataDragonVersion: "16.17.1"}\n'
+    )
+    result = runner.invoke(
+        app, ["catalog", "sync-champions", "--patch", "99.1", "--mapping-file", str(mapping)]
+    )
+    assert result.exit_code == 1
+    assert "resultado=NO_MAPPING" in result.output
+
+
+def test_sync_champions_without_mapping_file_is_blocked(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "sync-champions",
+            "--patch",
+            "16.17",
+            "--mapping-file",
+            str(tmp_path / "x.yaml"),
+        ],
+    )
+    assert result.exit_code == 1 and "BLOCKED" in result.output

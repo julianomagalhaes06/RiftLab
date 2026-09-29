@@ -1,4 +1,5 @@
 import type {
+  ChampionAsset,
   BudgetSource,
   DecisionBudget,
   InventoryItem,
@@ -167,12 +168,37 @@ export function championLabel(championId: number): string {
   return `Campeão #${championId}`;
 }
 
+/** Host fixo do CDN oficial (CC-208). Nenhuma outra origem de imagem é montada. */
+export const DATA_DRAGON_HOST = "https://ddragon.leagueoflegends.com";
+const VERSION_PATTERN = /^\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+const IMAGE_FILE_PATTERN = /^[A-Za-z0-9]{1,64}\.png$/;
+
+/** URL do retrato quadrado, ou null se versão/arquivo não passarem na validação
+ * (defesa em profundidade: a API já valida, mas a interface nunca monta caminho livre). */
+export function championPortraitUrl(
+  champion: Pick<ChampionAsset, "dataDragonVersion" | "imageFile"> | null | undefined,
+): string | null {
+  if (
+    !champion ||
+    !VERSION_PATTERN.test(champion.dataDragonVersion) ||
+    !IMAGE_FILE_PATTERN.test(champion.imageFile)
+  ) {
+    return null;
+  }
+  return `${DATA_DRAGON_HOST}/cdn/${champion.dataDragonVersion}/img/champion/${champion.imageFile}`;
+}
+
+/** Nome do campeão quando resolvido; senão o rótulo numérico honesto. */
+export function championName(participant: Pick<MatchParticipant, "championId" | "champion">): string {
+  return participant.champion?.name ?? championLabel(participant.championId);
+}
+
 export function teamLabel(team: number): string {
   return `Time ${team}`;
 }
 
 export function participantLabel(participant: MatchParticipant): string {
-  return `Participante ${participant.participantId} — ${championLabel(participant.championId)}`;
+  return `Participante ${participant.participantId} — ${championName(participant)}`;
 }
 
 export function itemLabel(item: Pick<InventoryItem, "itemId" | "name">): string {

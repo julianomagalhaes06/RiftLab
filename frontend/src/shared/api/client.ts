@@ -15,6 +15,7 @@ export type ImportJobState = Schemas["ImportJobState"];
 export type MatchSummary = Schemas["MatchSummary"];
 export type MatchDetail = Schemas["MatchDetail"];
 export type MatchParticipant = Schemas["MatchParticipant"];
+export type ChampionAsset = Schemas["ChampionAsset"];
 export type MatchPreparation = Schemas["MatchPreparation"];
 export type PreparationStatus = Schemas["PreparationStatus"];
 export type MatchPage = Schemas["CursorPage_MatchSummary_"];

@@ -194,6 +194,21 @@ export interface components {
          * @enum {string}
          */
         BudgetSource: "UNKNOWN" | "FRAME_ESTIMATE" | "USER_PROVIDED";
+        /**
+         * ChampionAsset
+         * @description Nome e retrato oficiais (CC-208), resolvidos pelo `key` numérico no catálogo do
+         *     Data Dragon da versão FIXADA para o patch. O retrato é
+         *     `https://ddragon.leagueoflegends.com/cdn/{dataDragonVersion}/img/champion/{imageFile}`;
+         *     os dois campos são validados por padrão estrito (nunca caminho ou URL livre).
+         */
+        ChampionAsset: {
+            /** Datadragonversion */
+            dataDragonVersion: string;
+            /** Imagefile */
+            imageFile: string;
+            /** Name */
+            name: string;
+        };
         /** CursorPage[DecisionStateSummary] */
         CursorPage_DecisionStateSummary_: {
             /** Items */
@@ -453,6 +468,8 @@ export interface components {
          *     contrato so garante inteiro nao negativo nesta etapa.
          */
         MatchParticipant: {
+            /** @description null em partida DEMO, patch sem mapping, catálogo ainda não sincronizado ou campeão ausente do catálogo: a interface mostra o id numérico. */
+            champion?: components["schemas"]["ChampionAsset"] | null;
             /** Championid */
             championId: number;
             /** Participantid */

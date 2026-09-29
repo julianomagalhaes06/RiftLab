@@ -28,6 +28,17 @@ class MatchSummary(CamelModel):
     preparation_status: PreparationStatus
 
 
+class ChampionAsset(CamelModel):
+    """Nome e retrato oficiais (CC-208), resolvidos pelo `key` numérico no catálogo do
+    Data Dragon da versão FIXADA para o patch. O retrato é
+    `https://ddragon.leagueoflegends.com/cdn/{dataDragonVersion}/img/champion/{imageFile}`;
+    os dois campos são validados por padrão estrito (nunca caminho ou URL livre)."""
+
+    name: str = Field(min_length=1, max_length=100)
+    data_dragon_version: str = Field(pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}$")
+    image_file: str = Field(pattern=r"^[A-Za-z0-9]{1,64}\.png$")
+
+
 class MatchParticipant(CamelModel):
     """docs/domain-model.md: participants tem subject_hash isolado dos dados
     publicos — nunca exposto aqui. A codificacao exata de "team" (ex.: 100/200
@@ -38,6 +49,11 @@ class MatchParticipant(CamelModel):
     champion_id: int = Field(ge=1)
     team: int = Field(ge=0)
     role: str | None = Field(default=None, min_length=1, max_length=20)
+    champion: ChampionAsset | None = Field(
+        default=None,
+        description="null em partida DEMO, patch sem mapping, catálogo ainda não "
+        "sincronizado ou campeão ausente do catálogo: a interface mostra o id numérico.",
+    )
 
 
 class MatchPreparation(CamelModel):

@@ -149,6 +149,64 @@ def catalog_sync(
         raise typer.Exit(code=1) from exc
 
 
+@catalog_app.command("sync-champions")
+def catalog_sync_champions(
+    patch: str = typer.Option(
+        ..., help="gamePatch major.minor real (ex.: 16.17), com entrada no mapping de catálogo."
+    ),
+    mapping_file: Path = typer.Option(
+        None,
+        help="Caminho do mapping YAML (padrão: RIFTLAB_CATALOG_MAPPINGS_PATH/"
+        "Settings.catalog_mappings_path).",
+    ),
+    env_file: Path = typer.Option(
+        None, help="Caminho do .env a carregar (padrão: raiz do repositório)."
+    ),
+) -> None:
+    """Nomes e retratos oficiais dos campeões (CC-208): busca champion.json pt_BR da
+    versão do Data Dragon FIXADA para o patch e grava o catálogo. Patch sem mapping não
+    usa rede; catálogo já gravado não é buscado de novo (idempotente)."""
+    import asyncio
+
+    from riftlab.catalog.infrastructure.catalog_mapping import load_catalog_mapping
+    from riftlab.catalog.infrastructure.data_dragon_transport import DataDragonTransport
+    from riftlab.champions.application import ensure_champion_catalog
+    from riftlab.cli.env_file import load_settings
+    from riftlab.db import build_engine
+    from riftlab.shared.db import build_session_factory
+    from riftlab.shared.errors import SourceError
+
+    settings = load_settings(env_file)
+    resolved_mapping_file = mapping_file or Path(settings.catalog_mappings_path)
+    if not resolved_mapping_file.exists():
+        typer.echo(
+            f"BLOCKED: mapping de catálogo não encontrado em {resolved_mapping_file}.", err=True
+        )
+        raise typer.Exit(code=1)
+    mapping = load_catalog_mapping(resolved_mapping_file)
+
+    async def _run() -> str:
+        engine = build_engine(settings.database_url)
+        transport = DataDragonTransport()
+        try:
+            outcome = await ensure_champion_catalog(
+                build_session_factory(engine), mapping, patch, transport.fetch_champion_catalog
+            )
+            return outcome.value
+        finally:
+            await transport.aclose()
+            await engine.dispose()
+
+    try:
+        outcome = asyncio.run(_run())
+    except SourceError as exc:
+        typer.echo(f"BLOCKED: {exc.code} - {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"patch={patch} resultado={outcome}")
+    if outcome == "NO_MAPPING":
+        raise typer.Exit(code=1)
+
+
 timeline_app = typer.Typer(
     help="Reconstrução pré-compra de inventário (CC-203).",
     no_args_is_help=True,

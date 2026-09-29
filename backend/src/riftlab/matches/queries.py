@@ -16,6 +16,8 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
+from riftlab.champions.application import ChampionAsset, champion_assets
 from riftlab.decisions.domain import ParticipantView
 from riftlab.ingestion.domain import Match
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
@@ -47,6 +49,7 @@ class MatchDetailData:
     match: Match
     participants: list[ParticipantView]
     preparation: PreparationInfo
+    champions: dict[int, ChampionAsset]
 
 
 def encode_match_cursor(start_at: datetime, match_id: str) -> str:
@@ -103,7 +106,9 @@ async def list_matches(
     return MatchPage(items, next_cursor)
 
 
-async def get_match_detail(session_factory: SessionFactory, match_id: str) -> MatchDetailData:
+async def get_match_detail(
+    session_factory: SessionFactory, match_id: str, mapping: CatalogMapping | None = None
+) -> MatchDetailData:
     async with read_only_unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         match = await repo.get_match(match_id)
@@ -113,4 +118,8 @@ async def get_match_detail(session_factory: SessionFactory, match_id: str) -> Ma
             ParticipantView.from_participant(p) for p in await repo.list_participants(match_id)
         ]
         job = await repo.get_latest_preparation_job(match_id)
-    return MatchDetailData(match, participants, preparation_info(job))
+        # CC-208: só banco (catálogo de campeões já sincronizado); nunca busca o CDN.
+        champions = await champion_assets(
+            session, mapping, match_id, match.patch, (p.champion_id for p in participants)
+        )
+    return MatchDetailData(match, participants, preparation_info(job), champions)

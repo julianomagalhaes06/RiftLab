@@ -24,9 +24,20 @@ ALLOWED_HOST = "ddragon.leagueoflegends.com"
 # Mesmo formato usado por configs/catalog-mappings.yaml e pela API real de
 # versions.json (ex.: "16.17.1") — nunca aceita um valor arbitrário como
 # parte da URL sem validar o formato primeiro.
-_VERSION_PATTERN = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}$")
+VERSION_PATTERN = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}$")
 
 _MAX_BACKOFF_SECONDS = 10.0
+
+# Idiomas aceitos para champion.json (CC-208): lista fechada, nunca texto livre.
+ALLOWED_CHAMPION_LOCALES = frozenset({"pt_BR"})
+
+
+def _check_version(data_dragon_version: str) -> None:
+    if not VERSION_PATTERN.match(data_dragon_version):
+        raise SourceSchemaError(
+            code="DATA_DRAGON_INVALID_VERSION",
+            detail="versão do Data Dragon fora do formato esperado",
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,9 +59,9 @@ def _backoff_seconds(attempt: int) -> float:
 
 
 class DataDragonTransport:
-    """Busca item.json de uma versão específica e já validada do Data
-    Dragon — nunca "latest", nunca outra rota além de item.json (escopo do
-    CC-202)."""
+    """Busca item.json (CC-202) e champion.json (CC-208) de uma versão
+    específica e já validada do Data Dragon — nunca "latest", nunca outra rota
+    além dessas duas, fixas."""
 
     def __init__(
         self,
@@ -69,13 +80,25 @@ class DataDragonTransport:
             await self._client.aclose()
 
     async def fetch_item_catalog(self, data_dragon_version: str) -> RawDataDragonResponse:
-        if not _VERSION_PATTERN.match(data_dragon_version):
-            raise SourceSchemaError(
-                code="DATA_DRAGON_INVALID_VERSION",
-                detail="versão do Data Dragon fora do formato esperado",
-            )
+        _check_version(data_dragon_version)
         url = f"https://{ALLOWED_HOST}/cdn/{data_dragon_version}/data/en_US/item.json"
+        return await self._get(url, data_dragon_version)
 
+    async def fetch_champion_catalog(
+        self, data_dragon_version: str, locale: str = "pt_BR"
+    ) -> RawDataDragonResponse:
+        """champion.json (CC-208) de uma versão validada e de um idioma da lista
+        fechada — rota própria e fixa, ao lado da de itens (nenhuma das duas aceita
+        caminho vindo de fora)."""
+        _check_version(data_dragon_version)
+        if locale not in ALLOWED_CHAMPION_LOCALES:
+            raise SourceSchemaError(
+                code="DATA_DRAGON_INVALID_LOCALE", detail="idioma fora da lista permitida"
+            )
+        url = f"https://{ALLOWED_HOST}/cdn/{data_dragon_version}/data/{locale}/champion.json"
+        return await self._get(url, data_dragon_version)
+
+    async def _get(self, url: str, data_dragon_version: str) -> RawDataDragonResponse:
         attempt = 0
         while True:
             attempt += 1

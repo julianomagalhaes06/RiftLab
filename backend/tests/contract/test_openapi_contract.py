@@ -137,7 +137,13 @@ def test_match_response_schemas_expose_no_personal_identifier() -> None:
     """A lista e o detalhe não carregam identificador pessoal nem a classe/item
     comprado: o hash do participante nunca sai da API."""
     schemas = _current_schema()["components"]["schemas"]
-    for name in ("MatchSummary", "MatchDetail", "MatchParticipant", "MatchPreparation"):
+    for name in (
+        "MatchSummary",
+        "MatchDetail",
+        "MatchParticipant",
+        "MatchPreparation",
+        "ChampionAsset",
+    ):
         for prop in schemas[name]["properties"]:
             assert not any(w in prop.lower() for w in ("subject", "hash", "puuid", "riotid")), (
                 name,
@@ -148,6 +154,12 @@ def test_match_response_schemas_expose_no_personal_identifier() -> None:
         "championId",
         "team",
         "role",
+        "champion",  # CC-208: nome e retrato oficiais, ou null
+    }
+    assert set(schemas["ChampionAsset"]["properties"]) == {
+        "name",
+        "dataDragonVersion",
+        "imageFile",
     }
     assert "preparationStatus" in schemas["MatchSummary"]["properties"]
     assert set(schemas["PreparationStatus"]["enum"]) == {

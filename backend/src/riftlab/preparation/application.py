@@ -37,8 +37,12 @@ from riftlab.catalog.domain import CatalogSource
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_catalog_mapping
 from riftlab.catalog.infrastructure.curation import CURATION_RULES_VERSION
 from riftlab.catalog.infrastructure.data_dragon_source import DataDragonCatalogSource
-from riftlab.catalog.infrastructure.data_dragon_transport import DataDragonTransport
+from riftlab.catalog.infrastructure.data_dragon_transport import (
+    DataDragonTransport,
+    RawDataDragonResponse,
+)
 from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource, demo_catalog_mapping
+from riftlab.champions.application import ChampionFetcher, ensure_champion_catalog
 from riftlab.config import Settings
 from riftlab.decisions.application import extract_decisions, resolve_current_versions
 from riftlab.decisions.domain import DecisionError
@@ -161,12 +165,43 @@ async def _ensure_catalog(
     return mapping
 
 
+async def _default_champion_fetch(version: str, locale: str) -> RawDataDragonResponse:
+    transport = DataDragonTransport()
+    try:
+        return await transport.fetch_champion_catalog(version, locale)
+    finally:
+        await transport.aclose()
+
+
+async def _ensure_champions(
+    session_factory: SessionFactory,
+    job: ImportJob,
+    mapping: CatalogMapping,
+    patch: str,
+    champion_fetch: ChampionFetcher,
+) -> None:
+    """Nomes e retratos (CC-208) são acessórios: DEMO nunca busca (não há campeão
+    real a atribuir); em REAL, patch sem mapping não usa rede; e qualquer falha
+    (CDN fora do ar, documento inválido, versão divergente) só é registrada — a
+    partida continua preparada e a interface mostra o rótulo numérico."""
+    if job.mode == ImportMode.DEMO:
+        return
+    try:
+        await ensure_champion_catalog(session_factory, mapping, patch, champion_fetch)
+    except SourceError as exc:
+        logger.warning(
+            "catálogo de campeões indisponível; seguindo sem nomes/retratos",
+            extra={"code": exc.code},
+        )
+
+
 async def _prepare(
     session_factory: SessionFactory,
     raw_store: DurableRawMatchStore,
     settings: Settings,
     job: ImportJob,
     catalog_source_factory: CatalogSourceFactory,
+    champion_fetch: ChampionFetcher = _default_champion_fetch,
 ) -> None:
     match_id = job.requested_match_id
     async with unit_of_work(session_factory) as session:
@@ -187,6 +222,7 @@ async def _prepare(
     )
     await reconstruct_match(session_factory, mapping, source, match_id, empirical_rules=rules)
     await extract_decisions(session_factory, match_id, scope_path=Path(settings.scope_path))
+    await _ensure_champions(session_factory, job, mapping, match.patch, champion_fetch)
 
 
 async def _finalize(
@@ -221,6 +257,7 @@ async def process_next_preparation(
     raw_store: DurableRawMatchStore,
     settings: Settings,
     catalog_source_factory: CatalogSourceFactory | None = None,
+    champion_fetch: ChampionFetcher | None = None,
 ) -> bool:
     """Um ciclo do worker para PREPARE. True se uma preparação foi processada
     (mesmo que tenha falhado); False se não havia trabalho elegível.
@@ -243,6 +280,7 @@ async def process_next_preparation(
             settings,
             job,
             catalog_source_factory or _default_catalog_source,
+            champion_fetch or _default_champion_fetch,
         )
     except SubjectHashSecretMissingError:
         await _finalize(session_factory, job, failed="SUBJECT_HASH_SECRET_MISSING")

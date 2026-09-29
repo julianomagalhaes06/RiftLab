@@ -396,7 +396,14 @@ def test_match_detail_has_participants_without_hash_and_a_preparation_block() ->
     )
     assert detail.participants[0].role is None  # ausente ≠ inventado
     assert detail.preparation.error_code == "TIMELINE_REPLAY_ERROR"
-    assert set(MatchParticipant.model_fields) == {"participant_id", "champion_id", "team", "role"}
+    assert set(MatchParticipant.model_fields) == {
+        "participant_id",
+        "champion_id",
+        "team",
+        "role",
+        "champion",
+    }
+    assert detail.participants[0].champion is None  # ausente ⇒ rótulo numérico (CC-208)
     with pytest.raises(ValidationError):
         MatchParticipant.model_validate(
             {"participantId": 1, "championId": 22, "team": 100, "subjectHash": "x" * 64}
@@ -472,3 +479,24 @@ def test_learning_attempt_reveal_requires_explicit_true() -> None:
 def test_camel_model_rejects_unknown_field() -> None:
     with pytest.raises(ValidationError):
         ObjectiveInterpretRequest.model_validate({"text": "curto", "unexpectedField": True})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("imageFile", "../Kaisa.png"),
+        ("imageFile", "https://evil.example/Kaisa.png"),
+        ("imageFile", "Kaisa.svg"),
+        ("dataDragonVersion", "latest"),
+        ("dataDragonVersion", "16.17.1/../x"),
+        ("name", ""),
+    ],
+)
+def test_champion_asset_rejects_paths_urls_and_unpinned_versions(field: str, value: str) -> None:
+    """CC-208: a API nunca divulga caminho livre, URL ou versão não fixada."""
+    from riftlab.shared.api.matches import ChampionAsset
+
+    valid = {"name": "Kai'Sa", "dataDragonVersion": "16.17.1", "imageFile": "Kaisa.png"}
+    assert ChampionAsset.model_validate(valid).image_file == "Kaisa.png"
+    with pytest.raises(ValidationError):
+        ChampionAsset.model_validate({**valid, field: value})

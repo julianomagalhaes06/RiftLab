@@ -11,6 +11,35 @@
         "title": "BudgetSource",
         "type": "string"
       },
+      "ChampionAsset": {
+        "additionalProperties": false,
+        "description": "Nome e retrato oficiais (CC-208), resolvidos pelo `key` numérico no catálogo do\nData Dragon da versão FIXADA para o patch. O retrato é\n`https://ddragon.leagueoflegends.com/cdn/{dataDragonVersion}/img/champion/{imageFile}`;\nos dois campos são validados por padrão estrito (nunca caminho ou URL livre).",
+        "properties": {
+          "dataDragonVersion": {
+            "pattern": "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$",
+            "title": "Datadragonversion",
+            "type": "string"
+          },
+          "imageFile": {
+            "pattern": "^[A-Za-z0-9]{1,64}\\.png$",
+            "title": "Imagefile",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "dataDragonVersion",
+          "imageFile"
+        ],
+        "title": "ChampionAsset",
+        "type": "object"
+      },
       "CursorPage_DecisionStateSummary_": {
         "additionalProperties": false,
         "properties": {
@@ -641,6 +670,17 @@
         "additionalProperties": false,
         "description": "docs/domain-model.md: participants tem subject_hash isolado dos dados\npublicos — nunca exposto aqui. A codificacao exata de \"team\" (ex.: 100/200\nestilo Riot vs 1/2 simplificado) ainda nao foi decidida (CC-201/202); o\ncontrato so garante inteiro nao negativo nesta etapa.",
         "properties": {
+          "champion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChampionAsset"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null em partida DEMO, patch sem mapping, catálogo ainda não sincronizado ou campeão ausente do catálogo: a interface mostra o id numérico."
+          },
           "championId": {
             "minimum": 1.0,
             "title": "Championid",
