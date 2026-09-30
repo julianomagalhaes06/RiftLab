@@ -334,6 +334,7 @@ async def _persist_result(
                         team=participant.team,
                         subject_hash=participant.subject_hash,
                         role=participant.role,
+                        score=participant.score,
                     )
                 )
             for event in result.events:

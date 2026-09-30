@@ -23,6 +23,7 @@ from riftlab.ingestion.domain import (
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore, RawStoreCorruptedError
 from riftlab.ingestion.infrastructure.riot_transport import RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
+from riftlab.ingestion.score import parse_participant_score
 from riftlab.shared.domain import SourceOrigin
 from riftlab.shared.errors import SourceNotFoundError, SourceSchemaError
 from riftlab.shared.numeric import is_ascii_digits
@@ -314,6 +315,7 @@ def _build_match_source_result(
                 team=_require_int(raw_participant["teamId"], "teamId"),
                 subject_hash=compute_real_subject_hash(puuid, subject_hash_secret),
                 role=role or None,
+                score=parse_participant_score(raw_participant),
             )
         )
         match_puuid_by_id[participant_id] = puuid

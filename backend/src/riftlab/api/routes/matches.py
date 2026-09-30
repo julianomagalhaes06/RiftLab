@@ -17,10 +17,9 @@ from fastapi import APIRouter, Query, Request, Response
 
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_catalog_mapping
 from riftlab.champions.application import ChampionAsset as ChampionAssetData
-from riftlab.decisions.domain import ParticipantView
 from riftlab.errors import ProblemDetail
 from riftlab.ingestion.domain import Match
-from riftlab.matches.queries import get_match_detail, list_matches
+from riftlab.matches.queries import MatchParticipantFactsView, get_match_detail, list_matches
 from riftlab.preparation.application import (
     PreparationInfo,
     preparation_info,
@@ -175,7 +174,7 @@ def _catalog_mapping_or_none(path: Path) -> CatalogMapping | None:
 
 
 def _to_participant(
-    view: ParticipantView, champions: Mapping[int, ChampionAssetData]
+    view: MatchParticipantFactsView, champions: Mapping[int, ChampionAssetData]
 ) -> MatchParticipant:
     asset = champions.get(view.champion_id)
     return MatchParticipant(
@@ -183,6 +182,12 @@ def _to_participant(
         champion_id=view.champion_id,
         team=view.team,
         role=view.role,
+        win=view.score.win,
+        kills=view.score.kills,
+        deaths=view.score.deaths,
+        assists=view.score.assists,
+        total_minions_killed=view.score.total_minions_killed,
+        neutral_minions_killed=view.score.neutral_minions_killed,
         champion=(
             ChampionAsset(
                 name=asset.name,

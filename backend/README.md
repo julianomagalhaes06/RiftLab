@@ -343,3 +343,16 @@ uv run cc ranked refresh --season 2026-3 --account-file ../.private/riot-account
 ```
 
 O comando exige `RIFTLAB_RIOT_API_KEY`, `RIFTLAB_SUBJECT_HASH_SECRET` e o banco configurados no ambiente ou `.env`. A temporada é informada pelo operador porque League-V4 não retorna temporada. A conta fica fora da imagem; para a API em container, montar o arquivo privado somente para leitura e definir `RIFTLAB_RANKED_ACCOUNT_FILE` com o caminho montado. `GET /api/v1/ranked/me` usa exclusivamente banco e identidade local HMAC, sem rede, PUUID ou Riot ID na resposta. A atualização registra tentativas válidas e falhas separadamente, sem apagar a posição anterior; `UNRANKED` exige resposta válida da Riot. O limitador Riot desta CLI coordena chamadas **desta execução**, não entre processos; 429 e `Retry-After` são respeitados. Nenhuma atualização real ocorreu na validação do CC-310.
+
+### Placar factual pós-partida (CC-313)
+
+Novos imports de partidas concluídas preservam, por participante, `win`, `kills`, `deaths`, `assists`, `totalMinionsKilled` e `neutralMinionsKilled`. Campos ausentes ficam `null`; zero observado permanece zero. `GET /api/v1/matches/{id}` expõe esses fatos no detalhe de cada participante, sem indicar qual conta é a própria. A lista de partidas e as features pré-decisão não recebem placar final.
+
+Para completar linhas antigas somente a partir de raw local íntegro, definir uma conexão de banco **explicitamente** e executar uma partida por vez:
+
+```sh
+export RIFTLAB_BACKFILL_DATABASE_URL='postgresql+asyncpg://USUARIO:SENHA@HOST:5432/BANCO'
+cc matches backfill-score --match-id BR1_1234567890 --raw-dir /caminho/raw/imports
+```
+
+O comando não carrega `.env`, não usa `RIFTLAB_DATABASE_URL` implícita e não busca rede. Confere hash e identidade do Match-V5 antes da escrita; raw ausente/corrompido não altera o banco, e valor já preenchido divergente bloqueia a transação. O operador deve apontar para o banco pretendido. Tropas são mantidas em duas contagens de origem, sem soma na API; uma futura soma visual só seria definida quando ambas forem conhecidas.

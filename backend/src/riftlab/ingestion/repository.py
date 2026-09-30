@@ -25,6 +25,7 @@ from riftlab.ingestion.models import (
     ParticipantModel,
     RiotRateLimitModel,
 )
+from riftlab.ingestion.score import ParticipantScore
 from riftlab.shared.errors import ConflictError
 
 _RIOT_RATE_LIMIT_KEY = "global"
@@ -59,6 +60,12 @@ class SqlAlchemyIngestionRepository:
                 team=participant.team,
                 role=participant.role,
                 subject_hash=participant.subject_hash,
+                win=participant.score.win,
+                kills=participant.score.kills,
+                deaths=participant.score.deaths,
+                assists=participant.score.assists,
+                total_minions_killed=participant.score.total_minions_killed,
+                neutral_minions_killed=participant.score.neutral_minions_killed,
             )
         )
 
@@ -109,6 +116,7 @@ class SqlAlchemyIngestionRepository:
             team=row.team,
             role=row.role,
             subject_hash=row.subject_hash,
+            score=_score_from_row(row),
         )
 
     async def list_participants(self, match_id: str) -> list[Participant]:
@@ -126,6 +134,7 @@ class SqlAlchemyIngestionRepository:
                 team=row.team,
                 role=row.role,
                 subject_hash=row.subject_hash,
+                score=_score_from_row(row),
             )
             for row in result.scalars()
         ]
@@ -446,4 +455,15 @@ def _match_from_row(row: MatchModel) -> Match:
         start_at=row.start_at,
         duration_seconds=row.duration_seconds,
         raw_hash=row.raw_hash,
+    )
+
+
+def _score_from_row(row: ParticipantModel) -> ParticipantScore:
+    return ParticipantScore(
+        win=row.win,
+        kills=row.kills,
+        deaths=row.deaths,
+        assists=row.assists,
+        total_minions_killed=row.total_minions_killed,
+        neutral_minions_killed=row.neutral_minions_killed,
     )

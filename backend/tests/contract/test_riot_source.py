@@ -158,6 +158,37 @@ async def test_load_match_success_maps_participants_frames_events(tmp_path) -> N
     assert _PUUID_1 not in repr(p1)
 
 
+async def test_riot_score_keeps_zero_and_missing_distinct(tmp_path) -> None:
+    match_doc = _match_doc()
+    match_doc["info"]["participants"][0].update(
+        win=False,
+        kills=0,
+        deaths=0,
+        assists=7,
+        totalMinionsKilled=100,
+        neutralMinionsKilled=6,
+    )
+    result = await _source(_RoutedHandler(match_doc, _timeline_doc()), tmp_path / "raw").load_match(
+        _MATCH_ID
+    )
+    assert result.participants[0].score.win is False
+    assert result.participants[0].score.deaths == 0
+    assert result.participants[0].score.total_minions_killed == 100
+    assert result.participants[0].score.neutral_minions_killed == 6
+    assert result.participants[1].score.win is None
+    assert result.participants[1].score.deaths is None
+
+
+async def test_riot_invalid_score_rejects_source(tmp_path) -> None:
+    match_doc = _match_doc()
+    match_doc["info"]["participants"][0]["kills"] = True
+    with pytest.raises(SourceSchemaError) as error:
+        await _source(_RoutedHandler(match_doc, _timeline_doc()), tmp_path / "raw").load_match(
+            _MATCH_ID
+        )
+    assert error.value.code == "MATCH_SCORE_INVALID"
+
+
 async def test_load_match_rejects_incomplete_match(tmp_path) -> None:
     handler = _RoutedHandler(_match_doc(endOfGameResult="Abort_AntiCheatExit"), _timeline_doc())
     source = _source(handler, tmp_path / "raw")

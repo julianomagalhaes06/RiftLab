@@ -407,6 +407,12 @@ def test_match_detail_has_participants_without_hash_and_a_preparation_block() ->
         "team",
         "role",
         "champion",
+        "win",
+        "kills",
+        "deaths",
+        "assists",
+        "total_minions_killed",
+        "neutral_minions_killed",
     }
     assert detail.participants[0].champion is None  # ausente ⇒ rótulo numérico (CC-208)
     with pytest.raises(ValidationError):

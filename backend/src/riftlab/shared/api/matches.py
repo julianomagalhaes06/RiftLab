@@ -57,6 +57,14 @@ class MatchParticipant(CamelModel):
     champion_id: int = Field(ge=1)
     team: int = Field(ge=0)
     role: str | None = Field(default=None, min_length=1, max_length=20)
+    win: bool | None = Field(
+        default=None, strict=True, description="Vitória deste participante; null se não observada."
+    )
+    kills: int | None = Field(default=None, strict=True, ge=0, le=2_147_483_647)
+    deaths: int | None = Field(default=None, strict=True, ge=0, le=2_147_483_647)
+    assists: int | None = Field(default=None, strict=True, ge=0, le=2_147_483_647)
+    total_minions_killed: int | None = Field(default=None, strict=True, ge=0, le=2_147_483_647)
+    neutral_minions_killed: int | None = Field(default=None, strict=True, ge=0, le=2_147_483_647)
     champion: ChampionAsset | None = Field(
         default=None,
         description="null em partida DEMO, patch sem mapping, catálogo ainda não "

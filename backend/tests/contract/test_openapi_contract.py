@@ -156,6 +156,12 @@ def test_match_response_schemas_expose_no_personal_identifier() -> None:
         "team",
         "role",
         "champion",  # CC-208: nome e retrato oficiais, ou null
+        "win",
+        "kills",
+        "deaths",
+        "assists",
+        "totalMinionsKilled",
+        "neutralMinionsKilled",
     }
     assert set(schemas["ChampionAsset"]["properties"]) == {
         "name",

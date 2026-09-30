@@ -34,6 +34,16 @@ class MatchModel(Base):
 
 class ParticipantModel(Base):
     __tablename__ = "participants"
+    __table_args__ = tuple(
+        CheckConstraint(f"{name} IS NULL OR {name} >= 0", name=f"{name}_non_negative")
+        for name in (
+            "kills",
+            "deaths",
+            "assists",
+            "total_minions_killed",
+            "neutral_minions_killed",
+        )
+    )
 
     match_id: Mapped[str] = mapped_column(ForeignKey("matches.match_id"), primary_key=True)
     participant_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -41,6 +51,12 @@ class ParticipantModel(Base):
     team: Mapped[int] = mapped_column(Integer, nullable=False)
     role: Mapped[str | None] = mapped_column(String, nullable=True)
     subject_hash: Mapped[str] = mapped_column(String, nullable=False)
+    win: Mapped[bool | None] = mapped_column(nullable=True)
+    kills: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    deaths: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    assists: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_minions_killed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    neutral_minions_killed: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):

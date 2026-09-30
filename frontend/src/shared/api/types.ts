@@ -527,16 +527,31 @@ export interface components {
          *     contrato so garante inteiro nao negativo nesta etapa.
          */
         MatchParticipant: {
+            /** Assists */
+            assists?: number | null;
             /** @description null em partida DEMO, patch sem mapping, catálogo ainda não sincronizado ou campeão ausente do catálogo: a interface mostra o id numérico. */
             champion?: components["schemas"]["ChampionAsset"] | null;
             /** Championid */
             championId: number;
+            /** Deaths */
+            deaths?: number | null;
+            /** Kills */
+            kills?: number | null;
+            /** Neutralminionskilled */
+            neutralMinionsKilled?: number | null;
             /** Participantid */
             participantId: number;
             /** Role */
             role?: string | null;
             /** Team */
             team: number;
+            /** Totalminionskilled */
+            totalMinionsKilled?: number | null;
+            /**
+             * Win
+             * @description Vitória deste participante; null se não observada.
+             */
+            win?: boolean | null;
         };
         /**
          * MatchPreparation

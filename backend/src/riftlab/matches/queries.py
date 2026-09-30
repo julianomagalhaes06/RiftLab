@@ -18,9 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
 from riftlab.champions.application import ChampionAsset, champion_assets
-from riftlab.decisions.domain import ParticipantView
-from riftlab.ingestion.domain import Match
+from riftlab.ingestion.domain import Match, Participant
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.ingestion.score import ParticipantScore
 from riftlab.preparation.application import PreparationInfo, preparation_info
 from riftlab.shared.api.common import MATCH_ID_DEMO_PATTERN, MATCH_ID_REAL_PATTERN
 from riftlab.shared.db import read_only_unit_of_work
@@ -46,9 +46,30 @@ class MatchPage:
 
 
 @dataclass(frozen=True, slots=True)
+class MatchParticipantFactsView:
+    """Fatos pós-partida sem campo para subject_hash ou conta própria."""
+
+    participant_id: int
+    champion_id: int
+    team: int
+    role: str | None
+    score: ParticipantScore
+
+    @classmethod
+    def from_participant(cls, participant: Participant) -> MatchParticipantFactsView:
+        return cls(
+            participant.participant_id,
+            participant.champion_id,
+            participant.team,
+            participant.role,
+            participant.score,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MatchDetailData:
     match: Match
-    participants: list[ParticipantView]
+    participants: list[MatchParticipantFactsView]
     preparation: PreparationInfo
     champions: dict[int, ChampionAsset]
 
@@ -149,7 +170,8 @@ async def get_match_detail(
         if match is None:
             raise NotFoundError(f"match {match_id!r} não encontrado")
         participants = [
-            ParticipantView.from_participant(p) for p in await repo.list_participants(match_id)
+            MatchParticipantFactsView.from_participant(p)
+            for p in await repo.list_participants(match_id)
         ]
         job = await repo.get_latest_preparation_job(match_id)
         # CC-208: só banco (catálogo de campeões já sincronizado); nunca busca o CDN.

@@ -289,7 +289,19 @@ async def test_detail_shows_match_participants_and_preparation_without_personal_
     }
     assert body["participants"], "a partida demo tem participantes"
     for participant in body["participants"]:
-        assert set(participant) == {"participantId", "championId", "team", "role", "champion"}
+        assert set(participant) == {
+            "participantId",
+            "championId",
+            "team",
+            "role",
+            "champion",
+            "win",
+            "kills",
+            "deaths",
+            "assists",
+            "totalMinionsKilled",
+            "neutralMinionsKilled",
+        }
         assert participant["champion"] is None  # DEMO nunca recebe campeão real (CC-208)
     assert not any(word in key.lower() for key in _keys(body) for word in _PERSONAL)
     assert not any(value in response.text for value in hashes)  # o hash nunca sai

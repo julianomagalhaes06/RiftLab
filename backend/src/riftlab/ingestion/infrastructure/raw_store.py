@@ -87,10 +87,39 @@ class DurableRawMatchStore:
     (RawStoreCorruptedError) — a identidade (match_id, kind) é
     write-once-do-conteúdo-que-vencer-primeiro, nunca last-write-wins."""
 
-    def __init__(self, directory: Path) -> None:
+    def __init__(self, directory: Path, *, create: bool = True) -> None:
         self._directory = directory
         self._blobs_directory = directory / "blobs"
-        self._blobs_directory.mkdir(parents=True, exist_ok=True)
+        if create:
+            self._blobs_directory.mkdir(parents=True, exist_ok=True)
+
+    def read_if_valid_read_only(self, match_id: str, kind: str) -> bytes | None:
+        """Backfill: valida ponteiro/blob atual sem migrar legado nem criar diretório.
+
+        Também valida o par legado corpo+sidecar sem migrá-lo; backfill nunca
+        escreve no raw, inclusive se o formato antigo estiver presente.
+        """
+        self._validate(match_id, kind)
+        ref_path = self._ref_path(match_id, kind)
+        if not ref_path.exists():
+            legacy_body = self._directory / f"{match_id}.{kind}.json"
+            legacy_hash = self._directory / f"{match_id}.{kind}.sha256"
+            if not legacy_body.exists() and not legacy_hash.exists():
+                return None
+            if not legacy_body.exists() or not legacy_hash.exists():
+                raise RawStoreCorruptedError("raw legado incompleto")
+            body = legacy_body.read_bytes()
+            expected = legacy_hash.read_text().strip()
+            if (
+                not _SHA256_HEX_PATTERN.fullmatch(expected)
+                or hashlib.sha256(body).hexdigest() != expected
+            ):
+                raise RawStoreCorruptedError("hash do raw legado divergente")
+            return body
+        referenced_hash = ref_path.read_text().strip()
+        if not _SHA256_HEX_PATTERN.fullmatch(referenced_hash):
+            raise RawStoreCorruptedError("ponteiro de raw inválido")
+        return self._read_blob(match_id, kind, referenced_hash)
 
     def read_if_valid(self, match_id: str, kind: str) -> bytes | None:
         """None se nunca foi gravado (nem no formato atual, nem no legado

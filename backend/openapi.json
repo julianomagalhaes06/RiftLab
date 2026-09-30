@@ -765,6 +765,19 @@
         "additionalProperties": false,
         "description": "docs/domain-model.md: participants tem subject_hash isolado dos dados\npublicos — nunca exposto aqui. A codificacao exata de \"team\" (ex.: 100/200\nestilo Riot vs 1/2 simplificado) ainda nao foi decidida (CC-201/202); o\ncontrato so garante inteiro nao negativo nesta etapa.",
         "properties": {
+          "assists": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assists"
+          },
           "champion": {
             "anyOf": [
               {
@@ -780,6 +793,45 @@
             "minimum": 1.0,
             "title": "Championid",
             "type": "integer"
+          },
+          "deaths": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deaths"
+          },
+          "kills": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kills"
+          },
+          "neutralMinionsKilled": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Neutralminionskilled"
           },
           "participantId": {
             "maximum": 10.0,
@@ -804,6 +856,31 @@
             "minimum": 0.0,
             "title": "Team",
             "type": "integer"
+          },
+          "totalMinionsKilled": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totalminionskilled"
+          },
+          "win": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Vitória deste participante; null se não observada.",
+            "title": "Win"
           }
         },
         "required": [
