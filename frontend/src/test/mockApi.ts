@@ -98,6 +98,8 @@ export function matchSummary(overrides: Record<string, unknown> = {}) {
     startAt: "2026-09-01T12:00:00Z",
     durationSeconds: 1800,
     preparationStatus: "READY",
+    supportLevel: typeof overrides.matchId === "string" && overrides.matchId.startsWith("BR1_") ? "LIMITED" : "DEMO",
+    supportReason: typeof overrides.matchId === "string" && overrides.matchId.startsWith("BR1_") ? "PATCH_NOT_VALIDATED" : "DEMO_DATA",
     championsPresent: [
       { championId: 9001, name: null },
       { championId: 9002, name: null },

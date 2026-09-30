@@ -1,8 +1,7 @@
-# Mapeamento explícito gameVersion/gamePatch -> versão do Data Dragon
-# (catálogo público oficial), congelado a partir do recorte real do CC-105
-# (configs/scope.yaml). Um patch sem entrada aqui nunca recebe fallback
-# "latest": a resolução (backend/src/riftlab/catalog/infrastructure/
-# catalog_mapping.py, CC-202) devolve MISSING_CATALOG sem tentar rede.
+# Overrides manuais explícitos preservados da auditoria CC-105. Para patch
+# novo, preparação/CLI consulta versions.json e grava a primeira versão
+# publicada para o mesmo major.minor; sem correspondência, MISSING_CATALOG.
+# Entrada neste arquivo prevalece sobre resolução automática persistida.
 #
 # matches.patch (docs/domain-model.md) guarda só major.minor (ex.: "16.17");
 # o raw bruto persistido pela importação (CC-201) contém a versão completa
@@ -25,9 +24,7 @@ schemaVersion: v1
 # anteriores, mesmo que o restante do mapping não tenha mudado.
 mappingVersion: v1
 
-# Só os dois patches minor adjacentes congelados em configs/scope.yaml
-# (CC-105) — ampliar esta lista para outros patches está fora do escopo do
-# CC-202 (não amplia coleta de partidas nem recorte).
+# Overrides históricos; não ampliar a cada patch novo.
 mappings:
   "16.16":
     dataDragonVersion: "16.16.1"

@@ -76,7 +76,9 @@ def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
-def parse_real_scope_document(content: bytes) -> DecisionScope:
+def parse_real_scope_document(
+    content: bytes, adjacent_patches: tuple[str, ...] | None = None
+) -> DecisionScope:
     """Lê `configs/scope.yaml`. Estrutura inválida é erro explícito, nunca um
     recorte parcial ou um default."""
     try:
@@ -96,16 +98,38 @@ def parse_real_scope_document(content: bytes) -> DecisionScope:
         isinstance(champion_ids, list) and bool(champion_ids) and all(map(_is_int, champion_ids)),
         "championIds inválido",
     )
-    patches = document.get("patches")
-    _require(isinstance(patches, list) and bool(patches), "patches inválido")
     game_patches: list[str] = []
-    for entry in patches:
-        game_patch = entry.get("gamePatch") if isinstance(entry, dict) else None
-        if not isinstance(game_patch, str) or not game_patch:
-            raise DecisionConfigError(code="SCOPE_DOCUMENT_INVALID", detail="gamePatch inválido")
-        game_patches.append(game_patch)
+    window = document.get("patchWindow")
+    if window is None:
+        patches = document.get("patches")
+        _require(isinstance(patches, list) and bool(patches), "patches inválido")
+        for entry in patches:
+            game_patch = entry.get("gamePatch") if isinstance(entry, dict) else None
+            if not isinstance(game_patch, str) or not game_patch:
+                raise DecisionConfigError(
+                    code="SCOPE_DOCUMENT_INVALID", detail="gamePatch inválido"
+                )
+            game_patches.append(game_patch)
+    else:
+        _require(
+            isinstance(window, dict) and window.get("mode") == "rolling", "patchWindow inválido"
+        )
+        size = window.get("size")
+        _require(_is_int(size) and 1 <= size <= 10, "patchWindow.size inválido")
+        if adjacent_patches is None:
+            raise DecisionConfigError(
+                code="CURRENT_PATCH_NOT_DETECTED",
+                detail="execute cc patch detect antes de usar a janela móvel",
+            )
+        _require(len(adjacent_patches) >= size, "janela detectada incompleta")
+        game_patches = list(adjacent_patches[:size])
+    effective = ",".join(game_patches)
     return DecisionScope(
-        version=f"scope_yaml:{schema_version}:{frozen_at}",
+        version=(
+            f"scope_yaml:{schema_version}:{frozen_at}:{effective}"
+            if window is not None
+            else f"scope_yaml:{schema_version}:{frozen_at}"
+        ),
         origin=SourceOrigin.COMPLETED_MATCH,
         queue=document["queue"],
         map_id=document["map"],
@@ -115,8 +139,8 @@ def parse_real_scope_document(content: bytes) -> DecisionScope:
     )
 
 
-def load_real_scope(path: Path) -> DecisionScope:
-    return parse_real_scope_document(path.read_bytes())
+def load_real_scope(path: Path, adjacent_patches: tuple[str, ...] | None = None) -> DecisionScope:
+    return parse_real_scope_document(path.read_bytes(), adjacent_patches)
 
 
 def scope_for_origin(origin: SourceOrigin, real_scope: DecisionScope | None) -> DecisionScope:

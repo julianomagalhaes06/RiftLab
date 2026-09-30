@@ -115,6 +115,42 @@ catalog_app = typer.Typer(
 )
 app.add_typer(catalog_app, name="catalog")
 
+patch_app = typer.Typer(help="Detecção explícita do patch vigente.", no_args_is_help=True)
+app.add_typer(patch_app, name="patch")
+
+
+@patch_app.command("detect")
+def patch_detect(
+    env_file: Path = typer.Option(None, help="Arquivo de ambiente do banco alvo."),
+) -> None:
+    """Lê versions.json público e registra o primeiro patch da lista no banco configurado."""
+    import asyncio
+
+    from riftlab.catalog.infrastructure.data_dragon_transport import DataDragonTransport
+    from riftlab.catalog.patches import record_current_patch
+    from riftlab.cli.env_file import load_settings
+    from riftlab.db import build_engine
+    from riftlab.shared.db import build_session_factory
+    from riftlab.shared.errors import SourceError
+
+    settings = load_settings(env_file)
+
+    async def run() -> str:
+        engine = build_engine(settings.database_url)
+        transport = DataDragonTransport()
+        try:
+            raw = await transport.fetch_versions()
+            return await record_current_patch(build_session_factory(engine), raw.body)
+        finally:
+            await transport.aclose()
+            await engine.dispose()
+
+    try:
+        typer.echo(f"patchVigente={asyncio.run(run())}")
+    except SourceError as exc:
+        typer.echo(f"BLOCKED: {exc.code}", err=True)
+        raise typer.Exit(code=1) from exc
+
 
 @catalog_app.command("sync")
 def catalog_sync(
@@ -182,8 +218,12 @@ def catalog_sync(
                         err=True,
                     )
                     raise typer.Exit(code=1)
-                mapping = load_catalog_mapping(resolved_mapping_file)
                 transport = DataDragonTransport()
+                from riftlab.catalog.patches import ensure_patch_mapping
+
+                mapping = await ensure_patch_mapping(
+                    session_factory, load_catalog_mapping(resolved_mapping_file), patch, transport
+                )
                 source = DataDragonCatalogSource(transport, mapping)
 
             result = await sync_catalog(session_factory, source, patch)
@@ -243,8 +283,13 @@ def catalog_sync_champions(
         engine = build_engine(settings.database_url)
         transport = DataDragonTransport()
         try:
+            from riftlab.catalog.patches import ensure_patch_mapping
+
+            resolved = await ensure_patch_mapping(
+                build_session_factory(engine), mapping, patch, transport
+            )
             outcome = await ensure_champion_catalog(
-                build_session_factory(engine), mapping, patch, transport.fetch_champion_catalog
+                build_session_factory(engine), resolved, patch, transport.fetch_champion_catalog
             )
             return outcome.value
         finally:
@@ -329,6 +374,11 @@ def timeline_reconstruct(
         engine = build_engine(settings.database_url)
         session_factory = build_session_factory(engine)
         try:
+            effective_mapping = mapping
+            if mode == "real":
+                from riftlab.catalog.patches import load_persisted_mapping
+
+                effective_mapping = await load_persisted_mapping(session_factory, mapping)
             source: MatchSource
             if mode == "demo":
                 source = DemoMatchSource()
@@ -346,7 +396,7 @@ def timeline_reconstruct(
                 reconstruction_version=RECONSTRUCTION_ALGORITHM_VERSION,
             )
             result = await reconstruct_match(
-                session_factory, mapping, source, match_id, empirical_rules=rules
+                session_factory, effective_mapping, source, match_id, empirical_rules=rules
             )
             typer.echo(
                 f"matchId={result.match_id} catalogId={result.catalog_id} "

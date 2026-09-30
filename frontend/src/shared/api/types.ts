@@ -518,6 +518,17 @@ export interface components {
              * Format: date-time
              */
             startAt: string;
+            /**
+             * Supportlevel
+             * @description Sem avaliação de ranking neste patch: suporte limitado; DEMO é ilustrativo.
+             * @enum {string}
+             */
+            supportLevel: "LIMITED" | "DEMO";
+            /**
+             * Supportreason
+             * @enum {string}
+             */
+            supportReason: "PATCH_NOT_VALIDATED" | "DEMO_DATA";
         };
         /**
          * MatchParticipant
@@ -596,6 +607,17 @@ export interface components {
              * Format: date-time
              */
             startAt: string;
+            /**
+             * Supportlevel
+             * @description Sem avaliação de ranking neste patch: suporte limitado; DEMO é ilustrativo.
+             * @enum {string}
+             */
+            supportLevel: "LIMITED" | "DEMO";
+            /**
+             * Supportreason
+             * @enum {string}
+             */
+            supportReason: "PATCH_NOT_VALIDATED" | "DEMO_DATA";
         };
         /**
          * ObservedLevel

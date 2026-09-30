@@ -1,6 +1,8 @@
-"""Mapping explícito gameVersion/gamePatch -> Data Dragon (CC-202). Nunca cai
-para "latest": um patch sem entrada aqui é MISSING_CATALOG, sem tentativa de
-rede para adivinhar (plano do card, docs/architecture.md)."""
+"""Overrides explícitos para patch → Data Dragon (CC-202/314).
+
+Resoluções automáticas são persistidas em patch_resolutions e combinadas com
+estes overrides; nunca há fallback para a versão mais recente de outro patch.
+"""
 
 from __future__ import annotations
 
@@ -45,8 +47,7 @@ class CatalogMapping:
     entries: dict[str, MappingEntry]
 
     def resolve(self, game_patch: str) -> MappingEntry | None:
-        """None = MISSING_CATALOG: patch fora do mapping explícito, nunca
-        substituído por uma versão "mais recente" adivinhada."""
+        """None = patch sem override/resolução no snapshot recebido."""
         return self.entries.get(game_patch)
 
 

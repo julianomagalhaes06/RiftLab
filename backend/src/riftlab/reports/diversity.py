@@ -43,8 +43,10 @@ def _histogram(counts: list[int]) -> dict[str, int]:
 async def build_diversity_report(
     session_factory: SessionFactory, scope_path: Path, *, match_ids: Collection[str] | None = None
 ) -> dict[str, Any]:
-    scope = load_real_scope(scope_path)
     async with read_only_unit_of_work(session_factory) as session:
+        from riftlab.catalog.patches import current_patch_window
+
+        scope = load_real_scope(scope_path, await current_patch_window(session))
         sample = await real_imported_match_ids(session, match_ids)
         if not sample:
             return _empty()
@@ -117,6 +119,7 @@ async def build_diversity_report(
         },
         "patches": {patch: int(count) for patch, count in sorted(patch_rows)},
         "patchesInScope": sorted(scope.patches),
+        "scopeVersion": scope.version,
         "championCoverage": {str(cid): count for cid, count in sorted(champions.items())},
         "scope": {
             "role": scope.role,

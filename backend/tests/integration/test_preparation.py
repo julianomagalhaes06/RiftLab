@@ -244,8 +244,17 @@ async def test_crash_mid_preparation_resumes_after_lease_expiry_without_duplicat
 
 
 async def test_real_patch_without_mapping_entry_uses_no_network_and_marks_missing_catalog(
-    session_factory, tmp_path, real_match
+    session_factory, tmp_path, real_match, monkeypatch
 ) -> None:
+    from riftlab.catalog.infrastructure.data_dragon_transport import (
+        DataDragonTransport,
+        RawDataDragonResponse,
+    )
+
+    async def versions(_self):
+        return RawDataDragonResponse("versions.json", b'["16.19.1"]', "0" * 64)
+
+    monkeypatch.setattr(DataDragonTransport, "fetch_versions", versions)
     patch = unique_patch()
     settings = write_prepare_configs(tmp_path, scope_patch=patch, mapped_patches=("1.1",))
     raw_store = DurableRawMatchStore(tmp_path / "raw")

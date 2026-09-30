@@ -14,7 +14,6 @@ from pathlib import Path
 import pytest
 from pipeline_helpers import (
     DEMO_1_MAPPING,
-    config_path,
     import_demo_match,
     sync_demo_catalog,
 )
@@ -268,7 +267,13 @@ async def test_real_origin_points_are_ineligible_with_reasons_and_no_subject_has
     assert missing_scope.value.code == "SCOPE_FILE_MISSING"
     assert await _counts(session_factory, match_id) == (0, 0)
 
-    extraction = await _extract(session_factory, match_id, config_path("scope.yaml"))
+    legacy_scope = tmp_path / "legacy-scope.yaml"
+    legacy_scope.write_text(
+        "schemaVersion: v1\nfrozenAt: '2026-09-14'\nqueue: 420\nmap: 11\n"
+        "role: BOTTOM\nchampionIds: [145, 51, 81]\npatches:\n"
+        "  - gamePatch: '16.16'\n  - gamePatch: '16.17'\n"
+    )
+    extraction = await _extract(session_factory, match_id, legacy_scope)
     assert extraction.marker.versions.scope_version == "scope_yaml:v1:2026-09-14"
     assert (extraction.marker.point_count, extraction.marker.eligible_count) == (2, 0)
     reverted, rebought = extraction.points  # ordem: event_timestamp_ms, source_index
@@ -645,7 +650,13 @@ async def test_demo_0008_in_real_origin_is_blocked_only_by_scope_never_by_invent
     a própria: nenhum INVENTORY_UNCERTAIN."""
     match_id = "DEMO-0008"
     await _prepare(session_factory, tmp_path, match_id, source=_RealOriginSource(DemoMatchSource()))
-    extraction = await _extract(session_factory, match_id, config_path("scope.yaml"))
+    legacy_scope = tmp_path / "legacy-scope.yaml"
+    legacy_scope.write_text(
+        "schemaVersion: v1\nfrozenAt: '2026-09-14'\nqueue: 420\nmap: 11\n"
+        "role: BOTTOM\nchampionIds: [145, 51, 81]\npatches:\n"
+        "  - gamePatch: '16.16'\n  - gamePatch: '16.17'\n"
+    )
+    extraction = await _extract(session_factory, match_id, legacy_scope)
     [point] = extraction.points
     assert set(_codes(point)) == {"OUT_OF_SCOPE"}
     assert _codes(point)["OUT_OF_SCOPE"] == ["PATCH_OUT_OF_SCOPE", "CHAMPION_OUT_OF_SCOPE"]

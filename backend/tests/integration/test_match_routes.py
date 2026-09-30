@@ -197,6 +197,8 @@ async def test_list_items_have_no_personal_field_and_report_not_requested_withou
             "durationSeconds": 1800,
             "preparationStatus": "NOT_REQUESTED",
             "championsPresent": [],
+            "supportLevel": "LIMITED",
+            "supportReason": "PATCH_NOT_VALIDATED",
         }
     finally:
         await _delete_matches(session_factory, [match_id])
@@ -435,8 +437,17 @@ async def test_item_names_come_from_the_catalog_pinned_by_the_point_not_the_curr
 
 
 async def test_item_name_is_null_without_catalog_or_when_the_catalog_item_has_no_name(
-    session_factory, tmp_path
+    session_factory, tmp_path, monkeypatch
 ) -> None:
+    from riftlab.catalog.infrastructure.data_dragon_transport import (
+        DataDragonTransport,
+        RawDataDragonResponse,
+    )
+
+    async def versions(_self):
+        return RawDataDragonResponse("versions.json", b'["16.19.1"]', "0" * 64)
+
+    monkeypatch.setattr(DataDragonTransport, "fetch_versions", versions)
     unnamed_id = f"BR1_{uuid.uuid4().int % 10**10}"
     no_map_id = f"BR1_{uuid.uuid4().int % 10**10}"
     patch, other_patch = unique_patch(), unique_patch()

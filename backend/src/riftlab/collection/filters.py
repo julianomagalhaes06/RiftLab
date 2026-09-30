@@ -35,6 +35,7 @@ class MatchFilterConfig:
     queue: int
     map_id: int
     patches: frozenset[str]
+    scope_version: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

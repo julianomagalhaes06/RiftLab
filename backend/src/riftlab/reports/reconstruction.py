@@ -61,6 +61,8 @@ class PatchStats:
 
 @dataclass(slots=True)
 class ReconstructionReport:
+    scope_version: str | None = None
+    patches_in_scope: tuple[str, ...] = ()
     matches_imported: int = 0
     preparation: Counter[str] = field(default_factory=Counter)
     preparation_errors: Counter[str] = field(default_factory=Counter)
@@ -86,6 +88,8 @@ class ReconstructionReport:
     def as_dict(self) -> dict[str, Any]:
         ineligible = self.points_total - self.points_eligible
         return {
+            "scopeVersion": self.scope_version,
+            "patchesInScope": list(self.patches_in_scope),
             "reconstructionVersion": self.reconstruction_version,
             "matchesImported": self.matches_imported,
             "preparation": dict(sorted(self.preparation.items())),
@@ -155,6 +159,12 @@ async def build_reconstruction_report(
 ) -> ReconstructionReport:
     report = ReconstructionReport()
     async with read_only_unit_of_work(session_factory) as session:
+        from riftlab.catalog.patches import current_patch_window
+        from riftlab.decisions.scope import load_real_scope
+
+        scope = load_real_scope(scope_path, await current_patch_window(session))
+        report.scope_version = scope.version
+        report.patches_in_scope = tuple(sorted(scope.patches))
         ingestion = SqlAlchemyIngestionRepository(session)
         decisions = SqlAlchemyDecisionRepository(session)
         sample = await real_imported_match_ids(session, match_ids)

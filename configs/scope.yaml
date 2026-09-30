@@ -18,7 +18,7 @@ map: 11
 role: BOTTOM
 
 # Os 3 campeões com maior cobertura real observada em BOTTOM, dentro da
-# janela de patches abaixo (não da amostra bruta inteira — ver "patches").
+# janela histórica da auditoria (não da amostra bruta inteira; ver historicalPatches).
 championIds:
   - 145 # 18 partidas observadas na janela
   - 51 # 14 partidas observadas na janela
@@ -28,7 +28,13 @@ championIds:
 # (que cobre 15 patches distintos ao longo de mais de um ano — misturar
 # todos introduziria inconsistência de balanceamento entre patches
 # distantes, por isso a cobertura de campeões foi restrita a esta janela).
-patches:
+# `cc patch detect` é obrigatório antes de usar este recorte móvel. A janela
+# efetiva usa o patch vigente e o anterior observados no versions.json.
+# A lista histórica abaixo documenta a auditoria CC-105 e não é fallback.
+patchWindow:
+  mode: rolling
+  size: 2
+historicalPatches:
   - gamePatch: "16.16"
     fullGameVersion: "16.16.804.9184"
     dataDragonVersion: "16.16.1"

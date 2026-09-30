@@ -42,6 +42,7 @@ from riftlab.catalog.infrastructure.data_dragon_transport import (
     RawDataDragonResponse,
 )
 from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource, demo_catalog_mapping
+from riftlab.catalog.patches import ensure_patch_mapping
 from riftlab.champions.application import ChampionFetcher, ensure_champion_catalog
 from riftlab.config import Settings
 from riftlab.decisions.application import extract_decisions, resolve_current_versions
@@ -56,6 +57,7 @@ from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.observability import safe_exception_description
 from riftlab.shared.api.enums import PreparationStatus
 from riftlab.shared.db import unit_of_work
+from riftlab.shared.domain import SourceOrigin
 from riftlab.shared.errors import (
     ConflictError,
     DomainError,
@@ -155,7 +157,12 @@ async def _ensure_catalog(
             code=CODE_MAPPING_MISSING,
             detail="mapping de catálogo não encontrado no caminho configurado",
         )
-    mapping = load_catalog_mapping(mapping_path)
+    overrides = load_catalog_mapping(mapping_path)
+    transport = DataDragonTransport()
+    try:
+        mapping = await ensure_patch_mapping(session_factory, overrides, patch, transport)
+    finally:
+        await transport.aclose()
     if mapping.resolve(patch) is None:
         return mapping  # sem entrada: nenhuma rede, catálogo ausente (MISSING_CATALOG)
     canonical = await resolve_catalog_for_match(session_factory, mapping, patch)
@@ -346,4 +353,6 @@ async def _decisions_are_current(session: AsyncSession, match_id: str, scope_pat
     extraction = await SqlAlchemyDecisionRepository(session).get_extraction(
         match_id, current.versions
     )
-    return extraction is not None
+    return extraction is not None and (
+        current.origin is SourceOrigin.CURATED_DEMO or current.catalog is not None
+    )

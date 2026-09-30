@@ -54,6 +54,7 @@ function MatchSelection({ match, panelRef }: { match: MatchSummary | null; panel
         <div><dt>Duração</dt><dd>{matchDuration(match.durationSeconds)}</dd></div>
         <div><dt>Patch</dt><dd>{match.patch}</dd></div>
         <div><dt>Preparação</dt><dd>{PREPARATION_LABEL[match.preparationStatus]}</dd></div>
+        <div><dt>Suporte</dt><dd>{match.supportLevel === "LIMITED" ? "Limitado: patch sem avaliação" : "Demonstração ilustrativa"}</dd></div>
       </dl>
       <div className="history-selection__champions">
         <h4>Campeões presentes</h4>

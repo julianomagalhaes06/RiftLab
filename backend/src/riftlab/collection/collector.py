@@ -358,6 +358,10 @@ class _Collector:
         if self._limiter is not None:
             report.limiter_wait_seconds = self._limiter.waited_seconds
         report.observed = {
+            "patchWindow": {
+                "patches": sorted(self._filters.patches),
+                "scopeVersion": self._filters.scope_version,
+            },
             "statusByKind": self._transport.status_counts(),
             "requestedPageSize": self._ceilings.page_size,
             "maxListPageLength": self._max_page_length,

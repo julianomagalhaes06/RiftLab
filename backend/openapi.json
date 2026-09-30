@@ -745,6 +745,23 @@
             "format": "date-time",
             "title": "Startat",
             "type": "string"
+          },
+          "supportLevel": {
+            "description": "Sem avaliação de ranking neste patch: suporte limitado; DEMO é ilustrativo.",
+            "enum": [
+              "LIMITED",
+              "DEMO"
+            ],
+            "title": "Supportlevel",
+            "type": "string"
+          },
+          "supportReason": {
+            "enum": [
+              "PATCH_NOT_VALIDATED",
+              "DEMO_DATA"
+            ],
+            "title": "Supportreason",
+            "type": "string"
           }
         },
         "required": [
@@ -755,6 +772,8 @@
           "startAt",
           "durationSeconds",
           "preparationStatus",
+          "supportLevel",
+          "supportReason",
           "participants",
           "preparation"
         ],
@@ -978,6 +997,23 @@
             "format": "date-time",
             "title": "Startat",
             "type": "string"
+          },
+          "supportLevel": {
+            "description": "Sem avaliação de ranking neste patch: suporte limitado; DEMO é ilustrativo.",
+            "enum": [
+              "LIMITED",
+              "DEMO"
+            ],
+            "title": "Supportlevel",
+            "type": "string"
+          },
+          "supportReason": {
+            "enum": [
+              "PATCH_NOT_VALIDATED",
+              "DEMO_DATA"
+            ],
+            "title": "Supportreason",
+            "type": "string"
           }
         },
         "required": [
@@ -987,7 +1023,9 @@
           "patch",
           "startAt",
           "durationSeconds",
-          "preparationStatus"
+          "preparationStatus",
+          "supportLevel",
+          "supportReason"
         ],
         "title": "MatchSummary",
         "type": "object"

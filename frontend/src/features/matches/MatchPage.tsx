@@ -171,6 +171,11 @@ export function MatchPage({
               Partida sintética: valida o fluxo do sistema e não representa um jogo real.
             </p>
           ) : null}
+          {match.supportLevel === "LIMITED" ? (
+            <div className="notice notice--info" role="note">
+              <p>Suporte limitado neste patch: ainda não há avaliação de ranking própria. Nenhuma recomendação é gerada.</p>
+            </div>
+          ) : null}
 
           <PreparationPanel
             preparation={match.preparation}

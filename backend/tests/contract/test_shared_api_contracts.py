@@ -367,6 +367,8 @@ _MATCH_SUMMARY = {
     "startAt": "2026-09-01T12:00:00Z",
     "durationSeconds": 1800,
     "preparationStatus": "READY",
+    "supportLevel": "LIMITED",
+    "supportReason": "PATCH_NOT_VALIDATED",
 }
 
 

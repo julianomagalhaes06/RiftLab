@@ -80,7 +80,18 @@ def test_catalog_sync_real_mode_missing_mapping_file_blocks(tmp_path) -> None:
     assert "BLOCKED" in result.output
 
 
-def test_catalog_sync_real_mode_unmapped_patch_blocks_without_network(tmp_path) -> None:
+def test_catalog_sync_real_mode_unmapped_patch_blocks_without_network(
+    tmp_path, monkeypatch
+) -> None:
+    from riftlab.catalog.infrastructure.data_dragon_transport import (
+        DataDragonTransport,
+        RawDataDragonResponse,
+    )
+
+    async def versions(_self):
+        return RawDataDragonResponse("versions.json", b'["16.19.1"]', "0" * 64)
+
+    monkeypatch.setattr(DataDragonTransport, "fetch_versions", versions)
     mapping_file = tmp_path / "catalog-mappings.yaml"
     mapping_file.write_text(
         "schemaVersion: v1\nmappingVersion: v1\n"
@@ -112,6 +123,12 @@ def test_sync_champions_for_a_patch_without_mapping_uses_no_network(
     """CC-208: `cc catalog sync-champions` com patch fora do mapping termina sem rede
     (a busca real falharia o teste se fosse chamada)."""
     from riftlab.catalog.infrastructure import data_dragon_transport
+    from riftlab.catalog.infrastructure.data_dragon_transport import RawDataDragonResponse
+
+    async def versions(_self):
+        return RawDataDragonResponse("versions.json", b'["16.19.1"]', "0" * 64)
+
+    monkeypatch.setattr(data_dragon_transport.DataDragonTransport, "fetch_versions", versions)
 
     async def _no_network(*_args, **_kwargs):
         raise AssertionError("não deveria buscar o CDN")

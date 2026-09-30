@@ -14,8 +14,10 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request, Response
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_catalog_mapping
+from riftlab.catalog.patches import load_persisted_mapping
 from riftlab.champions.application import ChampionAsset as ChampionAssetData
 from riftlab.errors import ProblemDetail
 from riftlab.ingestion.domain import Match
@@ -26,6 +28,7 @@ from riftlab.preparation.application import (
     request_preparation,
 )
 from riftlab.shared.api.common import (
+    MATCH_ID_DEMO_PATTERN,
     PAGINATION_DEFAULT_LIMIT,
     PAGINATION_MAX_LIMIT,
     CursorPage,
@@ -77,7 +80,10 @@ async def list_imported_matches(
         request.app.state.session_factory,
         limit=limit,
         cursor=cursor,
-        mapping=_catalog_mapping_or_none(Path(request.app.state.settings.catalog_mappings_path)),
+        mapping=await _catalog_mapping_or_none(
+            request.app.state.session_factory,
+            Path(request.app.state.settings.catalog_mappings_path),
+        ),
     )
     return CursorPage[MatchSummary](
         items=[
@@ -97,7 +103,10 @@ async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail
     detail = await get_match_detail(
         request.app.state.session_factory,
         match_id,
-        _catalog_mapping_or_none(Path(request.app.state.settings.catalog_mappings_path)),
+        await _catalog_mapping_or_none(
+            request.app.state.session_factory,
+            Path(request.app.state.settings.catalog_mappings_path),
+        ),
     )
     summary = _to_summary(
         detail.match,
@@ -161,14 +170,24 @@ def _to_summary(
             MatchChampion(champion_id=champion_id, name=name)
             for champion_id, name in champions_present
         ],
+        support_level=("DEMO" if MATCH_ID_DEMO_PATTERN.fullmatch(match.match_id) else "LIMITED"),
+        support_reason=(
+            "DEMO_DATA"
+            if MATCH_ID_DEMO_PATTERN.fullmatch(match.match_id)
+            else "PATCH_NOT_VALIDATED"
+        ),
     )
 
 
-def _catalog_mapping_or_none(path: Path) -> CatalogMapping | None:
+async def _catalog_mapping_or_none(
+    session_factory: async_sessionmaker[AsyncSession], path: Path
+) -> CatalogMapping | None:
     """Mapping explícito lido do arquivo local (sem rede). Arquivo ausente ou inválido:
     a partida continua legível, só sem nomes/retratos (CC-208)."""
     try:
-        return load_catalog_mapping(path) if path.is_file() else None
+        if not path.is_file():
+            return None
+        return await load_persisted_mapping(session_factory, load_catalog_mapping(path))
     except SourceSchemaError:
         return None
 

@@ -58,10 +58,12 @@ describe("Histórico com dados realmente disponíveis", () => {
     expect(select).toHaveAttribute("aria-pressed", "true");
     const inspector = screen.getByRole("complementary", { name: "Detalhes da partida" });
     expect(within(inspector).getByText("DEMO-0008")).toBeInTheDocument();
+    expect(within(inspector).getByText("Demonstração ilustrativa")).toBeInTheDocument();
     expect(within(inspector).getByText(/Nomes não disponíveis/)).toBeInTheDocument();
     expect(within(inspector).getByRole("link", { name: "Abrir Contexto" })).toHaveAttribute("href", "/historico/DEMO-0008");
     fireEvent.click(screen.getByRole("button", { name: "RIOT" }));
     expect(within(inspector).getByText("BR1_111")).toBeInTheDocument();
+    expect(within(inspector).getByText("Limitado: patch sem avaliação")).toBeInTheDocument();
     expect(api.callsTo("GET", /^\/api\/v1\/matches\/[^/]+$/)).toHaveLength(0);
     expect(api.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(1);
   });

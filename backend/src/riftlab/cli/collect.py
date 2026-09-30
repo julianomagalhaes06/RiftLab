@@ -34,6 +34,27 @@ report_app = typer.Typer(
 )
 
 
+@report_app.command("patch-readiness")
+def report_patch_readiness(
+    env_file: Path = typer.Option(None, help="Arquivo de ambiente do banco alvo."),
+) -> None:
+    """Triagem de amostra por patch, só leitura e sem identificadores pessoais."""
+    from riftlab.cli.env_file import load_settings
+    from riftlab.db import build_engine
+    from riftlab.reports.patch_readiness import patch_readiness
+    from riftlab.shared.db import build_session_factory
+
+    async def run() -> dict[str, object]:
+        engine = build_engine(load_settings(env_file).database_url)
+        try:
+            settings = load_settings(env_file)
+            return await patch_readiness(build_session_factory(engine), _scope_file(settings, None))
+        finally:
+            await engine.dispose()
+
+    typer.echo(json.dumps(asyncio.run(run()), indent=2, sort_keys=True))
+
+
 @report_app.command("gate")
 def report_gate(
     frozen_dir: Path = typer.Option(..., help="Diretório dos agregados congelados do CC-207."),
@@ -180,7 +201,29 @@ def collect_run(
         )
     try:
         seeds = load_seeds(seeds_file)
-        real_scope = load_real_scope(_scope_file(settings, scope))
+
+        async def read_window() -> tuple[str, ...] | None:
+            from riftlab.catalog.patches import current_patch_window
+            from riftlab.db import build_engine
+            from riftlab.shared.db import build_session_factory, read_only_unit_of_work
+
+            engine = build_engine(settings.database_url)
+            try:
+                async with read_only_unit_of_work(build_session_factory(engine)) as session:
+                    return await current_patch_window(session)
+            finally:
+                await engine.dispose()
+
+        scope_path = _scope_file(settings, scope)
+        import yaml
+
+        scope_document = yaml.safe_load(scope_path.read_bytes())
+        window = (
+            asyncio.run(read_window())
+            if isinstance(scope_document, dict) and "patchWindow" in scope_document
+            else None
+        )
+        real_scope = load_real_scope(scope_path, window)
         ceilings = CollectionCeilings(
             max_requests=max_requests,
             max_matches=max_matches,
@@ -217,7 +260,9 @@ def collect_run(
                 raw_store=DurableRawMatchStore(resolved_raw),
                 manifest=CollectionManifest(manifest_dir),
                 seeds=seeds,
-                filters=MatchFilterConfig(real_scope.queue, real_scope.map_id, selected),
+                filters=MatchFilterConfig(
+                    real_scope.queue, real_scope.map_id, selected, real_scope.version
+                ),
                 subject_hash_secret=settings.subject_hash_secret,
                 ceilings=ceilings,
                 rate_limiter=limiter,

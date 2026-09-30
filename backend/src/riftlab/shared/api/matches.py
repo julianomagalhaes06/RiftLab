@@ -5,6 +5,7 @@ PARTIDAS (CC-205: lista, detalhe e preparação) estão montadas."""
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -34,6 +35,10 @@ class MatchSummary(CamelModel):
     duration_seconds: int = Field(ge=0)
     preparation_status: PreparationStatus
     champions_present: list[MatchChampion] = Field(default_factory=list)
+    support_level: Literal["LIMITED", "DEMO"] = Field(
+        description="Sem avaliação de ranking neste patch: suporte limitado; DEMO é ilustrativo."
+    )
+    support_reason: Literal["PATCH_NOT_VALIDATED", "DEMO_DATA"]
 
 
 class ChampionAsset(CamelModel):

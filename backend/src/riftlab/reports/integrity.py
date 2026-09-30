@@ -62,6 +62,10 @@ async def check_integrity(
         return int(await session.scalar(query) or 0)
 
     async with read_only_unit_of_work(session_factory) as session:
+        from riftlab.catalog.patches import current_patch_window
+        from riftlab.decisions.scope import load_real_scope
+
+        scope = load_real_scope(scope_path, await current_patch_window(session))
         matches = await count_matches(session)
         violations["MATCH_WITHOUT_PARTICIPANTS"] = await count_matches(
             session, ~exists().where(ParticipantModel.match_id == MatchModel.match_id)
@@ -99,6 +103,8 @@ async def check_integrity(
         )
     total = sum(violations.values())
     return {
+        "scopeVersion": scope.version,
+        "patchesInScope": sorted(scope.patches),
         "matchesChecked": matches,
         "readyChecked": len(ready),
         "realMatchesChecked": len(real_ids),

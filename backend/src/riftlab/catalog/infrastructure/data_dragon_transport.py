@@ -59,9 +59,8 @@ def _backoff_seconds(attempt: int) -> float:
 
 
 class DataDragonTransport:
-    """Busca item.json (CC-202) e champion.json (CC-208) de uma versão
-    específica e já validada do Data Dragon — nunca "latest", nunca outra rota
-    além dessas duas, fixas."""
+    """Busca versions.json público e item/champion.json de versão exata.
+    Host e caminhos são fixos; nenhuma URL vem do usuário."""
 
     def __init__(
         self,
@@ -83,6 +82,9 @@ class DataDragonTransport:
         _check_version(data_dragon_version)
         url = f"https://{ALLOWED_HOST}/cdn/{data_dragon_version}/data/en_US/item.json"
         return await self._get(url, data_dragon_version)
+
+    async def fetch_versions(self) -> RawDataDragonResponse:
+        return await self._get(f"https://{ALLOWED_HOST}/api/versions.json", "versions.json")
 
     async def fetch_champion_catalog(
         self, data_dragon_version: str, locale: str = "pt_BR"

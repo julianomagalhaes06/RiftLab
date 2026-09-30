@@ -109,7 +109,9 @@ def _origin_from_import_mode(mode: ImportMode | None) -> SourceOrigin:
     return SourceOrigin.CURATED_DEMO if mode is ImportMode.DEMO else SourceOrigin.COMPLETED_MATCH
 
 
-def _load_scope(origin: SourceOrigin, scope_path: Path) -> DecisionScope:
+async def _load_scope(
+    session: AsyncSession, origin: SourceOrigin, scope_path: Path
+) -> DecisionScope:
     if origin is SourceOrigin.CURATED_DEMO:
         return scope_for_origin(origin, None)
     if not scope_path.is_file():
@@ -117,7 +119,10 @@ def _load_scope(origin: SourceOrigin, scope_path: Path) -> DecisionScope:
             code="SCOPE_FILE_MISSING",
             detail="recorte real (configs/scope.yaml) não encontrado no caminho configurado",
         )
-    return scope_for_origin(origin, load_real_scope(scope_path))
+    from riftlab.catalog.patches import current_patch_window
+
+    window = await current_patch_window(session)
+    return scope_for_origin(origin, load_real_scope(scope_path, window))
 
 
 def _to_stored(point: DecisionPoint, extraction_id: uuid.UUID) -> StoredDecisionPoint:
@@ -188,7 +193,7 @@ async def resolve_current_versions(
             raise DecisionInputError(
                 code="CATALOG_NOT_FOUND", detail="catálogo da marca de reconstrução ausente"
             )
-    scope = _load_scope(origin, scope_path)
+    scope = await _load_scope(session, origin, scope_path)
     return CurrentVersions(match, catalog, origin, scope, build_versions(scope, catalog))
 
 
