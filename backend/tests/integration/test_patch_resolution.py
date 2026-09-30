@@ -68,7 +68,11 @@ async def test_detected_patch_is_recorded_without_any_match_collection(session_f
 
     async with read_only_unit_of_work(session_factory) as session:
         window = await current_patch_window(session)
-    scope = load_real_scope(Path("configs/scope.yaml"), window)
+    root = Path(__file__).resolve().parents[2]
+    scope_file = root / "configs/scope.yaml"
+    if not scope_file.is_file():
+        scope_file = root.parent / "configs/scope.yaml"
+    scope = load_real_scope(scope_file, window)
     assert scope.patches == {"16.19", "16.18"}
     assert "16.19,16.18" in scope.version
     filters = MatchFilterConfig(scope.queue, scope.map_id, scope.patches, scope.version)
