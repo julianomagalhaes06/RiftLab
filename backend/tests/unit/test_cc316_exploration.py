@@ -24,13 +24,15 @@ import typer
 import riftlab.collection.cc316_adoption as adoption_module
 import riftlab.collection.cc316_discovery as discovery_module
 import riftlab.collection.cc316_exploration as exploration_module
-from riftlab.cli.collect import collect_cc316_exploration_fetch
+from riftlab.cli.collect import collect_cc316_confirmation_fetch, collect_cc316_exploration_fetch
 from riftlab.collection.cc316_adoption import persist_adopted_partition_once
 from riftlab.collection.cc316_discovery import DiscoveryError, create_operational_budget_baseline
 from riftlab.collection.cc316_exploration import (
     connectivity_preflight,
+    load_adopted_confirmation_ids,
     load_exploration_fetch_authorization,
     run_cc316_exploration_fetch,
+    run_cc316_partition_fetch,
 )
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.ingestion.infrastructure.riot_transport import RawRiotResponse
@@ -574,5 +576,173 @@ def test_cli_preflight_failure_creates_no_attempt_state(
         "request-budget-07.json",
         ".cc316-discovery-consumed-07",
         "exploration-fetch-attempt-07.json",
+    ):
+        assert not (setup.output_dir / name).exists()
+
+
+def _write_freeze(private: Path, text: str = "congelamento sintético") -> str:
+    freeze = private / "validation" / "sprint-3" / "CC-321" / "12-congelamento-cc316.md"
+    private_dir(freeze.parent)
+    freeze.write_text(text, encoding="utf-8")
+    digest = hashlib.sha256(freeze.read_bytes()).hexdigest()
+    freeze.with_suffix(".md.sha256").write_text(f"{digest}  {freeze.name}\n", encoding="ascii")
+    return digest
+
+
+async def _fetch_confirmation(
+    setup: ExplorationSetup,
+    transport: FakeExplorationTransport,
+    freeze_sha256: str,
+    *,
+    max_requests: int = 60,
+) -> Any:
+    return await run_cc316_partition_fetch(
+        partition="confirmation",
+        transport=transport,
+        output_dir=setup.output_dir,
+        attempt_number=7,
+        authorized_max_requests=max_requests,
+        adopted_partition_sha256=setup.adopted_sha256,
+        freeze_sha256=freeze_sha256,
+        temporal_baseline_path=setup.baseline,
+    )
+
+
+def test_confirmation_ids_are_released_only_with_the_sealed_freeze(tmp_path: Path) -> None:
+    setup = _exploration_setup(tmp_path)
+    adopted = setup.output_dir / "partition-cc316b-adopted.json"
+    with pytest.raises(DiscoveryError, match="congelamento"):
+        load_adopted_confirmation_ids(adopted, expected_sha256=setup.adopted_sha256)
+
+    freeze_sha256 = _write_freeze(tmp_path / ".private")
+
+    released = load_adopted_confirmation_ids(
+        adopted, expected_sha256=setup.adopted_sha256, freeze_sha256=freeze_sha256
+    )
+    assert released == tuple(setup.artifact["partition"]["confirmationPotentialMatchIds"])
+    assert set(released).isdisjoint(setup.exploration)
+
+
+@pytest.mark.asyncio
+async def test_confirmation_fetch_stores_only_confirmation_pairs(tmp_path: Path) -> None:
+    setup = _exploration_setup(tmp_path)
+    freeze_sha256 = _write_freeze(tmp_path / ".private")
+    transport = FakeExplorationTransport()
+
+    summary = await _fetch_confirmation(setup, transport, freeze_sha256)
+
+    partition = setup.artifact["partition"]
+    confirmation = partition["confirmationPotentialMatchIds"]
+    assert (summary.partition, summary.status, summary.match_count) == (
+        "confirmation",
+        "COMPLETED",
+        len(confirmation),
+    )
+    assert [match_id for _, match_id in transport.calls] == [
+        match_id for match_id in confirmation for _ in ("match", "timeline")
+    ]
+    never = (
+        set(setup.exploration)
+        | set(partition["overlapExcludedMatchIds"])
+        | set(partition["outOfScopeMatchIds"])
+    )
+    assert never.isdisjoint(match_id for _, match_id in transport.calls)
+    assert not (setup.output_dir / "raw-exploration").exists()
+    store = DurableRawMatchStore(setup.output_dir / "raw-confirmation", create=False)
+    assert all(store.read_if_valid(match_id, "timeline") is not None for match_id in confirmation)
+    report = json.loads((setup.output_dir / "confirmation-fetch-attempt-07.json").read_text())
+    assert report["phase"] == "CONFIRMATION_FETCH"
+    assert report["confirmationMatchIds"] == confirmation
+    assert report["privacy"]["confirmationFetched"] is True
+    assert report["privacy"]["eventsProcessed"] is False
+
+
+@pytest.mark.parametrize("freeze_state", ["missing", "tampered", "other_pin"])
+@pytest.mark.asyncio
+async def test_confirmation_fetch_without_sealed_freeze_makes_no_request(
+    tmp_path: Path, freeze_state: str
+) -> None:
+    setup = _exploration_setup(tmp_path)
+    pinned = "0" * 64
+    if freeze_state != "missing":
+        pinned = _write_freeze(tmp_path / ".private")
+    if freeze_state == "tampered":
+        (tmp_path / ".private/validation/sprint-3/CC-321/12-congelamento-cc316.md").write_text(
+            "alterado depois do selo", encoding="utf-8"
+        )
+    if freeze_state == "other_pin":
+        pinned = "ab" * 32
+    transport = FakeExplorationTransport()
+
+    with pytest.raises(DiscoveryError, match="congelamento"):
+        await _fetch_confirmation(setup, transport, pinned)
+
+    assert transport.calls == []
+    assert not (setup.output_dir / ".cc316-discovery-consumed-07").exists()
+    assert not (setup.output_dir / "request-budget-07.json").exists()
+
+
+def test_authorization_scopes_do_not_cross(tmp_path: Path) -> None:
+    exploration_path = _write_authorization(tmp_path, adopted_sha256=FAKE_ADOPTED_SHA256)
+    with pytest.raises(DiscoveryError, match="escopo"):
+        load_exploration_fetch_authorization(
+            exploration_path,
+            attempt_number=7,
+            adopted_partition_sha256=FAKE_ADOPTED_SHA256,
+            amendment_sha256=FAKE_AMENDMENT_SHA256,
+            scope="CONFIRMATION_FETCH",
+        )
+    confirmation_path = _write_authorization(
+        tmp_path / "other",
+        adopted_sha256=FAKE_ADOPTED_SHA256,
+        overrides={"scope": "CONFIRMATION_FETCH"},
+    )
+    assert (
+        load_exploration_fetch_authorization(
+            confirmation_path,
+            attempt_number=7,
+            adopted_partition_sha256=FAKE_ADOPTED_SHA256,
+            amendment_sha256=FAKE_AMENDMENT_SHA256,
+            scope="CONFIRMATION_FETCH",
+        )
+        == 60
+    )
+    with pytest.raises(DiscoveryError, match="escopo"):
+        load_exploration_fetch_authorization(
+            confirmation_path,
+            attempt_number=7,
+            adopted_partition_sha256=FAKE_ADOPTED_SHA256,
+            amendment_sha256=FAKE_AMENDMENT_SHA256,
+        )
+
+
+def test_cli_confirmation_fetch_without_freeze_blocks_before_settings_or_network(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    setup = _exploration_setup(tmp_path)
+    amendment_sha256 = write_amendment(tmp_path / ".private")
+    monkeypatch.setattr(adoption_module, "AMENDMENT_SHA256", amendment_sha256)
+    monkeypatch.setattr(adoption_module, "ADOPTED_PARTITION_SHA256", setup.adopted_sha256)
+    monkeypatch.setattr(discovery_module, "temporal_budget_baseline_path", lambda: setup.baseline)
+    authorization = _write_authorization(
+        tmp_path,
+        adopted_sha256=setup.adopted_sha256,
+        amendment_sha256=amendment_sha256,
+        overrides={"scope": "CONFIRMATION_FETCH"},
+    )
+    monkeypatch.setattr("riftlab.cli.env_file.load_settings", _forbidden)
+    monkeypatch.setattr(exploration_module, "connectivity_preflight", _forbidden)
+
+    with pytest.raises(typer.Exit):
+        collect_cc316_confirmation_fetch(
+            attempt=7, authorization=authorization, output_dir=setup.output_dir, env_file=None
+        )
+
+    for name in (
+        "process-lifecycle-07.json",
+        "request-budget-07.json",
+        ".cc316-discovery-consumed-07",
+        "confirmation-fetch-attempt-07.json",
+        "raw-confirmation",
     ):
         assert not (setup.output_dir / name).exists()

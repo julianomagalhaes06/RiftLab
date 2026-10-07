@@ -39,6 +39,19 @@ def _document() -> dict:
     return copy.deepcopy(yaml.safe_load(CONFIG.read_text(encoding="utf-8")))
 
 
+def _pending(document: dict, rule_id: str) -> dict:
+    """Entrada PENDING pura, independente do estado atual do registro do repositório."""
+    document["rules"][rule_id].update(
+        status="PENDING",
+        patchesValidated=[],
+        contraRate=None,
+        counterExamples=None,
+        evidence=None,
+        activatedInVersion=None,
+    )
+    return document["rules"][rule_id]
+
+
 def _supported(document: dict, rule_id: str = "R5", patches: tuple[str, ...] = ("16.17",)) -> dict:
     document["rules"][rule_id].update(
         status="EMPIRICALLY_SUPPORTED",
@@ -66,6 +79,20 @@ def test_repository_registry_declares_every_rule_and_starts_all_pending() -> Non
     )
     assert rules.system_item_ids >= {1202, 2001, 2002}
     assert 3866 not in rules.system_item_ids and 3867 not in rules.system_item_ids  # ocupam slot
+
+
+def test_repository_registry_releases_only_the_rules_confirmed_for_16_19() -> None:
+    """Estado liberado pela confirmação única CC-316 (CC-322): R1, R2, R2i, R4s, R4w e R5 só
+    em 16.19; R6 (H6 REJECT) e qualquer outro patch continuam com o comportamento da v6."""
+    rules = load_empirical_rules(CONFIG, reconstruction_version=VERSION)
+    assert rules.enabled_for("16.19") == frozenset({"R1", "R2", "R2i", "R4s", "R4w", "R5"})
+    for patch in ("16.16", "16.17", "16.18", "16.20"):
+        assert rules.enabled_for(patch) == frozenset()
+    assert rules.entries["R6"].status == "PENDING"
+    for rule_id in ("R1", "R2", "R2i", "R4s", "R4w", "R5"):
+        entry = rules.entries[rule_id]
+        assert entry.patches_validated == frozenset({"16.19"})
+        assert entry.evidence and "CC-322" in entry.evidence
 
 
 def test_a_supported_rule_of_the_repository_can_only_be_active_in_the_current_version() -> None:
@@ -125,10 +152,10 @@ def _mutations() -> list[tuple[str, callable]]:
         d["rules"]["R1"]["status"] = "APPROVED"
 
     def pending_with_patches(d: dict) -> None:
-        d["rules"]["R1"]["patchesValidated"] = ["16.17"]
+        _pending(d, "R1")["patchesValidated"] = ["16.17"]
 
     def pending_with_evidence(d: dict) -> None:
-        d["rules"]["R1"]["evidence"] = "x"
+        _pending(d, "R1")["evidence"] = "x"
 
     def supported_without_patches(d: dict) -> None:
         _supported(d, "R1", ())

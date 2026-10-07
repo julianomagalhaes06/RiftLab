@@ -15,57 +15,57 @@ rules:
   R1:
     ruleVersion: 1
     description: destroy de consumível POSSUÍDO, sem compra composta que o reivindique, é consumo de uma unidade
-    status: PENDING
-    patchesValidated: []
-    contraRate: null
-    counterExamples: null
-    evidence: null
-    activatedInVersion: null
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.003457
+    counterExamples: 8
+    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H1b 8/2314 (sup Wilson 0.0068), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
+    activatedInVersion: 8
   R2:
     ruleVersion: 1
     description: troca de trinket (destroy do trinket possuído no mesmo instante de uma compra de trinket)
-    status: PENDING
-    patchesValidated: []
-    contraRate: null
-    counterExamples: null
-    evidence: null
-    activatedInVersion: null
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.026559
+    counterExamples: 23
+    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H2g 23/866 (sup Wilson 0.0395), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
+    activatedInVersion: 8
   R2i:
     ruleVersion: 1
     description: todo participante começa com o trinket padrão 3340
-    status: PENDING
-    patchesValidated: []
-    contraRate: null
-    counterExamples: null
-    evidence: null
-    activatedInVersion: null
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.010893
+    counterExamples: 5
+    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H2i 5/459 (sup Wilson 0.0252), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
+    activatedInVersion: 8
   R4s:
     ruleVersion: 1
     description: destroy sem posse de item de sistema/missão (systemItemIds) não altera o inventário nem marca
-    status: PENDING
-    patchesValidated: []
-    contraRate: null
-    counterExamples: null
-    evidence: null
-    activatedInVersion: null
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.0
+    counterExamples: 0
+    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H4s 0/4317 (sup Wilson 0.0009), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
+    activatedInVersion: 8
   R4w:
     ruleVersion: 1
     description: compras do World Atlas (3865) do participantId 0 são o item inicial dos Apoios (falha segura)
-    status: PENDING
-    patchesValidated: []
-    contraRate: null
-    counterExamples: null
-    evidence: null
-    activatedInVersion: null
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.0
+    counterExamples: 0
+    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H4w 0/295 (sup Wilson 0.0129), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
+    activatedInVersion: 8
   R5:
     ruleVersion: 1
     description: libera UNVALIDATED_DESTROY_ORDER_RECONCILIATION (destroy dos componentes antes da compra composta)
-    status: PENDING
-    patchesValidated: []
-    contraRate: null
-    counterExamples: null
-    evidence: null
-    activatedInVersion: null
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.000063
+    counterExamples: 1
+    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H5 1/15761 (sup Wilson 0.0004), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
+    activatedInVersion: 8
   R6:
     ruleVersion: 1
     description: undo em pilha (transação de compra transparente) e libera UNVALIDATED_UNDO_SEMANTICS

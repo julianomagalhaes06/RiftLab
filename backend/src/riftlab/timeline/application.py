@@ -102,7 +102,7 @@ STALE_FRAME_THRESHOLD_MS = 90_000
 #       partida). Ativar uma regra exige nova versão (o registro recusa
 #       `activatedInVersion` diferente da corrente), então estados de uma
 #       versão nunca são reaproveitados com outro conjunto de regras.
-RECONSTRUCTION_ALGORITHM_VERSION = 7
+RECONSTRUCTION_ALGORITHM_VERSION = 8
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens

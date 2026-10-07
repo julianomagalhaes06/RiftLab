@@ -1,8 +1,9 @@
-"""CC-316-B exploration-only raw fetch (match+timeline of the 20 exploration IDs).
+"""CC-316-B raw fetch of one partition (match+timeline): exploration or confirmation.
 
-The IDs come only from the pinned adopted partition. Each attempt needs a
-user authorization artifact, passes a connectivity preflight that sends no
-request to Riot, and spends the cumulative CC-320 request/time budget.
+The IDs come only from the pinned adopted partition; confirmation IDs are
+released only after the sealed CC-316 freeze. Each attempt needs a user
+authorization artifact for its scope, passes a connectivity preflight that
+sends no request to Riot, and spends the cumulative CC-320 request/time budget.
 """
 
 from __future__ import annotations
@@ -64,8 +65,39 @@ from riftlab.shared.errors import (
 )
 
 EXPLORATION_RAW_DIRNAME = "raw-exploration"
+CONFIRMATION_RAW_DIRNAME = "raw-confirmation"
 FIRST_CC316B_ATTEMPT = 7
+FETCH_SCOPES = {"exploration": "EXPLORATION_FETCH", "confirmation": "CONFIRMATION_FETCH"}
+FREEZE_RELATIVE_PATH = "validation/sprint-3/CC-321/12-congelamento-cc316.md"
+FREEZE_SHA256 = "4d2b488e42a87cb60e9cd046b31aa801a95013d3d521d39b01bb1fb8289e3494"
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+
+
+def verify_freeze(private_root: Path, *, expected_sha256: str = FREEZE_SHA256) -> None:
+    """Fail closed unless the sealed CC-316 freeze document and its sidecar are unchanged."""
+    path = private_root / FREEZE_RELATIVE_PATH
+    try:
+        raw = path.read_bytes()
+        sidecar = path.with_suffix(path.suffix + ".sha256").read_text(encoding="ascii")
+    except (OSError, UnicodeError) as exc:
+        raise DiscoveryError("congelamento CC-316 ausente ou ilegível") from exc
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != expected_sha256 or sidecar != f"{digest}  {path.name}\n":
+        raise DiscoveryError("congelamento CC-316 ou sidecar divergente do valor fixado")
+
+
+def load_adopted_confirmation_ids(
+    path: Path,
+    *,
+    expected_sha256: str = ADOPTED_PARTITION_SHA256,
+    freeze_sha256: str = FREEZE_SHA256,
+) -> tuple[str, ...]:
+    """Return the confirmation-potential IDs only after the sealed freeze is verified."""
+    verify_freeze(private_root_for(path), expected_sha256=freeze_sha256)
+    # The pinned loader re-validates the whole artifact, confirmation list included.
+    load_adopted_exploration_ids(path, expected_sha256=expected_sha256)
+    partition = json.loads(path.read_bytes())["partition"]
+    return tuple(partition["confirmationPotentialMatchIds"])
 
 
 def load_exploration_fetch_authorization(
@@ -74,8 +106,9 @@ def load_exploration_fetch_authorization(
     attempt_number: int,
     adopted_partition_sha256: str = ADOPTED_PARTITION_SHA256,
     amendment_sha256: str = AMENDMENT_SHA256,
+    scope: str = FETCH_SCOPES["exploration"],
 ) -> int:
-    """Verify the user's authorization for one attempt; return its request cap."""
+    """Verify the user's authorization for one attempt and scope; return its request cap."""
 
     def require(condition: bool, message: str) -> None:
         if not condition:
@@ -106,7 +139,8 @@ def load_exploration_fetch_authorization(
     require(
         document["schemaVersion"] == 1
         and document["protocol"] == "CC-316-B"
-        and document["scope"] == "EXPLORATION_FETCH",
+        and scope in FETCH_SCOPES.values()
+        and document["scope"] == scope,
         "versão, protocolo ou escopo",
     )
     attempt = document["attemptNumber"]
@@ -221,8 +255,9 @@ class ExplorationTransport(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class ExplorationFetchSummary:
+    partition: str
     status: str
-    exploration_count: int
+    match_count: int
     pairs_fetched: int
     pairs_already_present: int
     match_not_found: int
@@ -234,16 +269,23 @@ class ExplorationFetchSummary:
     report_sha256: str
 
 
-def exploration_attempt_paths(output_dir: Path, attempt_number: int) -> dict[str, Path]:
+def exploration_attempt_paths(
+    output_dir: Path, attempt_number: int, partition: str = "exploration"
+) -> dict[str, Path]:
     """Per-attempt files share the CC-320 ledger names so history stays cumulative."""
+    if partition not in FETCH_SCOPES:
+        raise DiscoveryError("partição CC-316-B fora da allowlist")
     budget = output_dir / f"request-budget-{attempt_number:02d}.json"
+    raw_dirname = (
+        EXPLORATION_RAW_DIRNAME if partition == "exploration" else CONFIRMATION_RAW_DIRNAME
+    )
     return {
         "adopted": output_dir / ADOPTED_PARTITION_FILENAME,
         "budget": budget,
         "lifecycle": process_lifecycle_path(budget, attempt_number),
         "marker": output_dir / f".cc316-discovery-consumed-{attempt_number:02d}",
-        "raw": output_dir / EXPLORATION_RAW_DIRNAME,
-        "report": output_dir / f"exploration-fetch-attempt-{attempt_number:02d}.json",
+        "raw": output_dir / raw_dirname,
+        "report": output_dir / f"{partition}-fetch-attempt-{attempt_number:02d}.json",
     }
 
 
@@ -271,25 +313,34 @@ def _timeline_identity_matches(body: bytes, match_id: str) -> bool:
     return isinstance(metadata, dict) and metadata.get("matchId") == match_id
 
 
-async def run_cc316_exploration_fetch(
+async def run_cc316_exploration_fetch(**kwargs: Any) -> ExplorationFetchSummary:
+    """Fetch the 20 exploration pairs; see `run_cc316_partition_fetch`."""
+    return await run_cc316_partition_fetch(partition="exploration", **kwargs)
+
+
+async def run_cc316_partition_fetch(
     *,
+    partition: str,
     transport: ExplorationTransport,
     output_dir: Path,
     attempt_number: int,
     authorized_max_requests: int,
     adopted_partition_sha256: str = ADOPTED_PARTITION_SHA256,
+    freeze_sha256: str = FREEZE_SHA256,
     clock: Callable[[], float] = time.monotonic,
     process_started_monotonic_ns: int | None = None,
     boot_identifier: str | None = None,
     clock_ns: Callable[[], int] = time.monotonic_ns,
     temporal_baseline_path: Path | None = None,
 ) -> ExplorationFetchSummary:
-    """Fetch and store raw match+timeline pairs for the exploration IDs only.
+    """Fetch and store raw match+timeline pairs for one partition's IDs only.
 
     Every HTTP attempt is reserved durably before it is sent. Pairs already in
     the private raw store cost zero requests, so an authorized later attempt
-    resumes without refetching.
+    resumes without refetching. Confirmation IDs require the sealed freeze.
     """
+    if partition not in FETCH_SCOPES:
+        raise DiscoveryError("partição CC-316-B fora da allowlist")
     if (
         isinstance(attempt_number, bool)
         or not isinstance(attempt_number, int)
@@ -315,10 +366,15 @@ async def run_cc316_exploration_fetch(
     if output_mode & 0o077:
         raise DiscoveryError("diretório cc316 deve usar modo privado")
 
-    paths = exploration_attempt_paths(output_dir, attempt_number)
-    exploration_ids = load_adopted_exploration_ids(
-        paths["adopted"], expected_sha256=adopted_partition_sha256
-    )
+    paths = exploration_attempt_paths(output_dir, attempt_number, partition)
+    if partition == "exploration":
+        match_ids = load_adopted_exploration_ids(
+            paths["adopted"], expected_sha256=adopted_partition_sha256
+        )
+    else:
+        match_ids = load_adopted_confirmation_ids(
+            paths["adopted"], expected_sha256=adopted_partition_sha256, freeze_sha256=freeze_sha256
+        )
     started = clock()
     process_started = (
         clock_ns() if process_started_monotonic_ns is None else process_started_monotonic_ns
@@ -351,12 +407,12 @@ async def run_cc316_exploration_fetch(
         pending = sum(
             (store.read_if_valid(match_id, "match") is None)
             + (store.read_if_valid(match_id, "timeline") is None)
-            for match_id in exploration_ids
+            for match_id in match_ids
         )
     except RawStoreCorruptedError as exc:
-        raise DiscoveryError("armazenamento bruto da exploração corrompido") from exc
+        raise DiscoveryError(f"armazenamento bruto da partição {partition} corrompido") from exc
     if pending == 0:
-        raise DiscoveryError("exploração já completa no armazenamento privado; nada a buscar")
+        raise DiscoveryError(f"partição {partition} já completa no armazenamento privado")
     if request_limit < pending:
         raise DiscoveryError(
             f"orçamento insuficiente: {pending} pedidos pendentes e {max(request_limit, 0)} "
@@ -415,7 +471,7 @@ async def run_cc316_exploration_fetch(
                     ):
                         raise DiscoveryError("teto de 60 minutos alcançado")
 
-                for match_id in exploration_ids:
+                for match_id in match_ids:
                     entry: dict[str, object] = {
                         "status": "",
                         "matchSha256": None,
@@ -470,25 +526,23 @@ async def run_cc316_exploration_fetch(
                     entry["status"] = "FETCHED" if fetched else "ALREADY_PRESENT"
                     counts["PAIR_FETCHED" if fetched else "PAIR_ALREADY_PRESENT"] += 1
 
-                complete = counts["PAIR_FETCHED"] + counts["PAIR_ALREADY_PRESENT"] == len(
-                    exploration_ids
-                )
+                complete = counts["PAIR_FETCHED"] + counts["PAIR_ALREADY_PRESENT"] == len(match_ids)
                 requests_used = journal.requests_reserved
                 elapsed_seconds = round(clock() - started, 3)
                 report: dict[str, object] = {
                     "schemaVersion": 1,
                     "protocol": "CC-316-B",
-                    "phase": "EXPLORATION_FETCH",
+                    "phase": FETCH_SCOPES[partition],
                     "attemptNumber": attempt_number,
                     "adoptedPartitionSha256": adopted_partition_sha256,
                     "status": "COMPLETED" if complete else "PARTIAL",
-                    "explorationMatchIds": list(exploration_ids),
+                    f"{partition}MatchIds": list(match_ids),
                     "resultByMatchId": results,
                     "counts": dict(sorted(counts.items())),
                     "requests": requests_used,
                     "elapsedSeconds": elapsed_seconds,
                     "privacy": {
-                        "confirmationFetched": False,
+                        "confirmationFetched": partition == "confirmation",
                         "databaseAccessed": False,
                         "eventsProcessed": False,
                         "participantIdentifiersInReport": False,
@@ -498,8 +552,9 @@ async def run_cc316_exploration_fetch(
                 report_sha256 = _atomic_write_once(paths["report"], canonical_json(report))
                 journal.finish(status="COMPLETED")
                 return ExplorationFetchSummary(
+                    partition=partition,
                     status="COMPLETED" if complete else "PARTIAL",
-                    exploration_count=len(exploration_ids),
+                    match_count=len(match_ids),
                     pairs_fetched=counts["PAIR_FETCHED"],
                     pairs_already_present=counts["PAIR_ALREADY_PRESENT"],
                     match_not_found=counts["MATCH_NOT_FOUND"],

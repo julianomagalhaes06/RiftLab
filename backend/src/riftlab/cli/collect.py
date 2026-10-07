@@ -257,7 +257,36 @@ def collect_cc316_exploration_fetch(
     env_file: Path | None = typer.Option(None, help="Arquivo de ambiente Riot local."),
 ) -> None:
     """Busca match+timeline só das 20 partidas de exploração CC-316-B (sem banco/confirmação)."""
-    current_process_started_monotonic_ns = time.monotonic_ns()
+    _run_cc316_partition_fetch(
+        "exploration", attempt, authorization, output_dir, env_file, time.monotonic_ns()
+    )
+
+
+@collect_app.command("cc316-confirmation-fetch")
+def collect_cc316_confirmation_fetch(
+    attempt: int = typer.Option(..., min=7, help="Tentativa CC-316-B autorizada (7 ou posterior)."),
+    authorization: Path = typer.Option(
+        ..., help="Autorização privada da tentativa (JSON com sidecar SHA-256)."
+    ),
+    output_dir: Path = typer.Option(
+        _DEFAULT_CC316_OUTPUT, help="Diretório privado cc316 da partição adotada."
+    ),
+    env_file: Path | None = typer.Option(None, help="Arquivo de ambiente Riot local."),
+) -> None:
+    """Busca match+timeline só da confirmação potencial CC-316 depois do congelamento selado."""
+    _run_cc316_partition_fetch(
+        "confirmation", attempt, authorization, output_dir, env_file, time.monotonic_ns()
+    )
+
+
+def _run_cc316_partition_fetch(
+    partition: str,
+    attempt: int,
+    authorization: Path,
+    output_dir: Path,
+    env_file: Path | None,
+    current_process_started_monotonic_ns: int,
+) -> None:
     import riftlab.collection.cc316_adoption as adoption
     import riftlab.collection.cc316_exploration as exploration
     from riftlab.cli.env_file import load_settings
@@ -280,18 +309,28 @@ def collect_cc316_exploration_fetch(
             attempt_number=attempt,
             adopted_partition_sha256=adopted_sha256,
             amendment_sha256=adoption.AMENDMENT_SHA256,
+            scope=exploration.FETCH_SCOPES[partition],
         )
     except DiscoveryError as exc:
         raise _blocked(str(exc)) from exc
     if output_dir.name != "cc316" or ".private" not in output_dir.parts:
         raise _blocked("saída deve ser o subdiretório cc316 sob .private")
-    paths = exploration.exploration_attempt_paths(output_dir, attempt)
+    paths = exploration.exploration_attempt_paths(output_dir, attempt, partition)
     try:
         adoption.verify_amendment(
             adoption.private_root_for(output_dir),
             expected_sha256=adoption.AMENDMENT_SHA256,
         )
-        adoption.load_adopted_exploration_ids(paths["adopted"], expected_sha256=adopted_sha256)
+        if partition == "exploration":
+            match_ids = adoption.load_adopted_exploration_ids(
+                paths["adopted"], expected_sha256=adopted_sha256
+            )
+        else:
+            match_ids = exploration.load_adopted_confirmation_ids(
+                paths["adopted"],
+                expected_sha256=adopted_sha256,
+                freeze_sha256=exploration.FREEZE_SHA256,
+            )
         validate_prior_budget_history(
             paths["budget"],
             attempt,
@@ -330,7 +369,7 @@ def collect_cc316_exploration_fetch(
             transport = RiotHttpTransport(
                 api_key=settings.riot_api_key or "",
                 budget=RiotFetchBudget(
-                    max_matches=adoption.EXPLORATION_SIZE,
+                    max_matches=len(match_ids),
                     max_requests=1_000,
                     max_attempts_per_request=5,
                     max_total_seconds=3_600,
@@ -338,12 +377,14 @@ def collect_cc316_exploration_fetch(
                 ),
                 rate_limiter=RiotRateLimiter(),
             )
-            return await exploration.run_cc316_exploration_fetch(
+            return await exploration.run_cc316_partition_fetch(
+                partition=partition,
                 transport=transport,
                 output_dir=output_dir,
                 attempt_number=attempt,
                 authorized_max_requests=max_requests,
                 adopted_partition_sha256=adopted_sha256,
+                freeze_sha256=exploration.FREEZE_SHA256,
                 process_started_monotonic_ns=lifecycle.process_started_monotonic_ns,
                 boot_identifier=lifecycle.boot_id,
             )
