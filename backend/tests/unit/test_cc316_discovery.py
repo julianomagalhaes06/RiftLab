@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import typer
@@ -36,6 +37,24 @@ from riftlab.shared.errors import SourceAuthError, SourceNotFoundError, SourceRa
 def synthetic_discovery_has_resolved_candidate_budget(monkeypatch: pytest.MonkeyPatch) -> None:
     """Let fake-transport discovery tests exercise the core without authorizing real I/O."""
     monkeypatch.setattr(discovery_module, "require_candidate_budget_resolved", lambda: None)
+
+
+_MONOTONIC_SHIFT_NS = 3_600_000_000_000
+
+
+def _shift_module_monotonic(monkeypatch: pytest.MonkeyPatch) -> Callable[[], int]:
+    """CLOCK_MONOTONIC starts at boot and a fresh CI runner can be younger than a
+    fabricated history; move the module's clock a fixed hour ahead instead."""
+
+    def shifted_ns() -> int:
+        return time.monotonic_ns() + _MONOTONIC_SHIFT_NS
+
+    monkeypatch.setattr(
+        discovery_module,
+        "time",
+        SimpleNamespace(monotonic_ns=shifted_ns, monotonic=time.monotonic),
+    )
+    return shifted_ns
 
 
 def _body(match_id: str, participants: list[str]) -> bytes:
@@ -893,11 +912,14 @@ async def test_listing_overflow_at_cap_freezes_unknown_tail_and_fails_closed(
 
 
 @pytest.mark.asyncio
-async def test_retry_counts_only_complete_same_boot_process_history(tmp_path: Path) -> None:
+async def test_retry_counts_only_complete_same_boot_process_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     snapshot, journal = _private_paths(tmp_path)
     private = snapshot.parent
     boot_id = current_boot_id()
-    history_base_ns = time.monotonic_ns() - 600_000_000_000
+    clock_ns = _shift_module_monotonic(monkeypatch)
+    history_base_ns = clock_ns() - 600_000_000_000
     for attempt, reserved, status in (
         (1, 5, "INTERRUPTED"),
         (2, 5, "INTERRUPTED"),
@@ -953,6 +975,7 @@ async def test_retry_counts_only_complete_same_boot_process_history(tmp_path: Pa
         artifact_path=snapshot,
         budget_journal_path=private / "request-budget-05.json",
         attempt_number=5,
+        clock_ns=clock_ns,
     )
 
     assert transport.request_limit == 464
@@ -963,12 +986,13 @@ async def test_retry_counts_only_complete_same_boot_process_history(tmp_path: Pa
 @pytest.mark.parametrize("failure", ["legacy", "boot", "missing-end"])
 @pytest.mark.asyncio
 async def test_legacy_incomplete_or_incomparable_history_fails_closed(
-    tmp_path: Path, failure: str
+    tmp_path: Path, failure: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     snapshot, journal = _private_paths(tmp_path)
     private = snapshot.parent
     boot_id = current_boot_id()
-    history_base_ns = time.monotonic_ns() - 200_000_000_000
+    clock_ns = _shift_module_monotonic(monkeypatch)
+    history_base_ns = clock_ns() - 200_000_000_000
     marker = private / ".cc316-discovery-consumed"
     marker.write_text("previous attempt")
     (private / "request-budget.json").write_text(
@@ -999,7 +1023,10 @@ async def test_legacy_incomplete_or_incomparable_history_fails_closed(
     process_lifecycle_path(journal, 1).write_text(json.dumps(lifecycle))
     transport = FakeTransport({}, {})
 
-    with pytest.raises(DiscoveryError, match="decisão/emenda explícita"):
+    expected = (
+        "sem intervalo monotônico completo" if failure == "missing-end" else "legado/incomparável"
+    )
+    with pytest.raises(DiscoveryError, match=expected):
         await run_cc316_discovery(
             transport=transport,
             seeds=[_seed()],
@@ -1007,6 +1034,7 @@ async def test_legacy_incomplete_or_incomparable_history_fails_closed(
             artifact_path=snapshot,
             budget_journal_path=private / "request-budget-02.json",
             attempt_number=2,
+            clock_ns=clock_ns,
         )
 
     assert transport.requests_made == 0
