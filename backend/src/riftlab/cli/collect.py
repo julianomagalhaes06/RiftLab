@@ -16,6 +16,7 @@ use --resume-after-auth-failure); 4 limite de taxa (espere o cooldown); 5 parcia
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import time
 from datetime import UTC, datetime
@@ -36,6 +37,7 @@ report_app = typer.Typer(
 _ROOT = Path(__file__).resolve().parents[4]
 _DEFAULT_CC316_SEEDS = _ROOT / ".private" / "collection" / "seeds.yaml"
 _DEFAULT_CC316_OUTPUT = _ROOT / ".private" / "collection" / "cc316"
+_DEFAULT_CC323_OUTPUT = _ROOT / ".private" / "collection" / "cc323"
 
 
 @collect_app.command("structural-cc316")
@@ -421,6 +423,147 @@ def _run_cc316_partition_fetch(
             ensure_ascii=False,
         )
     )
+
+
+@collect_app.command("dataset-16-19")
+def collect_dataset_16_19(
+    attempt: int = typer.Option(..., min=1, help="Tentativa autorizada da campanha CC-323."),
+    authorization: Path = typer.Option(
+        ..., help="Autorização privada da tentativa (JSON com sidecar SHA-256)."
+    ),
+    seeds_file: Path = typer.Option(
+        _DEFAULT_CC316_SEEDS, help="Lista privada de sementes com consentimento registrado."
+    ),
+    output_dir: Path = typer.Option(
+        _DEFAULT_CC323_OUTPUT, help="Diretório privado cc323 da coleta."
+    ),
+    env_file: Path | None = typer.Option(None, help="Arquivo de ambiente Riot local."),
+) -> None:
+    """Coleta CC-323: pares 16.19 por expansão a partir das sementes consentidas (sem banco)."""
+    current_process_started_monotonic_ns = time.monotonic_ns()
+    import riftlab.collection.dataset_collection as dataset
+    from riftlab.cli.env_file import load_settings
+    from riftlab.collection.cc316_discovery import DiscoveryError, ProcessLifecycleJournal
+    from riftlab.collection.cc316_exploration import connectivity_preflight
+    from riftlab.collection.seeds import SeedsFileError, load_seeds
+    from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
+    from riftlab.ingestion.infrastructure.riot_transport import (
+        RiotFetchBudget,
+        RiotHttpTransport,
+    )
+
+    try:
+        granted = dataset.load_collection_authorization(authorization, attempt_number=attempt)
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+    if output_dir.name != "cc323" or ".private" not in output_dir.parts:
+        raise _blocked("saída deve ser o subdiretório cc323 sob .private")
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        output_dir.chmod(0o700)
+    except OSError as exc:
+        raise _blocked("diretório de saída privada indisponível") from exc
+    paths = dataset.attempt_paths(output_dir, attempt)
+    try:
+        dataset.prior_campaign_usage(output_dir, attempt)
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+    if any(paths[name].exists() for name in ("report", "budget", "lifecycle", "marker")):
+        raise _blocked(
+            "esta tentativa já foi iniciada ou produziu estado local; revisão necessária"
+        )
+    try:
+        if hashlib.sha256(seeds_file.read_bytes()).hexdigest() != granted.seeds_sha256:
+            raise _blocked("arquivo de sementes diverge do autorizado; nada foi consultado")
+        seeds = load_seeds(seeds_file)
+    except (SeedsFileError, OSError) as exc:
+        raise _blocked(f"sementes consentidas indisponíveis ({type(exc).__name__})") from exc
+    known_raw_directories = [
+        directory
+        for directory in (
+            output_dir.parent / "cc316" / "raw-exploration",
+            output_dir.parent / "cc316" / "raw-confirmation",
+        )
+        if directory.is_dir()
+    ]
+
+    settings = load_settings(env_file)
+    if not settings.riot_api_key:
+        raise _blocked("chave Riot ausente; nada foi consultado")
+    try:
+        connectivity_preflight()
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+
+    try:
+        lifecycle = ProcessLifecycleJournal(
+            paths["lifecycle"],
+            attempt_number=attempt,
+            process_started_monotonic_ns=current_process_started_monotonic_ns,
+        )
+        lifecycle.__enter__()
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+
+    async def _run() -> Any:
+        lifecycle.mark_coroutine_started()
+        transport: RiotHttpTransport | None = None
+        try:
+            transport = RiotHttpTransport(
+                api_key=settings.riot_api_key or "",
+                budget=RiotFetchBudget(
+                    max_matches=dataset.MAX_PAIRS,
+                    max_requests=dataset.MAX_REQUESTS,
+                    max_attempts_per_request=5,
+                    max_total_seconds=dataset.MAX_SECONDS,
+                    request_timeout_seconds=10,
+                ),
+                rate_limiter=RiotRateLimiter(),
+            )
+            return await dataset.run_dataset_collection(
+                transport=transport,
+                seeds=seeds,
+                output_dir=output_dir,
+                attempt_number=attempt,
+                authorized_max_requests=granted.max_requests,
+                known_raw_directories=known_raw_directories,
+                process_started_monotonic_ns=lifecycle.process_started_monotonic_ns,
+            )
+        finally:
+            try:
+                if transport is not None:
+                    await transport.aclose()
+            finally:
+                lifecycle.mark_coroutine_finished()
+
+    result: Any | None = None
+    run_error: Exception | None = None
+    run_outcome = "INTERRUPTED"
+    try:
+        result = asyncio.run(_run())
+        run_outcome = "COMPLETED"
+    except Exception as exc:
+        run_error = exc
+    finally:
+        lifecycle.finish(run_outcome=run_outcome)
+
+    if run_error is not None:
+        typer.echo(
+            f"CC-323 interrompido: {type(run_error).__name__}; consulte o diário privado.",
+            err=True,
+        )
+        raise typer.Exit(code=EXIT_INCOMPLETE) from run_error
+    if result is None:
+        raise _blocked("resultado da coleta ausente após o ciclo de processo")
+    typer.echo(
+        json.dumps(
+            {field: getattr(result, field) for field in result.__dataclass_fields__},
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+    )
+    if result.status not in dataset.DESIGNED_STOPS:
+        raise typer.Exit(code=EXIT_INCOMPLETE)
 
 
 @report_app.command("patch-readiness")
