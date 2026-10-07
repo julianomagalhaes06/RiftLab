@@ -118,6 +118,57 @@ app.add_typer(catalog_app, name="catalog")
 patch_app = typer.Typer(help="Detecção explícita do patch vigente.", no_args_is_help=True)
 app.add_typer(patch_app, name="patch")
 
+dataset_app = typer.Typer(
+    help="Dataset preliminar (CC-302): corpus congelado e divisão cronológica.",
+    no_args_is_help=True,
+)
+app.add_typer(dataset_app, name="dataset")
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+@dataset_app.command("freeze-corpus")
+def dataset_freeze_corpus(
+    output: Path = typer.Option(
+        _REPO_ROOT / ".private" / "dataset" / "corpus-16.19.json",
+        help="Manifesto privado, gravado uma única vez com sidecar SHA-256.",
+    ),
+    policy: Path = typer.Option(
+        _REPO_ROOT / "configs" / "dataset.yaml", help="Política pública do dataset."
+    ),
+    collection_dir: Path = typer.Option(
+        _REPO_ROOT / ".private" / "collection", help="Raiz privada das coletas."
+    ),
+) -> None:
+    """Congela o corpus do patch (CC-316 + CC-323) e a divisão treino/teste, sem rede nem banco."""
+    import json
+
+    from riftlab.dataset.corpus import CorpusError, freeze_corpus
+
+    sources = {
+        "cc316-exploration": collection_dir / "cc316" / "raw-exploration",
+        "cc316-confirmation": collection_dir / "cc316" / "raw-confirmation",
+        "cc323": collection_dir / "cc323" / "raw",
+    }
+    try:
+        manifest, digest = freeze_corpus(output, sources, policy)
+    except CorpusError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    split = manifest["split"]
+    assert isinstance(split, dict)
+    typer.echo(
+        json.dumps(
+            {
+                "counts": manifest["counts"],
+                "sources": manifest["sources"],
+                "boundaryGameStartMs": split["boundaryGameStartMs"],
+                "sha256": digest,
+            },
+            sort_keys=True,
+        )
+    )
+
 
 @patch_app.command("detect")
 def patch_detect(

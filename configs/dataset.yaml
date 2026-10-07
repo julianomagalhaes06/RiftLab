@@ -1,0 +1,12 @@
+# Política do dataset preliminar (CC-302). Só política: as listas de partidas ficam
+# num manifesto privado congelado com hash, gerado por `cc dataset freeze-corpus`.
+schemaVersion: 1
+patch: "16.19"
+queueId: 420
+mapId: 11
+# Remakes (gameEndedInEarlySurrender) quase não têm compras reais; ficam fora, declarados.
+excludeRemakes: true
+split:
+  # Cronológica por partida: nenhuma partida (nem instante) atravessa treino e teste.
+  method: CHRONOLOGICAL_BY_MATCH
+  trainFraction: 0.7
