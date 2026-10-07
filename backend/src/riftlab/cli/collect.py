@@ -245,6 +245,143 @@ def collect_cc316_adopt_partition(
     )
 
 
+@collect_app.command("cc316-exploration-fetch")
+def collect_cc316_exploration_fetch(
+    attempt: int = typer.Option(..., min=7, help="Tentativa CC-316-B autorizada (7 ou posterior)."),
+    authorization: Path = typer.Option(
+        ..., help="Autorização privada da tentativa (JSON com sidecar SHA-256)."
+    ),
+    output_dir: Path = typer.Option(
+        _DEFAULT_CC316_OUTPUT, help="Diretório privado cc316 da partição adotada."
+    ),
+    env_file: Path | None = typer.Option(None, help="Arquivo de ambiente Riot local."),
+) -> None:
+    """Busca match+timeline só das 20 partidas de exploração CC-316-B (sem banco/confirmação)."""
+    current_process_started_monotonic_ns = time.monotonic_ns()
+    import riftlab.collection.cc316_adoption as adoption
+    import riftlab.collection.cc316_exploration as exploration
+    from riftlab.cli.env_file import load_settings
+    from riftlab.collection.cc316_discovery import (
+        DiscoveryError,
+        ProcessLifecycleJournal,
+        current_boot_id,
+        validate_prior_budget_history,
+    )
+    from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
+    from riftlab.ingestion.infrastructure.riot_transport import (
+        RiotFetchBudget,
+        RiotHttpTransport,
+    )
+
+    adopted_sha256 = adoption.ADOPTED_PARTITION_SHA256
+    try:
+        max_requests = exploration.load_exploration_fetch_authorization(
+            authorization,
+            attempt_number=attempt,
+            adopted_partition_sha256=adopted_sha256,
+            amendment_sha256=adoption.AMENDMENT_SHA256,
+        )
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+    if output_dir.name != "cc316" or ".private" not in output_dir.parts:
+        raise _blocked("saída deve ser o subdiretório cc316 sob .private")
+    paths = exploration.exploration_attempt_paths(output_dir, attempt)
+    try:
+        adoption.verify_amendment(
+            adoption.private_root_for(output_dir),
+            expected_sha256=adoption.AMENDMENT_SHA256,
+        )
+        adoption.load_adopted_exploration_ids(paths["adopted"], expected_sha256=adopted_sha256)
+        validate_prior_budget_history(
+            paths["budget"],
+            attempt,
+            boot_identifier=current_boot_id(),
+            current_process_started_monotonic_ns=current_process_started_monotonic_ns,
+        )
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+    if any(paths[name].exists() for name in ("report", "budget", "lifecycle", "marker")):
+        raise _blocked(
+            "esta tentativa já foi iniciada ou produziu estado local; revisão necessária"
+        )
+
+    settings = load_settings(env_file)
+    if not settings.riot_api_key:
+        raise _blocked("chave Riot ausente; nada foi consultado")
+    try:
+        exploration.connectivity_preflight()
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+
+    try:
+        lifecycle = ProcessLifecycleJournal(
+            paths["lifecycle"],
+            attempt_number=attempt,
+            process_started_monotonic_ns=current_process_started_monotonic_ns,
+        )
+        lifecycle.__enter__()
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+
+    async def _run() -> Any:
+        lifecycle.mark_coroutine_started()
+        transport: RiotHttpTransport | None = None
+        try:
+            transport = RiotHttpTransport(
+                api_key=settings.riot_api_key or "",
+                budget=RiotFetchBudget(
+                    max_matches=adoption.EXPLORATION_SIZE,
+                    max_requests=1_000,
+                    max_attempts_per_request=5,
+                    max_total_seconds=3_600,
+                    request_timeout_seconds=10,
+                ),
+                rate_limiter=RiotRateLimiter(),
+            )
+            return await exploration.run_cc316_exploration_fetch(
+                transport=transport,
+                output_dir=output_dir,
+                attempt_number=attempt,
+                authorized_max_requests=max_requests,
+                adopted_partition_sha256=adopted_sha256,
+                process_started_monotonic_ns=lifecycle.process_started_monotonic_ns,
+                boot_identifier=lifecycle.boot_id,
+            )
+        finally:
+            try:
+                if transport is not None:
+                    await transport.aclose()
+            finally:
+                lifecycle.mark_coroutine_finished()
+
+    result: Any | None = None
+    run_error: Exception | None = None
+    run_outcome = "INTERRUPTED"
+    try:
+        result = asyncio.run(_run())
+        run_outcome = "COMPLETED"
+    except Exception as exc:
+        run_error = exc
+    finally:
+        lifecycle.finish(run_outcome=run_outcome)
+
+    if run_error is not None:
+        typer.echo(
+            f"CC-316-B interrompido: {type(run_error).__name__}; consulte o diário privado.",
+            err=True,
+        )
+        raise typer.Exit(code=EXIT_INCOMPLETE) from run_error
+    if result is None:
+        raise _blocked("resultado da busca ausente após o ciclo de processo")
+    typer.echo(
+        json.dumps(
+            {field: getattr(result, field) for field in result.__dataclass_fields__},
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+    )
+
+
 @report_app.command("patch-readiness")
 def report_patch_readiness(
     env_file: Path = typer.Option(None, help="Arquivo de ambiente do banco alvo."),
