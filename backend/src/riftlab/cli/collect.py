@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,216 @@ report_app = typer.Typer(
     help="Relatórios agregados da amostra REAL, sem dado pessoal (CC-206).",
     no_args_is_help=True,
 )
+_ROOT = Path(__file__).resolve().parents[4]
+_DEFAULT_CC316_SEEDS = _ROOT / ".private" / "collection" / "seeds.yaml"
+_DEFAULT_CC316_OUTPUT = _ROOT / ".private" / "collection" / "cc316"
+
+
+@collect_app.command("structural-cc316")
+def collect_structural_cc316(
+    seeds_file: Path = typer.Option(
+        _DEFAULT_CC316_SEEDS, help="Lista privada de sementes com consentimento registrado."
+    ),
+    output_dir: Path = typer.Option(
+        _DEFAULT_CC316_OUTPUT, help="Diretório privado dedicado a diário e partição estrutural."
+    ),
+    attempt: int = typer.Option(1, min=1, help="Rodada sequencial; repetir só após INTERRUPTED."),
+    env_file: Path | None = typer.Option(None, help="Arquivo de ambiente Riot local."),
+) -> None:
+    """Executa uma rodada única de descoberta estrutural CC-316 (sem raw/timeline/DB)."""
+    current_process_started_monotonic_ns = time.monotonic_ns()
+    from riftlab.cli.env_file import load_settings
+    from riftlab.collection.cc316_discovery import (
+        DiscoveryError,
+        ProcessLifecycleJournal,
+        current_boot_id,
+        process_lifecycle_path,
+        require_candidate_budget_resolved,
+        run_cc316_discovery,
+        validate_prior_budget_history,
+    )
+    from riftlab.collection.seeds import SeedsFileError, load_seeds
+    from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
+    from riftlab.ingestion.infrastructure.riot_transport import (
+        RiotFetchBudget,
+        RiotHttpTransport,
+    )
+
+    try:
+        require_candidate_budget_resolved()
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+    settings = load_settings(env_file)
+    if not settings.riot_api_key:
+        raise _blocked("chave Riot ausente; nada foi consultado")
+    if not settings.subject_hash_secret:
+        raise _blocked("segredo HMAC ausente; nada foi consultado")
+    try:
+        seeds = load_seeds(seeds_file)
+    except (SeedsFileError, OSError) as exc:
+        raise _blocked(f"sementes consentidas indisponíveis ({type(exc).__name__})") from exc
+
+    if output_dir.name != "cc316" or ".private" not in output_dir.parts:
+        raise _blocked("saída deve ser o subdiretório cc316 sob .private")
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        output_dir.chmod(0o700)
+        if output_dir.stat().st_mode & 0o077:
+            raise OSError("permissões privadas insuficientes")
+    except OSError as exc:
+        raise _blocked("diretório de saída privada indisponível") from exc
+
+    artifact_path = output_dir / (
+        "partition-snapshot.json"
+        if attempt == 1
+        else f"partition-snapshot-attempt-{attempt:02d}.json"
+    )
+    budget_path = output_dir / (
+        "request-budget.json" if attempt == 1 else f"request-budget-{attempt:02d}.json"
+    )
+    lifecycle_path = process_lifecycle_path(budget_path, attempt)
+    try:
+        validate_prior_budget_history(
+            budget_path,
+            attempt,
+            boot_identifier=current_boot_id(),
+            current_process_started_monotonic_ns=current_process_started_monotonic_ns,
+        )
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+    run_marker = output_dir / (
+        ".cc316-discovery-consumed" if attempt == 1 else f".cc316-discovery-consumed-{attempt:02d}"
+    )
+    if (
+        artifact_path.exists()
+        or budget_path.exists()
+        or lifecycle_path.exists()
+        or run_marker.exists()
+    ):
+        raise _blocked(
+            "esta tentativa já foi iniciada ou produziu estado local; revisão necessária"
+        )
+
+    try:
+        lifecycle = ProcessLifecycleJournal(
+            lifecycle_path,
+            attempt_number=attempt,
+            process_started_monotonic_ns=current_process_started_monotonic_ns,
+        )
+        lifecycle.__enter__()
+    except DiscoveryError as exc:
+        raise _blocked(str(exc)) from exc
+
+    async def _run() -> Any:
+        lifecycle.mark_coroutine_started()
+        transport: RiotHttpTransport | None = None
+        try:
+            limiter = RiotRateLimiter()
+            transport = RiotHttpTransport(
+                api_key=settings.riot_api_key or "",
+                budget=RiotFetchBudget(
+                    max_matches=320,
+                    max_requests=1_000,
+                    max_attempts_per_request=5,
+                    max_total_seconds=3_600,
+                    request_timeout_seconds=10,
+                ),
+                rate_limiter=limiter,
+            )
+            return await run_cc316_discovery(
+                transport=transport,
+                seeds=seeds,
+                subject_hash_secret=settings.subject_hash_secret or "",
+                artifact_path=artifact_path,
+                budget_journal_path=budget_path,
+                attempt_number=attempt,
+                process_started_monotonic_ns=lifecycle.process_started_monotonic_ns,
+                boot_identifier=lifecycle.boot_id,
+            )
+        finally:
+            try:
+                if transport is not None:
+                    await transport.aclose()
+            finally:
+                lifecycle.mark_coroutine_finished()
+
+    result: Any | None = None
+    run_error: Exception | None = None
+    run_outcome = "INTERRUPTED"
+    try:
+        result = asyncio.run(_run())
+        run_outcome = "COMPLETED"
+    except Exception as exc:
+        run_error = exc
+    finally:
+        lifecycle.finish(run_outcome=run_outcome)
+
+    if run_error is not None:
+        typer.echo(
+            f"CC-316 interrompido: {type(run_error).__name__}; consulte o diário privado.",
+            err=True,
+        )
+        raise typer.Exit(code=EXIT_INCOMPLETE) from run_error
+
+    if result is None:
+        raise _blocked("resultado da coleta ausente após o ciclo de processo")
+
+    typer.echo(
+        json.dumps(
+            {
+                field: getattr(result.summary, field)
+                for field in result.summary.__dataclass_fields__
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+    )
+
+
+@collect_app.command("cc316-adopt-partition")
+def collect_cc316_adopt_partition(
+    output_dir: Path = typer.Option(
+        _DEFAULT_CC316_OUTPUT, help="Diretório privado cc316 com o snapshot da rodada 4."
+    ),
+) -> None:
+    """Gera uma vez o artefato da partição adotada pela emenda CC-316-B (local, sem rede)."""
+    import riftlab.collection.cc316_adoption as adoption
+    from riftlab.collection.cc316_discovery import DiscoveryError
+
+    if output_dir.name != "cc316" or ".private" not in output_dir.parts:
+        raise _blocked("saída deve ser o subdiretório cc316 sob .private")
+    try:
+        adoption.verify_amendment(
+            adoption.private_root_for(output_dir),
+            expected_sha256=adoption.AMENDMENT_SHA256,
+        )
+        artifact = adoption.derive_adopted_partition(
+            (output_dir / adoption.SOURCE_SNAPSHOT_FILENAME).read_bytes(),
+            source_sha256=adoption.SOURCE_SNAPSHOT_SHA256,
+            amendment_sha256=adoption.AMENDMENT_SHA256,
+        )
+        digest = adoption.persist_adopted_partition_once(
+            output_dir / adoption.ADOPTED_PARTITION_FILENAME, artifact
+        )
+    except (DiscoveryError, OSError) as exc:
+        raise _blocked(f"partição adotada não gerada ({exc})") from exc
+    universe = artifact["universe"]
+    partition = artifact["partition"]
+    assert isinstance(universe, dict) and isinstance(partition, dict)
+    typer.echo(
+        json.dumps(
+            {
+                "adoptedPartitionSha256": digest,
+                "candidateCount": universe["candidateCount"],
+                "eligibleCount": universe["eligibleCount"],
+                "explorationCount": len(partition["explorationMatchIds"]),
+                "confirmationPotentialCount": len(partition["confirmationPotentialMatchIds"]),
+                "overlapExcludedCount": len(partition["overlapExcludedMatchIds"]),
+                "outOfScopeCount": len(partition["outOfScopeMatchIds"]),
+            },
+            sort_keys=True,
+        )
+    )
 
 
 @report_app.command("patch-readiness")

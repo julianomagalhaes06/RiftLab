@@ -8,10 +8,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import socket
+import ssl
+from pathlib import Path
 
+import httpcore
 import httpx
 import pytest
 
+from riftlab.collection.cc316_discovery import BudgetJournal, DiscoveryError
 from riftlab.ingestion.infrastructure.riot_transport import (
     API_KEY_HEADER,
     RiotFetchBudget,
@@ -52,6 +57,18 @@ def _transport(
     )
 
 
+def _attach_private_diagnostics(transport: RiotHttpTransport, journal: BudgetJournal) -> None:
+    transport.set_request_observer(journal.reserve)
+    transport.set_request_result_observer(journal.record_result)
+    transport.set_local_budget_observer(journal.record_local_budget)
+
+
+def _journal_path(tmp_path: Path, name: str = "budget.json") -> Path:
+    private = tmp_path / ".private"
+    private.mkdir(mode=0o700, exist_ok=True)
+    return private / name
+
+
 async def test_fetch_match_success_sends_key_only_in_header_and_hashes_body() -> None:
     body = json.dumps({"metadata": {"matchId": "BR1_1000000001"}, "info": {}}).encode()
     seen: list[httpx.Request] = []
@@ -74,6 +91,25 @@ async def test_fetch_match_success_sends_key_only_in_header_and_hashes_body() ->
     assert request.url.host == "americas.api.riotgames.com"
     assert request.url.path == "/lol/match/v5/matches/BR1_1000000001"
     assert _FAKE_API_KEY not in str(request.url)
+
+
+async def test_structural_projection_fetch_returns_opaque_body_without_json_materialization() -> (
+    None
+):
+    body = b"opaque-response-for-the-CC-316-scanner"
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, content=body)
+
+    transport = _transport(handler)
+    result = await transport.fetch_match_for_structural_projection("BR1_1000000001")
+    await transport.aclose()
+
+    assert result == body
+    assert len(seen) == 1
+    assert seen[0].url.path == "/lol/match/v5/matches/BR1_1000000001"
 
 
 async def test_fetch_timeline_uses_timeline_path() -> None:
@@ -154,6 +190,416 @@ async def test_429_respects_retry_after_and_succeeds_within_budget() -> None:
     assert result.body == body
     assert slept == [2.0]
     assert len(calls) == 2
+
+
+async def test_request_observer_reserves_each_attempt_before_http_call() -> None:
+    observed: list[tuple[int, str]] = []
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(429, headers={"Retry-After": "1"})
+        return httpx.Response(200, content=b"{}")
+
+    async def fake_sleep(seconds: float) -> None:
+        return None
+
+    transport = _transport(handler, sleep=fake_sleep)
+
+    def reserve(request_class: str) -> int:
+        observed.append((transport.requests_made, request_class))
+        return transport.requests_made + 1
+
+    transport.set_request_observer(reserve)
+    transport.set_request_result_observer(
+        lambda ordinal, result, status, duration_ms, exception_class, cause_category: None
+    )
+    await transport.fetch_match_for_structural_projection("BR1_1000000001")
+    await transport.aclose()
+
+    assert observed == [(0, "match-structural"), (1, "match-structural")]
+    assert calls == 2
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_result", "expected_error"),
+    [
+        (200, "HTTP_200", None),
+        (401, "HTTP_AUTH", SourceAuthError),
+        (403, "HTTP_AUTH", SourceAuthError),
+        (404, "HTTP_NOT_FOUND", SourceNotFoundError),
+        (429, "HTTP_429", SourceRateLimitedError),
+        (503, "HTTP_5XX", SourceError),
+        (302, "HTTP_UNEXPECTED", SourceError),
+    ],
+)
+async def test_private_diagnostics_allowlisted_http_outcomes(
+    tmp_path: Path,
+    status_code: int,
+    expected_result: str,
+    expected_error: type[Exception] | None,
+) -> None:
+    journal_path = _journal_path(tmp_path)
+    private_marker = "PRIVATE_ID_URL_BODY_SECRET_MARKER"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        persisted = json.loads(journal_path.read_text())
+        entry = persisted["diagnostics"][-1]
+        assert entry["requestReserved"] is True
+        assert entry["result"] == "PENDING"
+        assert entry["ordinal"] == 1
+        assert entry["requestClass"] == "match-structural"
+        assert private_marker not in json.dumps(persisted)
+        return httpx.Response(status_code, content=private_marker.encode())
+
+    with BudgetJournal(journal_path, limit=3) as journal:
+        transport = _transport(handler, budget=_budget(max_attempts_per_request=1))
+        _attach_private_diagnostics(transport, journal)
+        if expected_error is None:
+            assert (
+                await transport.fetch_match_for_structural_projection("BR1_1000000001")
+                == private_marker.encode()
+            )
+        else:
+            with pytest.raises(expected_error):
+                await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved = json.loads(journal_path.read_text())
+    assert saved["schemaVersion"] == 3
+    assert saved["requestsReserved"] == 1
+    entry = saved["diagnostics"][0]
+    assert entry == {
+        "sequence": 1,
+        "ordinal": 1,
+        "requestClass": "match-structural",
+        "result": expected_result,
+        "statusCode": status_code,
+        "durationMs": entry["durationMs"],
+        "exceptionClass": None,
+        "causeCategory": None,
+        "requestReserved": True,
+    }
+    assert isinstance(entry["durationMs"], (int, float)) and entry["durationMs"] >= 0
+    assert private_marker not in journal_path.read_text()
+    assert "BR1_1000000001" not in journal_path.read_text()
+    assert "/lol/match/" not in journal_path.read_text()
+    assert _FAKE_API_KEY not in journal_path.read_text()
+
+
+async def test_private_diagnostics_record_http_error_for_each_retry(tmp_path: Path) -> None:
+    journal_path = _journal_path(tmp_path)
+    private_marker = "SECRET_ID_URL_BODY_MARKER"
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        raise httpx.ConnectError(private_marker, request=request)
+
+    with BudgetJournal(journal_path, limit=3) as journal:
+        transport = _transport(handler, budget=_budget(max_attempts_per_request=2))
+        _attach_private_diagnostics(transport, journal)
+        with pytest.raises(SourceError) as excinfo:
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved = json.loads(journal_path.read_text())
+    assert excinfo.value.code == "UPSTREAM_UNAVAILABLE"
+    assert calls == 2
+    assert saved["requestsReserved"] == 2
+    assert [entry["result"] for entry in saved["diagnostics"]] == ["HTTP_ERROR", "HTTP_ERROR"]
+    assert [entry["ordinal"] for entry in saved["diagnostics"]] == [1, 2]
+    assert all(entry["statusCode"] is None for entry in saved["diagnostics"])
+    assert all(entry["exceptionClass"] == "ConnectError" for entry in saved["diagnostics"])
+    assert all(entry["causeCategory"] == "UNKNOWN" for entry in saved["diagnostics"])
+    assert all(entry["durationMs"] >= 0 for entry in saved["diagnostics"])
+    assert private_marker not in journal_path.read_text()
+    assert "BR1_1000000001" not in journal_path.read_text()
+
+
+@pytest.mark.parametrize(
+    ("exception_type", "expected_class"),
+    [
+        (httpx.ConnectTimeout, "ConnectTimeout"),
+        (httpx.ReadTimeout, "ReadTimeout"),
+        (httpx.ConnectError, "ConnectError"),
+        (httpx.ReadError, "ReadError"),
+        (httpx.RemoteProtocolError, "RemoteProtocolError"),
+    ],
+)
+async def test_private_diagnostics_allowlist_network_exception_classes_and_duration(
+    tmp_path: Path,
+    exception_type: type[httpx.HTTPError],
+    expected_class: str,
+) -> None:
+    journal_path = _journal_path(tmp_path)
+    sensitive_marker = "PRIVATE_HOST_QUERY_CAUSE_SECRET_MARKER"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise exception_type(sensitive_marker, request=request)
+
+    with BudgetJournal(journal_path, limit=1) as journal:
+        transport = _transport(handler, budget=_budget(max_attempts_per_request=1))
+        _attach_private_diagnostics(transport, journal)
+        with pytest.raises(SourceError):
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved_text = journal_path.read_text()
+    entry = json.loads(saved_text)["diagnostics"][0]
+    assert entry["ordinal"] == 1
+    assert entry["requestClass"] == "match-structural"
+    assert entry["result"] == "HTTP_ERROR"
+    assert entry["exceptionClass"] == expected_class
+    assert entry["causeCategory"] == "UNKNOWN"
+    assert isinstance(entry["durationMs"], (int, float)) and entry["durationMs"] >= 0
+    assert sensitive_marker not in saved_text
+    assert "BR1_1000000001" not in saved_text
+
+
+@pytest.mark.parametrize(
+    ("cause_kind", "expected_category"),
+    [
+        ("dns", "DNS"),
+        ("socket", "SOCKET"),
+        ("tls", "TLS"),
+        ("proxy", "PROXY"),
+        ("unknown", "UNKNOWN"),
+        ("unlisted-dns-code", "UNKNOWN"),
+        ("cause-too-deep", "UNKNOWN"),
+    ],
+)
+async def test_private_diagnostics_classify_only_allowlisted_nested_causes(
+    tmp_path: Path, cause_kind: str, expected_category: str
+) -> None:
+    journal_path = _journal_path(tmp_path)
+    markers = {
+        "outer": "SYNTHETIC_OUTER_SECRET_MARKER",
+        "cause": "SYNTHETIC_CAUSE_ID_URL_SECRET_MARKER",
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if cause_kind == "dns":
+            cause: BaseException = socket.gaierror(socket.EAI_AGAIN, markers["cause"])
+        elif cause_kind == "socket":
+            cause = ConnectionRefusedError(111, markers["cause"])
+        elif cause_kind == "tls":
+            cause = ssl.SSLError(markers["cause"])
+        elif cause_kind == "proxy":
+            cause = httpcore.ProxyError(markers["cause"])
+        elif cause_kind == "unlisted-dns-code":
+            cause = socket.gaierror(-999, markers["cause"])
+        elif cause_kind == "cause-too-deep":
+            cause = ConnectionRefusedError(111, markers["cause"])
+            for _ in range(6):
+                wrapper = ValueError(markers["cause"])
+                wrapper.__cause__ = cause
+                cause = wrapper
+        else:
+            cause = ValueError(markers["cause"])
+        try:
+            raise cause
+        except BaseException as nested:
+            raise httpx.ConnectError(markers["outer"], request=request) from nested
+
+    with BudgetJournal(journal_path, limit=1) as journal:
+        transport = _transport(handler, budget=_budget(max_attempts_per_request=1))
+        _attach_private_diagnostics(transport, journal)
+        with pytest.raises(SourceError):
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved_text = journal_path.read_text()
+    entry = json.loads(saved_text)["diagnostics"][0]
+    assert entry["causeCategory"] == expected_category
+    assert entry["exceptionClass"] == "ConnectError"
+    assert markers["outer"] not in saved_text
+    assert markers["cause"] not in saved_text
+    assert "BR1_1000000001" not in saved_text
+    assert "/lol/match/v5/" not in saved_text
+
+
+async def test_private_diagnostics_record_each_5xx_retry_with_numeric_status(
+    tmp_path: Path,
+) -> None:
+    journal_path = _journal_path(tmp_path)
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(503)
+
+    with BudgetJournal(journal_path, limit=3) as journal:
+        transport = _transport(handler, budget=_budget(max_attempts_per_request=2))
+        _attach_private_diagnostics(transport, journal)
+        with pytest.raises(SourceError):
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved = json.loads(journal_path.read_text())
+    assert calls == 2
+    assert [entry["result"] for entry in saved["diagnostics"]] == ["HTTP_5XX", "HTTP_5XX"]
+    assert [entry["statusCode"] for entry in saved["diagnostics"]] == [503, 503]
+    assert all(entry["durationMs"] >= 0 for entry in saved["diagnostics"])
+    assert all(entry["exceptionClass"] is None for entry in saved["diagnostics"])
+    assert all(entry["causeCategory"] is None for entry in saved["diagnostics"])
+
+
+async def test_private_diagnostics_leave_pending_reservation_after_crash(tmp_path: Path) -> None:
+    journal_path = _journal_path(tmp_path)
+
+    class SimulatedCrash(BaseException):
+        pass
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise SimulatedCrash
+
+    with BudgetJournal(journal_path, limit=1) as journal:
+        transport = _transport(handler)
+        _attach_private_diagnostics(transport, journal)
+        with pytest.raises(SimulatedCrash):
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved = json.loads(journal_path.read_text())
+    assert saved["requestsReserved"] == 1
+    assert saved["diagnostics"][0]["result"] == "PENDING"
+    assert saved["diagnostics"][0]["statusCode"] is None
+    assert saved["diagnostics"][0]["durationMs"] is None
+    assert saved["diagnostics"][0]["exceptionClass"] is None
+    assert saved["diagnostics"][0]["causeCategory"] is None
+
+
+async def test_failed_durable_reservation_prevents_http_send(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal_path = _journal_path(tmp_path)
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200)
+
+    with BudgetJournal(journal_path, limit=1) as journal:
+
+        def fail_save() -> None:
+            raise DiscoveryError("synthetic durable-write failure")
+
+        monkeypatch.setattr(journal, "_save", fail_save)
+        transport = _transport(handler)
+        _attach_private_diagnostics(transport, journal)
+        with pytest.raises(DiscoveryError):
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    assert calls == 0
+    saved = json.loads(journal_path.read_text())
+    assert saved["requestsReserved"] == 0
+    assert saved["diagnostics"] == []
+
+
+async def test_failed_result_write_keeps_durable_request_pending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    journal_path = _journal_path(tmp_path)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"SAFE_BODY_NOT_PERSISTED")
+
+    with BudgetJournal(journal_path, limit=1) as journal:
+        real_save = journal._save
+        save_calls = 0
+
+        def fail_result_save() -> None:
+            nonlocal save_calls
+            save_calls += 1
+            if save_calls == 2:
+                raise DiscoveryError("synthetic result-write failure")
+            real_save()
+
+        monkeypatch.setattr(journal, "_save", fail_result_save)
+        transport = _transport(handler)
+        _attach_private_diagnostics(transport, journal)
+        with pytest.raises(DiscoveryError):
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved = json.loads(journal_path.read_text())
+    assert saved["requestsReserved"] == 1
+    assert saved["diagnostics"][0]["result"] == "PENDING"
+    assert "SAFE_BODY_NOT_PERSISTED" not in journal_path.read_text()
+
+
+async def test_local_time_budget_is_recorded_without_reserving_or_sending(
+    tmp_path: Path,
+) -> None:
+    journal_path = _journal_path(tmp_path)
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200)
+
+    with BudgetJournal(journal_path, limit=1) as journal:
+        transport = _transport(handler, budget=_budget(max_total_seconds=0))
+        _attach_private_diagnostics(transport, journal)
+        with pytest.raises(SourceError) as excinfo:
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved = json.loads(journal_path.read_text())
+    assert excinfo.value.code == "UPSTREAM_UNAVAILABLE"
+    assert calls == 0
+    assert saved["requestsReserved"] == 0
+    assert saved["diagnostics"] == [
+        {
+            "sequence": 1,
+            "ordinal": None,
+            "requestClass": "match-structural",
+            "result": "LOCAL_TIME_BUDGET",
+            "statusCode": None,
+            "durationMs": None,
+            "exceptionClass": None,
+            "causeCategory": None,
+            "requestReserved": False,
+        }
+    ]
+
+
+async def test_local_request_budget_is_diagnostic_without_an_extra_reservation(
+    tmp_path: Path,
+) -> None:
+    journal_path = _journal_path(tmp_path)
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200)
+
+    with BudgetJournal(journal_path, limit=2) as journal:
+        transport = _transport(handler, budget=_budget(max_requests=1))
+        _attach_private_diagnostics(transport, journal)
+        await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        with pytest.raises(SourceRateLimitedError):
+            await transport.fetch_match_for_structural_projection("BR1_1000000001")
+        await transport.aclose()
+
+    saved = json.loads(journal_path.read_text())
+    assert calls == 1
+    assert saved["requestsReserved"] == 1
+    assert [entry["result"] for entry in saved["diagnostics"]] == [
+        "HTTP_200",
+        "LOCAL_REQUEST_BUDGET",
+    ]
+    assert saved["diagnostics"][1]["ordinal"] is None
+    assert saved["diagnostics"][1]["requestReserved"] is False
 
 
 async def test_429_without_retry_after_raises_rate_limited_immediately() -> None:
