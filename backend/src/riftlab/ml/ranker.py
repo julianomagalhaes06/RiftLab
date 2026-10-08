@@ -12,7 +12,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from riftlab.dataset.popularity import PopularityModel
-from riftlab.ml.features import Catalogs, categorical_indices, decision_vectors, design_matrix
+from riftlab.ml.features import (
+    CATEGORICAL,
+    Catalogs,
+    categorical_indices,
+    decision_vectors,
+    design_matrix,
+)
 from riftlab.ml.metrics import evaluate
 
 # B1 (pesos fixados antes de qualquer avaliação, CC-402): aproveitar componentes vale 2,
@@ -71,9 +77,7 @@ def model_scores(model: Any, catalogs: Catalogs, drop: frozenset[str]) -> Any:
             return []
         names = [n for n in model.feature_names_]
         x = [[vector[name] for name in names] for vector in vectors]
-        cats = [
-            i for i, name in enumerate(names) if name in ("self_champion_id", "candidate_item_id")
-        ]
+        cats = [i for i, name in enumerate(names) if name in CATEGORICAL]
         return list(model.predict(Pool(x, cat_features=cats, feature_names=names)))
 
     return score

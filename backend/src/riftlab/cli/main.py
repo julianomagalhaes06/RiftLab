@@ -233,6 +233,82 @@ def ml_train_ranker(
     typer.echo(json.dumps({"validation": summary, "run": report["runSha256"]}, sort_keys=True))
 
 
+@ml_app.command("enrich-context")
+def ml_enrich_context(
+    dataset: Path = typer.Option(..., help="Dataset de planejamento congelado."),
+    output: Path = typer.Option(..., help="Dataset novo com contexto rico (privado, uma vez)."),
+    collection_dir: Path = typer.Option(_REPO_ROOT / ".private" / "collection"),
+    items: Path = typer.Option(_ITEMS_16_19),
+) -> None:
+    """Acrescenta contexto anterior à âncora (CC-408) lendo o raw só para leitura."""
+    import hashlib
+    import json
+    import uuid
+
+    from riftlab.catalog.classification import ItemClass, classify_catalog
+    from riftlab.catalog.domain import Item
+    from riftlab.catalog.infrastructure.curation import (
+        CURATION_RULES_VERSION,
+        curate_data_dragon_items,
+    )
+    from riftlab.collection.cc316_adoption import canonical_json
+    from riftlab.collection.cc316_discovery import _atomic_write_once
+    from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+    from riftlab.ml.context import rich_context
+
+    if ".private" not in output.parts or output.exists():
+        typer.echo("BLOCKED: saída deve ser nova e ficar em .private", err=True)
+        raise typer.Exit(code=1)
+    artifact = _verified_private_json(dataset)
+    item_doc = json.loads(items.read_bytes())
+    curated, excluded = curate_data_dragon_items(item_doc["data"])
+    cid = uuid.uuid4()
+    catalog = {
+        d.item_id: Item(cid, d.item_id, d.price, d.recipe, d.attributes, d.flags) for d in curated
+    }
+    table = classify_catalog(
+        catalog,
+        curation_rules_version=CURATION_RULES_VERSION,
+        excluded_item_ids=frozenset(e.item_id for e in excluded),
+    )
+    main_tags = {
+        i: tuple(item_doc["data"][str(i)].get("tags", ()))
+        for i, c in table.by_item_id.items()
+        if c.item_class is ItemClass.MAIN
+    }
+    stores = [
+        DurableRawMatchStore(collection_dir / d, create=False)
+        for d in ("cc316/raw-exploration", "cc316/raw-confirmation", "cc323/raw")
+    ]
+    cache: dict[str, Any] = {}
+
+    def bodies(match_id: str) -> Any:
+        if match_id not in cache:
+            cache.clear()
+            for store in stores:
+                match = store.read_if_valid_read_only(match_id, "match")
+                if match is not None:
+                    timeline = store.read_if_valid_read_only(match_id, "timeline")
+                    cache[match_id] = (json.loads(match), json.loads(timeline or b"{}"))
+                    break
+        return cache[match_id]
+
+    rows = []
+    for row in sorted(artifact["rows"], key=lambda r: r["matchId"]):
+        match, timeline = bodies(row["matchId"])
+        anchor = int(row["features"]["game_time_ms"])
+        context = rich_context(match, timeline, row["participantId"], anchor, main_tags)
+        rows.append({**row, "context": context})
+    enriched = {
+        **{k: v for k, v in artifact.items() if k != "rows"},
+        "contextCard": "CC-408",
+        "sourceDatasetSha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
+        "rows": rows,
+    }
+    digest = _atomic_write_once(output, canonical_json(enriched))
+    typer.echo(json.dumps({"rows": len(rows), "sha256": digest}))
+
+
 @ml_app.command("evaluate-test")
 def ml_evaluate_test(
     run_dir: Path = typer.Option(..., help="Execução já selecionada."),

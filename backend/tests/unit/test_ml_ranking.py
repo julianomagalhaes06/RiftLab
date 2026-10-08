@@ -127,6 +127,7 @@ def test_catboost_smoke_and_single_test_run(tmp_path: Path) -> None:
         "M1-full",
         "M1-no_composition",
         "M1-no_economy",
+        "M1-no_rich_context",
     }
     assert (tmp_path / "run" / "m1-full.cbm").exists()
     result = test_run(tmp_path / "run", dataset, champions, items)

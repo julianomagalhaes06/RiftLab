@@ -12,6 +12,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from riftlab.ml.context import RICH_CONTEXT
+
 CHAMPION_TAGS = ("Assassin", "Fighter", "Mage", "Marksman", "Support", "Tank")
 ITEM_TAGS = (
     "Armor",
@@ -28,7 +30,7 @@ ITEM_TAGS = (
     "SpellBlock",
     "SpellDamage",
 )
-CATEGORICAL = ("self_champion_id", "candidate_item_id")
+CATEGORICAL = ("self_champion_id", "candidate_item_id", "lane_opponent_champion_id")
 COMPOSITION = tuple(f"{side}_{tag.lower()}" for side in ("ally", "enemy") for tag in CHAMPION_TAGS)
 ECONOMY = ("gold_estimate", "gold_stale", "remaining_cost", "affordable_margin")
 NUMERIC = (
@@ -41,12 +43,14 @@ NUMERIC = (
     *ECONOMY,
     *(f"item_{tag.lower()}" for tag in ITEM_TAGS),
     *COMPOSITION,
+    *(name for name in RICH_CONTEXT if name != "lane_opponent_champion_id"),
 )
 FEATURE_NAMES = (*CATEGORICAL, *NUMERIC)
 ABLATIONS = {
     "full": frozenset(),
     "no_composition": frozenset(COMPOSITION),
     "no_economy": frozenset(ECONOMY),
+    "no_rich_context": frozenset(RICH_CONTEXT),
 }
 NAN = math.nan
 
@@ -88,6 +92,18 @@ def _composition(side: str, champion_ids: Any, catalogs: Catalogs) -> dict[str, 
     return {f"{side}_{tag.lower()}": value for tag, value in counts.items()}
 
 
+def _rich(context: Any) -> dict[str, Any]:
+    """CC-408 context when present; NaN / "NONE" otherwise (never zero)."""
+    context = context if isinstance(context, dict) else {}
+    out: dict[str, Any] = {}
+    for name in RICH_CONTEXT:
+        if name == "lane_opponent_champion_id":
+            out[name] = str(context.get(name, "NONE"))
+        else:
+            out[name] = _number(context.get(name))
+    return out
+
+
 def decision_vectors(row: Mapping[str, Any], catalogs: Catalogs) -> list[dict[str, Any]]:
     """Feature dicts for every legal candidate of one decision, in candidate order."""
     features = row.get("features") or {}
@@ -105,6 +121,7 @@ def decision_vectors(row: Mapping[str, Any], catalogs: Catalogs) -> list[dict[st
         "gold_stale": float(stale) if isinstance(stale, bool) else NAN,
         **_composition("ally", features.get("ally_champion_ids"), catalogs),
         **_composition("enemy", features.get("enemy_champion_ids"), catalogs),
+        **_rich(row.get("context")),
     }
     vectors = []
     for candidate in row.get("candidates") or []:
