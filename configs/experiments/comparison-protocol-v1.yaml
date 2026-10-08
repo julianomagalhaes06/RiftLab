@@ -1,0 +1,23 @@
+# Protocolo de comparação da Sprint 4 (CC-401). Fixado antes de qualquer acesso ao teste.
+schemaVersion: 1
+dataset: dataset-16.19-v2        # manifesto privado congelado (70/15/15 cronológico por partida)
+unit: decision                   # uma linha = ponto de decisão elegível × candidatos legais
+target: historical_purchase      # mede imitação da escolha histórica, não pertinência
+metrics:
+  primary: mrr
+  secondary: [hit_at_1, hit_at_3, hit_at_5]
+uncertainty:
+  method: bootstrap_by_match     # reamostra partidas (decisões de uma partida juntas)
+  resamples: 2000
+  confidence: 0.95
+  seed: 401
+baselines: [popularity_champion_ordinal, uniform_random_expected]
+model_selection: validation_only # hiperparâmetros e escolhas só com a validação
+test_access: after_config_freeze # o teste roda uma vez, depois de congelar a configuração do ranker
+subsets:
+  - all
+  - player_disjoint             # decisões de jogadores que não aparecem em nenhuma partida de treino
+declared_limits:
+  - single_patch_16.19
+  - convenience_snowball_sample_player_correlated
+  - test_and_validation_concentrated_on_last_day_of_patch

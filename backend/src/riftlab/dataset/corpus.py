@@ -45,6 +45,7 @@ class DatasetPolicy:
     map_id: int
     exclude_remakes: bool
     train_fraction: float
+    validation_fraction: float = 0.0  # CC-401: 0 mantém a divisão treino/teste do CC-302
 
 
 def load_dataset_policy(path: Path) -> DatasetPolicy:
@@ -59,10 +60,13 @@ def load_dataset_policy(path: Path) -> DatasetPolicy:
         document["schemaVersion"] != 1
         or not isinstance(document["patch"], str)
         or not isinstance(split, dict)
-        or set(split) != {"method", "trainFraction"}
+        or set(split) - {"validationFraction"} != {"method", "trainFraction"}
         or split["method"] != "CHRONOLOGICAL_BY_MATCH"
         or not isinstance(split["trainFraction"], float)
+        or not isinstance(split.get("validationFraction", 0.0), float)
         or not 0 < split["trainFraction"] < 1
+        or not 0 <= split.get("validationFraction", 0.0)
+        or split["trainFraction"] + split.get("validationFraction", 0.0) > 1 - 1e-6
         or not isinstance(document["excludeRemakes"], bool)
     ):
         raise CorpusError("política do dataset inválida")
@@ -72,6 +76,7 @@ def load_dataset_policy(path: Path) -> DatasetPolicy:
         map_id=int(document["mapId"]),
         exclude_remakes=document["excludeRemakes"],
         train_fraction=split["trainFraction"],
+        validation_fraction=split.get("validationFraction", 0.0),
     )
 
 
@@ -154,6 +159,21 @@ def build_corpus_manifest(
     test = [match_id for match_id in ordered if starts[match_id] >= boundary]
     if not train or not test:
         raise CorpusError("divisão cronológica degenerada")
+    if policy.validation_fraction:
+        end = policy.train_fraction + policy.validation_fraction
+        test_boundary = starts[ordered[int(len(ordered) * end)]]
+        validation = [m for m in test if starts[m] < test_boundary]
+        test = [m for m in test if starts[m] >= test_boundary]
+        if not validation or not test:
+            raise CorpusError("divisão cronológica degenerada")
+        return _three_way_manifest(
+            policy,
+            policy_sha256,
+            source_counts,
+            exclusions,
+            (boundary, test_boundary),
+            (train, validation, test),
+        )
     manifest: dict[str, object] = {
         "schemaVersion": 1,
         "card": "CC-302",
@@ -174,6 +194,44 @@ def build_corpus_manifest(
         "privacy": {"participantIdentifiersInManifest": False, "storesOpenedReadOnly": True},
     }
     return manifest
+
+
+def _three_way_manifest(
+    policy: DatasetPolicy,
+    policy_sha256: str,
+    source_counts: dict[str, dict[str, int]],
+    exclusions: dict[str, str],
+    boundaries: tuple[int, int],
+    splits: tuple[list[str], list[str], list[str]],
+) -> dict[str, object]:
+    train, validation, test = splits
+    return {
+        "schemaVersion": 2,
+        "card": "CC-401",
+        "patch": policy.patch,
+        "target": {"queueId": policy.queue_id, "mapId": policy.map_id, "gameComplete": True},
+        "policySha256": policy_sha256,
+        "sources": source_counts,
+        "exclusions": dict(sorted(exclusions.items())),
+        "split": {
+            "method": "CHRONOLOGICAL_BY_MATCH",
+            "trainFraction": policy.train_fraction,
+            "validationFraction": policy.validation_fraction,
+            "boundaryGameStartMs": boundaries[0],
+            "testBoundaryGameStartMs": boundaries[1],
+            "rule": "train < boundary <= validation < testBoundary <= test (gameStart)",
+            "trainMatchIds": train,
+            "validationMatchIds": validation,
+            "testMatchIds": test,
+        },
+        "counts": {
+            "kept": len(train) + len(validation) + len(test),
+            "train": len(train),
+            "validation": len(validation),
+            "test": len(test),
+        },
+        "privacy": {"participantIdentifiersInManifest": False, "storesOpenedReadOnly": True},
+    }
 
 
 def freeze_corpus(

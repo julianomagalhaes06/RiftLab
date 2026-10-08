@@ -167,3 +167,50 @@ def test_repository_policy_is_valid() -> None:
     assert (policy.patch, policy.queue_id, policy.map_id) == ("16.19", 420, 11)
     assert policy.exclude_remakes is True
     assert policy.train_fraction == 0.7
+
+
+def test_three_way_split_is_chronological_and_keeps_instants_together(tmp_path: Path) -> None:
+    store = _store(
+        tmp_path / "a",
+        {f"BR1_{i}": _body(f"BR1_{i}", 1_000 + i) for i in range(1, 15)}
+        | {"BR1_99": _body("BR1_99", 1_012)},
+    )
+    policy = load_dataset_policy(
+        _policy(
+            tmp_path,
+            POLICY_TEXT.replace(
+                "  trainFraction: 0.7\n", "  trainFraction: 0.7\n  validationFraction: 0.15\n"
+            ),
+        )
+    )
+
+    manifest = build_corpus_manifest({"a": store}, policy, policy_sha256="0" * 64)
+
+    split = manifest["split"]
+    assert isinstance(split, dict)
+    train, validation, test = (split[f"{n}MatchIds"] for n in ("train", "validation", "test"))
+    assert manifest["schemaVersion"] == 2 and manifest["card"] == "CC-401"
+    assert set(train).isdisjoint(validation) and set(validation).isdisjoint(test)
+    assert len(train) + len(validation) + len(test) == 15
+    # 15 kept: cut at index 10 (start 1011) and index 12 (start 1012, shared by two matches).
+    assert split["boundaryGameStartMs"] == 1_011 and split["testBoundaryGameStartMs"] == 1_012
+    assert {"BR1_12", "BR1_99"} <= set(test)
+
+
+@pytest.mark.parametrize("extra", ["  validationFraction: 0.3\n", "  validationFraction: 1\n"])
+def test_invalid_validation_fraction_fails_closed(tmp_path: Path, extra: str) -> None:
+    with pytest.raises(CorpusError):
+        load_dataset_policy(
+            _policy(
+                tmp_path,
+                POLICY_TEXT.replace("  trainFraction: 0.7\n", "  trainFraction: 0.7\n" + extra),
+            )
+        )
+
+
+def test_repository_experiment_policy_is_70_15_15() -> None:
+    policy = load_dataset_policy(
+        Path(__file__).resolve().parents[3] / "configs" / "experiments" / "dataset-16.19-v2.yaml"
+    )
+
+    assert (policy.train_fraction, policy.validation_fraction) == (0.7, 0.15)

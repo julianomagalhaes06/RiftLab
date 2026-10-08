@@ -13,7 +13,7 @@ import uuid
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -65,10 +65,19 @@ def split_assignment(manifest: Mapping[str, Any]) -> dict[str, str]:
     split = manifest.get("split")
     if not isinstance(split, dict):
         raise RowsError("manifesto sem divisão")
-    train, test = split.get("trainMatchIds"), split.get("testMatchIds")
-    if not isinstance(train, list) or not isinstance(test, list) or set(train) & set(test):
+    parts = {
+        name: split.get(f"{name}MatchIds", [] if name == "validation" else None)
+        for name in ("train", "validation", "test")
+    }
+    if not all(isinstance(ids, list) for ids in parts.values()):
         raise RowsError("divisão do manifesto inválida")
-    return {match_id: "train" for match_id in train} | {match_id: "test" for match_id in test}
+    assignment: dict[str, str] = {}
+    for name, ids in parts.items():
+        for match_id in cast(list[str], ids):
+            if match_id in assignment:
+                raise RowsError("divisão do manifesto inválida")
+            assignment[match_id] = name
+    return assignment
 
 
 async def build_rows(

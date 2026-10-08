@@ -1,0 +1,12 @@
+# Política do dataset final da Sprint 4 (CC-401): mesma base do CC-302, divisão 70/15/15.
+schemaVersion: 1
+patch: "16.19"
+queueId: 420
+mapId: 11
+excludeRemakes: true
+split:
+  # Cronológica por partida: treino < validação < teste pelo instante de início; nenhum
+  # instante atravessa duas partes. Validação escolhe configurações; teste só no fim.
+  method: CHRONOLOGICAL_BY_MATCH
+  trainFraction: 0.7
+  validationFraction: 0.15

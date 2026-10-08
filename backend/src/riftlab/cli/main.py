@@ -192,6 +192,44 @@ def dataset_build_rows(
     typer.echo(json.dumps({"counts": artifact["counts"], "sha256": digest}, sort_keys=True))
 
 
+@dataset_app.command("freeze-dataset")
+def dataset_freeze_final(
+    rows_path: Path = typer.Option(..., help="Linhas congeladas (JSON com sidecar)."),
+    manifest: Path = typer.Option(..., help="Manifesto do corpus com treino/validação/teste."),
+    output: Path = typer.Option(..., help="Dataset final privado, gravado uma vez."),
+    collection_dir: Path = typer.Option(
+        _REPO_ROOT / ".private" / "collection", help="Raiz privada das coletas (só leitura)."
+    ),
+) -> None:
+    """Congela o dataset final (CC-401): rótulos da divisão, cobertura e contaminação."""
+    import hashlib
+    import json
+
+    from riftlab.collection.cc316_adoption import canonical_json
+    from riftlab.collection.cc316_discovery import _atomic_write_once
+    from riftlab.dataset.final import build_final_dataset
+
+    if ".private" not in output.parts or output.exists():
+        typer.echo("BLOCKED: saída deve ser nova e ficar em .private", err=True)
+        raise typer.Exit(code=1)
+    rows_artifact = _verified_private_json(rows_path)
+    corpus = _verified_private_json(manifest)
+    artifact = build_final_dataset(
+        rows_artifact,
+        corpus,
+        [
+            collection_dir / "cc316" / "raw-exploration",
+            collection_dir / "cc316" / "raw-confirmation",
+            collection_dir / "cc323" / "raw",
+        ],
+        rows_sha256=hashlib.sha256(rows_path.read_bytes()).hexdigest(),
+        manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest(),
+    )
+    digest = _atomic_write_once(output, canonical_json(artifact))
+    summary = {key: artifact[key] for key in ("coverage", "playerContamination")}
+    typer.echo(json.dumps({**summary, "sha256": digest}, sort_keys=True, ensure_ascii=False))
+
+
 @dataset_app.command("baseline")
 def dataset_baseline(
     rows_path: Path = typer.Option(
@@ -208,7 +246,11 @@ def dataset_baseline(
     model = fit(row for row in rows if row["split"] == "train")
     report = {
         "train": evaluate(model, [row for row in rows if row["split"] == "train"]),
-        "test": evaluate(model, [row for row in rows if row["split"] == "test"]),
+        **{
+            split: evaluate(model, [row for row in rows if row["split"] == split])
+            for split in ("validation", "test")
+            if any(row["split"] == split for row in rows)
+        },
     }
     typer.echo(json.dumps(report, sort_keys=True, ensure_ascii=False))
 
