@@ -20,7 +20,7 @@ rules:
     contraRate: 0.003457
     counterExamples: 8
     evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H1b 8/2314 (sup Wilson 0.0068), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 8
+    activatedInVersion: 9
   R2:
     ruleVersion: 1
     description: troca de trinket (destroy do trinket possuído no mesmo instante de uma compra de trinket)
@@ -29,7 +29,7 @@ rules:
     contraRate: 0.026559
     counterExamples: 23
     evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H2g 23/866 (sup Wilson 0.0395), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 8
+    activatedInVersion: 9
   R2i:
     ruleVersion: 1
     description: todo participante começa com o trinket padrão 3340
@@ -38,7 +38,7 @@ rules:
     contraRate: 0.010893
     counterExamples: 5
     evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H2i 5/459 (sup Wilson 0.0252), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 8
+    activatedInVersion: 9
   R4s:
     ruleVersion: 1
     description: destroy sem posse de item de sistema/missão (systemItemIds) não altera o inventário nem marca
@@ -47,7 +47,7 @@ rules:
     contraRate: 0.0
     counterExamples: 0
     evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H4s 0/4317 (sup Wilson 0.0009), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 8
+    activatedInVersion: 9
   R4w:
     ruleVersion: 1
     description: compras do World Atlas (3865) do participantId 0 são o item inicial dos Apoios (falha segura)
@@ -56,7 +56,7 @@ rules:
     contraRate: 0.0
     counterExamples: 0
     evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H4w 0/295 (sup Wilson 0.0129), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 8
+    activatedInVersion: 9
   R5:
     ruleVersion: 1
     description: libera UNVALIDATED_DESTROY_ORDER_RECONCILIATION (destroy dos componentes antes da compra composta)
@@ -65,7 +65,7 @@ rules:
     contraRate: 0.000063
     counterExamples: 1
     evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H5 1/15761 (sup Wilson 0.0004), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 8
+    activatedInVersion: 9
   R6:
     ruleVersion: 1
     description: undo em pilha (transação de compra transparente) e libera UNVALIDATED_UNDO_SEMANTICS
@@ -75,3 +75,48 @@ rules:
     counterExamples: null
     evidence: null
     activatedInVersion: null
+  R7b:
+    ruleVersion: 1
+    description: "destroy sem posse do Biscoito da Vontade Eterna (2010), concedido pela runa 8345, é consumo da unidade concedida"
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.005978
+    counterExamples: 7
+    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H7b 7/1171 (sup Wilson 0.0123), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
+    activatedInVersion: 9
+  R7m:
+    ruleVersion: 1
+    description: "destroy sem posse dos Calçados Levemente Mágicos (2422), concedidos pela runa 8304, não altera o inventário"
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.003656
+    counterExamples: 2
+    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H7m 2/547 (sup Wilson 0.0132), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
+    activatedInVersion: 9
+  R7x:
+    ruleVersion: 1
+    description: "destroy sem posse dos elixires 2150/2151/2152, concedidos pela runa 8313, é consumo da unidade concedida"
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.000000
+    counterExamples: 0
+    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H7x 0/485 (sup Wilson 0.0079), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
+    activatedInVersion: 9
+  R8:
+    ruleVersion: 1
+    description: "bota destruída no instante em que termina a missão de rota: BOTTOM (1202) remove a bota; MID (1201) troca a tier 2 pelo sucessor único do catálogo"
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.000000
+    counterExamples: 0
+    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H8 0/434 (sup Wilson 0.0088), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
+    activatedInVersion: 9
+  R8t:
+    ruleVersion: 1
+    description: "Botas básicas (1001) destruídas no instante em que termina a missão do BOTTOM (1202) saem do inventário sem substituta"
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: ["16.19"]
+    contraRate: 0.000000
+    counterExamples: 0
+    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H8t1 0/216 (sup Wilson 0.0175), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
+    activatedInVersion: 9

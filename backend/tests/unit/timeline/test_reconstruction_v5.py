@@ -63,11 +63,11 @@ def _reduce(
     )
 
 
-def test_algorithm_version_is_eight() -> None:
-    """A v8 (regras empíricas ativadas pelo registro só nos patches validados) mantém tudo
+def test_algorithm_version_is_nine() -> None:
+    """A v9 (regras empíricas ativadas pelo registro só nos patches validados) mantém tudo
     da v5/v6 (nível, timestamp do evento, bloco retrospectivo); os testes deste arquivo
     seguem valendo porque, com as regras desligadas, o resultado é idêntico ao da v6."""
-    assert RECONSTRUCTION_ALGORITHM_VERSION == 8
+    assert RECONSTRUCTION_ALGORITHM_VERSION == 9
 
 
 # --- observação de nível ---------------------------------------------------

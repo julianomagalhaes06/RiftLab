@@ -34,7 +34,11 @@ from riftlab.timeline.domain import (
     TimelineReplayError,
 )
 from riftlab.timeline.empirical_rules import (
+    BOOTS_ITEM_ID,
+    BOT_LANE_QUEST_ITEM_ID,
     DEFAULT_TRINKET_ITEM_ID,
+    GRANTED_ITEM_IDS_BY_RULE,
+    MID_LANE_QUEST_ITEM_ID,
     RULE_R1,
     RULE_R2,
     RULE_R2I,
@@ -42,6 +46,8 @@ from riftlab.timeline.empirical_rules import (
     RULE_R4W,
     RULE_R5,
     RULE_R6,
+    RULE_R8,
+    RULE_R8T,
     SUPPORT_ROLE,
     EmpiricalRules,
     attribute_system_purchases,
@@ -102,7 +108,7 @@ STALE_FRAME_THRESHOLD_MS = 90_000
 #       partida). Ativar uma regra exige nova versão (o registro recusa
 #       `activatedInVersion` diferente da corrente), então estados de uma
 #       versão nunca são reaproveitados com outro conjunto de regras.
-RECONSTRUCTION_ALGORITHM_VERSION = 8
+RECONSTRUCTION_ALGORITHM_VERSION = 9
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens
@@ -567,6 +573,48 @@ def _slots_used(
     return slots, unknown
 
 
+def _lane_quest_boot_successor(
+    item_id: int,
+    timestamp_ms: int,
+    quest_ts: Mapping[int, set[int]],
+    catalog_items: Mapping[int, Item],
+) -> int | None:
+    """R8: 0 = bota removida (missão BOTTOM); ID = sucessor (missão MID); None = não se aplica.
+
+    Bota = Botas (1001) ou item cuja receita contém as Botas. O sucessor do MID é o
+    item único do catálogo cuja receita é exatamente uma unidade da bota destruída.
+    """
+    item = catalog_items.get(item_id)
+    recipe = _recipe_ids(item)
+    is_boot = item_id == BOOTS_ITEM_ID or BOOTS_ITEM_ID in recipe
+    if not is_boot:
+        return None
+    if timestamp_ms in quest_ts.get(BOT_LANE_QUEST_ITEM_ID, set()):
+        return 0
+    if timestamp_ms in quest_ts.get(MID_LANE_QUEST_ITEM_ID, set()) and item_id != BOOTS_ITEM_ID:
+        successors = [
+            other_id
+            for other_id, other in catalog_items.items()
+            if isinstance(other.recipe, list)
+            and len(other.recipe) == 1
+            and isinstance(other.recipe[0], dict)
+            and other.recipe[0].get("itemId") == item_id
+            and other.recipe[0].get("quantity") == 1
+        ]
+        return successors[0] if len(successors) == 1 else None
+    return None
+
+
+def _recipe_ids(item: Item | None) -> set[int]:
+    if item is None or not isinstance(item.recipe, list):
+        return set()
+    return {
+        entry["itemId"]
+        for entry in item.recipe
+        if isinstance(entry, dict) and isinstance(entry.get("itemId"), int)
+    }
+
+
 def reconstruct_participant_purchases(
     *,
     participant_id: int,
@@ -630,6 +678,18 @@ def reconstruct_participant_purchases(
         and _has_trinket_tag(catalog_items.get(event.payload["itemId"]))
     }
     purchase_ts = {event.timestamp_ms for event in owned_events if event.type == "ITEM_PURCHASED"}
+    # R7*: itens concedidos sem compra; R8: instantes em que a missão de rota terminou.
+    granted_item_ids = frozenset().union(
+        *(ids for rule, ids in GRANTED_ITEM_IDS_BY_RULE.items() if rule in enabled_rules)
+    )
+    quest_ts = {
+        quest_id: {
+            event.timestamp_ms
+            for event in owned_events
+            if event.type == "ITEM_DESTROYED" and event.payload.get("itemId") == quest_id
+        }
+        for quest_id in (BOT_LANE_QUEST_ITEM_ID, MID_LANE_QUEST_ITEM_ID)
+    }
     undo_stack_enabled = RULE_R6 in enabled_rules
     rev_stack: list[_ReversibleOp] = []
     # R2i: todo participante começa com o trinket padrão (65/66 dos que nunca
@@ -916,6 +976,31 @@ def reconstruct_participant_purchases(
                 # normal): o destroy sem posse não altera o inventário e não
                 # marca incerteza. Comprado e depois destruído (posse) segue o
                 # caminho normal.
+                last_reversible = None
+            elif (
+                item_id in granted_item_ids
+                and inventory.owned(item_id) == 0
+                and inventory.trinket_item_id != item_id
+            ):
+                # R7b/R7m/R7x: item concedido por runa (nunca comprado): o
+                # destroy sem posse é o consumo da unidade concedida. A unidade
+                # nunca foi contada no inventário, então nada é removido.
+                last_reversible = None
+            elif (
+                (RULE_R8T if item_id == BOOTS_ITEM_ID else RULE_R8) in enabled_rules
+                and inventory.owned(item_id) > 0
+                and _lane_quest_boot_successor(item_id, event.timestamp_ms, quest_ts, catalog_items)
+                is not None
+            ):
+                # R8 (tier 2) / R8t (Botas 1001, só BOTTOM): bota destruída no instante
+                # em que a missão de rota termina. BOTTOM: a bota sai sem substituta.
+                # MID: a bota tier 2 vira o sucessor único do catálogo (concedido).
+                successor = _lane_quest_boot_successor(
+                    item_id, event.timestamp_ms, quest_ts, catalog_items
+                )
+                inventory = inventory.with_removed(item_id, 1)
+                if successor:
+                    inventory = inventory.with_added(successor, 1)
                 last_reversible = None
             else:
                 # R1: destroy de consumível POSSUÍDO, sem compra composta que o

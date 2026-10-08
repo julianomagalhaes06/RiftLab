@@ -40,7 +40,34 @@ RULE_R4S = "R4s"  # itens de sistema/missão que nunca ocupam slot normal
 RULE_R4W = "R4w"  # World Atlas por vínculo de papel (pré-passo de eventos)
 RULE_R5 = "R5"  # libera UNVALIDATED_DESTROY_ORDER_RECONCILIATION
 RULE_R6 = "R6"  # undo em pilha e liberação de UNVALIDATED_UNDO_SEMANTICS
-KNOWN_RULE_IDS = (RULE_R1, RULE_R2, RULE_R2I, RULE_R4S, RULE_R4W, RULE_R5, RULE_R6)
+RULE_R7B = "R7b"  # biscoito concedido por runa: destroy sem posse é consumo (CC-324)
+RULE_R7M = "R7m"  # Calçados Levemente Mágicos concedidos por runa (CC-324)
+RULE_R7X = "R7x"  # elixires concedidos pelo Tônico Triplo (CC-324)
+RULE_R8 = "R8"  # missão de rota e bota tier 2: BOTTOM remove, MID troca pelo sucessor (CC-324)
+RULE_R8T = "R8t"  # missão do BOTTOM remove as Botas básicas (1001) (CC-324, origem exploratória)
+KNOWN_RULE_IDS = (
+    RULE_R1,
+    RULE_R2,
+    RULE_R2I,
+    RULE_R4S,
+    RULE_R4W,
+    RULE_R5,
+    RULE_R6,
+    RULE_R7B,
+    RULE_R7M,
+    RULE_R7X,
+    RULE_R8,
+    RULE_R8T,
+)
+# Itens concedidos sem evento de compra, por regra (forma da exploração CC-324).
+GRANTED_ITEM_IDS_BY_RULE: dict[str, frozenset[int]] = {
+    RULE_R7B: frozenset({2010}),
+    RULE_R7M: frozenset({2422}),
+    RULE_R7X: frozenset({2150, 2151, 2152}),
+}
+BOOTS_ITEM_ID = 1001
+BOT_LANE_QUEST_ITEM_ID = 1202
+MID_LANE_QUEST_ITEM_ID = 1201
 
 STATUS_PENDING = "PENDING"
 STATUS_SUPPORTED = "EMPIRICALLY_SUPPORTED"

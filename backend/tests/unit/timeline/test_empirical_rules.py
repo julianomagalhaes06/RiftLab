@@ -82,10 +82,13 @@ def test_repository_registry_declares_every_rule_and_starts_all_pending() -> Non
 
 
 def test_repository_registry_releases_only_the_rules_confirmed_for_16_19() -> None:
-    """Estado liberado pela confirmação única CC-316 (CC-322): R1, R2, R2i, R4s, R4w e R5 só
-    em 16.19; R6 (H6 REJECT) e qualquer outro patch continuam com o comportamento da v6."""
+    """Estado liberado pelas confirmações únicas CC-316 (CC-322: R1, R2, R2i, R4s, R4w, R5) e
+    CC-324 (R7b, R7m, R7x, R8, R8t), só em 16.19; R6 (H6 REJECT) e qualquer outro patch
+    continuam com o comportamento da v6."""
     rules = load_empirical_rules(CONFIG, reconstruction_version=VERSION)
-    assert rules.enabled_for("16.19") == frozenset({"R1", "R2", "R2i", "R4s", "R4w", "R5"})
+    assert rules.enabled_for("16.19") == frozenset(
+        {"R1", "R2", "R2i", "R4s", "R4w", "R5", "R7b", "R7m", "R7x", "R8", "R8t"}
+    )
     for patch in ("16.16", "16.17", "16.18", "16.20"):
         assert rules.enabled_for(patch) == frozenset()
     assert rules.entries["R6"].status == "PENDING"
@@ -93,6 +96,10 @@ def test_repository_registry_releases_only_the_rules_confirmed_for_16_19() -> No
         entry = rules.entries[rule_id]
         assert entry.patches_validated == frozenset({"16.19"})
         assert entry.evidence and "CC-322" in entry.evidence
+    for rule_id in ("R7b", "R7m", "R7x", "R8", "R8t"):
+        entry = rules.entries[rule_id]
+        assert entry.patches_validated == frozenset({"16.19"})
+        assert entry.evidence and "CC-324" in entry.evidence
 
 
 def test_a_supported_rule_of_the_repository_can_only_be_active_in_the_current_version() -> None:
