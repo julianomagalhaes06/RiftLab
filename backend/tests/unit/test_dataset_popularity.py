@@ -1,0 +1,80 @@
+"""CC-302 popularity baseline and split assignment (pure, synthetic rows)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from riftlab.dataset.popularity import evaluate, fit
+from riftlab.dataset.rows import RowsError, split_assignment
+
+
+def row(split: str, champ: int, ordinal: int, target: int, cands: list[int], **kw: Any) -> dict:
+    return {
+        "split": split,
+        "championId": champ,
+        "mainItemOrdinal": ordinal,
+        "targetItemId": target,
+        "candidateItemIds": cands,
+        "targetLegal": kw.get("legal", target in cands),
+    }
+
+
+def test_fit_refuses_test_rows_so_the_baseline_never_sees_test() -> None:
+    with pytest.raises(ValueError, match="treino"):
+        fit([row("test", 1, 1, 10, [10])])
+
+
+def test_ranking_uses_champion_cell_then_ordinal_prior_then_item_id() -> None:
+    model = fit(
+        [
+            row("train", 1, 1, 10, [10, 20, 30]),
+            row("train", 1, 1, 10, [10, 20, 30]),
+            row("train", 2, 1, 20, [10, 20, 30]),
+            row("train", 2, 1, 20, [10, 20, 30]),
+            row("train", 2, 1, 20, [10, 20, 30]),
+        ]
+    )
+
+    assert model.rank(1, 1, [30, 20, 10]) == [10, 20, 30]  # own cell wins
+    assert model.rank(9, 1, [30, 20, 10]) == [20, 10, 30]  # unseen champion: ordinal prior
+    assert model.rank(9, 2, [30, 20, 10]) == [10, 20, 30]  # nothing known: item id fallback
+
+
+def test_illegal_targets_are_never_labels() -> None:
+    model = fit([row("train", 1, 1, 99, [10, 20], legal=False)])
+
+    assert model.by_cell == {}
+
+
+def test_evaluate_reports_missing_targets_zero_candidates_and_random_expectation() -> None:
+    model = fit([row("train", 1, 1, 10, [10, 20])])
+    report = evaluate(
+        model,
+        [
+            row("test", 1, 1, 10, [10, 20]),  # rank 1
+            row("test", 1, 1, 20, [10, 20]),  # rank 2
+            row("test", 1, 1, 30, [10, 20]),  # target not legal
+            row("test", 1, 1, 10, []),  # zero candidates
+        ],
+    )
+
+    assert report["counts"] == {
+        "rows": 4,
+        "evaluated": 2,
+        "targetNotInCandidates": 1,
+        "zeroCandidates": 1,
+    }
+    assert report["popularity"]["hitAt1"] == 0.5
+    assert report["popularity"]["mrr"] == 0.75
+    assert report["uniformRandomExpected"]["hitAt1"] == 0.5
+    assert report["uniformRandomExpected"]["mrr"] == 0.75
+    assert report["measures"] == "IMITATION_OF_HISTORICAL_CHOICE"
+
+
+def test_split_assignment_rejects_overlap() -> None:
+    manifest = {"split": {"trainMatchIds": ["BR1_1"], "testMatchIds": ["BR1_2"]}}
+    assert split_assignment(manifest) == {"BR1_1": "train", "BR1_2": "test"}
+    with pytest.raises(RowsError):
+        split_assignment({"split": {"trainMatchIds": ["BR1_1"], "testMatchIds": ["BR1_1"]}})

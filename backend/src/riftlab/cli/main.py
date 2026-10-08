@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import typer
 import uvicorn
@@ -125,6 +126,91 @@ dataset_app = typer.Typer(
 app.add_typer(dataset_app, name="dataset")
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _verified_private_json(path: Path) -> Any:
+    import hashlib
+    import json
+
+    raw = path.read_bytes()
+    sidecar = path.with_suffix(path.suffix + ".sha256").read_text(encoding="ascii")
+    if sidecar != f"{hashlib.sha256(raw).hexdigest()}  {path.name}\n":
+        raise typer.Exit(code=1)
+    return json.loads(raw)
+
+
+@dataset_app.command("build-rows")
+def dataset_build_rows(
+    manifest: Path = typer.Option(
+        _REPO_ROOT / ".private" / "dataset" / "corpus-16.19.json", help="Manifesto congelado."
+    ),
+    rules: Path = typer.Option(
+        _REPO_ROOT / "configs" / "item-rules" / "16.19.json", help="Regras de itens do patch."
+    ),
+    output: Path = typer.Option(
+        _REPO_ROOT / ".private" / "dataset" / "rows-16.19.json", help="Saída privada única."
+    ),
+    env_file: Path | None = typer.Option(None, help="Banco preparado (descartável)."),
+) -> None:
+    """Gera linhas decisão × candidatos legais a partir de um banco já preparado."""
+    import asyncio
+    import json
+
+    from riftlab.candidates.rules import load_item_rules
+    from riftlab.cli.env_file import load_settings
+    from riftlab.collection.cc316_adoption import canonical_json
+    from riftlab.collection.cc316_discovery import _atomic_write_once
+    from riftlab.dataset.rows import build_rows
+    from riftlab.db import build_engine
+    from riftlab.shared.db import build_session_factory
+
+    if ".private" not in output.parts or output.exists():
+        typer.echo("BLOCKED: saída deve ser nova e ficar em .private", err=True)
+        raise typer.Exit(code=1)
+    corpus = _verified_private_json(manifest)
+    item_rules = load_item_rules(rules)
+    settings = load_settings(env_file)
+
+    async def _run() -> Any:
+        engine = build_engine(settings.database_url)
+        try:
+            return await build_rows(build_session_factory(engine), corpus, item_rules)
+        finally:
+            await engine.dispose()
+
+    rows, counts = asyncio.run(_run())
+    artifact = {
+        "schemaVersion": 1,
+        "card": "CC-302",
+        "corpusSha256": manifest.with_suffix(manifest.suffix + ".sha256").read_text().split()[0],
+        "rulesVersion": item_rules.version,
+        "counts": dict(sorted(counts.items())),
+        "rows": rows,
+    }
+    output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    digest = _atomic_write_once(output, canonical_json(artifact))
+    typer.echo(json.dumps({"counts": artifact["counts"], "sha256": digest}, sort_keys=True))
+
+
+@dataset_app.command("baseline")
+def dataset_baseline(
+    rows_path: Path = typer.Option(
+        _REPO_ROOT / ".private" / "dataset" / "rows-16.19.json", help="Linhas congeladas."
+    ),
+) -> None:
+    """Ajusta o baseline de popularidade só no treino e avalia no teste (imitação)."""
+    import json
+
+    from riftlab.dataset.popularity import evaluate, fit
+
+    artifact = _verified_private_json(rows_path)
+    rows = artifact["rows"]
+    model = fit(row for row in rows if row["split"] == "train")
+    report = {
+        "train": evaluate(model, [row for row in rows if row["split"] == "train"]),
+        "test": evaluate(model, [row for row in rows if row["split"] == "test"]),
+    }
+    typer.echo(json.dumps(report, sort_keys=True, ensure_ascii=False))
 
 
 @dataset_app.command("freeze-corpus")
