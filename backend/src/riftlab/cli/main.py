@@ -192,6 +192,68 @@ def dataset_build_rows(
     typer.echo(json.dumps({"counts": artifact["counts"], "sha256": digest}, sort_keys=True))
 
 
+ml_app = typer.Typer(
+    help="Ranking contextual (CC-402): treino e teste único.", no_args_is_help=True
+)
+app.add_typer(ml_app, name="ml")
+_CC402 = _REPO_ROOT / ".private" / "validation" / "sprint-4" / "CC-402" / "catalog"
+_ITEMS_16_19 = (
+    _REPO_ROOT
+    / ".private"
+    / "validation"
+    / "sprint-3"
+    / "CC-321"
+    / "catalog"
+    / "item-16.19.1-en_US.json"
+)
+
+
+@ml_app.command("train-ranker")
+def ml_train_ranker(
+    dataset: Path = typer.Option(..., help="Dataset final com candidatos enriquecidos."),
+    run_dir: Path = typer.Option(..., help="Diretório novo da execução (artefatos privados)."),
+    champions: Path = typer.Option(_CC402 / "champion-16.19.1-en_US.json"),
+    items: Path = typer.Option(_ITEMS_16_19),
+) -> None:
+    """Seleciona B0/B1/M1 e ablações só na validação; o teste fica fechado."""
+    import json
+
+    from riftlab.ml.experiment import ExperimentError, train_run
+
+    try:
+        report = train_run(dataset, champions, items, run_dir)
+    except ExperimentError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    summary = {
+        name: {"mrr": r["all"]["point"]["mrr"], "ci95": r["all"]["ci95"].get("mrr")}
+        for name, r in report["validation"].items()
+    }
+    typer.echo(json.dumps({"validation": summary, "run": report["runSha256"]}, sort_keys=True))
+
+
+@ml_app.command("evaluate-test")
+def ml_evaluate_test(
+    run_dir: Path = typer.Option(..., help="Execução já selecionada."),
+    dataset: Path = typer.Option(..., help="Mesmo dataset da seleção."),
+    champions: Path = typer.Option(_CC402 / "champion-16.19.1-en_US.json"),
+    items: Path = typer.Option(_ITEMS_16_19),
+) -> None:
+    """Avalia uma única vez no teste (recusa segunda execução ou insumo alterado)."""
+    import json
+
+    from riftlab.ml.experiment import ExperimentError, test_run
+
+    try:
+        result = test_run(run_dir, dataset, champions, items)
+    except ExperimentError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps({n: r["all"]["point"] for n, r in result["test"].items()}, sort_keys=True)
+    )
+
+
 @dataset_app.command("freeze-dataset")
 def dataset_freeze_final(
     rows_path: Path = typer.Option(..., help="Linhas congeladas (JSON com sidecar)."),

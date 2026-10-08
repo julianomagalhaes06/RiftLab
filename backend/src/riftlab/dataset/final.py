@@ -75,8 +75,10 @@ def build_final_dataset(
         coverage[split]["targetLegal"] += int(bool(row.get("targetLegal")))
         if split != "train":
             player = _players(row["matchId"], stores)[row["participantId"]]
+            seen = player in train_players
+            row["playerSeenInTrain"] = seen
             contamination[split]["rows"] += 1
-            contamination[split]["playerSeenInTrain"] += int(player in train_players)
+            contamination[split]["playerSeenInTrain"] += int(seen)
     return {
         "schemaVersion": 1,
         "card": "CC-401",

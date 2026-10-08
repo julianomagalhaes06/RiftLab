@@ -29,6 +29,9 @@ dev = [
   "mypy>=1.13,<2",
   "types-PyYAML>=6.0,<7",
 ]
+ml = [
+    "catboost>=1.2,<2",
+]
 
 [build-system]
 requires = ["hatchling"]

@@ -158,6 +158,17 @@ async def build_rows(
             row.update(
                 status="OK" if ids else "ZERO_CANDIDATES",
                 candidateItemIds=ids,
+                candidates=[
+                    {
+                        "itemId": candidate.item_id,
+                        "remainingCost": candidate.remaining_cost,
+                        "ownedComponentCompatible": "OWNED_COMPONENT_COMPATIBLE"
+                        in candidate.evidence_codes,
+                    }
+                    for candidate in candidates.candidates
+                ],
+                features=dict(values),
+                featureMasks=dict((point.features or {}).get("masks", {})),
                 targetLegal=legal,
                 targetExclusionReasons=[] if legal else list(reasons.get(point.target_item_id, ())),
             )
