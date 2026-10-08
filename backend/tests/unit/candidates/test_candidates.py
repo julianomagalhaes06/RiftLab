@@ -221,6 +221,55 @@ def test_local_patch_rules_are_pinned_and_conservative() -> None:
         assert not rules.exclusive_coverage
 
 
+def test_patch_16_19_rules_cover_groups_and_duplicates_from_curation() -> None:
+    rules = load_item_rules(ROOT / "configs" / "item-rules" / "16.19.json")
+    groups = set(rules.exclusive_groups)
+
+    assert rules.game_patch == "16.19"
+    assert rules.exclusive_coverage and rules.unique_item_ids
+    assert rules.high_id_namespace_excluded and rules.excluded_ids == frozenset()
+    assert frozenset({3036, 3033}) in groups  # Lord Dominik's x Mortal Reminder
+    assert frozenset({3074, 3748}) in groups  # Ravenous x Titanic Hydra
+    assert frozenset({3053, 6673}) in groups  # Sterak's x Immortal Shieldbow (Lifeline)
+    assert frozenset({3074, 3077}) not in groups  # Tiamat is consumed by its hydra
+    assert frozenset({3057, 3078}) not in groups  # Sheen is consumed by Trinity Force
+    assert all(len(group) == 2 for group in groups)
+
+
+def test_patch_16_19_rules_release_candidates_on_the_pinned_catalog() -> None:
+    raw_path = (
+        ROOT
+        / ".private"
+        / "validation"
+        / "sprint-3"
+        / "CC-321"
+        / "catalog"
+        / "item-16.19.1-en_US.json"
+    )
+    if not raw_path.exists():
+        pytest.skip("local private Data Dragon fixture is intentionally outside Docker context")
+    raw = json.loads(raw_path.read_text(encoding="utf-8"))["data"]
+    curated, excluded = curate_data_dragon_items(raw)
+    catalog = replace(CATALOG, game_patch="16.19", data_dragon_version="16.19.1")
+    items = tuple(
+        Item(catalog.id, e.item_id, e.price, e.recipe, e.attributes, e.flags, e.schema_version)
+        for e in curated
+    )
+    classification = classify_catalog(
+        {entry.item_id: entry for entry in items},
+        curation_rules_version="data_dragon_v5",
+        excluded_item_ids=frozenset(entry.item_id for entry in excluded),
+    )
+    rules = load_item_rules(ROOT / "configs" / "item-rules" / "16.19.json")
+    result = enumerate_candidates(
+        replace(context(), game_patch="16.19"), catalog, items, classification, rules
+    )
+    reasons = {entry.item_id: entry.reason_codes for entry in result.exclusions}
+    assert result.candidates
+    assert all("EXCLUSIVE_GROUP_UNKNOWN" not in r for r in reasons.values())
+    assert all("DUPLICATE_RULE_UNKNOWN" not in r for r in reasons.values())
+
+
 @pytest.mark.parametrize("patch", ["16.16", "16.17"])
 def test_curated_local_data_dragon_fail_closed_with_real_twin_ids(patch: str) -> None:
     raw_path = (
