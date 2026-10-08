@@ -151,6 +151,7 @@ def dataset_build_rows(
         _REPO_ROOT / ".private" / "dataset" / "rows-16.19.json", help="Saída privada única."
     ),
     env_file: Path | None = typer.Option(None, help="Banco preparado (descartável)."),
+    task: str = typer.Option("purchase", help="purchase (CC-302) ou planning (CC-407)."),
 ) -> None:
     """Gera linhas decisão × candidatos legais a partir de um banco já preparado."""
     import asyncio
@@ -174,7 +175,7 @@ def dataset_build_rows(
     async def _run() -> Any:
         engine = build_engine(settings.database_url)
         try:
-            return await build_rows(build_session_factory(engine), corpus, item_rules)
+            return await build_rows(build_session_factory(engine), corpus, item_rules, task=task)
         finally:
             await engine.dispose()
 

@@ -78,3 +78,14 @@ def test_split_assignment_rejects_overlap() -> None:
     assert split_assignment(manifest) == {"BR1_1": "train", "BR1_2": "test"}
     with pytest.raises(RowsError):
         split_assignment({"split": {"trainMatchIds": ["BR1_1"], "testMatchIds": ["BR1_1"]}})
+
+
+def test_planning_anchor_never_lies_after_the_target() -> None:
+    from riftlab.dataset.rows import planning_anchor
+
+    states = [3, 10, 20, 35, 50]
+    assert planning_anchor(states, ordinal=1, first_main_index=None, target_index=35) == 3
+    assert planning_anchor(states, ordinal=2, first_main_index=20, target_index=50) == 35
+    assert planning_anchor(states, ordinal=2, first_main_index=35, target_index=50) == 50
+    assert planning_anchor(states, ordinal=2, first_main_index=None, target_index=50) is None
+    assert planning_anchor(states, ordinal=2, first_main_index=50, target_index=50) is None

@@ -80,12 +80,41 @@ def split_assignment(manifest: Mapping[str, Any]) -> dict[str, str]:
     return assignment
 
 
+def planning_anchor(
+    state_indexes: list[int],
+    *,
+    ordinal: int,
+    first_main_index: int | None,
+    target_index: int,
+) -> int | None:
+    """Source index of the anchor state (CC-407), or None.
+
+    1st main item: the first purchase state of the game. 2nd: the first purchase state
+    after the 1st main item. The anchor never lies after the target purchase.
+    """
+    after = -1 if ordinal == 1 else first_main_index
+    if after is None:
+        return None
+    later = sorted(i for i in state_indexes if after < i <= target_index)
+    return later[0] if later else None
+
+
 async def build_rows(
     session_factory: async_sessionmaker[AsyncSession],
     manifest: Mapping[str, Any],
     rules: ItemRules,
+    *,
+    task: str = "purchase",
 ) -> tuple[list[dict[str, Any]], Counter[str]]:
-    """Return one row per eligible point of the corpus, plus aggregate counts."""
+    """Return one row per eligible point of the corpus, plus aggregate counts.
+
+    `purchase` (CC-302): candidates at the instant of the purchase. `planning` (CC-407):
+    candidates at an earlier anchor — before the first purchase of the game for the 1st
+    main item, or right after the 1st main item for the 2nd — so the purchase-time gold
+    cannot reveal the target.
+    """
+    if task not in ("purchase", "planning"):
+        raise RowsError("tarefa desconhecida")
     split_of = split_assignment(manifest)
     if rules.game_patch != manifest.get("patch"):
         raise RowsError("regras de itens de outro patch")
@@ -110,6 +139,20 @@ async def build_rows(
         if len({point.decision_state_id for point in points}) != len(points):
             raise RowsError("estado com mais de um ponto elegível; extrações duplicadas")
         states = SqlAlchemyTimelineRepository(session)
+        first_main: dict[tuple[str, int], int] = {}
+        if task == "planning":
+            ordinal_rows = await session.execute(
+                select(
+                    DecisionPointModel.match_id,
+                    DecisionPointModel.participant_id,
+                    DecisionPointModel.event_source_index,
+                ).where(
+                    DecisionPointModel.main_item_ordinal == 1,
+                    DecisionPointModel.reconstruction_version == RECONSTRUCTION_ALGORITHM_VERSION,
+                )
+            )
+            for match_id, participant_id, source_index in ordinal_rows:
+                first_main[(match_id, participant_id)] = source_index
         for point in points:
             split = split_of.get(point.match_id)
             if split is None:
@@ -125,6 +168,36 @@ async def build_rows(
             champion_id = values.get("self_champion_id")
             if state is None or not isinstance(champion_id, int):
                 raise RowsError("ponto elegível sem estado ou campeão")
+            if task == "planning":
+                if point.main_item_ordinal not in (1, 2):
+                    counts["PLANNING_ORDINAL_OUT_OF_SCOPE"] += 1
+                    continue
+                history = [
+                    s
+                    for s in await states.list_decision_states(point.match_id, point.participant_id)
+                    if s.state_version == RECONSTRUCTION_ALGORITHM_VERSION
+                ]
+                anchor = planning_anchor(
+                    [s.event_source_index for s in history],
+                    ordinal=point.main_item_ordinal,
+                    first_main_index=first_main.get((point.match_id, point.participant_id)),
+                    target_index=point.event_source_index,
+                )
+                if anchor is None:
+                    counts["PLANNING_NO_ANCHOR"] += 1
+                    continue
+                state = next(s for s in history if s.event_source_index == anchor)
+                values = {
+                    **values,
+                    "game_time_ms": state.snapshot.get("eventTimestampMs"),
+                    "gold_estimate": None,
+                    "gold_stale": None,
+                    "level": (state.quality.get("levelObservation") or {}).get("value"),
+                    "inventory_items": [
+                        [int(k), v]
+                        for k, v in (state.snapshot.get("inventory") or {}).get("items", {}).items()
+                    ],
+                }
             row: dict[str, Any] = {
                 "matchId": point.match_id,
                 "split": split,
@@ -133,6 +206,8 @@ async def build_rows(
                 "mainItemOrdinal": point.main_item_ordinal,
                 "championId": champion_id,
                 "targetItemId": point.target_item_id,
+                "task": task,
+                "anchorEventSourceIndex": state.event_source_index,
             }
             try:
                 candidates = enumerate_candidates(
