@@ -146,3 +146,118 @@ def test_run(
         )
     _write_once(run_dir / "test.json", result, mode=0o400)
     return result
+
+
+def cluster_run(
+    dataset_path: Path,
+    champion_path: Path,
+    item_path: Path,
+    out_path: Path,
+    ks: tuple[int, ...] = (3, 5, 8),
+) -> dict[str, Any]:
+    """CC-403: clusters fitted on train only; ranking with/without them on validation."""
+    from riftlab.ml.clusters import context_matrix, fit_kmeans, silhouette, stability
+    from riftlab.ml.features import CLUSTER_FEATURE
+
+    if out_path.exists():
+        raise ExperimentError("saída já existe; nunca sobrescrita")
+    rows, catalogs = _load(dataset_path, champion_path, item_path)
+    train = [r for r in rows if r["split"] == "train"]
+    validation = [r for r in rows if r["split"] == "validation"]
+    train_m, val_m = context_matrix(train, catalogs), context_matrix(validation, catalogs)
+    baseline = train_and_select(train, validation, catalogs, frozenset({CLUSTER_FEATURE}))
+    base_mrr = evaluate(
+        validation,
+        model_scores(baseline["model"], catalogs, frozenset({CLUSTER_FEATURE})),
+        resamples=0,
+    )
+    report: dict[str, Any] = {
+        "schemaVersion": 1,
+        "card": "CC-403",
+        "inputs": {"datasetSha256": _sha(dataset_path)},
+        "withoutCluster": {
+            "validationMrr": base_mrr["all"]["point"]["mrr"],
+            "config": baseline["config"],
+        },
+        "k": {},
+    }
+    for k in ks:
+        model = fit_kmeans(train_m, k, seed=403)
+        tl, vl = model.assign(train_m), model.assign(val_m)
+        tr = [{**r, "decisionCluster": int(c)} for r, c in zip(train, tl, strict=True)]
+        va = [{**r, "decisionCluster": int(c)} for r, c in zip(validation, vl, strict=True)]
+        selected = train_and_select(tr, va, catalogs)
+        val = evaluate(
+            va,
+            model_scores(selected["model"], catalogs, frozenset()),
+            resamples=RESAMPLES,
+            seed=SEED,
+        )
+        report["k"][str(k)] = {
+            "trainSilhouette": silhouette(train_m, model),
+            "stabilityRandIndex": stability(train_m, k, seeds=(1, 2, 3, 4, 5)),
+            "trainSizes": [int((tl == j).sum()) for j in range(k)],
+            "validationSizes": [int((vl == j).sum()) for j in range(k)],
+            "validationMrr": val["all"]["point"]["mrr"],
+            "validationCi95": val["all"]["ci95"].get("mrr"),
+            "config": selected["config"],
+        }
+    best = max(report["k"].items(), key=lambda kv: kv[1]["validationMrr"])
+    gain = best[1]["validationMrr"] - report["withoutCluster"]["validationMrr"]
+    report["decision"] = {
+        "bestK": int(best[0]),
+        "validationGain": gain,
+        "integrate": bool(gain > 0.01),
+        "rule": "integrar só com ganho de MRR > 0,01 na validação",
+    }
+    report["sha256"] = _write_once(out_path, report)
+    return report
+
+
+def support_run(dataset_path: Path, out_config: Path, out_report: Path) -> dict[str, Any]:
+    """CC-404: support threshold for B0 chosen on validation; risk-coverage on val and test."""
+    from riftlab.ml.support import (
+        MAX_RISK,
+        THRESHOLDS,
+        SupportPolicy,
+        cell_counts,
+        risk_coverage,
+        select_threshold,
+    )
+
+    if out_config.exists() or out_report.exists():
+        raise ExperimentError("saída já existe; nunca sobrescrita")
+    rows = json.loads(dataset_path.read_bytes())["rows"]
+    train = [r for r in rows if r["split"] == "train"]
+    model = fit(train)
+    counts = cell_counts(train)
+    patch = "16.19"
+    validation = [r for r in rows if r["split"] == "validation"]
+    test = [r for r in rows if r["split"] == "test"]
+    threshold, val_curve = select_threshold(validation, model, counts, patch)
+    policy = SupportPolicy(patch, threshold, counts)
+    config = {
+        "schemaVersion": 1,
+        "card": "CC-404",
+        "activeRanking": "B0_popularity_champion_ordinal",
+        "patch": patch,
+        "supportThreshold": threshold,
+        "thresholdGrid": list(THRESHOLDS),
+        "maxRisk": MAX_RISK,
+        "riskMetric": "1 - hit@3 entre decisões cobertas",
+        "datasetSha256": _sha(dataset_path),
+        "cellCounts": {f"{c}|{o}": n for (c, o), n in sorted(counts.items(), key=str)},
+    }
+    config_sha = _write_once(out_config, config)
+    report = {
+        "schemaVersion": 1,
+        "card": "CC-404",
+        "configSha256": config_sha,
+        "validationCurve": val_curve,
+        "test": risk_coverage(test, model, policy),
+        "testAllThresholds": [
+            risk_coverage(test, model, SupportPolicy(patch, t, counts)) for t in THRESHOLDS
+        ],
+    }
+    _write_once(out_report, report)
+    return report

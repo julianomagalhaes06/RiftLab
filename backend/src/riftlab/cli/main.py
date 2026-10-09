@@ -309,6 +309,28 @@ def ml_enrich_context(
     typer.echo(json.dumps({"rows": len(rows), "sha256": digest}))
 
 
+@ml_app.command("cluster-experiment")
+def ml_cluster_experiment(
+    dataset: Path = typer.Option(..., help="Dataset de planejamento com contexto."),
+    output: Path = typer.Option(..., help="Relatório privado novo."),
+    champions: Path = typer.Option(_CC402 / "champion-16.19.1-en_US.json"),
+    items: Path = typer.Option(_ITEMS_16_19),
+) -> None:
+    """CC-403: clusters de contexto (treino) e ranking com/sem cluster (validação)."""
+    import json
+
+    from riftlab.ml.experiment import ExperimentError, cluster_run
+
+    try:
+        report = cluster_run(dataset, champions, items, output)
+    except ExperimentError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps({"withoutCluster": report["withoutCluster"], "decision": report["decision"]})
+    )
+
+
 @ml_app.command("evaluate-test")
 def ml_evaluate_test(
     run_dir: Path = typer.Option(..., help="Execução já selecionada."),

@@ -30,7 +30,12 @@ ITEM_TAGS = (
     "SpellBlock",
     "SpellDamage",
 )
-CATEGORICAL = ("self_champion_id", "candidate_item_id", "lane_opponent_champion_id")
+CATEGORICAL = (
+    "self_champion_id",
+    "candidate_item_id",
+    "lane_opponent_champion_id",
+    "decision_cluster",
+)
 COMPOSITION = tuple(f"{side}_{tag.lower()}" for side in ("ally", "enemy") for tag in CHAMPION_TAGS)
 ECONOMY = ("gold_estimate", "gold_stale", "remaining_cost", "affordable_margin")
 NUMERIC = (
@@ -52,6 +57,7 @@ ABLATIONS = {
     "no_economy": frozenset(ECONOMY),
     "no_rich_context": frozenset(RICH_CONTEXT),
 }
+CLUSTER_FEATURE = "decision_cluster"
 NAN = math.nan
 
 
@@ -122,6 +128,7 @@ def decision_vectors(row: Mapping[str, Any], catalogs: Catalogs) -> list[dict[st
         **_composition("ally", features.get("ally_champion_ids"), catalogs),
         **_composition("enemy", features.get("enemy_champion_ids"), catalogs),
         **_rich(row.get("context")),
+        "decision_cluster": str(row.get("decisionCluster", "NONE")),
     }
     vectors = []
     for candidate in row.get("candidates") or []:
