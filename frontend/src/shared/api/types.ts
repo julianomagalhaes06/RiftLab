@@ -4,6 +4,40 @@
  */
 
 export interface paths {
+    "/api/v1/analyses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Analysis */
+        post: operations["post_analysis_api_v1_analyses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analyses/{analysis_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Analysis */
+        get: operations["read_analysis_api_v1_analyses__analysis_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decisions/{decision_id}": {
         parameters: {
             query?: never;
@@ -207,6 +241,142 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnalysisCandidate */
+        AnalysisCandidate: {
+            /** Affordability */
+            affordability: string;
+            /** Baserank */
+            baseRank?: number | null;
+            /** Evidencecodes */
+            evidenceCodes?: string[];
+            /** Explanations */
+            explanations?: components["schemas"]["AnalysisExplanation"][];
+            /** Itemid */
+            itemId: number;
+            /** Name */
+            name?: string | null;
+            /** Rank */
+            rank: number;
+            /** Remainingcost */
+            remainingCost: number;
+            /** Score */
+            score: number;
+        };
+        /**
+         * AnalysisEngine
+         * @description docs/contracts.md: engine: POPULARITY, RULES, CONTEXTUAL_RANKER.
+         * @enum {string}
+         */
+        AnalysisEngine: "POPULARITY" | "RULES" | "CONTEXTUAL_RANKER";
+        /**
+         * AnalysisExplanation
+         * @description CC-305: frase determinística e o campo real/versão de onde vem.
+         */
+        AnalysisExplanation: {
+            /** Source */
+            source: string;
+            /** Text */
+            text: string;
+        };
+        /**
+         * AnalysisQuality
+         * @description frameAgeMs e None quando nao ha snapshot anterior para estimar (ex.:
+         *     budgetSource=UNKNOWN) — ausencia real e mascara null, nunca 0 inventado
+         *     (docs/domain-model.md, mesmo padrao de shared.api.matches.DecisionState).
+         *     Idade negativa continua rejeitada quando o valor esta presente.
+         */
+        AnalysisQuality: {
+            budgetSource: components["schemas"]["BudgetSource"];
+            /** Frameagems */
+            frameAgeMs?: number | null;
+            /** Warnings */
+            warnings?: string[];
+        };
+        /**
+         * AnalysisRequest
+         * @description {decisionId,objective,budget?} + Idempotency-Key (header HTTP, fora do
+         *     corpo). Reenvio da mesma chave com corpo identico e idempotente (200);
+         *     corpo divergente e 409 IDEMPOTENCY_CONFLICT — validado no handler, nao
+         *     neste schema de corpo.
+         */
+        AnalysisRequest: {
+            budget?: components["schemas"]["UserProvidedBudget"] | null;
+            /**
+             * Decisionid
+             * Format: uuid
+             */
+            decisionId: string;
+            objective: components["schemas"]["ObjectiveForm"];
+        };
+        /**
+         * AnalysisResult
+         * @description GET /analyses/{id}: resultado imutavel. Invariante de
+         *     docs/contracts.md: "Sem evidencia: candidates=[] e reasonCodes
+         *     obrigatorio" — status != AVAILABLE implica candidates vazio e ao menos um
+         *     reason code.
+         */
+        AnalysisResult: {
+            /**
+             * Analysisid
+             * Format: uuid
+             */
+            analysisId: string;
+            /** Candidates */
+            candidates?: components["schemas"]["AnalysisCandidate"][];
+            /**
+             * Decisionid
+             * Format: uuid
+             */
+            decisionId: string;
+            engine: components["schemas"]["AnalysisEngine"];
+            objective: components["schemas"]["ObjectiveForm"];
+            quality: components["schemas"]["AnalysisQuality"];
+            /** Scorenote */
+            scoreNote?: string | null;
+            status: components["schemas"]["AnalysisStatus"];
+            support: components["schemas"]["AnalysisSupport"];
+            versions: components["schemas"]["AnalysisVersions"];
+        };
+        /**
+         * AnalysisStatus
+         * @description docs/contracts.md: status: AVAILABLE, INSUFFICIENT_EVIDENCE ou
+         *     UNSUPPORTED.
+         * @enum {string}
+         */
+        AnalysisStatus: "AVAILABLE" | "INSUFFICIENT_EVIDENCE" | "UNSUPPORTED";
+        /**
+         * AnalysisSupport
+         * @description level nao e enumerado por completo em docs/contracts.md (so o exemplo
+         *     "LIMITED"); reasonCodes e lista aberta ("minimos", ver
+         *     common.MINIMUM_ANALYSIS_REASON_CODES).
+         */
+        AnalysisSupport: {
+            /** Legalcandidates */
+            legalCandidates?: number | null;
+            /** Level */
+            level: string;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Referencedecisions */
+            referenceDecisions?: number | null;
+        };
+        /** AnalysisVersions */
+        AnalysisVersions: {
+            /** Candidates */
+            candidates: string;
+            /** Catalog */
+            catalog: string;
+            /** Features */
+            features: string;
+            /** Itemrules */
+            itemRules?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Objective */
+            objective?: string | null;
+            /** Ranking */
+            ranking?: string | null;
+        };
         /**
          * BudgetSource
          * @description docs/domain-model.md: budget_source: UNKNOWN, FRAME_ESTIMATE,
@@ -620,6 +790,14 @@ export interface components {
             supportReason: "PATCH_NOT_VALIDATED" | "DEMO_DATA";
         };
         /**
+         * ObjectiveForm
+         * @description Formulario estruturado citado em docs/contracts.md e reaproveitado como
+         *     o campo "objective" de POST /analyses e /learning-attempts.
+         */
+        ObjectiveForm: {
+            priority: components["schemas"]["Priority"];
+        };
+        /**
          * ObservedLevel
          * @description Nível do mesmo frame estritamente anterior usado para o ouro; ausência
          *     explícita (`value` null com `absent_reason`), nunca 0.
@@ -672,6 +850,13 @@ export interface components {
          * @enum {string}
          */
         PreparationStatus: "NOT_REQUESTED" | "PENDING" | "RUNNING" | "READY" | "FAILED";
+        /**
+         * Priority
+         * @description docs/contracts.md: formulario de objetivo {priority:
+         *     BALANCED|SURVIVAL|DAMAGE|UTILITY}.
+         * @enum {string}
+         */
+        Priority: "BALANCED" | "SURVIVAL" | "DAMAGE" | "UTILITY";
         /** ProblemDetail */
         ProblemDetail: {
             /** Code */
@@ -712,6 +897,23 @@ export interface components {
              */
             status: string;
         };
+        /**
+         * UserProvidedBudget
+         * @description docs/contracts.md: Budget opcional {gold: inteiro 0..100000, source:
+         *     USER_PROVIDED}. source e Literal fixo: o cliente nunca pode declarar
+         *     FRAME_ESTIMATE/UNKNOWN, que so o servidor atribui — "fonte de orcamento do
+         *     servidor nao e sobrescrita, cria cenario separado".
+         */
+        UserProvidedBudget: {
+            /** Gold */
+            gold: number;
+            /**
+             * Source
+             * @default USER_PROVIDED
+             * @constant
+             */
+            source: "USER_PROVIDED";
+        };
     };
     responses: never;
     parameters: never;
@@ -721,6 +923,108 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    post_analysis_api_v1_analyses_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    read_analysis_api_v1_analyses__analysis_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                analysis_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     get_decision_api_v1_decisions__decision_id__get: {
         parameters: {
             query?: never;
