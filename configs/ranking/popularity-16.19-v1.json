@@ -1,0 +1,60 @@
+{
+ "schemaVersion": 1,
+ "version": "popularity_16_19_v1",
+ "gamePatch": "16.19",
+ "source": "CC-401: partição de treino do dataset 16.19 (decisões no instante da compra), só contagens agregadas por campeão e ordem do item principal; sem identificadores",
+ "datasetSha256": "0d1bb49aac969a923a92e893aaff76baf9c9aec021bf67ad81d2dbc1ddbcfa47",
+ "smoothing": {
+  "alpha": 1.0,
+  "prior": "frequência da mesma ordem do item"
+ },
+ "cells": {
+  "145|1": {
+   "6672": 65,
+   "3087": 32,
+   "3124": 7,
+   "6697": 5,
+   "3032": 2,
+   "6676": 1,
+   "3115": 1
+  },
+  "145|2": {
+   "3124": 41,
+   "3087": 5,
+   "6676": 2,
+   "3046": 1,
+   "6672": 1,
+   "4645": 1,
+   "6699": 1,
+   "3085": 1
+  },
+  "51|1": {
+   "2523": 66,
+   "6676": 48,
+   "3095": 5,
+   "3032": 5,
+   "3031": 3,
+   "6672": 1
+  },
+  "51|2": {
+   "3031": 47,
+   "3094": 4,
+   "6676": 2,
+   "2523": 2,
+   "3072": 1,
+   "3033": 1
+  },
+  "81|1": {
+   "3078": 58,
+   "3004": 7,
+   "3508": 6,
+   "6697": 2
+  },
+  "81|2": {
+   "3004": 39,
+   "3078": 3,
+   "6695": 1,
+   "3161": 1
+  }
+ }
+}

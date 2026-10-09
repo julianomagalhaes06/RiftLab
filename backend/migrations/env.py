@@ -8,6 +8,8 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import riftlab.analyses.models  # noqa: F401
+
 # Importa todos os modulos de modelos para que registrem suas tabelas em
 # Base.metadata antes do autogenerate/target_metadata ser usado.
 import riftlab.catalog.models  # noqa: F401

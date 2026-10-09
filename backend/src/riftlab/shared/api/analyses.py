@@ -42,6 +42,9 @@ class AnalysisVersions(CamelModel):
     catalog: str = Field(min_length=1, max_length=40)
     features: str = Field(min_length=1, max_length=20)
     candidates: str = Field(min_length=1, max_length=20)
+    ranking: str | None = Field(default=None, max_length=40)  # CC-303
+    objective: str | None = Field(default=None, max_length=40)  # CC-304
+    item_rules: str | None = Field(default=None, max_length=60)
 
 
 class AnalysisQuality(CamelModel):
@@ -62,15 +65,27 @@ class AnalysisSupport(CamelModel):
 
     level: str = Field(min_length=1, max_length=40)
     reason_codes: list[str] = Field(default_factory=list)
+    legal_candidates: int | None = Field(default=None, ge=0)
+    reference_decisions: int | None = Field(default=None, ge=0)
+
+
+class AnalysisExplanation(CamelModel):
+    """CC-305: frase determinística e o campo real/versão de onde vem."""
+
+    text: str = Field(min_length=1, max_length=300)
+    source: str = Field(min_length=1, max_length=80)
 
 
 class AnalysisCandidate(CamelModel):
     item_id: int = Field(ge=0)
+    name: str | None = None
     rank: int = Field(ge=1)
+    base_rank: int | None = Field(default=None, ge=1)  # ordem antes do objetivo (CC-304)
     score: float
     remaining_cost: int = Field(ge=0)
     affordability: str = Field(min_length=1, max_length=20)
     evidence_codes: list[str] = Field(default_factory=list)
+    explanations: list[AnalysisExplanation] = Field(default_factory=list)
 
 
 class AnalysisResult(CamelModel):
@@ -88,6 +103,7 @@ class AnalysisResult(CamelModel):
     quality: AnalysisQuality
     support: AnalysisSupport
     candidates: list[AnalysisCandidate] = Field(default_factory=list)
+    score_note: str | None = None
 
     @model_validator(mode="after")
     def _no_candidates_without_evidence(self) -> AnalysisResult:
@@ -106,6 +122,7 @@ class AnalysisResult(CamelModel):
 __all__ = [
     "MINIMUM_ANALYSIS_REASON_CODES",
     "AnalysisCandidate",
+    "AnalysisExplanation",
     "AnalysisQuality",
     "AnalysisRequest",
     "AnalysisResult",

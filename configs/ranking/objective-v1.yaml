@@ -1,0 +1,10 @@
+# Reordenação pelo objetivo do formulário (CC-304). Bônus normalizado por atributos do
+# catálogo (tags do Data Dragon), peso λ congelado antes de qualquer avaliação.
+schemaVersion: 1
+version: objective_v1
+lambda: 0.3
+tags:
+  BALANCED: []
+  SURVIVAL: [Armor, SpellBlock, Health]
+  DAMAGE: [Damage, CriticalStrike, AttackSpeed, SpellDamage, ArmorPenetration, MagicPenetration]
+  UTILITY: [CooldownReduction, Mana, NonbootsMovement, Aura, ManaRegen]

@@ -10,24 +10,24 @@
       "price": 400,
       "recipe": [],
       "attributes": { "name": "Componente Sintético A" },
-      "flags": { "completed": false }
+      "flags": { "completed": false, "purchasable": true, "maps": [11] }
     },
     {
       "itemId": 100002,
       "price": 350,
       "recipe": [],
       "attributes": { "name": "Componente Sintético B" },
-      "flags": { "completed": false }
+      "flags": { "completed": false, "purchasable": true, "maps": [11] }
     },
     {
       "itemId": 100010,
-      "price": 1100,
+      "price": 1300,
       "recipe": [
         { "itemId": 100001, "quantity": 2 },
         { "itemId": 100002, "quantity": 1 }
       ],
       "attributes": { "name": "Item Composto Sintético" },
-      "flags": { "completed": true }
+      "flags": { "completed": true, "purchasable": true, "maps": [11] }
     }
   ]
 }

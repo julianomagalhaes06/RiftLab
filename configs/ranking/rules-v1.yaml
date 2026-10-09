@@ -1,0 +1,9 @@
+# Regras explícitas do motor RULES (CC-303). Pesos fixados por decisão de projeto, sem
+# ajuste em dados: servem de alternativa transparente quando não há popularidade para o
+# patch (por exemplo, a demonstração). Não foram validadas como a melhor compra.
+schemaVersion: 1
+version: rules_v1
+weights:
+  ownedComponent: 2.0        # aproveitar componentes que o jogador já tem
+  remainingCostPer1000: -1.0 # cada 1.000 de ouro ainda a pagar
+  compositionAffinity: 0.5   # armadura × inimigos de dano físico; resistência mágica × dano mágico

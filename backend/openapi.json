@@ -1,6 +1,379 @@
 {
   "components": {
     "schemas": {
+      "AnalysisCandidate": {
+        "additionalProperties": false,
+        "properties": {
+          "affordability": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Affordability",
+            "type": "string"
+          },
+          "baseRank": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baserank"
+          },
+          "evidenceCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidencecodes",
+            "type": "array"
+          },
+          "explanations": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisExplanation"
+            },
+            "title": "Explanations",
+            "type": "array"
+          },
+          "itemId": {
+            "minimum": 0.0,
+            "title": "Itemid",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "rank": {
+            "minimum": 1.0,
+            "title": "Rank",
+            "type": "integer"
+          },
+          "remainingCost": {
+            "minimum": 0.0,
+            "title": "Remainingcost",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "itemId",
+          "rank",
+          "score",
+          "remainingCost",
+          "affordability"
+        ],
+        "title": "AnalysisCandidate",
+        "type": "object"
+      },
+      "AnalysisEngine": {
+        "description": "docs/contracts.md: engine: POPULARITY, RULES, CONTEXTUAL_RANKER.",
+        "enum": [
+          "POPULARITY",
+          "RULES",
+          "CONTEXTUAL_RANKER"
+        ],
+        "title": "AnalysisEngine",
+        "type": "string"
+      },
+      "AnalysisExplanation": {
+        "additionalProperties": false,
+        "description": "CC-305: frase determinística e o campo real/versão de onde vem.",
+        "properties": {
+          "source": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "source"
+        ],
+        "title": "AnalysisExplanation",
+        "type": "object"
+      },
+      "AnalysisQuality": {
+        "additionalProperties": false,
+        "description": "frameAgeMs e None quando nao ha snapshot anterior para estimar (ex.:\nbudgetSource=UNKNOWN) — ausencia real e mascara null, nunca 0 inventado\n(docs/domain-model.md, mesmo padrao de shared.api.matches.DecisionState).\nIdade negativa continua rejeitada quando o valor esta presente.",
+        "properties": {
+          "budgetSource": {
+            "$ref": "#/components/schemas/BudgetSource"
+          },
+          "frameAgeMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frameagems"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "budgetSource"
+        ],
+        "title": "AnalysisQuality",
+        "type": "object"
+      },
+      "AnalysisRequest": {
+        "additionalProperties": false,
+        "description": "{decisionId,objective,budget?} + Idempotency-Key (header HTTP, fora do\ncorpo). Reenvio da mesma chave com corpo identico e idempotente (200);\ncorpo divergente e 409 IDEMPOTENCY_CONFLICT — validado no handler, nao\nneste schema de corpo.",
+        "properties": {
+          "budget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserProvidedBudget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decisionId": {
+            "format": "uuid",
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/ObjectiveForm"
+          }
+        },
+        "required": [
+          "decisionId",
+          "objective"
+        ],
+        "title": "AnalysisRequest",
+        "type": "object"
+      },
+      "AnalysisResult": {
+        "additionalProperties": false,
+        "description": "GET /analyses/{id}: resultado imutavel. Invariante de\ndocs/contracts.md: \"Sem evidencia: candidates=[] e reasonCodes\nobrigatorio\" — status != AVAILABLE implica candidates vazio e ao menos um\nreason code.",
+        "properties": {
+          "analysisId": {
+            "format": "uuid",
+            "title": "Analysisid",
+            "type": "string"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "decisionId": {
+            "format": "uuid",
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/AnalysisEngine"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/ObjectiveForm"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/AnalysisQuality"
+          },
+          "scoreNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scorenote"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AnalysisStatus"
+          },
+          "support": {
+            "$ref": "#/components/schemas/AnalysisSupport"
+          },
+          "versions": {
+            "$ref": "#/components/schemas/AnalysisVersions"
+          }
+        },
+        "required": [
+          "analysisId",
+          "decisionId",
+          "status",
+          "engine",
+          "objective",
+          "versions",
+          "quality",
+          "support"
+        ],
+        "title": "AnalysisResult",
+        "type": "object"
+      },
+      "AnalysisStatus": {
+        "description": "docs/contracts.md: status: AVAILABLE, INSUFFICIENT_EVIDENCE ou\nUNSUPPORTED.",
+        "enum": [
+          "AVAILABLE",
+          "INSUFFICIENT_EVIDENCE",
+          "UNSUPPORTED"
+        ],
+        "title": "AnalysisStatus",
+        "type": "string"
+      },
+      "AnalysisSupport": {
+        "additionalProperties": false,
+        "description": "level nao e enumerado por completo em docs/contracts.md (so o exemplo\n\"LIMITED\"); reasonCodes e lista aberta (\"minimos\", ver\ncommon.MINIMUM_ANALYSIS_REASON_CODES).",
+        "properties": {
+          "legalCandidates": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legalcandidates"
+          },
+          "level": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Level",
+            "type": "string"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "referenceDecisions": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencedecisions"
+          }
+        },
+        "required": [
+          "level"
+        ],
+        "title": "AnalysisSupport",
+        "type": "object"
+      },
+      "AnalysisVersions": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Candidates",
+            "type": "string"
+          },
+          "catalog": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Catalog",
+            "type": "string"
+          },
+          "features": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Features",
+            "type": "string"
+          },
+          "itemRules": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Itemrules"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "objective": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective"
+          },
+          "ranking": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranking"
+          }
+        },
+        "required": [
+          "catalog",
+          "features",
+          "candidates"
+        ],
+        "title": "AnalysisVersions",
+        "type": "object"
+      },
       "BudgetSource": {
         "description": "docs/domain-model.md: budget_source: UNKNOWN, FRAME_ESTIMATE,\nUSER_PROVIDED.",
         "enum": [
@@ -1030,6 +1403,20 @@
         "title": "MatchSummary",
         "type": "object"
       },
+      "ObjectiveForm": {
+        "additionalProperties": false,
+        "description": "Formulario estruturado citado em docs/contracts.md e reaproveitado como\no campo \"objective\" de POST /analyses e /learning-attempts.",
+        "properties": {
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          }
+        },
+        "required": [
+          "priority"
+        ],
+        "title": "ObjectiveForm",
+        "type": "object"
+      },
       "ObservedLevel": {
         "additionalProperties": false,
         "description": "Nível do mesmo frame estritamente anterior usado para o ouro; ausência\nexplícita (`value` null com `absent_reason`), nunca 0.",
@@ -1184,6 +1571,17 @@
         "title": "PreparationStatus",
         "type": "string"
       },
+      "Priority": {
+        "description": "docs/contracts.md: formulario de objetivo {priority:\nBALANCED|SURVIVAL|DAMAGE|UTILITY}.",
+        "enum": [
+          "BALANCED",
+          "SURVIVAL",
+          "DAMAGE",
+          "UTILITY"
+        ],
+        "title": "Priority",
+        "type": "string"
+      },
       "ProblemDetail": {
         "properties": {
           "code": {
@@ -1290,6 +1688,29 @@
         },
         "title": "ReadyStatus",
         "type": "object"
+      },
+      "UserProvidedBudget": {
+        "additionalProperties": false,
+        "description": "docs/contracts.md: Budget opcional {gold: inteiro 0..100000, source:\nUSER_PROVIDED}. source e Literal fixo: o cliente nunca pode declarar\nFRAME_ESTIMATE/UNKNOWN, que so o servidor atribui — \"fonte de orcamento do\nservidor nao e sobrescrita, cria cenario separado\".",
+        "properties": {
+          "gold": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Gold",
+            "type": "integer"
+          },
+          "source": {
+            "const": "USER_PROVIDED",
+            "default": "USER_PROVIDED",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gold"
+        ],
+        "title": "UserProvidedBudget",
+        "type": "object"
       }
     }
   },
@@ -1299,6 +1720,143 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/analyses": {
+      "post": {
+        "operationId": "post_analysis_api_v1_analyses_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Post Analysis",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
+    "/api/v1/analyses/{analysis_id}": {
+      "get": {
+        "operationId": "read_analysis_api_v1_analyses__analysis_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Read Analysis",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
     "/api/v1/decisions/{decision_id}": {
       "get": {
         "operationId": "get_decision_api_v1_decisions__decision_id__get",

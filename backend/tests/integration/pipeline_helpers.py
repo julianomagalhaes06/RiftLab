@@ -14,8 +14,9 @@ from typing import Any
 
 import httpx
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
+from riftlab.analyses.models import AnalysisModel
 from riftlab.catalog.application import sync_catalog
 from riftlab.catalog.domain import CatalogItemSourceDTO, CatalogSourceResult
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
@@ -59,6 +60,13 @@ async def reset_match(session_factory, match_id: str) -> None:
     que respeita as FKs. DELETE é permitido nas tabelas imutáveis; só UPDATE é
     rejeitado."""
     async with unit_of_work(session_factory) as session:
+        await session.execute(
+            delete(AnalysisModel).where(
+                AnalysisModel.decision_id.in_(
+                    select(DecisionPointModel.id).where(DecisionPointModel.match_id == match_id)
+                )
+            )
+        )
         await session.execute(
             delete(DecisionPointModel).where(DecisionPointModel.match_id == match_id)
         )

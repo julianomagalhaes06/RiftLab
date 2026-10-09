@@ -1,0 +1,11 @@
+{
+  "version": "item_rules_demo_1_v1",
+  "gamePatch": "DEMO-1",
+  "curationRulesVersion": "curated_demo_v1",
+  "excludedIds": [],
+  "exclusiveGroups": [],
+  "exclusiveCoverage": true,
+  "uniqueItemIds": true,
+  "highIdNamespaceExcluded": false,
+  "evidence": "SINTÉTICO: catálogo de demonstração com 3 itens fictícios (2 componentes e 1 item completo), sem grupos exclusivos por construção. Serve só para a demonstração sem rede; não é regra do jogo."
+}
