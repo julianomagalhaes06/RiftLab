@@ -261,3 +261,135 @@ def support_run(dataset_path: Path, out_config: Path, out_report: Path) -> dict[
     }
     _write_once(out_report, report)
     return report
+
+
+def benchmark_run(
+    dataset_path: Path,
+    model_path: Path,
+    champion_path: Path,
+    item_path: Path,
+    queries: int = 100,
+    warmup: int = 10,
+) -> dict[str, Any]:
+    """CC-406: p50/p95 of candidate enumeration, B0 ranking + support, and M1 scoring.
+
+    Offline, CPU, single process; no network, import or LLM in the measured path.
+    Candidate enumeration uses the pinned catalog and each decision's anchor inventory.
+    """
+    import resource
+    import time
+    import uuid as _uuid
+
+    from catboost import CatBoostRanker
+
+    from riftlab.candidates.domain import CandidateContext, enumerate_candidates
+    from riftlab.candidates.rules import load_item_rules
+    from riftlab.catalog.classification import classify_catalog
+    from riftlab.catalog.domain import CatalogVersion, Item
+    from riftlab.catalog.infrastructure.curation import (
+        CURATION_RULES_VERSION,
+        curate_data_dragon_items,
+    )
+    from riftlab.decisions.features import GoldView, LevelView, PreDecisionView
+    from riftlab.ml.support import SupportPolicy, cell_counts
+
+    rows, catalogs = _load(dataset_path, champion_path, item_path)
+    train = [r for r in rows if r["split"] == "train"]
+    pool = [r for r in rows if r["split"] == "validation"][: queries + warmup]
+    popularity, counts = fit(train), cell_counts(train)
+    policy = SupportPolicy("16.19", 0, counts)
+    model = CatBoostRanker()
+    model.load_model(str(model_path))
+    m1 = model_scores(model, catalogs, frozenset())
+    item_doc = json.loads(item_path.read_bytes())
+    curated, excluded = curate_data_dragon_items(item_doc["data"])
+    catalog_id = _uuid.uuid4()
+    catalog = CatalogVersion(
+        catalog_id,
+        "16.19",
+        "16.19.1",
+        _sha(item_path),
+        "bench",
+        _sha(item_path),
+        CURATION_RULES_VERSION,
+    )
+    items = tuple(
+        Item(catalog_id, d.item_id, d.price, d.recipe, d.attributes, d.flags, d.schema_version)
+        for d in curated
+    )
+    classification = classify_catalog(
+        {i.item_id: i for i in items},
+        curation_rules_version=CURATION_RULES_VERSION,
+        excluded_item_ids=frozenset(x.item_id for x in excluded),
+    )
+    rules = load_item_rules(
+        Path(__file__).resolve().parents[4] / "configs" / "item-rules" / "16.19.json"
+    )
+    timings: dict[str, list[float]] = {"enumerate": [], "b0_rank_support": [], "m1_score": []}
+    sizes: list[int] = []
+    for index, row in enumerate(pool):
+        view = PreDecisionView(
+            state_id=_uuid.uuid4(),
+            match_id=row["matchId"],
+            participant_id=row["participantId"],
+            event_source_index=0,
+            event_timestamp_ms=int(row["features"].get("game_time_ms") or 0),
+            inventory_items=tuple(
+                sorted((int(i), int(c)) for i, c in row["features"].get("inventory_items") or [])
+            ),
+            trinket_item_id=None,
+            gold=GoldView(None, "UNKNOWN", None),
+            level=LevelView(None, None, "BENCH"),
+            pre_decision_uncertain=False,
+            pre_decision_reasons=(),
+        )
+        t0 = time.perf_counter()
+        enumerated = enumerate_candidates(
+            CandidateContext(
+                view=view, game_patch="16.19", map_id=11, champion_id=row["championId"]
+            ),
+            catalog,
+            items,
+            classification,
+            rules,
+        )
+        result = [c.item_id for c in enumerated.candidates]
+        t1 = time.perf_counter()
+        decided, _ = policy.decide(row)
+        b0 = (
+            [popularity.score(row["championId"], row["mainItemOrdinal"], c) for c in result]
+            if decided
+            else []
+        )
+        sorted(zip(result, b0, strict=False), key=lambda p: -p[1])
+        t2 = time.perf_counter()
+        m1(row)
+        t3 = time.perf_counter()
+        if index >= warmup:
+            timings["enumerate"].append(t1 - t0)
+            timings["b0_rank_support"].append(t2 - t1)
+            timings["m1_score"].append(t3 - t2)
+            sizes.append(len(result))
+
+    def pct(values: list[float], q: float) -> float:
+        ordered = sorted(values)
+        return round(ordered[min(len(ordered) - 1, int(q * len(ordered)))] * 1000, 3)
+
+    return {
+        "schemaVersion": 1,
+        "card": "CC-406",
+        "queries": len(sizes),
+        "warmup": warmup,
+        "candidatesPerQuery": {"median": sorted(sizes)[len(sizes) // 2], "max": max(sizes)},
+        "milliseconds": {
+            name: {"p50": pct(values, 0.5), "p95": pct(values, 0.95)}
+            for name, values in timings.items()
+        },
+        "maxRssMb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 1),
+        "environment": {
+            "python": sys.version.split()[0],
+            "machine": platform.machine(),
+            "threads": 1,
+        },
+        "measuredPath": "offline, sem rede/importação/LLM; enumeração + ranking B0/suporte + M1",
+    }

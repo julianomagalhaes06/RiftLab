@@ -15,6 +15,7 @@ import riftlab.catalog.patches  # noqa: F401
 import riftlab.champions.models  # noqa: F401
 import riftlab.decisions.models  # noqa: F401
 import riftlab.ingestion.models  # noqa: F401
+import riftlab.ml.models  # noqa: F401
 import riftlab.ranked.models  # noqa: F401
 import riftlab.timeline.models  # noqa: F401
 from riftlab.config import get_settings

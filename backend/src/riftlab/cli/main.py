@@ -331,6 +331,135 @@ def ml_cluster_experiment(
     )
 
 
+_ARTIFACTS = _REPO_ROOT / ".private" / "artifacts"
+
+
+def _registry_run(env_file: Path | None, action: Any) -> Any:
+    import asyncio
+
+    from riftlab.cli.env_file import load_settings
+    from riftlab.db import build_engine
+    from riftlab.shared.db import build_session_factory
+
+    settings = load_settings(env_file)
+
+    async def _run() -> Any:
+        engine = build_engine(settings.database_url)
+        try:
+            return await action(build_session_factory(engine))
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(_run())
+
+
+@ml_app.command("registry-register")
+def ml_registry_register(
+    task: str = typer.Option(...),
+    scope: str = typer.Option(...),
+    kind: str = typer.Option(..., help="BASELINE ou MODEL."),
+    name: str = typer.Option(...),
+    artifact: Path = typer.Option(..., help="Arquivo local sob .private/artifacts."),
+    dataset: Path = typer.Option(..., help="Dataset usado (registrado pelo hash)."),
+    metrics_json: str = typer.Option("{}", help="Métricas (JSON)."),
+    env_file: Path | None = typer.Option(None),
+) -> None:
+    """Registra uma versão (REGISTERED); não ativa nada."""
+    import json
+
+    from riftlab.ml import registry
+
+    async def action(sf: Any) -> Any:
+        ds = await registry.register_dataset(
+            sf, dataset, task=task, patch="16.19", description=dataset.name
+        )
+        return await registry.register_version(
+            sf,
+            task=task,
+            scope=scope,
+            kind=kind,
+            name=name,
+            artifact=artifact,
+            artifact_root=_ARTIFACTS,
+            dataset_manifest_id=ds,
+            feature_names=[],
+            metrics=json.loads(metrics_json),
+        )
+
+    try:
+        typer.echo(str(_registry_run(env_file, action)))
+    except registry.RegistryError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@ml_app.command("registry-promote")
+def ml_registry_promote(
+    version_id: str = typer.Option(...), env_file: Path | None = typer.Option(None)
+) -> None:
+    """Promove atomicamente (a ativa anterior é aposentada, nunca apagada)."""
+    import uuid
+
+    from riftlab.ml import registry
+
+    try:
+        _registry_run(env_file, lambda sf: registry.promote(sf, uuid.UUID(version_id)))
+    except registry.RegistryError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo("ACTIVE " + version_id)
+
+
+@ml_app.command("registry-rollback")
+def ml_registry_rollback(
+    task: str = typer.Option(...),
+    scope: str = typer.Option(...),
+    env_file: Path | None = typer.Option(None),
+) -> None:
+    """Reativa a versão anterior da tarefa/escopo."""
+    from riftlab.ml import registry
+
+    try:
+        version = _registry_run(env_file, lambda sf: registry.rollback(sf, task, scope))
+    except registry.RegistryError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo("ACTIVE " + str(version))
+
+
+@ml_app.command("registry-active")
+def ml_registry_active(
+    task: str = typer.Option(...),
+    scope: str = typer.Option(...),
+    env_file: Path | None = typer.Option(None),
+) -> None:
+    """Mostra a versão ativa (hash conferido) ou o fallback explícito."""
+    import dataclasses
+    import json
+
+    from riftlab.ml import registry
+
+    active = _registry_run(env_file, lambda sf: registry.resolve_active(sf, task, scope))
+    typer.echo(json.dumps(dataclasses.asdict(active), default=str))
+
+
+@ml_app.command("benchmark")
+def ml_benchmark(
+    dataset: Path = typer.Option(..., help="Dataset com candidatos (consultas da validação)."),
+    model: Path = typer.Option(..., help="Modelo M1 (.cbm) para medir a pontuação."),
+    champions: Path = typer.Option(_CC402 / "champion-16.19.1-en_US.json"),
+    items: Path = typer.Option(_ITEMS_16_19),
+    queries: int = typer.Option(100),
+) -> None:
+    """CC-406: p50/p95 de enumeração, ranking B0 + suporte e M1, offline e sem segredo."""
+    import json
+
+    from riftlab.ml.experiment import benchmark_run
+
+    report = benchmark_run(dataset, model, champions, items, queries=queries)
+    typer.echo(json.dumps(report, ensure_ascii=False, sort_keys=True))
+
+
 @ml_app.command("evaluate-test")
 def ml_evaluate_test(
     run_dir: Path = typer.Option(..., help="Execução já selecionada."),
