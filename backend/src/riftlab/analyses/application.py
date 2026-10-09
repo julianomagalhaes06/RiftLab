@@ -30,6 +30,7 @@ from riftlab.candidates.rules import load_item_rules
 from riftlab.dataset.rows import _catalog
 from riftlab.decisions.features import build_pre_decision_view
 from riftlab.decisions.models import DecisionPointModel
+from riftlab.ml.registry import resolve_active
 from riftlab.ranking.engine import (
     POPULARITY,
     RULES,
@@ -43,6 +44,7 @@ from riftlab.shared.errors import ConflictError, NotFoundError
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 ALGORITHM_VERSION = "analysis_v1"
+REGISTRY_TASK = "purchase_decision"  # escopo do registro = patch do catálogo
 
 
 def request_hash(body: dict[str, Any]) -> str:
@@ -197,6 +199,10 @@ async def create_analysis(
             return {"analysisId": str(existing.id), **existing.result}, False
         decision_id = uuid.UUID(str(body["decisionId"]))
         result = await _compute(session, decision_id, body, configs)
+    patch = str(result["versions"].get("catalog", "")).split("/")[0]
+    active = await resolve_active(session_factory, REGISTRY_TASK, patch)
+    registry_version = active.version_id
+    result["versions"]["registryVersion"] = str(registry_version) if registry_version else None
     analysis_id = uuid.uuid4()
     try:
         async with session_factory.begin() as session:
@@ -208,7 +214,7 @@ async def create_analysis(
                     request_sha256=digest,
                     engine=result["engine"],
                     status=result["status"],
-                    model_version_id=None,
+                    model_version_id=registry_version,
                     result=result,
                 )
             )

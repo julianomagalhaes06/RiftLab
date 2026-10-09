@@ -9,6 +9,8 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+import riftlab.decisions.models  # noqa: F401  (alvo da FK decision_points)
+import riftlab.ml.models  # noqa: F401  (alvo da FK ml_model_versions)
 from riftlab.shared.db import Base, CreatedAtMixin, UuidPkMixin
 
 

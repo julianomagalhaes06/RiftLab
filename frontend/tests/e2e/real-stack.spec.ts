@@ -59,6 +59,18 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     ).toBeVisible();
     await expect(page.getByText("Elegível para análise")).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/item comprado|nome indisponível/);
+
+    // Estudo (CC-304/305): escolher antes de revelar; sem custo nem histórico antes.
+    await page.getByRole("button", { name: "Confirmar objetivo e começar" }).click();
+    await expect(page.getByLabel("Item Composto Sintético")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/Faltam \d+ de ouro|histórico/);
+    await page.getByLabel("Item Composto Sintético").check();
+    await page.getByRole("button", { name: "Responder" }).click();
+    await page.getByRole("button", { name: "Revelar comparação" }).click();
+    await expect(page.getByRole("heading", { name: "Comparação" })).toBeVisible();
+    await expect(page.getByText("Faltam 150 de ouro para completar o item.")).toBeVisible();
+    await expect(page.getByText(/compra feita na partida \(histórico\)/)).toBeVisible();
+    await expect(page.getByText(/sua escolha/)).toBeVisible();
     const detailUrl = page.url();
 
     // Retomada por URL: recarregar o detalhe e abrir o deep link da partida

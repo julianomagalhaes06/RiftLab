@@ -125,3 +125,55 @@ async def test_user_budget_scenario_marks_affordability(
     assert results[100]["quality"]["budgetSource"] == "USER_PROVIDED"
     assert results[100]["candidates"][0]["affordability"] == "ABOVE_USER_BUDGET"
     assert results[5000]["candidates"][0]["affordability"] == "WITHIN_USER_BUDGET"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("_demo_match", ["DEMO-0008"], indirect=True)
+async def test_analysis_records_the_active_registry_version_and_keeps_it(
+    app_client, session_factory, tmp_path, _demo_match
+) -> None:
+    from riftlab.ml import registry
+
+    decision = (await _decisions(app_client, session_factory, tmp_path, _demo_match))[-1]
+    root = tmp_path / "artifacts"
+    root.mkdir()
+    (root / "b0.json").write_text("b0")
+    (root / "b0-v2.json").write_text("b0 v2")
+    dataset = await registry.register_dataset(
+        session_factory, root / "b0.json", task="purchase_decision", patch="DEMO-1", description="t"
+    )
+    versions = []
+    for name in ("b0.json", "b0-v2.json"):
+        versions.append(
+            await registry.register_version(
+                session_factory,
+                task="purchase_decision",
+                scope="DEMO-1",
+                kind="BASELINE",
+                name=name,
+                artifact=root / name,
+                artifact_root=root,
+                dataset_manifest_id=dataset,
+                feature_names=[],
+                metrics={},
+            )
+        )
+    body = {"decisionId": decision["decisionId"], "objective": {"priority": "BALANCED"}}
+    await registry.promote(session_factory, versions[0])
+    first = (
+        await app_client.post(
+            "/api/v1/analyses", json=body, headers={"Idempotency-Key": f"t-{uuid.uuid4()}"}
+        )
+    ).json()
+    await registry.promote(session_factory, versions[1])
+    second = (
+        await app_client.post(
+            "/api/v1/analyses", json=body, headers={"Idempotency-Key": f"t-{uuid.uuid4()}"}
+        )
+    ).json()
+    assert first["versions"]["registryVersion"] == str(versions[0])
+    assert second["versions"]["registryVersion"] == str(versions[1])
+    again = (await app_client.get(f"/api/v1/analyses/{first['analysisId']}")).json()
+    assert again["versions"]["registryVersion"] == str(
+        versions[0]
+    )  # análise antiga preserva versão

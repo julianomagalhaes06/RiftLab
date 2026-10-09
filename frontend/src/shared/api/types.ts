@@ -463,6 +463,8 @@ export interface components {
             objective?: string | null;
             /** Ranking */
             ranking?: string | null;
+            /** Registryversion */
+            registryVersion?: string | null;
         };
         /**
          * BudgetSource

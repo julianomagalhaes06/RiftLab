@@ -10,6 +10,7 @@ from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+import riftlab.analyses.models  # noqa: F401  (alvo da FK analyses)
 from riftlab.shared.db import Base, CreatedAtMixin, UuidPkMixin
 
 

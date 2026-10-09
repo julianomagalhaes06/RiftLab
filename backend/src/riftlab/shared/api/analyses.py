@@ -45,6 +45,7 @@ class AnalysisVersions(CamelModel):
     ranking: str | None = Field(default=None, max_length=40)  # CC-303
     objective: str | None = Field(default=None, max_length=40)  # CC-304
     item_rules: str | None = Field(default=None, max_length=60)
+    registry_version: UUID | None = None  # CC-405: versão ativa do registro (baseline ou modelo)
 
 
 class AnalysisQuality(CamelModel):
