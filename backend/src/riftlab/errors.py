@@ -15,6 +15,7 @@ from riftlab.shared.errors import (
     ConflictError,
     DecisionsNotPreparedError,
     InvalidCursorError,
+    InvalidRequestError,
     NotFoundError,
     RiotKeyMissingError,
 )
@@ -171,6 +172,16 @@ def register_exception_handlers(app: FastAPI) -> None:
             code=RESOURCE_NOT_FOUND,
             title="Recurso nao encontrado",
             detail="Recurso ou rota nao encontrados.",
+        )
+
+    @app.exception_handler(InvalidRequestError)
+    async def invalid_request_handler(request: Request, exc: InvalidRequestError) -> JSONResponse:
+        return problem_response(
+            request,
+            status_code=422,
+            code=VALIDATION_ERROR,
+            title="Requisicao invalida",
+            detail="O corpo nao corresponde ao estado do recurso.",
         )
 
     @app.exception_handler(ConflictError)

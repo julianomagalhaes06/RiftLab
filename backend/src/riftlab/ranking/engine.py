@@ -236,5 +236,6 @@ def as_payload(item: RankedCandidate) -> dict[str, Any]:
         "remainingCost": item.facts.remaining_cost,
         "affordability": item.facts.affordability,
         "evidenceCodes": list(item.facts.evidence_codes),
+        "tags": list(item.facts.tags),
         "explanations": list(item.explanations),
     }

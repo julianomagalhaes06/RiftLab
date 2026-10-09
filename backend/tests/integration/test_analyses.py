@@ -102,3 +102,26 @@ async def test_unknown_decision_and_analysis_are_404(app_client, _migrated_datab
     )
     assert missing.status_code == 404
     assert (await app_client.get(f"/api/v1/analyses/{uuid.uuid4()}")).status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("_demo_match", ["DEMO-0008"], indirect=True)
+async def test_user_budget_scenario_marks_affordability(
+    app_client, session_factory, tmp_path, _demo_match
+) -> None:
+    decision = (await _decisions(app_client, session_factory, tmp_path, _demo_match))[-1]
+    results = {}
+    for gold in (100, 5000):
+        response = await app_client.post(
+            "/api/v1/analyses",
+            json={
+                "decisionId": decision["decisionId"],
+                "objective": {"priority": "BALANCED"},
+                "budget": {"gold": gold, "source": "USER_PROVIDED"},
+            },
+            headers={"Idempotency-Key": f"test-{uuid.uuid4()}"},
+        )
+        results[gold] = response.json()
+    assert results[100]["quality"]["budgetSource"] == "USER_PROVIDED"
+    assert results[100]["candidates"][0]["affordability"] == "ABOVE_USER_BUDGET"
+    assert results[5000]["candidates"][0]["affordability"] == "WITHIN_USER_BUDGET"

@@ -34,6 +34,7 @@ from riftlab.ingestion.models import (
     RiotRateLimitModel,
 )
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.learning.models import LearningAttemptModel
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.domain import SourceOrigin
 from riftlab.timeline.models import DecisionStateModel, MatchReconstructionModel, TimelineEventModel
@@ -60,6 +61,13 @@ async def reset_match(session_factory, match_id: str) -> None:
     que respeita as FKs. DELETE é permitido nas tabelas imutáveis; só UPDATE é
     rejeitado."""
     async with unit_of_work(session_factory) as session:
+        await session.execute(
+            delete(LearningAttemptModel).where(
+                LearningAttemptModel.decision_id.in_(
+                    select(DecisionPointModel.id).where(DecisionPointModel.match_id == match_id)
+                )
+            )
+        )
         await session.execute(
             delete(AnalysisModel).where(
                 AnalysisModel.decision_id.in_(

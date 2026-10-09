@@ -27,6 +27,10 @@ export type DecisionBudget = Schemas["DecisionBudget"];
 export type DecisionReason = Schemas["DecisionReason"];
 export type InventoryItem = Schemas["InventoryItem"];
 export type BudgetSource = Schemas["BudgetSource"];
+export type LearningAttempt = Schemas["LearningAttemptPublicState"];
+export type AnalysisResult = Schemas["AnalysisResult"];
+export type AnalysisCandidate = Schemas["AnalysisCandidate"];
+export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 
 export interface PageParams {
   cursor?: string | null;
@@ -36,6 +40,7 @@ export interface PageParams {
 interface RequestOptions {
   body?: unknown;
   signal?: AbortSignal;
+  idempotencyKey?: string;
 }
 
 export interface ApiClient {
@@ -53,6 +58,26 @@ export interface ApiClient {
     signal?: AbortSignal,
   ): Promise<DecisionPage>;
   getDecision(decisionId: string, signal?: AbortSignal): Promise<DecisionState>;
+  createAttempt(
+    decisionId: string,
+    priority: ObjectivePriority,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<LearningAttempt>;
+  answerAttempt(
+    attemptId: string,
+    answer: { itemId: number | null; skipped: boolean; rationale?: string | null },
+    signal?: AbortSignal,
+  ): Promise<LearningAttempt>;
+  hintAttempt(attemptId: string, level: 1 | 2, signal?: AbortSignal): Promise<LearningAttempt>;
+  revealAttempt(attemptId: string, signal?: AbortSignal): Promise<LearningAttempt>;
+  createScenarioAnalysis(
+    decisionId: string,
+    priority: ObjectivePriority,
+    gold: number,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<AnalysisResult>;
 }
 
 function queryString(params: Record<string, string | number | null | undefined>): string {
@@ -74,10 +99,11 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
       response = await doFetch(path, {
         method,
         signal: options.signal,
-        headers:
-          options.body === undefined
-            ? { accept: "application/json" }
-            : { accept: "application/json", "content-type": "application/json" },
+        headers: {
+          accept: "application/json",
+          ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+          ...(options.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}),
+        },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       });
     } catch (error) {
@@ -128,6 +154,33 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
       ),
     getDecision: (decisionId, signal) =>
       request("GET", `/api/v1/decisions/${enc(decisionId)}`, { signal }),
+    createAttempt: (decisionId, priority, idempotencyKey, signal) =>
+      request("POST", "/api/v1/learning-attempts", {
+        body: { decisionId, objective: { priority } },
+        signal,
+        idempotencyKey,
+      }),
+    answerAttempt: (attemptId, answer, signal) =>
+      request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/answer`, {
+        body: answer,
+        signal,
+      }),
+    hintAttempt: (attemptId, level, signal) =>
+      request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/hint`, {
+        body: { level },
+        signal,
+      }),
+    createScenarioAnalysis: (decisionId, priority, gold, idempotencyKey, signal) =>
+      request("POST", "/api/v1/analyses", {
+        body: { decisionId, objective: { priority }, budget: { gold, source: "USER_PROVIDED" } },
+        signal,
+        idempotencyKey,
+      }),
+    revealAttempt: (attemptId, signal) =>
+      request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/reveal`, {
+        body: { explicit: true },
+        signal,
+      }),
   };
 }
 

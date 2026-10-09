@@ -106,6 +106,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning-attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Attempt */
+        post: operations["post_attempt_api_v1_learning_attempts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning-attempts/{attempt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Attempt */
+        get: operations["read_attempt_api_v1_learning_attempts__attempt_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning-attempts/{attempt_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Answer */
+        post: operations["post_answer_api_v1_learning_attempts__attempt_id__answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning-attempts/{attempt_id}/hint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Hint */
+        post: operations["post_hint_api_v1_learning_attempts__attempt_id__hint_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning-attempts/{attempt_id}/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Reveal */
+        post: operations["post_reveal_api_v1_learning_attempts__attempt_id__reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/matches": {
         parameters: {
             query?: never;
@@ -261,6 +346,8 @@ export interface components {
             remainingCost: number;
             /** Score */
             score: number;
+            /** Tags */
+            tags?: string[];
         };
         /**
          * AnalysisEngine
@@ -643,6 +730,134 @@ export interface components {
             /** Quantity */
             quantity: number;
         };
+        /**
+         * LearningAttemptAnswerRequest
+         * @description {itemId ou null, rationale?, skipped:boolean}; se not skipped, item
+         *     obrigatorio (docs/contracts.md). rationale maximo 1000 caracteres,
+         *     contratual.
+         */
+        LearningAttemptAnswerRequest: {
+            /** Itemid */
+            itemId?: number | null;
+            /** Rationale */
+            rationale?: string | null;
+            /**
+             * Skipped
+             * @default false
+             */
+            skipped: boolean;
+        };
+        /**
+         * LearningAttemptCreateRequest
+         * @description {decisionId, objective} + Idempotency-Key -> 201.
+         */
+        LearningAttemptCreateRequest: {
+            /**
+             * Decisionid
+             * Format: uuid
+             */
+            decisionId: string;
+            objective: components["schemas"]["ObjectiveForm"];
+        };
+        /**
+         * LearningAttemptHint
+         * @description Pista curada (CC-304): fatos disponíveis, nunca um vencedor.
+         */
+        LearningAttemptHint: {
+            /** Level */
+            level: number;
+            /** Source */
+            source: string;
+            /** Text */
+            text: string;
+        };
+        /**
+         * LearningAttemptHintRequest
+         * @description {level:1|2} — nunca um terceiro nivel; nunca muda ordem nem revela
+         *     ranking (docs/contracts.md).
+         */
+        LearningAttemptHintRequest: {
+            /**
+             * Level
+             * @enum {integer}
+             */
+            level: 1 | 2;
+        };
+        /**
+         * LearningAttemptOption
+         * @description Alternativa exibida antes do reveal: "sem rank/score/evidence que
+         *     revele ordem, sem compra historica; ordem estavel aleatorizada por
+         *     tentativa" (docs/contracts.md) — por isso o schema nao tem esses campos.
+         */
+        LearningAttemptOption: {
+            /** Itemid */
+            itemId: number;
+            /** Name */
+            name?: string | null;
+        };
+        /**
+         * LearningAttemptPublicState
+         * @description Estado publico da tentativa (GET .../{id} e resposta de POST
+         *     .../{id}). context nao tem forma fechada em nenhum doc ainda (o "estado
+         *     imediatamente anterior a decisao" concreto e responsabilidade de
+         *     CC-203/204/304) — mantido como objeto opaco aqui, proposital.
+         */
+        LearningAttemptPublicState: {
+            /** Analysisid */
+            analysisId?: string | null;
+            /**
+             * Attemptid
+             * Format: uuid
+             */
+            attemptId: string;
+            comparison?: components["schemas"]["AnalysisResult"] | null;
+            /** Context */
+            context: {
+                [key: string]: unknown;
+            };
+            /** Decisionid */
+            decisionId?: string | null;
+            /** Hintlevel */
+            hintLevel: number;
+            /** Hints */
+            hints?: components["schemas"]["LearningAttemptHint"][];
+            /** Historicalitemid */
+            historicalItemId?: number | null;
+            objective?: components["schemas"]["ObjectiveForm"] | null;
+            /** Options */
+            options: components["schemas"]["LearningAttemptOption"][];
+            /** Rationale */
+            rationale?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Selecteditemid */
+            selectedItemId?: number | null;
+            /**
+             * Skipped
+             * @default false
+             */
+            skipped: boolean;
+            status: components["schemas"]["LearningAttemptState"];
+        };
+        /**
+         * LearningAttemptRevealRequest
+         * @description {explicit:true} — reveal so e valido com confirmacao explicita, nunca
+         *     implicito; Literal[True] rejeita explicit:false em vez de apenas ignorar.
+         */
+        LearningAttemptRevealRequest: {
+            /**
+             * Explicit
+             * @constant
+             */
+            explicit: true;
+        };
+        /**
+         * LearningAttemptState
+         * @description docs/domain-model.md: OPEN -> ANSWERED -> REVEALED, ou OPEN -> REVEALED
+         *     por pedido explicito; REVEALED e monotonico (nunca volta a ficar cega).
+         * @enum {string}
+         */
+        LearningAttemptState: "OPEN" | "ANSWERED" | "REVEALED";
         /** LiveStatus */
         LiveStatus: {
             /**
@@ -1177,6 +1392,267 @@ export interface operations {
                 };
             };
             /** @description job_id não é um UUID válido. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_attempt_api_v1_learning_attempts_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningAttemptCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningAttemptPublicState"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    read_attempt_api_v1_learning_attempts__attempt_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningAttemptPublicState"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_answer_api_v1_learning_attempts__attempt_id__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningAttemptAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningAttemptPublicState"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_hint_api_v1_learning_attempts__attempt_id__hint_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningAttemptHintRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningAttemptPublicState"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_reveal_api_v1_learning_attempts__attempt_id__reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningAttemptRevealRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningAttemptPublicState"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;

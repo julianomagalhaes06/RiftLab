@@ -40,6 +40,11 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/ranked/me",
         "/api/v1/analyses",
         "/api/v1/analyses/{analysis_id}",
+        "/api/v1/learning-attempts",
+        "/api/v1/learning-attempts/{attempt_id}",
+        "/api/v1/learning-attempts/{attempt_id}/answer",
+        "/api/v1/learning-attempts/{attempt_id}/hint",
+        "/api/v1/learning-attempts/{attempt_id}/reveal",
     }
 
 

@@ -65,6 +65,13 @@
           "score": {
             "title": "Score",
             "type": "number"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
           }
         },
         "required": [
@@ -1024,6 +1031,303 @@
         ],
         "title": "InventoryItem",
         "type": "object"
+      },
+      "LearningAttemptAnswerRequest": {
+        "additionalProperties": false,
+        "description": "{itemId ou null, rationale?, skipped:boolean}; se not skipped, item\nobrigatorio (docs/contracts.md). rationale maximo 1000 caracteres,\ncontratual.",
+        "properties": {
+          "itemId": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Itemid"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "skipped": {
+            "default": false,
+            "title": "Skipped",
+            "type": "boolean"
+          }
+        },
+        "title": "LearningAttemptAnswerRequest",
+        "type": "object"
+      },
+      "LearningAttemptCreateRequest": {
+        "additionalProperties": false,
+        "description": "{decisionId, objective} + Idempotency-Key -> 201.",
+        "properties": {
+          "decisionId": {
+            "format": "uuid",
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "objective": {
+            "$ref": "#/components/schemas/ObjectiveForm"
+          }
+        },
+        "required": [
+          "decisionId",
+          "objective"
+        ],
+        "title": "LearningAttemptCreateRequest",
+        "type": "object"
+      },
+      "LearningAttemptHint": {
+        "additionalProperties": false,
+        "description": "Pista curada (CC-304): fatos disponíveis, nunca um vencedor.",
+        "properties": {
+          "level": {
+            "maximum": 2.0,
+            "minimum": 1.0,
+            "title": "Level",
+            "type": "integer"
+          },
+          "source": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "text",
+          "source"
+        ],
+        "title": "LearningAttemptHint",
+        "type": "object"
+      },
+      "LearningAttemptHintRequest": {
+        "additionalProperties": false,
+        "description": "{level:1|2} — nunca um terceiro nivel; nunca muda ordem nem revela\nranking (docs/contracts.md).",
+        "properties": {
+          "level": {
+            "enum": [
+              1,
+              2
+            ],
+            "title": "Level",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "level"
+        ],
+        "title": "LearningAttemptHintRequest",
+        "type": "object"
+      },
+      "LearningAttemptOption": {
+        "additionalProperties": false,
+        "description": "Alternativa exibida antes do reveal: \"sem rank/score/evidence que\nrevele ordem, sem compra historica; ordem estavel aleatorizada por\ntentativa\" (docs/contracts.md) — por isso o schema nao tem esses campos.",
+        "properties": {
+          "itemId": {
+            "minimum": 0.0,
+            "title": "Itemid",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "itemId"
+        ],
+        "title": "LearningAttemptOption",
+        "type": "object"
+      },
+      "LearningAttemptPublicState": {
+        "additionalProperties": false,
+        "description": "Estado publico da tentativa (GET .../{id} e resposta de POST\n.../{id}). context nao tem forma fechada em nenhum doc ainda (o \"estado\nimediatamente anterior a decisao\" concreto e responsabilidade de\nCC-203/204/304) — mantido como objeto opaco aqui, proposital.",
+        "properties": {
+          "analysisId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysisid"
+          },
+          "attemptId": {
+            "format": "uuid",
+            "title": "Attemptid",
+            "type": "string"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "context": {
+            "additionalProperties": true,
+            "title": "Context",
+            "type": "object"
+          },
+          "decisionId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionid"
+          },
+          "hintLevel": {
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Hintlevel",
+            "type": "integer"
+          },
+          "hints": {
+            "items": {
+              "$ref": "#/components/schemas/LearningAttemptHint"
+            },
+            "title": "Hints",
+            "type": "array"
+          },
+          "historicalItemId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historicalitemid"
+          },
+          "objective": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectiveForm"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/LearningAttemptOption"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "selectedItemId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selecteditemid"
+          },
+          "skipped": {
+            "default": false,
+            "title": "Skipped",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LearningAttemptState"
+          }
+        },
+        "required": [
+          "attemptId",
+          "status",
+          "context",
+          "options",
+          "hintLevel"
+        ],
+        "title": "LearningAttemptPublicState",
+        "type": "object"
+      },
+      "LearningAttemptRevealRequest": {
+        "additionalProperties": false,
+        "description": "{explicit:true} — reveal so e valido com confirmacao explicita, nunca\nimplicito; Literal[True] rejeita explicit:false em vez de apenas ignorar.",
+        "properties": {
+          "explicit": {
+            "const": true,
+            "title": "Explicit",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "explicit"
+        ],
+        "title": "LearningAttemptRevealRequest",
+        "type": "object"
+      },
+      "LearningAttemptState": {
+        "description": "docs/domain-model.md: OPEN -> ANSWERED -> REVEALED, ou OPEN -> REVEALED\npor pedido explicito; REVEALED e monotonico (nunca volta a ficar cega).",
+        "enum": [
+          "OPEN",
+          "ANSWERED",
+          "REVEALED"
+        ],
+        "title": "LearningAttemptState",
+        "type": "string"
       },
       "LiveStatus": {
         "properties": {
@@ -2064,6 +2368,362 @@
         "summary": "Retry Import Route",
         "tags": [
           "imports"
+        ]
+      }
+    },
+    "/api/v1/learning-attempts": {
+      "post": {
+        "operationId": "post_attempt_api_v1_learning_attempts_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningAttemptCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningAttemptPublicState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Post Attempt",
+        "tags": [
+          "learning"
+        ]
+      }
+    },
+    "/api/v1/learning-attempts/{attempt_id}": {
+      "get": {
+        "operationId": "read_attempt_api_v1_learning_attempts__attempt_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningAttemptPublicState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Read Attempt",
+        "tags": [
+          "learning"
+        ]
+      }
+    },
+    "/api/v1/learning-attempts/{attempt_id}/answer": {
+      "post": {
+        "operationId": "post_answer_api_v1_learning_attempts__attempt_id__answer_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningAttemptAnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningAttemptPublicState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Post Answer",
+        "tags": [
+          "learning"
+        ]
+      }
+    },
+    "/api/v1/learning-attempts/{attempt_id}/hint": {
+      "post": {
+        "operationId": "post_hint_api_v1_learning_attempts__attempt_id__hint_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningAttemptHintRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningAttemptPublicState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Post Hint",
+        "tags": [
+          "learning"
+        ]
+      }
+    },
+    "/api/v1/learning-attempts/{attempt_id}/reveal": {
+      "post": {
+        "operationId": "post_reveal_api_v1_learning_attempts__attempt_id__reveal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningAttemptRevealRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningAttemptPublicState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Post Reveal",
+        "tags": [
+          "learning"
         ]
       }
     },

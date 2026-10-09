@@ -85,6 +85,7 @@ class AnalysisCandidate(CamelModel):
     remaining_cost: int = Field(ge=0)
     affordability: str = Field(min_length=1, max_length=20)
     evidence_codes: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)  # atributos do catálogo (públicos)
     explanations: list[AnalysisExplanation] = Field(default_factory=list)
 
 

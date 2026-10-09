@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from riftlab.shared.api.analyses import AnalysisResult
 from riftlab.shared.api.common import CamelModel
 from riftlab.shared.api.enums import LearningAttemptState
 from riftlab.shared.api.objectives import ObjectiveForm
@@ -29,6 +30,15 @@ class LearningAttemptOption(CamelModel):
     tentativa" (docs/contracts.md) — por isso o schema nao tem esses campos."""
 
     item_id: int = Field(ge=0)
+    name: str | None = None
+
+
+class LearningAttemptHint(CamelModel):
+    """Pista curada (CC-304): fatos disponíveis, nunca um vencedor."""
+
+    level: int = Field(ge=1, le=2)
+    text: str = Field(min_length=1, max_length=400)
+    source: str = Field(min_length=1, max_length=80)
 
 
 class LearningAttemptPublicState(CamelModel):
@@ -43,12 +53,23 @@ class LearningAttemptPublicState(CamelModel):
     options: list[LearningAttemptOption]
     hint_level: int = Field(ge=0, le=2)
     analysis_id: UUID | None = None
+    decision_id: UUID | None = None
+    objective: ObjectiveForm | None = None
+    selected_item_id: int | None = None
+    skipped: bool = False
+    rationale: str | None = None
+    reason_codes: list[str] = Field(default_factory=list)
+    hints: list[LearningAttemptHint] = Field(default_factory=list)
+    comparison: AnalysisResult | None = None  # só depois de REVEALED
+    historical_item_id: int | None = None  # compra histórica, só depois de REVEALED
 
     @model_validator(mode="after")
     def _analysis_id_only_after_reveal(self) -> LearningAttemptPublicState:
         has_analysis = self.analysis_id is not None
         revealed = self.status == LearningAttemptState.REVEALED
-        if has_analysis and not revealed:
+        if (
+            has_analysis or self.comparison is not None or self.historical_item_id
+        ) and not revealed:
             raise ValueError(
                 "analysisId so pode aparecer apos REVEALED (docs/domain-model.md: "
                 "analysis_id nullable ate revelacao)"

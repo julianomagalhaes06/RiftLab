@@ -16,6 +16,10 @@ class DecisionsNotPreparedError(DomainError):
     "extraída com zero pontos". Nunca carrega detalhe interno."""
 
 
+class InvalidRequestError(DomainError):
+    """Corpo válido no schema, mas incompatível com o estado do recurso (422)."""
+
+
 class InvalidCursorError(DomainError):
     """Cursor de paginação malformado, adulterado, de outro escopo ou de uma
     extração inexistente. Nunca ecoa o conteúdo recebido."""

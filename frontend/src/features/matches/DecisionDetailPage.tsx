@@ -14,6 +14,7 @@ import {
 } from "./format";
 import { ChampionBadge } from "./ChampionBadge";
 import { useDecision } from "./useDecision";
+import { StudyPanel } from "../study/StudyPanel";
 
 const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
   NO_PRIOR_FRAME: "não há quadro anterior à decisão",
@@ -208,6 +209,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
       <Inventory decision={decision} />
       <Level decision={decision} />
       <Budget decision={decision} />
+      {decision.eligible ? <StudyPanel decisionId={decision.decisionId} /> : null}
       <TechnicalDetails decision={decision} />
     </section>
   );
