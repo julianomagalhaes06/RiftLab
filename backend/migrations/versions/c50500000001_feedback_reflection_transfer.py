@@ -50,7 +50,9 @@ def upgrade() -> None:
         CREATE TRIGGER analysis_feedback_immutable BEFORE UPDATE ON analysis_feedback
         FOR EACH ROW EXECUTE FUNCTION reject_feedback_update()
     """)
-    op.add_column("learning_attempts", sa.Column("reflection", sa.String(length=1000), nullable=True))
+    op.add_column(
+        "learning_attempts", sa.Column("reflection", sa.String(length=1000), nullable=True)
+    )
     op.add_column(
         "learning_attempts", sa.Column("reflected_at", sa.DateTime(timezone=True), nullable=True)
     )
