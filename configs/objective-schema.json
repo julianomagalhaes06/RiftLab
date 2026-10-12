@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "riftlab/objective-schema-v1",
+  "title": "Saída do interpretador de objetivo (CC-501/503/504)",
+  "description": "Um único objeto JSON. NEEDS_INPUT quando o texto é ambíguo, fora do domínio, só exclui opções ou tenta instruir o interpretador; o formulário abre nesse caso.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["priority"],
+  "properties": {
+    "priority": {
+      "type": "string",
+      "enum": ["BALANCED", "SURVIVAL", "DAMAGE", "UTILITY", "NEEDS_INPUT"]
+    }
+  }
+}
