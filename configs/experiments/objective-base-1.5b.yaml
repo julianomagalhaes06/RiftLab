@@ -1,0 +1,8 @@
+# CC-502/503: modelo base sem ajuste, mesmo prompt do ajustado.
+model: Qwen/Qwen2.5-1.5B-Instruct
+revision: 989aa7980e4cf806f80c7fef2b1adb7bc71aa306
+license: apache-2.0
+seed: 0
+threads: 4
+maxNewTokens: 12
+device: cpu

@@ -1,0 +1,12 @@
+# CC-503: avaliação na CPU local do 1.5B + adaptador treinado no Colab (Tesla T4), época de
+# menor perda na validação (manifesto em artifacts/objectives/lora-1.5b-colab/manifest.json).
+model: Qwen/Qwen2.5-1.5B-Instruct
+revision: 989aa7980e4cf806f80c7fef2b1adb7bc71aa306
+license: apache-2.0
+adapter: artifacts/objectives/lora-1.5b-colab/epoch-3
+adapterSha256: f61654561beeac2804cdfff3720525061f4e3f3c8e0b43643aad2b07ba89016c
+parserVersion: qwen2.5-1.5b-lora-v1
+seed: 0
+threads: 4
+device: cpu
+maxNewTokens: 12

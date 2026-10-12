@@ -1,0 +1,8 @@
+# CC-502: modelo base sem ajuste, mesmo prompt do ajustado (ml/objectives/riftlab_objectives/prompt.py).
+model: Qwen/Qwen2.5-0.5B-Instruct
+revision: 7ae557604adf67be50417f59c2c2f167def9a775
+license: apache-2.0
+seed: 0
+threads: 4
+maxNewTokens: 12
+device: cpu

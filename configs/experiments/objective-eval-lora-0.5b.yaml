@@ -1,0 +1,11 @@
+# CC-503: avaliação do 0.5B + adaptador escolhido pela menor perda na validação.
+model: Qwen/Qwen2.5-0.5B-Instruct
+revision: 7ae557604adf67be50417f59c2c2f167def9a775
+license: apache-2.0
+adapter: artifacts/objectives/lora-0.5b/epoch-3
+adapterSha256: a867eedf0434cbefaf24ab46f02207e19544769a2707a051d60479da8e0aa625
+parserVersion: qwen2.5-0.5b-lora-v1
+seed: 0
+threads: 4
+maxNewTokens: 12
+device: cpu

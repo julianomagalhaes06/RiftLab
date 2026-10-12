@@ -1,0 +1,19 @@
+# CC-503: LoRA em CPU sobre o Qwen2.5-0.5B-Instruct, mesmo prompt do base.
+model: Qwen/Qwen2.5-0.5B-Instruct
+revision: 7ae557604adf67be50417f59c2c2f167def9a775
+license: apache-2.0
+seed: 503
+threads: 4
+epochs: 3
+batchSize: 4
+gradAccumulation: 4
+gradientCheckpointing: true
+learningRate: 0.0002
+maxHours: 6
+maxNewTokens: 12
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  targetModules: [q_proj, k_proj, v_proj, o_proj]
+output: artifacts/objectives/lora-0.5b
