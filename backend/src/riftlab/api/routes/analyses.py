@@ -12,11 +12,16 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Request, Response
+from fastapi import APIRouter, Header, Query, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from riftlab.analyses.application import create_analysis, get_analysis
 from riftlab.errors import ProblemDetail
+from riftlab.reviews.application import submit_feedback
+from riftlab.reviews.report import build_report, render_html
 from riftlab.shared.api.analyses import AnalysisRequest, AnalysisResult
+from riftlab.shared.api.enums import ReportFormat
+from riftlab.shared.api.feedback import FeedbackRequest, FeedbackResult
 
 router = APIRouter(prefix="/api/v1/analyses", tags=["analyses"])
 _CONFIGS = Path(__file__).resolve().parents[5] / "configs"
@@ -54,3 +59,59 @@ async def read_analysis(analysis_id: uuid.UUID, request: Request) -> AnalysisRes
     return AnalysisResult.model_validate(
         await get_analysis(request.app.state.session_factory, analysis_id)
     )
+
+
+@router.post(
+    "/{analysis_id}/feedback", status_code=201, response_model=FeedbackResult, responses=_ERRORS
+)
+async def post_feedback(
+    analysis_id: uuid.UUID,
+    body: FeedbackRequest,
+    request: Request,
+    response: Response,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+) -> FeedbackResult:
+    """CC-505: julgamento por alternativa (0..3 ou null = abstenção), idempotente."""
+    result, created = await submit_feedback(
+        request.app.state.session_factory,
+        analysis_id,
+        body.model_dump(mode="json", by_alias=True),
+        idempotency_key,
+    )
+    if not created:
+        response.status_code = 200
+    return FeedbackResult.model_validate(result)
+
+
+# CSP do próprio relatório: nenhuma origem externa, nenhum script.
+_REPORT_HEADERS = {
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "no-store",
+}
+
+
+@router.get(
+    "/{analysis_id}/report",
+    responses={
+        200: {"content": {"application/json": {}, "text/html": {}}},
+        **_ERRORS,
+    },
+    response_class=Response,
+)
+async def read_report(
+    analysis_id: uuid.UUID,
+    request: Request,
+    format: ReportFormat = ReportFormat.JSON,  # noqa: A002 — nome do parâmetro no contrato
+    attempt_id: Annotated[uuid.UUID | None, Query(alias="attemptId")] = None,
+) -> Response:
+    """CC-505: exportação rastreável (JSON ou HTML autossuficiente), sem identificadores
+    pessoais; com attemptId vinculado inclui resposta inicial, pistas e reflexão."""
+    report = await build_report(
+        request.app.state.session_factory, analysis_id, attempt_id, _configs(request)
+    )
+    name = f"riftlab-analise-{str(analysis_id)[:8]}.{format.value}"
+    headers = {**_REPORT_HEADERS, "Content-Disposition": f'attachment; filename="{name}"'}
+    if format is ReportFormat.HTML:
+        return HTMLResponse(render_html(report), headers=headers)
+    return JSONResponse(report, headers=headers)

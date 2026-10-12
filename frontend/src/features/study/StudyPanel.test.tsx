@@ -70,7 +70,7 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
     fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
     await screen.findByText("Thornmail");
     const created = mock.callsTo("POST", /^\/api\/v1\/learning-attempts$/)[0];
-    expect(created.body).toEqual({ decisionId: DECISION, objective: { priority: "SURVIVAL" } });
+    expect(created.body).toEqual({ decisionId: DECISION, objective: { priority: "SURVIVAL" }, mode: "STUDY" });
     expect(screen.queryByText(/1200/)).toBeNull();
     expect(screen.queryByText(/histórico/)).toBeNull();
 
@@ -84,7 +84,7 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
     await screen.findByRole("heading", { name: "Comparação" });
-    expect(screen.getByText(/sua escolha/)).toBeInTheDocument();
+    expect(screen.getByText(/— sua escolha/)).toBeInTheDocument();
     expect(screen.getByText(/compra feita na partida \(histórico\)/)).toBeInTheDocument();
     expect(screen.getByText(/subiu pela prioridade do objetivo/)).toBeInTheDocument();
     expect(screen.getByText(/fonte: candidates.remainingCost/)).toBeInTheDocument();
@@ -131,6 +131,75 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
       objective: { priority: "SURVIVAL" },
       budget: { gold: 1500, source: "USER_PROVIDED" },
     });
+  });
+  it("reanalisar com objetivo de texto confirmado cria análise separada e mantém a comparação", async () => {
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
+    mock.on("POST", /\/reveal$/, () => json(200, attempt({ status: "REVEALED", analysisId: COMPARISON.analysisId, comparison: COMPARISON, historicalItemId: 3031 })));
+    mock.on("POST", /^\/api\/v1\/objectives\/interpret$/, () =>
+      json(200, { status: "INTERPRETED", objective: { priority: "DAMAGE", parserVersion: "rules_v1" }, parserVersion: "rules_v1", provider: "RULES", reasonCodes: [] }),
+    );
+    mock.on("POST", /^\/api\/v1\/analyses$/, () =>
+      json(201, { ...COMPARISON, objective: { priority: "DAMAGE", parserVersion: "rules_v1" }, candidates: [{ ...COMPARISON.candidates[1], rank: 1 }, { ...COMPARISON.candidates[0], rank: 2 }] }),
+    );
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText("Thornmail");
+    fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
+    await screen.findByRole("heading", { name: "Reanalisar com outro objetivo" });
+    fireEvent.change(screen.getByLabelText(/descreva em uma frase/), { target: { value: "quero bater mais" } });
+    fireEvent.click(screen.getByRole("button", { name: "Interpretar texto" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Usar este objetivo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reanalisar" }));
+    await screen.findByText(/Nova análise — objetivo Dano \(de texto confirmado \(interpretador rules_v1\)\)/);
+    expect(mock.callsTo("POST", /^\/api\/v1\/analyses$/)[0].body).toEqual({
+      decisionId: DECISION,
+      objective: { priority: "DAMAGE", parserVersion: "rules_v1" },
+    });
+    expect(screen.getByRole("heading", { name: "Comparação" })).toBeInTheDocument();
+  });
+  it("depois da comparação: reflexão uma vez, links de exportação e julgamento com abstenção", async () => {
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
+    mock.on("POST", /\/reveal$/, () => json(200, attempt({ status: "REVEALED", analysisId: COMPARISON.analysisId, comparison: COMPARISON, historicalItemId: 3031 })));
+    mock.on("POST", /\/reflection$/, () =>
+      json(200, attempt({ status: "REVEALED", analysisId: COMPARISON.analysisId, comparison: COMPARISON, historicalItemId: 3031, reflection: "<b>mais magos</b>" })),
+    );
+    mock.on("POST", /\/feedback$/, () =>
+      json(201, { feedbackId: "44444444-4444-4444-8444-444444444444", analysisId: COMPARISON.analysisId, itemId: 3075, grade: null, reason: "ok", rubricVersion: "rubric_v1", reviewerRef: "abcdefabcdef" }),
+    );
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText("Thornmail");
+    fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
+    await screen.findByRole("heading", { name: "Reflexão" });
+
+    fireEvent.change(screen.getByLabelText(/O que mudaria na sua escolha/), { target: { value: "<b>mais magos</b>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Registrar reflexão" }));
+    await screen.findByText(/Sua reflexão registrada/);
+    expect(screen.getByText("<b>mais magos</b>")).toBeInTheDocument(); // texto, não HTML
+    expect(mock.callsTo("POST", /\/reflection$/)[0].body).toEqual({ reflection: "<b>mais magos</b>" });
+
+    const html = screen.getByRole("link", { name: /Baixar HTML/ });
+    expect(html).toHaveAttribute("href", `/api/v1/analyses/${COMPARISON.analysisId}/report?format=html&attemptId=${ATTEMPT}`);
+    expect(screen.getByRole("link", { name: /Baixar JSON/ })).toHaveAttribute("download");
+
+    fireEvent.click(screen.getByText("Avaliação de revisor (opcional)"));
+    fireEvent.change(screen.getByLabelText("Nota"), { target: { value: "abstain" } });
+    fireEvent.change(screen.getByLabelText("Motivo"), { target: { value: "ok" } });
+    fireEvent.change(screen.getByLabelText("Pseudônimo do revisor"), { target: { value: "rev-a" } });
+    fireEvent.click(screen.getByRole("button", { name: "Registrar julgamento" }));
+    await screen.findByText(/abstenção \(revisor abcdefabcdef\)/);
+    expect(mock.callsTo("POST", /\/feedback$/)[0].body).toEqual({ itemId: 3075, grade: null, reason: "ok", rubricVersion: "rubric_v1", reviewerAlias: "rev-a" });
+  });
+
+  it("modo sem pistas cria tentativa TRANSFER e não oferece pistas", async () => {
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt({ mode: "TRANSFER" })));
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByLabelText(/Praticar sem pistas/));
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText("Thornmail");
+    expect(mock.callsTo("POST", /^\/api\/v1\/learning-attempts$/)[0].body).toMatchObject({ mode: "TRANSFER" });
+    expect(screen.getByText(/Modo sem pistas \(transferência\)/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Pista/ })).toBeNull();
   });
 });
 

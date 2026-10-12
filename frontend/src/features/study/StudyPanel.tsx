@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   api,
   type AnalysisCandidate,
   type AnalysisResult,
   type LearningAttempt,
-  type ObjectivePriority,
+  type LearningProgress,
+  type ObjectiveForm,
 } from "../../shared/api/client";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
+import { ObjectivePicker } from "../objectives/ObjectivePicker";
+import { ExportLinks, Reflection, ReviewerFeedback } from "../reports/AfterComparison";
+import { objectiveLabel, objectiveOrigin } from "../objectives/objectiveText";
 import "../review/review.css";
 
 /**
@@ -15,13 +19,6 @@ import "../review/review.css";
  * e só então revelar a comparação. Antes de revelar não há posição, pontuação, custo nem
  * compra histórica na tela.
  */
-
-const OBJECTIVES: ReadonlyArray<{ value: ObjectivePriority; label: string; hint: string }> = [
-  { value: "BALANCED", label: "Equilibrado", hint: "sem preferência por um tipo de atributo" },
-  { value: "SURVIVAL", label: "Sobrevivência", hint: "armadura, resistência mágica e vida" },
-  { value: "DAMAGE", label: "Dano", hint: "dano, crítico, velocidade de ataque e penetração" },
-  { value: "UTILITY", label: "Utilidade", hint: "aceleração de habilidade, mana e mobilidade" },
-];
 
 const ENGINE_TEXT: Readonly<Record<string, string>> = {
   POPULARITY: "Popularidade nas decisões de referência deste campeão nesta etapa da build",
@@ -56,7 +53,7 @@ function Comparison({ attempt }: { attempt: LearningAttempt }) {
     <section className="section" aria-labelledby="comparison-heading">
       <h3 id="comparison-heading">Comparação</h3>
       <p className="muted">
-        Objetivo: {OBJECTIVES.find((o) => o.value === comparison.objective.priority)?.label} ·
+        Objetivo: {objectiveLabel(comparison.objective.priority)} ({objectiveOrigin(comparison.objective)}) ·
         Critério: {ENGINE_TEXT[comparison.engine] ?? comparison.engine}
       </p>
       {candidates.length === 0 ? (
@@ -168,7 +165,7 @@ function Scenario({ attempt }: { attempt: LearningAttempt }) {
           disabled={!valid}
           onClick={() =>
             api
-              .createScenarioAnalysis(attempt.decisionId ?? "", comparison.objective.priority, value, crypto.randomUUID())
+              .createScenarioAnalysis(attempt.decisionId ?? "", comparison.objective, value, crypto.randomUUID())
               .then(setResult)
               .catch(setError)
           }
@@ -191,8 +188,93 @@ function Scenario({ attempt }: { attempt: LearningAttempt }) {
   );
 }
 
+/**
+ * Reanalisar com outro objetivo (UC03): a nova análise aparece separada e a comparação
+ * anterior continua na tela; falha ou timeout da interpretação não a apagam.
+ */
+function Reanalysis({ attempt }: { attempt: LearningAttempt }) {
+  const comparison = attempt.comparison;
+  const [objective, setObjective] = useState<ObjectiveForm>(
+    comparison?.objective ?? { priority: "BALANCED" },
+  );
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  if (!comparison || (comparison.candidates ?? []).length === 0) {
+    return null;
+  }
+  return (
+    <section className="section" aria-labelledby="reanalysis-heading">
+      <h4 id="reanalysis-heading">Reanalisar com outro objetivo</h4>
+      <p className="muted">
+        A nova análise fica separada; a comparação acima não muda. O objetivo só reordena as
+        alternativas legais pelos atributos do catálogo.
+      </p>
+      <ObjectivePicker idPrefix="reanalysis" value={objective} onChange={setObjective} />
+      <div className="actions">
+        <button
+          type="button"
+          className="button button--secondary"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            setError(null);
+            api
+              .createObjectiveAnalysis(attempt.decisionId ?? "", objective, crypto.randomUUID())
+              .then(setResult)
+              .catch(setError)
+              .finally(() => setBusy(false));
+          }}
+        >
+          Reanalisar
+        </button>
+      </div>
+      {error ? <ErrorNotice error={error} /> : null}
+      {result ? (
+        <>
+          <p className="muted">
+            Nova análise — objetivo {objectiveLabel(result.objective.priority)} (
+            {objectiveOrigin(result.objective)}):
+          </p>
+          <ol className="comparison-list">
+            {(result.candidates ?? []).map((candidate) => (
+              <li key={candidate.itemId}>
+                {candidate.rank}. {name(candidate)}
+              </li>
+            ))}
+          </ol>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+/** Progresso local descritivo (CC-505): contagens, sem nota nem estimativa de habilidade. */
+function Progress() {
+  const [progress, setProgress] = useState<LearningProgress | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    api
+      .getProgress(controller.signal)
+      .then(setProgress)
+      .catch(() => setProgress(null));
+    return () => controller.abort();
+  }, []);
+  if (!progress || progress.study.attempts + progress.transfer.attempts === 0) {
+    return null;
+  }
+  return (
+    <p className="muted">
+      Neste computador: {progress.study.attempts} estudo(s), {progress.study.reflections} com
+      reflexão, {progress.study.usedHints} com pistas; {progress.transfer.attempts} prática(s) sem
+      pistas. São só contagens: não medem habilidade.
+    </p>
+  );
+}
+
 export function StudyPanel({ decisionId }: { decisionId: string }) {
-  const [priority, setPriority] = useState<ObjectivePriority>("BALANCED");
+  const [objective, setObjective] = useState<ObjectiveForm>({ priority: "BALANCED" });
+  const [transfer, setTransfer] = useState(false);
   const [attempt, setAttempt] = useState<LearningAttempt | null>(null);
   const [choice, setChoice] = useState<number | "skip" | null>(null);
   const [rationale, setRationale] = useState("");
@@ -216,27 +298,26 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
       <section className="section" aria-labelledby="study-heading">
         <h3 id="study-heading">Estudar esta decisão</h3>
         <p className="muted">Escolha o que você queria priorizar antes de ver as alternativas.</p>
-        <fieldset className="field">
-          <legend>Objetivo</legend>
-          {OBJECTIVES.map((objective) => (
-            <label key={objective.value} className="radio-option">
-              <input
-                type="radio"
-                name="objective"
-                value={objective.value}
-                checked={priority === objective.value}
-                onChange={() => setPriority(objective.value)}
-              />
-              {objective.label} <span className="muted">— {objective.hint}</span>
-            </label>
-          ))}
-        </fieldset>
+        <ObjectivePicker idPrefix="study" value={objective} onChange={setObjective} />
+        <label className="radio-option">
+          <input type="checkbox" checked={transfer} onChange={(event) => setTransfer(event.target.checked)} />
+          Praticar sem pistas (transferência): use numa decisão diferente da que você estudou.
+        </label>
+        <Progress />
         <div className="actions">
           <button
             type="button"
             className="button"
             disabled={busy}
-            onClick={() => run(() => api.createAttempt(decisionId, priority, crypto.randomUUID()))}
+            onClick={() => run(() =>
+                api.createAttempt(
+                  decisionId,
+                  objective,
+                  crypto.randomUUID(),
+                  undefined,
+                  transfer ? "TRANSFER" : "STUDY",
+                ),
+              )}
           >
             Confirmar objetivo e começar
           </button>
@@ -251,6 +332,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
   return (
     <section className="section" aria-labelledby="study-heading">
       <h3 id="study-heading">Estudar esta decisão</h3>
+      {attempt.mode === "TRANSFER" ? <p className="muted">Modo sem pistas (transferência).</p> : null}
       {attempt.options.length === 0 ? (
         <div className="notice notice--info" role="note">
           <p>Não há alternativas para estudar nesta decisão.</p>
@@ -320,7 +402,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
             Responder
           </button>
         ) : null}
-        {!revealed && attempt.options.length > 0 && attempt.hintLevel < 1 ? (
+        {!revealed && attempt.mode !== "TRANSFER" && attempt.options.length > 0 && attempt.hintLevel < 1 ? (
           <button
             type="button"
             className="button button--secondary"
@@ -330,7 +412,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
             Pista: observar ameaças
           </button>
         ) : null}
-        {!revealed && attempt.options.length > 0 && attempt.hintLevel < 2 ? (
+        {!revealed && attempt.mode !== "TRANSFER" && attempt.options.length > 0 && attempt.hintLevel < 2 ? (
           <button
             type="button"
             className="button button--secondary"
@@ -354,6 +436,10 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
       {error ? <ErrorNotice error={error} /> : null}
       {revealed ? <Comparison attempt={attempt} /> : null}
       {revealed ? <Scenario attempt={attempt} /> : null}
+      {revealed ? <Reanalysis attempt={attempt} /> : null}
+      {revealed ? <Reflection attempt={attempt} onSaved={setAttempt} /> : null}
+      {revealed ? <ExportLinks attempt={attempt} /> : null}
+      {revealed ? <ReviewerFeedback attempt={attempt} /> : null}
     </section>
   );
 }

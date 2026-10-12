@@ -57,6 +57,8 @@ class AnalysisQuality(CamelModel):
     budget_source: BudgetSource
     frame_age_ms: int | None = Field(default=None, ge=0)
     warnings: list[str] = Field(default_factory=list)
+    # CC-505: ouro informado no cenário manual (budgetSource=USER_PROVIDED); nulo fora dele.
+    user_gold: int | None = Field(default=None, ge=0, le=100000)
 
 
 class AnalysisSupport(CamelModel):

@@ -169,6 +169,7 @@ async def _compute(
             else (point.budget or {}).get("origin", "UNKNOWN"),
             "frameAgeMs": (point.budget or {}).get("ageMs"),
             "warnings": [] if gold is not None or budget else ["BUDGET_UNKNOWN"],
+            "userGold": int(budget["gold"]) if budget else None,
         },
         "support": {
             "level": "SUPPORTED" if supported else "LIMITED",

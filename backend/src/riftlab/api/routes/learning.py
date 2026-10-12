@@ -19,6 +19,8 @@ from riftlab.learning.application import (
     create_attempt,
     get_attempt,
     hint_attempt,
+    progress,
+    reflect_attempt,
     reveal_attempt,
 )
 from riftlab.shared.api.learning import (
@@ -26,7 +28,9 @@ from riftlab.shared.api.learning import (
     LearningAttemptCreateRequest,
     LearningAttemptHintRequest,
     LearningAttemptPublicState,
+    LearningAttemptReflectionRequest,
     LearningAttemptRevealRequest,
+    LearningProgress,
 )
 
 router = APIRouter(prefix="/api/v1/learning-attempts", tags=["learning"])
@@ -51,6 +55,12 @@ async def post_attempt(
     if not created:
         response.status_code = 200
     return LearningAttemptPublicState.model_validate(state)
+
+
+@router.get("/progress", response_model=LearningProgress)
+async def read_progress(request: Request) -> LearningProgress:
+    """CC-505: contagens locais descritivas (não é nota nem estimativa de habilidade)."""
+    return LearningProgress.model_validate(await progress(request.app.state.session_factory))
 
 
 @router.get("/{attempt_id}", response_model=LearningAttemptPublicState, responses=_ERRORS)
@@ -87,4 +97,16 @@ async def post_reveal(
     attempt_id: uuid.UUID, body: LearningAttemptRevealRequest, request: Request
 ) -> LearningAttemptPublicState:
     state = await reveal_attempt(request.app.state.session_factory, attempt_id, _configs(request))
+    return LearningAttemptPublicState.model_validate(state)
+
+
+@router.post(
+    "/{attempt_id}/reflection", response_model=LearningAttemptPublicState, responses=_ERRORS
+)
+async def post_reflection(
+    attempt_id: uuid.UUID, body: LearningAttemptReflectionRequest, request: Request
+) -> LearningAttemptPublicState:
+    state = await reflect_attempt(
+        request.app.state.session_factory, attempt_id, body.reflection, _configs(request)
+    )
     return LearningAttemptPublicState.model_validate(state)

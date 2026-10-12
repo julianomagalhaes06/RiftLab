@@ -24,7 +24,8 @@ def test_openapi_only_announces_real_routes() -> None:
     schema-only em riftlab.shared.api; nenhuma delas pode aparecer aqui. imports
     (POST/GET/retry) passou a real no CC-201; as duas rotas de DECISOES (lista por
     partida e detalhe) no CC-204; as de PARTIDAS (lista, detalhe e nova tentativa
-    de preparação) no CC-205; análises (POST/GET) no CC-303."""
+    de preparação) no CC-205; análises (POST/GET) no CC-303; interpretação de
+    objetivo no CC-504; feedback, relatório, reflexão e progresso no CC-505."""
     schema = _current_schema()
     assert set(schema["paths"].keys()) == {
         "/health/live",
@@ -45,6 +46,11 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/learning-attempts/{attempt_id}/answer",
         "/api/v1/learning-attempts/{attempt_id}/hint",
         "/api/v1/learning-attempts/{attempt_id}/reveal",
+        "/api/v1/objectives/interpret",
+        "/api/v1/analyses/{analysis_id}/feedback",
+        "/api/v1/analyses/{analysis_id}/report",
+        "/api/v1/learning-attempts/progress",
+        "/api/v1/learning-attempts/{attempt_id}/reflection",
     }
 
 

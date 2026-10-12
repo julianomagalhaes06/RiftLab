@@ -46,6 +46,16 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   SUBJECT_HASH_SECRET_MISSING:
     "Configuração local incompleta: falta o segredo usado para anonimizar jogadores. Verifique o ambiente do servidor.",
 
+  // --- estudo, avaliação e relatório (CC-304/505) ---
+  ATTEMPT_LOCKED:
+    "Esta tentativa já tem uma resposta (ou reflexão) registrada; para mudar, comece uma nova tentativa.",
+  ATTEMPT_NOT_REVEALED: "A reflexão só pode ser registrada depois de ver a comparação.",
+  HINTS_DISABLED: "No modo sem pistas (transferência) as pistas ficam desligadas.",
+  FEEDBACK_EXISTS:
+    "Este revisor já registrou outro julgamento para esta alternativa com esta rubrica; julgamentos não são alterados.",
+  IDEMPOTENCY_CONFLICT:
+    "Este envio repetiu uma chave já usada com outro conteúdo. Recarregue a página e tente de novo.",
+
   // --- preparação (catálogo → reconstrução → extração) ---
   RAW_MATCH_NOT_CACHED:
     "Os dados brutos dessa partida não estão no armazenamento local. Importe a partida novamente.",

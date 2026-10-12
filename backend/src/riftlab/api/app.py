@@ -13,6 +13,7 @@ from riftlab.api.routes.health import router as health_router
 from riftlab.api.routes.imports import router as imports_router
 from riftlab.api.routes.learning import router as learning_router
 from riftlab.api.routes.matches import router as matches_router
+from riftlab.api.routes.objectives import router as objectives_router
 from riftlab.config import Settings, get_settings
 from riftlab.errors import register_exception_handlers
 from riftlab.observability import RequestIdMiddleware, configure_logging
@@ -46,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ranked_router)
     app.include_router(analyses_router)
     app.include_router(learning_router)
+    app.include_router(objectives_router)
     register_exception_handlers(app)
 
     return app

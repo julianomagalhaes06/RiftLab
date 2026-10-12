@@ -1,9 +1,10 @@
-"""POST /api/v1/analyses/{id}/feedback, GET .../report (docs/contracts.md,
-UC04). Schema-only: nenhuma rota montada nesta etapa (CC-602)."""
+"""POST /api/v1/analyses/{id}/feedback, GET .../report (docs/contracts.md, UC04;
+rotas no CC-505)."""
 
 from __future__ import annotations
 
 from typing import Annotated
+from uuid import UUID
 
 from pydantic import Field
 
@@ -29,7 +30,21 @@ class FeedbackRequest(CamelModel):
     reviewer_alias: str = Field(min_length=1, max_length=80)
 
 
+class FeedbackResult(CamelModel):
+    """Julgamento gravado (imutável). O pseudônimo não volta: só uma referência curta do
+    hash, para distinguir revisores sem identificá-los."""
+
+    feedback_id: UUID
+    analysis_id: UUID
+    item_id: int = Field(ge=0)
+    grade: Annotated[int, Field(ge=GRADE_MIN, le=GRADE_MAX)] | None
+    reason: str
+    rubric_version: str
+    reviewer_ref: str = Field(min_length=12, max_length=12)
+
+
 class ReportQuery(CamelModel):
-    """GET /analyses/{id}/report?format=json|html."""
+    """GET /analyses/{id}/report?format=json|html[&attemptId=]."""
 
     format: ReportFormat = ReportFormat.JSON
+    attempt_id: UUID | None = None

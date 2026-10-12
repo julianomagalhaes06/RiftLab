@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     # Mesmo racional: caminho absoluto copiado pelo Dockerfile.
     empirical_rules_path: str = "/app/configs/empirical-rules.yaml"
 
+    # CC-504: interpretador de objetivo. "rules" (padrão, sem modelo) ou "local_model"
+    # (sidecar em loopback, ml/objectives serve). Timeout abre o formulário (RNF03).
+    objective_parser: str = "rules"
+    objective_model_url: str | None = None
+    objective_model_version: str = "local_model_unversioned"
+    objective_parser_timeout_seconds: float = 15.0
+
     worker_heartbeat_path: str = "/tmp/riftlab-worker.heartbeat"
     # Toque do heartbeat: a cada ciclo do worker (reserva -> busca -> persiste
     # um job), e a cada espera deste intervalo quando ocioso — substitui o

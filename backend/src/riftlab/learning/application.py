@@ -60,6 +60,8 @@ def _public(row: LearningAttemptModel, extra: dict[str, Any] | None = None) -> d
         "analysisId": str(row.analysis_id) if revealed and row.analysis_id else None,
         "comparison": (extra or {}).get("comparison") if revealed else None,
         "historicalItemId": (extra or {}).get("historicalItemId") if revealed else None,
+        "mode": row.mode,
+        "reflection": row.reflection,
     }
 
 
@@ -141,6 +143,7 @@ async def create_attempt(
         hint_level=0,
         skipped=False,
         exercise_version=EXERCISE_VERSION,
+        mode=body.get("mode") or "STUDY",
     )
     try:
         async with session_factory.begin() as session:
@@ -212,6 +215,8 @@ async def hint_attempt(
 ) -> dict[str, Any]:
     async with session_factory.begin() as session:
         row = await _load(session, attempt_id, lock=True)
+        if row.mode == "TRANSFER":
+            raise ConflictError("HINTS_DISABLED")
         row.hint_level = max(row.hint_level, level)
     return await get_attempt(session_factory, attempt_id, configs)
 
@@ -230,3 +235,41 @@ async def reveal_attempt(
             row.analysis_id = uuid.UUID(analysis["analysisId"])
             row.revealed_at = datetime.now(UTC)
     return await get_attempt(session_factory, attempt_id, configs)
+
+
+async def reflect_attempt(
+    session_factory: async_sessionmaker[AsyncSession],
+    attempt_id: uuid.UUID,
+    reflection: str,
+    configs: Path,
+) -> dict[str, Any]:
+    """CC-505: one reflection after the comparison; the same text again is idempotent."""
+    async with session_factory.begin() as session:
+        row = await _load(session, attempt_id, lock=True)
+        if row.status != "REVEALED":
+            raise ConflictError("ATTEMPT_NOT_REVEALED")
+        if row.reflection is None:
+            row.reflection = reflection
+            row.reflected_at = datetime.now(UTC)
+        elif row.reflection != reflection:
+            raise ConflictError("ATTEMPT_LOCKED")
+    return await get_attempt(session_factory, attempt_id, configs)
+
+
+async def progress(session_factory: async_sessionmaker[AsyncSession]) -> dict[str, Any]:
+    """CC-505: local, descriptive counts. No score, ranking or skill estimate."""
+    async with session_factory() as session:
+        rows = (await session.execute(select(LearningAttemptModel))).scalars().all()
+
+    def count(mode: str) -> dict[str, int]:
+        part = [r for r in rows if r.mode == mode]
+        return {
+            "attempts": len(part),
+            "answered": sum(r.status != "OPEN" and not r.skipped for r in part),
+            "skipped": sum(r.skipped for r in part),
+            "revealed": sum(r.status == "REVEALED" for r in part),
+            "usedHints": sum(r.hint_level > 0 for r in part),
+            "reflections": sum(r.reflection is not None for r in part),
+        }
+
+    return {"study": count("STUDY"), "transfer": count("TRANSFER")}

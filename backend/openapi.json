@@ -137,6 +137,19 @@
             ],
             "title": "Frameagems"
           },
+          "userGold": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usergold"
+          },
           "warnings": {
             "items": {
               "type": "string"
@@ -872,6 +885,116 @@
         "title": "DecisionVersionInfo",
         "type": "object"
       },
+      "FeedbackRequest": {
+        "additionalProperties": false,
+        "description": "{itemId,grade,reason,rubricVersion,reviewerAlias} + Idempotency-Key.\ngrade 0..3 ou null para abstencao (docs/contracts.md).",
+        "properties": {
+          "grade": {
+            "anyOf": [
+              {
+                "maximum": 3.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade"
+          },
+          "itemId": {
+            "minimum": 0.0,
+            "title": "Itemid",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "reviewerAlias": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Revieweralias",
+            "type": "string"
+          },
+          "rubricVersion": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Rubricversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "grade",
+          "reason",
+          "rubricVersion",
+          "reviewerAlias"
+        ],
+        "title": "FeedbackRequest",
+        "type": "object"
+      },
+      "FeedbackResult": {
+        "additionalProperties": false,
+        "description": "Julgamento gravado (imutável). O pseudônimo não volta: só uma referência curta do\nhash, para distinguir revisores sem identificá-los.",
+        "properties": {
+          "analysisId": {
+            "format": "uuid",
+            "title": "Analysisid",
+            "type": "string"
+          },
+          "feedbackId": {
+            "format": "uuid",
+            "title": "Feedbackid",
+            "type": "string"
+          },
+          "grade": {
+            "anyOf": [
+              {
+                "maximum": 3.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade"
+          },
+          "itemId": {
+            "minimum": 0.0,
+            "title": "Itemid",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reviewerRef": {
+            "maxLength": 12,
+            "minLength": 12,
+            "title": "Reviewerref",
+            "type": "string"
+          },
+          "rubricVersion": {
+            "title": "Rubricversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feedbackId",
+          "analysisId",
+          "itemId",
+          "grade",
+          "reason",
+          "rubricVersion",
+          "reviewerRef"
+        ],
+        "title": "FeedbackResult",
+        "type": "object"
+      },
       "ImportJobAccepted": {
         "additionalProperties": false,
         "description": "202 de POST /imports: job novo ou job ativo reaproveitado.",
@@ -1090,6 +1213,15 @@
             "title": "Decisionid",
             "type": "string"
           },
+          "mode": {
+            "default": "STUDY",
+            "enum": [
+              "STUDY",
+              "TRANSFER"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
           "objective": {
             "$ref": "#/components/schemas/ObjectiveForm"
           }
@@ -1250,6 +1382,15 @@
             ],
             "title": "Historicalitemid"
           },
+          "mode": {
+            "default": "STUDY",
+            "enum": [
+              "STUDY",
+              "TRANSFER"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
           "objective": {
             "anyOf": [
               {
@@ -1285,6 +1426,17 @@
             "title": "Reasoncodes",
             "type": "array"
           },
+          "reflection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reflection"
+          },
           "selectedItemId": {
             "anyOf": [
               {
@@ -1315,6 +1467,23 @@
         "title": "LearningAttemptPublicState",
         "type": "object"
       },
+      "LearningAttemptReflectionRequest": {
+        "additionalProperties": false,
+        "description": "CC-505: \"o que mudaria se a ameaça ou o orçamento fosse diferente?\" — uma vez,\ndepois da revelação; até 1000 caracteres.",
+        "properties": {
+          "reflection": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reflection",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reflection"
+        ],
+        "title": "LearningAttemptReflectionRequest",
+        "type": "object"
+      },
       "LearningAttemptRevealRequest": {
         "additionalProperties": false,
         "description": "{explicit:true} — reveal so e valido com confirmacao explicita, nunca\nimplicito; Literal[True] rejeita explicit:false em vez de apenas ignorar.",
@@ -1340,6 +1509,69 @@
         ],
         "title": "LearningAttemptState",
         "type": "string"
+      },
+      "LearningProgress": {
+        "additionalProperties": false,
+        "description": "CC-505: progresso local descritivo (contagens). Não é nota, elo nem estimativa de\nhabilidade; tentativas não alimentam treino.",
+        "properties": {
+          "study": {
+            "$ref": "#/components/schemas/LearningProgressCounts"
+          },
+          "transfer": {
+            "$ref": "#/components/schemas/LearningProgressCounts"
+          }
+        },
+        "required": [
+          "study",
+          "transfer"
+        ],
+        "title": "LearningProgress",
+        "type": "object"
+      },
+      "LearningProgressCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "answered": {
+            "minimum": 0.0,
+            "title": "Answered",
+            "type": "integer"
+          },
+          "attempts": {
+            "minimum": 0.0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "reflections": {
+            "minimum": 0.0,
+            "title": "Reflections",
+            "type": "integer"
+          },
+          "revealed": {
+            "minimum": 0.0,
+            "title": "Revealed",
+            "type": "integer"
+          },
+          "skipped": {
+            "minimum": 0.0,
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "usedHints": {
+            "minimum": 0.0,
+            "title": "Usedhints",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attempts",
+          "answered",
+          "skipped",
+          "revealed",
+          "usedHints",
+          "reflections"
+        ],
+        "title": "LearningProgressCounts",
+        "type": "object"
       },
       "LiveStatus": {
         "properties": {
@@ -1723,6 +1955,18 @@
         "additionalProperties": false,
         "description": "Formulario estruturado citado em docs/contracts.md e reaproveitado como\no campo \"objective\" de POST /analyses e /learning-attempts.",
         "properties": {
+          "parserVersion": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9_.-]{1,60}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parserversion"
+          },
           "priority": {
             "$ref": "#/components/schemas/Priority"
           }
@@ -1731,6 +1975,76 @@
           "priority"
         ],
         "title": "ObjectiveForm",
+        "type": "object"
+      },
+      "ObjectiveInterpretRequest": {
+        "additionalProperties": false,
+        "description": "{text} ate 500 caracteres. Texto e dado, nunca instrucao de ferramenta\n(docs/contracts.md) — este schema so garante tamanho/tipo; o interpretador\n(CC-503/504) nao tem acesso a shell, rede ou segredos.",
+        "properties": {
+          "text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "ObjectiveInterpretRequest",
+        "type": "object"
+      },
+      "ObjectiveInterpretResult": {
+        "additionalProperties": false,
+        "description": "{status,objective,parserVersion} (docs/contracts.md) + provider e reasonCodes\n(CC-504: provedor rastreável). status INTERPRETED ou NEEDS_INPUT; NEEDS_INPUT traz\nobjective nulo e abre o formulário (ambíguo, fora do domínio, instrução ao\ninterpretador, saída inválida do modelo, TIMEOUT ou PROVIDER_ERROR).",
+        "properties": {
+          "objective": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ObjectiveForm"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parserVersion": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Parserversion",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "RULES",
+              "LOCAL_MODEL"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "INTERPRETED",
+              "NEEDS_INPUT"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "parserVersion",
+          "provider"
+        ],
+        "title": "ObjectiveInterpretResult",
         "type": "object"
       },
       "ObservedLevel": {
@@ -2005,6 +2319,15 @@
         "title": "ReadyStatus",
         "type": "object"
       },
+      "ReportFormat": {
+        "description": "docs/contracts.md: GET .../report | format=json ou html.",
+        "enum": [
+          "json",
+          "html"
+        ],
+        "title": "ReportFormat",
+        "type": "string"
+      },
       "UserProvidedBudget": {
         "additionalProperties": false,
         "description": "docs/contracts.md: Budget opcional {gold: inteiro 0..100000, source:\nUSER_PROVIDED}. source e Literal fixo: o cliente nunca pode declarar\nFRAME_ESTIMATE/UNKNOWN, que so o servidor atribui — \"fonte de orcamento do\nservidor nao e sobrescrita, cria cenario separado\".",
@@ -2168,6 +2491,178 @@
           }
         },
         "summary": "Read Analysis",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
+    "/api/v1/analyses/{analysis_id}/feedback": {
+      "post": {
+        "description": "CC-505: julgamento por alternativa (0..3 ou null = abstenção), idempotente.",
+        "operationId": "post_feedback_api_v1_analyses__analysis_id__feedback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Post Feedback",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
+    "/api/v1/analyses/{analysis_id}/report": {
+      "get": {
+        "description": "CC-505: exportação rastreável (JSON ou HTML autossuficiente), sem identificadores\npessoais; com attemptId vinculado inclui resposta inicial, pistas e reflexão.",
+        "operationId": "read_report_api_v1_analyses__analysis_id__report_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ReportFormat",
+              "default": "json"
+            }
+          },
+          {
+            "in": "query",
+            "name": "attemptId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attemptid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {},
+              "text/html": {}
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Read Report",
         "tags": [
           "analyses"
         ]
@@ -2457,6 +2952,28 @@
         ]
       }
     },
+    "/api/v1/learning-attempts/progress": {
+      "get": {
+        "description": "CC-505: contagens locais descritivas (não é nota nem estimativa de habilidade).",
+        "operationId": "read_progress_api_v1_learning_attempts_progress_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningProgress"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Progress",
+        "tags": [
+          "learning"
+        ]
+      }
+    },
     "/api/v1/learning-attempts/{attempt_id}": {
       "get": {
         "operationId": "read_attempt_api_v1_learning_attempts__attempt_id__get",
@@ -2661,6 +3178,79 @@
           }
         },
         "summary": "Post Hint",
+        "tags": [
+          "learning"
+        ]
+      }
+    },
+    "/api/v1/learning-attempts/{attempt_id}/reflection": {
+      "post": {
+        "operationId": "post_reflection_api_v1_learning_attempts__attempt_id__reflection_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attempt_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Attempt Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningAttemptReflectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningAttemptPublicState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Post Reflection",
         "tags": [
           "learning"
         ]
@@ -3004,6 +3594,47 @@
         "summary": "Pede nova tentativa de preparação da partida",
         "tags": [
           "matches"
+        ]
+      }
+    },
+    "/api/v1/objectives/interpret": {
+      "post": {
+        "operationId": "post_interpret_api_v1_objectives_interpret_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ObjectiveInterpretRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectiveInterpretResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Post Interpret",
+        "tags": [
+          "objectives"
         ]
       }
     },

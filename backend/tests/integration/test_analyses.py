@@ -177,3 +177,34 @@ async def test_analysis_records_the_active_registry_version_and_keeps_it(
     assert again["versions"]["registryVersion"] == str(
         versions[0]
     )  # análise antiga preserva versão
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("_demo_match", ["DEMO-0008"], indirect=True)
+async def test_text_objective_feeds_the_same_ranking_and_keeps_the_parser_version(
+    app_client, session_factory, tmp_path, _demo_match
+) -> None:
+    """CC-504: interpret → confirm → analysis; the parser version is traced, the ranking
+    only reads the priority, so the candidates match the form-chosen objective."""
+    decision = (await _decisions(app_client, session_factory, tmp_path, _demo_match))[-1]
+    interpreted = (
+        await app_client.post(
+            "/api/v1/objectives/interpret", json={"text": "não quero dano, quero aguentar"}
+        )
+    ).json()
+    assert interpreted["objective"] == {"priority": "SURVIVAL", "parserVersion": "rules_v1"}
+
+    from_text = await app_client.post(
+        "/api/v1/analyses",
+        json={"decisionId": decision["decisionId"], "objective": interpreted["objective"]},
+        headers={"Idempotency-Key": f"text-{uuid.uuid4()}"},
+    )
+    from_form = await app_client.post(
+        "/api/v1/analyses",
+        json={"decisionId": decision["decisionId"], "objective": {"priority": "SURVIVAL"}},
+        headers={"Idempotency-Key": f"form-{uuid.uuid4()}"},
+    )
+    assert from_text.status_code == from_form.status_code == 201
+    assert from_text.json()["objective"]["parserVersion"] == "rules_v1"
+    assert from_form.json()["objective"].get("parserVersion") is None
+    assert from_text.json()["candidates"] == from_form.json()["candidates"]

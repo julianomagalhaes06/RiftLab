@@ -38,6 +38,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analyses/{analysis_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Feedback
+         * @description CC-505: julgamento por alternativa (0..3 ou null = abstenção), idempotente.
+         */
+        post: operations["post_feedback_api_v1_analyses__analysis_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analyses/{analysis_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Report
+         * @description CC-505: exportação rastreável (JSON ou HTML autossuficiente), sem identificadores
+         *     pessoais; com attemptId vinculado inclui resposta inicial, pistas e reflexão.
+         */
+        get: operations["read_report_api_v1_analyses__analysis_id__report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decisions/{decision_id}": {
         parameters: {
             query?: never;
@@ -123,6 +164,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning-attempts/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Progress
+         * @description CC-505: contagens locais descritivas (não é nota nem estimativa de habilidade).
+         */
+        get: operations["read_progress_api_v1_learning_attempts_progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning-attempts/{attempt_id}": {
         parameters: {
             query?: never;
@@ -168,6 +229,23 @@ export interface paths {
         put?: never;
         /** Post Hint */
         post: operations["post_hint_api_v1_learning_attempts__attempt_id__hint_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/learning-attempts/{attempt_id}/reflection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Reflection */
+        post: operations["post_reflection_api_v1_learning_attempts__attempt_id__reflection_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -259,6 +337,23 @@ export interface paths {
          * @description Caminho mínimo de nova tentativa quando a preparação terminou em FAILED. Idempotente: se já há preparação ativa (PENDING/RUNNING) devolve-a; se está READY com decisões das versões correntes, devolve-a (200); caso contrário enfileira uma nova tentativa (202), preservando o histórico. Não coleta a partida de novo e não chama a Riot.
          */
         post: operations["prepare_match_api_v1_matches__match_id__preparation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/objectives/interpret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Interpret */
+        post: operations["post_interpret_api_v1_objectives_interpret_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -376,6 +471,8 @@ export interface components {
             budgetSource: components["schemas"]["BudgetSource"];
             /** Frameagems */
             frameAgeMs?: number | null;
+            /** Usergold */
+            userGold?: number | null;
             /** Warnings */
             warnings?: string[];
         };
@@ -655,6 +752,50 @@ export interface components {
             selectionVersion: string;
         };
         /**
+         * FeedbackRequest
+         * @description {itemId,grade,reason,rubricVersion,reviewerAlias} + Idempotency-Key.
+         *     grade 0..3 ou null para abstencao (docs/contracts.md).
+         */
+        FeedbackRequest: {
+            /** Grade */
+            grade: number | null;
+            /** Itemid */
+            itemId: number;
+            /** Reason */
+            reason: string;
+            /** Revieweralias */
+            reviewerAlias: string;
+            /** Rubricversion */
+            rubricVersion: string;
+        };
+        /**
+         * FeedbackResult
+         * @description Julgamento gravado (imutável). O pseudônimo não volta: só uma referência curta do
+         *     hash, para distinguir revisores sem identificá-los.
+         */
+        FeedbackResult: {
+            /**
+             * Analysisid
+             * Format: uuid
+             */
+            analysisId: string;
+            /**
+             * Feedbackid
+             * Format: uuid
+             */
+            feedbackId: string;
+            /** Grade */
+            grade: number | null;
+            /** Itemid */
+            itemId: number;
+            /** Reason */
+            reason: string;
+            /** Reviewerref */
+            reviewerRef: string;
+            /** Rubricversion */
+            rubricVersion: string;
+        };
+        /**
          * ImportJobAccepted
          * @description 202 de POST /imports: job novo ou job ativo reaproveitado.
          */
@@ -759,6 +900,12 @@ export interface components {
              * Format: uuid
              */
             decisionId: string;
+            /**
+             * Mode
+             * @default STUDY
+             * @enum {string}
+             */
+            mode: "STUDY" | "TRANSFER";
             objective: components["schemas"]["ObjectiveForm"];
         };
         /**
@@ -825,6 +972,12 @@ export interface components {
             hints?: components["schemas"]["LearningAttemptHint"][];
             /** Historicalitemid */
             historicalItemId?: number | null;
+            /**
+             * Mode
+             * @default STUDY
+             * @enum {string}
+             */
+            mode: "STUDY" | "TRANSFER";
             objective?: components["schemas"]["ObjectiveForm"] | null;
             /** Options */
             options: components["schemas"]["LearningAttemptOption"][];
@@ -832,6 +985,8 @@ export interface components {
             rationale?: string | null;
             /** Reasoncodes */
             reasonCodes?: string[];
+            /** Reflection */
+            reflection?: string | null;
             /** Selecteditemid */
             selectedItemId?: number | null;
             /**
@@ -840,6 +995,15 @@ export interface components {
              */
             skipped: boolean;
             status: components["schemas"]["LearningAttemptState"];
+        };
+        /**
+         * LearningAttemptReflectionRequest
+         * @description CC-505: "o que mudaria se a ameaça ou o orçamento fosse diferente?" — uma vez,
+         *     depois da revelação; até 1000 caracteres.
+         */
+        LearningAttemptReflectionRequest: {
+            /** Reflection */
+            reflection: string;
         };
         /**
          * LearningAttemptRevealRequest
@@ -860,6 +1024,30 @@ export interface components {
          * @enum {string}
          */
         LearningAttemptState: "OPEN" | "ANSWERED" | "REVEALED";
+        /**
+         * LearningProgress
+         * @description CC-505: progresso local descritivo (contagens). Não é nota, elo nem estimativa de
+         *     habilidade; tentativas não alimentam treino.
+         */
+        LearningProgress: {
+            study: components["schemas"]["LearningProgressCounts"];
+            transfer: components["schemas"]["LearningProgressCounts"];
+        };
+        /** LearningProgressCounts */
+        LearningProgressCounts: {
+            /** Answered */
+            answered: number;
+            /** Attempts */
+            attempts: number;
+            /** Reflections */
+            reflections: number;
+            /** Revealed */
+            revealed: number;
+            /** Skipped */
+            skipped: number;
+            /** Usedhints */
+            usedHints: number;
+        };
         /** LiveStatus */
         LiveStatus: {
             /**
@@ -1012,7 +1200,43 @@ export interface components {
          *     o campo "objective" de POST /analyses e /learning-attempts.
          */
         ObjectiveForm: {
+            /** Parserversion */
+            parserVersion?: string | null;
             priority: components["schemas"]["Priority"];
+        };
+        /**
+         * ObjectiveInterpretRequest
+         * @description {text} ate 500 caracteres. Texto e dado, nunca instrucao de ferramenta
+         *     (docs/contracts.md) — este schema so garante tamanho/tipo; o interpretador
+         *     (CC-503/504) nao tem acesso a shell, rede ou segredos.
+         */
+        ObjectiveInterpretRequest: {
+            /** Text */
+            text: string;
+        };
+        /**
+         * ObjectiveInterpretResult
+         * @description {status,objective,parserVersion} (docs/contracts.md) + provider e reasonCodes
+         *     (CC-504: provedor rastreável). status INTERPRETED ou NEEDS_INPUT; NEEDS_INPUT traz
+         *     objective nulo e abre o formulário (ambíguo, fora do domínio, instrução ao
+         *     interpretador, saída inválida do modelo, TIMEOUT ou PROVIDER_ERROR).
+         */
+        ObjectiveInterpretResult: {
+            objective?: components["schemas"]["ObjectiveForm"] | null;
+            /** Parserversion */
+            parserVersion: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "RULES" | "LOCAL_MODEL";
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "INTERPRETED" | "NEEDS_INPUT";
         };
         /**
          * ObservedLevel
@@ -1115,6 +1339,12 @@ export interface components {
             status: string;
         };
         /**
+         * ReportFormat
+         * @description docs/contracts.md: GET .../report | format=json ou html.
+         * @enum {string}
+         */
+        ReportFormat: "json" | "html";
+        /**
          * UserProvidedBudget
          * @description docs/contracts.md: Budget opcional {gold: inteiro 0..100000, source:
          *     USER_PROVIDED}. source e Literal fixo: o cliente nunca pode declarar
@@ -1211,6 +1441,114 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_feedback_api_v1_analyses__analysis_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                analysis_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    read_report_api_v1_analyses__analysis_id__report_get: {
+        parameters: {
+            query?: {
+                format?: components["schemas"]["ReportFormat"];
+                attemptId?: string | null;
+            };
+            header?: never;
+            path: {
+                analysis_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/html": unknown;
                 };
             };
             /** @description Not Found */
@@ -1457,6 +1795,26 @@ export interface operations {
             };
         };
     };
+    read_progress_api_v1_learning_attempts_progress_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningProgress"];
+                };
+            };
+        };
+    };
     read_attempt_api_v1_learning_attempts__attempt_id__get: {
         parameters: {
             query?: never;
@@ -1571,6 +1929,59 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LearningAttemptHintRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningAttemptPublicState"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_reflection_api_v1_learning_attempts__attempt_id__reflection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attempt_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningAttemptReflectionRequest"];
             };
         };
         responses: {
@@ -1820,6 +2231,39 @@ export interface operations {
                 };
             };
             /** @description VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado ou de versão desconhecida). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_interpret_api_v1_objectives_interpret_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObjectiveInterpretRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectiveInterpretResult"];
+                };
+            };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;

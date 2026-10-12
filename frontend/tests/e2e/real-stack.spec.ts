@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -60,6 +61,15 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(page.getByText("Elegível para análise")).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/item comprado|nome indisponível/);
 
+    // Objetivo por texto (CC-504): interpretado pelo provedor de regras e só vale confirmado.
+    await page.getByLabel(/descreva em uma frase/).fill("não quero dano, quero aguentar mais");
+    await page.getByRole("button", { name: "Interpretar texto" }).click();
+    await expect(page.getByText(/Entendi:/)).toContainText("Sobrevivência");
+    await expect(page.getByText(/regras fixas, sem modelo de linguagem/)).toBeVisible();
+    await page.getByRole("button", { name: "Usar este objetivo" }).click();
+    await expect(page.getByLabel(/Sobrevivência/)).toBeChecked();
+    await expect(page.getByText(/de texto confirmado \(interpretador rules_v1\)/)).toBeVisible();
+
     // Estudo (CC-304/305): escolher antes de revelar; sem custo nem histórico antes.
     await page.getByRole("button", { name: "Confirmar objetivo e começar" }).click();
     await expect(page.getByLabel("Item Composto Sintético")).toBeVisible();
@@ -70,7 +80,44 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(page.getByRole("heading", { name: "Comparação" })).toBeVisible();
     await expect(page.getByText("Faltam 150 de ouro para completar o item.")).toBeVisible();
     await expect(page.getByText(/compra feita na partida \(histórico\)/)).toBeVisible();
-    await expect(page.getByText(/sua escolha/)).toBeVisible();
+    await expect(page.getByText(/— sua escolha/)).toBeVisible();
+    await expect(page.getByText(/Objetivo: Sobrevivência \(de texto confirmado/)).toBeVisible();
+
+    // Reanalisar (CC-504): texto ambíguo cai no formulário sem mudar nada; o formulário reanalisa
+    await page.getByLabel(/descreva em uma frase/).fill("quero dano e vida");
+    await page.getByRole("button", { name: "Interpretar texto" }).click();
+    await expect(page.getByText(/o objetivo selecionado não mudou/)).toBeVisible();
+    await page.getByLabel(/Dano/).check();
+    await page.getByRole("button", { name: "Reanalisar" }).click();
+    await expect(page.getByText(/Nova análise — objetivo Dano \(escolhido no formulário\)/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Comparação" })).toBeVisible();
+
+    // Reflexão, julgamento e relatório (CC-505): o HTML baixado abre sem rede e escapa texto
+    const hostile = '<img src=x onerror="alert(1)">';
+    await page.getByLabel(/O que mudaria na sua escolha/).fill(`Com mais magos ${hostile}`);
+    await page.getByRole("button", { name: "Registrar reflexão" }).click();
+    await expect(page.getByText(/Sua reflexão registrada/)).toBeVisible();
+    await page.getByText("Avaliação de revisor (opcional)").click();
+    await page.getByLabel("Nota").selectOption("abstain");
+    await page.getByLabel("Motivo").fill("sem rubrica suficiente para este caso");
+    await page.getByLabel("Pseudônimo do revisor").fill("revisor-e2e");
+    await page.getByRole("button", { name: "Registrar julgamento" }).click();
+    await expect(page.getByText(/abstenção \(revisor [0-9a-f]{12}\)/)).toBeVisible();
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("link", { name: /Baixar HTML/ }).click(),
+    ]);
+    const reportHtml = await readFile(await download.path(), "utf-8");
+    expect(reportHtml).toContain("Resposta inicial");
+    expect(reportHtml).toContain("Item Composto Sintético");
+    expect(reportHtml).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(reportHtml).not.toContain("<script");
+    expect(reportHtml).not.toContain("DEMO-0008");
+    expect(reportHtml).not.toContain("revisor-e2e");
+    const reportPage = await page.context().newPage();
+    await reportPage.setContent(reportHtml);
+    await expect(reportPage.getByRole("heading", { name: "Relatório de análise de compra" })).toBeVisible();
+    await reportPage.close();
     const detailUrl = page.url();
 
     // Retomada por URL: recarregar o detalhe e abrir o deep link da partida

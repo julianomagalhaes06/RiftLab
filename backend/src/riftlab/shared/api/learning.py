@@ -22,6 +22,8 @@ class LearningAttemptCreateRequest(CamelModel):
 
     decision_id: UUID
     objective: ObjectiveForm
+    # CC-505: TRANSFER é a tentativa independente sem pistas (docs/learning-design.md, passo 8).
+    mode: Literal["STUDY", "TRANSFER"] = "STUDY"
 
 
 class LearningAttemptOption(CamelModel):
@@ -62,6 +64,8 @@ class LearningAttemptPublicState(CamelModel):
     hints: list[LearningAttemptHint] = Field(default_factory=list)
     comparison: AnalysisResult | None = None  # só depois de REVEALED
     historical_item_id: int | None = None  # compra histórica, só depois de REVEALED
+    mode: Literal["STUDY", "TRANSFER"] = "STUDY"
+    reflection: str | None = None  # CC-505: registrada uma vez, depois da revelação
 
     @model_validator(mode="after")
     def _analysis_id_only_after_reveal(self) -> LearningAttemptPublicState:
@@ -105,3 +109,27 @@ class LearningAttemptRevealRequest(CamelModel):
     implicito; Literal[True] rejeita explicit:false em vez de apenas ignorar."""
 
     explicit: Literal[True]
+
+
+class LearningAttemptReflectionRequest(CamelModel):
+    """CC-505: "o que mudaria se a ameaça ou o orçamento fosse diferente?" — uma vez,
+    depois da revelação; até 1000 caracteres."""
+
+    reflection: str = Field(min_length=1, max_length=RATIONALE_MAX_LENGTH)
+
+
+class LearningProgressCounts(CamelModel):
+    attempts: int = Field(ge=0)
+    answered: int = Field(ge=0)
+    skipped: int = Field(ge=0)
+    revealed: int = Field(ge=0)
+    used_hints: int = Field(ge=0)
+    reflections: int = Field(ge=0)
+
+
+class LearningProgress(CamelModel):
+    """CC-505: progresso local descritivo (contagens). Não é nota, elo nem estimativa de
+    habilidade; tentativas não alimentam treino."""
+
+    study: LearningProgressCounts
+    transfer: LearningProgressCounts

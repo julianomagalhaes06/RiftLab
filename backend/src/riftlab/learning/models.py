@@ -1,4 +1,4 @@
-"""CC-304: learning attempts (OPEN → ANSWERED → REVEALED, monotonic)."""
+"""CC-304/505: learning attempts (OPEN → ANSWERED → REVEALED, monotonic) and reflection."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ class LearningAttemptModel(UuidPkMixin, CreatedAtMixin, Base):
     __table_args__ = (
         CheckConstraint("status IN ('OPEN', 'ANSWERED', 'REVEALED')", name="status_known"),
         CheckConstraint("hint_level BETWEEN 0 AND 2", name="hint_level_range"),
+        CheckConstraint("mode IN ('STUDY', 'TRANSFER')", name="mode_known"),
     )
 
     decision_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("decision_points.id"), nullable=False)
@@ -35,3 +36,7 @@ class LearningAttemptModel(UuidPkMixin, CreatedAtMixin, Base):
     analysis_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("analyses.id"), nullable=True)
     revealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     exercise_version: Mapped[str] = mapped_column(String, nullable=False)
+    # CC-505: reflexão depois da revelação (uma vez) e modo de transferência sem pistas.
+    reflection: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    reflected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="STUDY")

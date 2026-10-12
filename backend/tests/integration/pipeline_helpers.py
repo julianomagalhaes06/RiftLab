@@ -35,6 +35,7 @@ from riftlab.ingestion.models import (
 )
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.learning.models import LearningAttemptModel
+from riftlab.reviews.models import AnalysisFeedbackModel
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.domain import SourceOrigin
 from riftlab.timeline.models import DecisionStateModel, MatchReconstructionModel, TimelineEventModel
@@ -65,6 +66,19 @@ async def reset_match(session_factory, match_id: str) -> None:
             delete(LearningAttemptModel).where(
                 LearningAttemptModel.decision_id.in_(
                     select(DecisionPointModel.id).where(DecisionPointModel.match_id == match_id)
+                )
+            )
+        )
+        await session.execute(
+            delete(AnalysisFeedbackModel).where(
+                AnalysisFeedbackModel.analysis_id.in_(
+                    select(AnalysisModel.id).where(
+                        AnalysisModel.decision_id.in_(
+                            select(DecisionPointModel.id).where(
+                                DecisionPointModel.match_id == match_id
+                            )
+                        )
+                    )
                 )
             )
         )

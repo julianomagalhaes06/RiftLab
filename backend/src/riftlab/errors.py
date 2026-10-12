@@ -192,7 +192,18 @@ def register_exception_handlers(app: FastAPI) -> None:
         # chega aqui. Se um cenario de conflito com outro codigo (ex.:
         # IDEMPOTENCY_CONFLICT) precisar de um 409 diferente no futuro, este
         # handler generico deixa de bastar — revisar entao.
-        specific = str(exc) if str(exc) in {"IDEMPOTENCY_CONFLICT", "ATTEMPT_LOCKED"} else None
+        specific = (
+            str(exc)
+            if str(exc)
+            in {
+                "IDEMPOTENCY_CONFLICT",
+                "ATTEMPT_LOCKED",
+                "ATTEMPT_NOT_REVEALED",
+                "HINTS_DISABLED",
+                "FEEDBACK_EXISTS",
+            }
+            else None
+        )
         return problem_response(
             request,
             status_code=409,

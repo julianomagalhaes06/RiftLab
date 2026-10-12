@@ -31,6 +31,12 @@ export type LearningAttempt = Schemas["LearningAttemptPublicState"];
 export type AnalysisResult = Schemas["AnalysisResult"];
 export type AnalysisCandidate = Schemas["AnalysisCandidate"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
+export type ObjectiveForm = Schemas["ObjectiveForm"];
+export type ObjectiveInterpretation = Schemas["ObjectiveInterpretResult"];
+export type FeedbackRequest = Schemas["FeedbackRequest"];
+export type FeedbackResult = Schemas["FeedbackResult"];
+export type LearningProgress = Schemas["LearningProgress"];
+export type AttemptMode = NonNullable<Schemas["LearningAttemptCreateRequest"]["mode"]>;
 
 export interface PageParams {
   cursor?: string | null;
@@ -60,10 +66,19 @@ export interface ApiClient {
   getDecision(decisionId: string, signal?: AbortSignal): Promise<DecisionState>;
   createAttempt(
     decisionId: string,
-    priority: ObjectivePriority,
+    objective: ObjectiveForm,
     idempotencyKey: string,
     signal?: AbortSignal,
+    mode?: AttemptMode,
   ): Promise<LearningAttempt>;
+  reflectAttempt(attemptId: string, reflection: string, signal?: AbortSignal): Promise<LearningAttempt>;
+  getProgress(signal?: AbortSignal): Promise<LearningProgress>;
+  submitFeedback(
+    analysisId: string,
+    feedback: FeedbackRequest,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<FeedbackResult>;
   answerAttempt(
     attemptId: string,
     answer: { itemId: number | null; skipped: boolean; rationale?: string | null },
@@ -73,11 +88,18 @@ export interface ApiClient {
   revealAttempt(attemptId: string, signal?: AbortSignal): Promise<LearningAttempt>;
   createScenarioAnalysis(
     decisionId: string,
-    priority: ObjectivePriority,
+    objective: ObjectiveForm,
     gold: number,
     idempotencyKey: string,
     signal?: AbortSignal,
   ): Promise<AnalysisResult>;
+  createObjectiveAnalysis(
+    decisionId: string,
+    objective: ObjectiveForm,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<AnalysisResult>;
+  interpretObjective(text: string, signal?: AbortSignal): Promise<ObjectiveInterpretation>;
 }
 
 function queryString(params: Record<string, string | number | null | undefined>): string {
@@ -154,9 +176,21 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
       ),
     getDecision: (decisionId, signal) =>
       request("GET", `/api/v1/decisions/${enc(decisionId)}`, { signal }),
-    createAttempt: (decisionId, priority, idempotencyKey, signal) =>
+    createAttempt: (decisionId, objective, idempotencyKey, signal, mode = "STUDY") =>
       request("POST", "/api/v1/learning-attempts", {
-        body: { decisionId, objective: { priority } },
+        body: { decisionId, objective, mode },
+        signal,
+        idempotencyKey,
+      }),
+    reflectAttempt: (attemptId, reflection, signal) =>
+      request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/reflection`, {
+        body: { reflection },
+        signal,
+      }),
+    getProgress: (signal) => request("GET", "/api/v1/learning-attempts/progress", { signal }),
+    submitFeedback: (analysisId, feedback, idempotencyKey, signal) =>
+      request("POST", `/api/v1/analyses/${enc(analysisId)}/feedback`, {
+        body: feedback,
         signal,
         idempotencyKey,
       }),
@@ -170,18 +204,29 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
         body: { level },
         signal,
       }),
-    createScenarioAnalysis: (decisionId, priority, gold, idempotencyKey, signal) =>
+    createScenarioAnalysis: (decisionId, objective, gold, idempotencyKey, signal) =>
       request("POST", "/api/v1/analyses", {
-        body: { decisionId, objective: { priority }, budget: { gold, source: "USER_PROVIDED" } },
+        body: { decisionId, objective, budget: { gold, source: "USER_PROVIDED" } },
         signal,
         idempotencyKey,
       }),
+    createObjectiveAnalysis: (decisionId, objective, idempotencyKey, signal) =>
+      request("POST", "/api/v1/analyses", { body: { decisionId, objective }, signal, idempotencyKey }),
+    // CC-504: o texto é dado; o servidor devolve INTERPRETED (para confirmar) ou NEEDS_INPUT.
+    interpretObjective: (text, signal) =>
+      request("POST", "/api/v1/objectives/interpret", { body: { text }, signal }),
     revealAttempt: (attemptId, signal) =>
       request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/reveal`, {
         body: { explicit: true },
         signal,
       }),
   };
+}
+
+/** CC-505: link de download do relatório (JSON ou HTML autossuficiente). */
+export function reportUrl(analysisId: string, format: "json" | "html", attemptId?: string | null): string {
+  const query = queryString({ format, attemptId: attemptId ?? undefined });
+  return `/api/v1/analyses/${encodeURIComponent(analysisId)}/report${query}`;
 }
 
 /** Instância padrão: usa o `fetch` global no momento da chamada (mockável nos testes). */
