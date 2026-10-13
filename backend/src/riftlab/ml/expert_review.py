@@ -489,18 +489,38 @@ def sample_from_run(
 # todos os blocos, medem a concordância entre todos.
 # ---------------------------------------------------------------------------
 
-ANCHORS = 6  # uma por estrato (campeão × ordem); 6 + 19 = 25 situações por bloco
+ANCHORS = 0  # blocos disjuntos; a concordância é medida entre quem responde o mesmo bloco
 BLOCKS = 3
+TOTAL = 60  # 3 blocos de 20 (decisão do usuário)
+
+
+def trim_sample(key: Mapping[str, Any], total: int = TOTAL, seed: int = REVIEW_SEED) -> list[str]:
+    """Reduz a amostra a `total` tirando, um por vez, a última situação (por hash) do maior
+    estrato, para manter campeões e ordens do item o mais equilibrados possível."""
+    by_stratum: dict[str, list[str]] = defaultdict(list)
+    for state_id in sorted(key["states"], key=lambda s: _digest(seed, "corte", s)):
+        meta = key["states"][state_id]
+        by_stratum[f"{meta['championId']}:{meta['mainItemOrdinal']}"].append(state_id)
+    while sum(len(v) for v in by_stratum.values()) > total:
+        largest = max(sorted(by_stratum), key=lambda stratum: len(by_stratum[stratum]))
+        by_stratum[largest].pop()
+    return sorted(s for v in by_stratum.values() for s in v)
 
 
 def plan_blocks(
-    key: Mapping[str, Any], blocks: int = BLOCKS, anchors: int = ANCHORS, seed: int = REVIEW_SEED
+    key: Mapping[str, Any],
+    blocks: int = BLOCKS,
+    anchors: int = ANCHORS,
+    seed: int = REVIEW_SEED,
+    keep: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Âncoras estratificadas (uma por estrato, depois por hash) e o resto distribuído por estrato
-    entre os blocos, para cada bloco ter a mesma mistura de campeão e ordem do item."""
+    entre os blocos, para cada bloco ter a mesma mistura de campeão e ordem do item. `keep`
+    restringe a amostra (ver `trim_sample`)."""
     states = key["states"]
+    selected = list(keep) if keep is not None else list(states)
     by_stratum: dict[str, list[str]] = defaultdict(list)
-    for state_id in sorted(states, key=lambda s: _digest(seed, "bloco", s)):
+    for state_id in sorted(selected, key=lambda s: _digest(seed, "bloco", s)):
         meta = states[state_id]
         by_stratum[f"{meta['championId']}:{meta['mainItemOrdinal']}"].append(state_id)
     chosen: list[str] = []

@@ -227,3 +227,19 @@ def test_choice_analysis_reports_origin_shares_rejections_and_agreement() -> Non
     report = analyze_choices(key, responses, plan, resamples=200)
     assert report["chosenBy"]["unsure"]["share"] > 0
     assert report["agreement"]["fleissAnchors"] < 1.0
+
+
+def test_trimmed_disjoint_blocks_keep_strata_balanced() -> None:
+    from riftlab.ml.expert_review import plan_blocks, trim_sample
+
+    _, key = _sample()  # 29 situações sintéticas: estratos 12/5/12
+    keep = trim_sample(key, total=27)
+    strata = Counter(
+        f"{key['states'][s]['championId']}:{key['states'][s]['mainItemOrdinal']}" for s in keep
+    )
+    assert sorted(strata.values()) == [5, 11, 11]  # sai dos maiores, um de cada vez
+    plan = plan_blocks(key, blocks=3, anchors=0, keep=keep)
+    blocks = list(plan["blocks"].values())
+    assert plan["anchors"] == [] and [len(b) for b in blocks] == [9, 9, 9]
+    assert sorted(s for b in blocks for s in b) == sorted(keep)  # disjuntos e completos
+    assert trim_sample(key, total=27) == keep
