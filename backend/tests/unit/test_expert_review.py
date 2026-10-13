@@ -243,3 +243,14 @@ def test_trimmed_disjoint_blocks_keep_strata_balanced() -> None:
     assert plan["anchors"] == [] and [len(b) for b in blocks] == [9, 9, 9]
     assert sorted(s for b in blocks for s in b) == sorted(keep)  # disjuntos e completos
     assert trim_sample(key, total=27) == keep
+
+
+def test_selection_by_split_and_ordinal_never_uses_training() -> None:
+    import pytest
+
+    rows = _rows() + [_row(400 + i, 81, 2, split="validation") for i in range(4)]
+    chosen = select_states(rows, per_stratum=100, splits=("test", "validation"), ordinals=(2,))
+    assert {r["mainItemOrdinal"] for r in chosen} == {2}
+    assert {r["split"] for r in chosen} == {"test", "validation"} and len(chosen) == 16
+    with pytest.raises(ValueError, match="treino"):
+        select_states(rows, splits=("train",))

@@ -514,14 +514,28 @@ def ml_review_sample(
     names: Path = typer.Option(_CC315 / "item-16.19.1-pt_BR.json", help="Nomes dos itens."),
     out_sheet: Path = typer.Option(_CC602 / "sheet.json", help="Folha cega (privada)."),
     out_key: Path = typer.Option(_CC602 / "key.json", help="Chave com origem (privada)."),
+    split: list[str] = typer.Option(["test"], help="Partes do dataset (nunca train)."),
+    ordinal: list[int] = typer.Option([], help="Só estas etapas da build (vazio = todas)."),
+    per_stratum: int = typer.Option(12, help="Máximo por campeão × etapa."),
 ) -> None:
-    """Amostra cega do teste reservado para os revisores (CC-602); grava uma vez."""
+    """Amostra cega para os revisores (CC-602); grava uma vez."""
     import json
 
     from riftlab.ml.expert_review import ReviewError, sample_from_run
 
     try:
-        summary = sample_from_run(dataset, run_dir, champions, items, names, out_sheet, out_key)
+        summary = sample_from_run(
+            dataset,
+            run_dir,
+            champions,
+            items,
+            names,
+            out_sheet,
+            out_key,
+            splits=tuple(split),
+            ordinals=tuple(ordinal) or None,
+            per_stratum=per_stratum,
+        )
     except ReviewError as exc:
         typer.echo(f"BLOCKED: {exc}", err=True)
         raise typer.Exit(code=1) from exc

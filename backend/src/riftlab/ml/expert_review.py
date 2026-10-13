@@ -54,12 +54,21 @@ def _digest(*parts: Any) -> str:
 
 
 def select_states(
-    rows: Sequence[Mapping[str, Any]], seed: int = REVIEW_SEED, per_stratum: int = PER_STRATUM
+    rows: Sequence[Mapping[str, Any]],
+    seed: int = REVIEW_SEED,
+    per_stratum: int = PER_STRATUM,
+    splits: Sequence[str] = ("test",),
+    ordinals: Sequence[int] | None = None,
 ) -> list[Mapping[str, Any]]:
-    """Até `per_stratum` decisões do teste por (campeão, ordem do item), escolhidas por hash."""
+    """Até `per_stratum` decisões por (campeão, ordem do item), escolhidas por hash, só das
+    partes indicadas (nunca o treino) e, se pedido, só de algumas etapas da build."""
+    if "train" in splits:
+        raise ValueError("a revisão nunca usa decisões de treino")
     strata: dict[tuple[int, int], list[Mapping[str, Any]]] = defaultdict(list)
     for row in rows:
-        if row["split"] == "test" and row.get("candidates") and row.get("targetLegal"):
+        if ordinals is not None and int(row["mainItemOrdinal"]) not in ordinals:
+            continue
+        if row["split"] in splits and row.get("candidates") and row.get("targetLegal"):
             strata[(int(row["championId"]), int(row["mainItemOrdinal"]))].append(row)
     chosen: list[Mapping[str, Any]] = []
     for key in sorted(strata):
@@ -182,11 +191,13 @@ def build_sample(
     seed: int = REVIEW_SEED,
     per_stratum: int = PER_STRATUM,
     synthetic: bool = False,
+    splits: Sequence[str] = ("test",),
+    ordinals: Sequence[int] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Folha cega dos revisores e chave privada com origem dos itens e identidade da decisão."""
     rng = random.Random(seed)
     states, key_states = [], {}
-    for index, row in enumerate(select_states(rows, seed, per_stratum), 1):
+    for index, row in enumerate(select_states(rows, seed, per_stratum, splits, ordinals), 1):
         state_id = f"R{index:02d}"
         order, roles = items_to_grade(row, popularity, model, rng)
         states.append(describe_state(row, state_id, order, champion_names, item_names, item_costs))
@@ -195,6 +206,7 @@ def build_sample(
             "participantId": row["participantId"],
             "championId": row["championId"],
             "mainItemOrdinal": row["mainItemOrdinal"],
+            "split": row["split"],
             "targetItemId": row["targetItemId"],
             "popularityRanking": _ranked(row, popularity(row))[:10],
             "items": {str(item): roles[item] for item in order},
@@ -428,6 +440,9 @@ def sample_from_run(
     out_sheet: Any,
     out_key: Any,
     model_name: str = "M1-full",
+    splits: Sequence[str] = ("test",),
+    ordinals: Sequence[int] | None = None,
+    per_stratum: int = PER_STRATUM,
 ) -> dict[str, Any]:
     """Monta folha e chave com o dataset, os catálogos e o modelo da execução congelada.
 
@@ -469,7 +484,11 @@ def sample_from_run(
         {int(c["key"]): str(c["name"]) for c in champions.values()},
         {int(i): str(e["name"]) for i, e in names_pt.items()},
         {int(i): int(e["gold"]["total"]) for i, e in items_en.items()},
+        per_stratum=per_stratum,
+        splits=splits,
+        ordinals=ordinals,
     )
+    key["selection"] = {"splits": list(splits), "ordinals": ordinals, "perStratum": per_stratum}
     key["inputs"] = {
         "datasetSha256": run["inputs"]["datasetSha256"],
         "runSha256": _sha(run_dir / "run.json"),
