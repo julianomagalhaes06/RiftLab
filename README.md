@@ -8,7 +8,7 @@ Uma build frequente não descreve todas as necessidades de uma partida. Composi�
 
 O público prioritário são iniciantes e jogadores de elos mais baixos. O objetivo é desenvolver autonomia: observar ameaças, identificar necessidades, comparar custos e justificar escolhas antes de receber feedback. A recomendação é uma estimativa contextual, não uma garantia de vitória nem uma demonstração de que a alternativa teria mudado o resultado.
 
-## Experiência prevista
+## Experiência
 
 1. Importar uma partida concluída ou abrir uma demonstração.
 2. Selecionar um participante dentro do recorte suportado.
@@ -18,7 +18,7 @@ O público prioritário são iniciantes e jogadores de elos mais baixos. O objet
 6. Consultar pistas graduais, comparar consequências e tentar um novo cenário sem ajuda.
 7. Exportar um relatório com versões, evidências e limitações.
 
-A interface distinguirá recomendação disponível, suporte limitado, estado incompatível e evidência insuficiente. Ouro estimado e ouro informado manualmente terão identificação própria.
+A interface distingue recomendação disponível, suporte limitado, estado incompatível e evidência insuficiente. Ouro estimado e ouro informado manualmente têm identificação própria.
 
 ## Escopo inicial
 
@@ -32,9 +32,9 @@ A interface distinguirá recomendação disponível, suporte limitado, estado in
 
 Ficam fora do primeiro ciclo: overlay em tempo real, automação de compras, treinamento de modelos de linguagem do zero, aprendizado por reforço, aplicação móvel nativa e suporte simultâneo a outros jogos.
 
-## Arquitetura prevista
+## Arquitetura
 
-Monólito modular em Python com FastAPI, PostgreSQL e processamento assíncrono por worker. Interface web em React e TypeScript. CatBoost para ranking e scikit-learn para baselines, agrupamento e avaliação. O treinamento permanece separado do atendimento de consultas.
+Monólito modular em Python com FastAPI, PostgreSQL e processamento assíncrono por worker (importação, preparação e expurgo numa fila durável). Interface web em React e TypeScript. Os experimentos de ranking usam CatBoost em CPU e um agrupamento KMeans em NumPy; o critério servido é a popularidade por campeão e etapa da build, porque nenhum modelo a superou. O treinamento roda pela CLI e fica separado do atendimento de consultas. O interpretador de objetivo usa regras por padrão; o ajuste de um modelo de linguagem ficou como experimento num ambiente separado (`ml/objectives`).
 
 ```mermaid
 flowchart LR
@@ -61,11 +61,20 @@ flowchart LR
 | 5 | Objetivos e revisão assistida | Experimento de fine-tuning, formulário alternativo e feedback |
 | 6 | Validação e entrega | Experimentos, testes integrados, relatório e demonstração |
 
+## Estado da entrega (13/10/2026)
+
+| Situação | O quê |
+| --- | --- |
+| **Entregue** | Importação BR1 e demonstração offline. Reconstrução do estado anterior à compra com proveniência e incerteza explícita. Decisões elegíveis. Candidatos legais do catálogo do patch. Comparação de até três alternativas com custo restante. Popularidade versionada com suporte e abstenção. Objetivo por formulário ou texto confirmado. Estudo com escolha antes da revelação, pistas, reflexão e transferência. Julgamento por rubrica e relatório JSON/HTML verificável. Registro de modelos. Expurgo com confirmação e retenção. Navegação Painel, Campeões, Minha posição e Histórico. Minha posição da conta própria. Demonstração reproduzível. |
+| **Experimentos com resultado negativo** | Ranker contextual (CatBoost) sem ganho sobre a popularidade no planejamento do próximo item. Clusters de contexto sem estrutura. Ajuste LoRA do interpretador reprovado no gate de ambiguidade. Regras de inventário em 16.16/16.17 não liberadas. |
+| **Pendente** | Revisão estratégica por especialistas (ferramenta pronta, aguardando os revisores). Estatísticas pessoais no Painel (taxa de vitória, KDA, decisões revistas). Guia de estudo por campeão. Glossário no estudo real. Piloto pedagógico com voluntários. |
+| **Fora do escopo** | Overlay ao vivo e partidas em andamento. Automação de compras. Treinar modelo de linguagem do zero. Aprendizado por reforço. Aplicativo móvel nativo. Outros jogos. Uso multiusuário ou exposição pública da API. |
+
 ## Situação atual
 
 Sprint 1 (fundação) concluída. Implementado e validado localmente: API FastAPI com health checks (`/health/live`, `/health/ready`), worker mínimo, frontend React mínimo, ambiente reproduzível via Docker Compose (CC-101); protótipo navegável de baixa/média fidelidade das jornadas de revisão e do modo Estudo, com dados ilustrativos e sem API real (CC-102); persistência inicial via Alembic (sete tabelas) e fronteiras de domínio por módulo (CC-103); fontes de dados plugáveis (`MatchSource`/`CatalogSource`) com fixtures sintéticas empacotadas para o modo demonstração, sem exigir rede nem credencial (CC-104); recorte inicial (BR1, fila ranqueada solo/duo, função e três campeões) congelado em `configs/scope.yaml` a partir de partidas reais coletadas com permissão explícita — amostra de conveniência, metodologia e limitações declaradas no próprio arquivo (CC-105); contrato de erro padronizado em `application/problem+json` para validação (422), rota inexistente (404) e falha inesperada (500), além do 503 já existente, com OpenAPI real das rotas de saúde declarado e tipos TypeScript gerados sem divergência (CC-106).
 
-Sprint 2 (importação e reconstrução temporal) em andamento: importador Riot resiliente entregue (CC-201) — `POST /api/v1/imports`, `GET .../{id}` e `POST .../{id}/retry` são rotas HTTP reais, com job durável em PostgreSQL (posse por lease com token/geração, retomada segura de crash, até 5 tentativas transitórias com backoff antes de falha permanente), worker que busca a partida (Riot Match-V5/Timeline-V5 real ou fixtures demo), valida (só partida concluída, RF17) e persiste match/participantes/eventos de forma atômica. Identificadores pessoais nunca são persistidos brutos: só um hash HMAC local. Importação real exige `RIFTLAB_RIOT_API_KEY` e `RIFTLAB_SUBJECT_HASH_SECRET` configuradas; o modo demonstração continua funcionando sem nenhuma das duas.
+Sprint 2 (importação e reconstrução temporal): importador Riot resiliente entregue (CC-201) — `POST /api/v1/imports`, `GET .../{id}` e `POST .../{id}/retry` são rotas HTTP reais, com job durável em PostgreSQL (posse por lease com token/geração, retomada segura de crash, até 5 tentativas transitórias com backoff antes de falha permanente), worker que busca a partida (Riot Match-V5/Timeline-V5 real ou fixtures demo), valida (só partida concluída, RF17) e persiste match/participantes/eventos de forma atômica. Identificadores pessoais nunca são persistidos brutos: só um hash HMAC local. Importação real exige `RIFTLAB_RIOT_API_KEY` e `RIFTLAB_SUBJECT_HASH_SECRET` configuradas; o modo demonstração continua funcionando sem nenhuma das duas.
 
 Catálogo versionado e regras do patch entregue (CC-202): `cc catalog sync --mode demo|real --patch X` busca (fixture demo ou Data Dragon público real, CDN sem credencial), valida (tipos/limites, ciclo/referência de receita) e persiste catálogo+itens de forma imutável e idempotente — mesmo conteúdo nunca duplica, conteúdo divergente nunca sobrescreve uma versão publicada. `configs/catalog-mappings.yaml` mantém overrides explícitos de 16.16.1/16.17.1. Para outro patch, a preparação ou CLI consulta `versions.json` público, fixa uma versão do mesmo `major.minor` no banco e nunca usa o `latest` de outro patch; ausência no CDN permanece `MISSING_CATALOG`. O recorte inicial do CC-105 segue documentado, enquanto a janela operacional é móvel.
 
@@ -232,7 +241,7 @@ O ranking compara popularidade por campeão, regras explícitas e ranking contex
 
 ## Dados e execução
 
-Credenciais, históricos brutos e pesos de modelos não pertencem ao repositório. O modo real dependerá de uma chave válida da Riot e das condições de acesso vigentes. O modo de demonstração utilizará fixtures sintéticas identificadas. A entrega básica roda em CPU, e a demonstração não depende de serviço pago nem de modelo de linguagem. O ajuste do interpretador rodou em CPU local e numa GPU T4 do Colab, sem custo; pesos e adaptadores ficam fora do repositório, com hash registrado.
+Credenciais, históricos brutos e pesos de modelos não pertencem ao repositório. O modo real depende de uma chave válida da Riot e das condições de acesso vigentes. O modo de demonstração usa fixtures sintéticas identificadas. A entrega básica roda em CPU, e a demonstração não depende de serviço pago nem de modelo de linguagem. O ajuste do interpretador rodou em CPU local e numa GPU T4 do Colab, sem custo; pesos e adaptadores ficam fora do repositório, com hash registrado.
 
 ## Relação com a Riot Games
 
