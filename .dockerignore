@@ -25,3 +25,6 @@ data
 artifacts
 mlruns
 wandb
+# Credenciais locais e backups cifrados nunca vão para o contexto do build
+.aws
+*.gpg
