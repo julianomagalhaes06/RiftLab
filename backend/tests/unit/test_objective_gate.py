@@ -13,11 +13,16 @@ from riftlab.config import Settings
 from riftlab.objectives.application import build_parser
 from riftlab.objectives.rules import RULES_VERSION
 
-GATE = yaml.safe_load(
-    (Path(__file__).resolve().parents[3] / "configs" / "objective-parser-gate.yaml").read_text(
-        encoding="utf-8"
+_HERE = Path(__file__).resolve()
+_GATE_PATH = next(
+    path
+    for path in (
+        root / "configs" / "objective-parser-gate.yaml"
+        for root in (_HERE.parents[2], _HERE.parents[3])
     )
-)
+    if path.is_file()
+)  # container (/app/configs) ou raiz do repositório (host)
+GATE = yaml.safe_load(_GATE_PATH.read_text(encoding="utf-8"))
 ROWS = {row["parserVersion"]: row for row in GATE["results"]}
 
 

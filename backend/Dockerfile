@@ -29,6 +29,8 @@ RUN uv sync --frozen
 COPY backend/tests ./tests
 # Exemplo público da lista de sementes (CC-206): um teste garante que ele acompanha o carregador.
 COPY configs/collection-seeds.example.yaml ./configs/collection-seeds.example.yaml
+# Registro do gate do interpretador (CC-506): um teste confere que o padrão segue o gate.
+COPY configs/objective-parser-gate.yaml ./configs/objective-parser-gate.yaml
 COPY backend/openapi.json ./openapi.json
 ENV PATH="/app/.venv/bin:$PATH"
 CMD ["pytest"]
