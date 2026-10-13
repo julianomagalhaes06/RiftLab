@@ -25,7 +25,8 @@ def test_openapi_only_announces_real_routes() -> None:
     (POST/GET/retry) passou a real no CC-201; as duas rotas de DECISOES (lista por
     partida e detalhe) no CC-204; as de PARTIDAS (lista, detalhe e nova tentativa
     de preparação) no CC-205; análises (POST/GET) no CC-303; interpretação de
-    objetivo no CC-504; feedback, relatório, reflexão e progresso no CC-505."""
+    objetivo no CC-504; feedback, relatório, reflexão e progresso no CC-505; prévia e
+    expurgo de partida (DELETE com confirmação) no CC-603."""
     schema = _current_schema()
     assert set(schema["paths"].keys()) == {
         "/health/live",
@@ -37,6 +38,7 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/matches/{match_id}",
         "/api/v1/matches/{match_id}/preparation",
         "/api/v1/matches/{match_id}/decisions",
+        "/api/v1/matches/{match_id}/purge-preview",
         "/api/v1/decisions/{decision_id}",
         "/api/v1/ranked/me",
         "/api/v1/analyses",
@@ -133,8 +135,12 @@ def test_match_routes_document_order_pagination_and_errors() -> None:
     listing = schema["paths"]["/api/v1/matches"]
     detail = schema["paths"]["/api/v1/matches/{match_id}"]
     prepare = schema["paths"]["/api/v1/matches/{match_id}/preparation"]
-    assert set(listing) == {"get"} and set(detail) == {"get"}  # leituras não escrevem
-    assert set(prepare) == {"post"}  # único caminho de escrita: nova tentativa de preparação
+    purge_preview = schema["paths"]["/api/v1/matches/{match_id}/purge-preview"]
+    assert set(listing) == {"get"} and set(purge_preview) == {"get"}  # leituras não escrevem
+    assert set(detail) == {"get", "delete"}  # CC-603: o expurgo exige confirmação explícita
+    assert {p["name"] for p in detail["delete"]["parameters"]} == {"match_id", "confirm"}
+    assert set(detail["delete"]["responses"]) == {"202", "404", "422"}
+    assert set(prepare) == {"post"}  # nova tentativa de preparação
     assert set(listing["get"]["responses"]) == {"200", "422"}
     assert set(detail["get"]["responses"]) == {"200", "404", "422"}
     assert set(prepare["post"]["responses"]) == {"202", "404", "422"}

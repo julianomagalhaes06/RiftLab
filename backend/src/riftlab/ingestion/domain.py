@@ -27,10 +27,12 @@ class JobKind(StrEnum):
     """Tipo do job na tabela `import_jobs`. IMPORT = importação da partida
     (CC-201); PREPARE = preparação durável pós-importação (CC-205: catálogo ->
     reconstrução -> extração de decisões), que reaproveita a mesma maquinaria de
-    lease/token/retry. Uma preparação READY é um PREPARE SUCCEEDED."""
+    lease/token/retry. Uma preparação READY é um PREPARE SUCCEEDED. PURGE =
+    expurgo da partida e dos derivados (CC-603), na mesma fila durável."""
 
     IMPORT = "IMPORT"
     PREPARE = "PREPARE"
+    PURGE = "PURGE"
 
 
 ACTIVE_IMPORT_JOB_STATES: frozenset[ImportJobState] = frozenset(

@@ -201,6 +201,7 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "ATTEMPT_NOT_REVEALED",
                 "HINTS_DISABLED",
                 "FEEDBACK_EXISTS",
+                "MATCH_PURGED",
             }
             else None
         )

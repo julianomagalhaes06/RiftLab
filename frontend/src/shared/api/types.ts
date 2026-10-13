@@ -300,7 +300,11 @@ export interface paths {
         get: operations["get_imported_match_api_v1_matches__match_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Expurga a partida e seus derivados (CC-603)
+         * @description Exige `confirm` igual ao id da partida. Cria um job PURGE consultável em /api/v1/imports/{jobId} (kind=PURGE). Idempotente: um expurgo ativo é devolvido; depois de concluído, repetir devolve o mesmo job.
+         */
+        delete: operations["purge_match_route_api_v1_matches__match_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -337,6 +341,23 @@ export interface paths {
          * @description Caminho mínimo de nova tentativa quando a preparação terminou em FAILED. Idempotente: se já há preparação ativa (PENDING/RUNNING) devolve-a; se está READY com decisões das versões correntes, devolve-a (200); caso contrário enfileira uma nova tentativa (202), preservando o histórico. Não coleta a partida de novo e não chama a Riot.
          */
         post: operations["prepare_match_api_v1_matches__match_id__preparation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/matches/{match_id}/purge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Prévia do expurgo de uma partida (nada é alterado) */
+        get: operations["purge_preview_route_api_v1_matches__match_id__purge_preview_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1315,6 +1336,60 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** PurgeCounts */
+        PurgeCounts: {
+            /** Analyses */
+            analyses: number;
+            /** Decisionpoints */
+            decisionPoints: number;
+            /** Decisionstates */
+            decisionStates: number;
+            /** Feedback */
+            feedback: number;
+            /** Learningattempts */
+            learningAttempts: number;
+            /** Participants */
+            participants: number;
+            /** Timelineevents */
+            timelineEvents: number;
+        };
+        /** PurgeDataset */
+        PurgeDataset: {
+            /** Alreadyinvalidated */
+            alreadyInvalidated: boolean;
+            /** Description */
+            description: string;
+            /** Patch */
+            patch: string;
+            /** Task */
+            task: string;
+        };
+        /** PurgeModel */
+        PurgeModel: {
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+        };
+        /**
+         * PurgePreview
+         * @description O que o expurgo removeria e invalidaria; nada é alterado por esta leitura.
+         */
+        PurgePreview: {
+            counts: components["schemas"]["PurgeCounts"];
+            /** Datasets */
+            datasets: components["schemas"]["PurgeDataset"][];
+            /** Limitations */
+            limitations: string[];
+            /** Matchid */
+            matchId: string;
+            /** Models */
+            models: components["schemas"]["PurgeModel"][];
+            /** Unverifiabledatasets */
+            unverifiableDatasets: number;
+        };
         /** RankedMe */
         RankedMe: {
             change: components["schemas"]["Change"] | null;
@@ -2150,6 +2225,48 @@ export interface operations {
             };
         };
     };
+    purge_match_route_api_v1_matches__match_id__delete: {
+        parameters: {
+            query: {
+                confirm: string;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportJobAccepted"];
+                };
+            };
+            /** @description Partida inexistente (ou sem importação concluída, no POST). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Confirmação ausente ou diferente do id. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     list_match_decisions_api_v1_matches__match_id__decisions_get: {
         parameters: {
             query: {
@@ -2221,6 +2338,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchPreparation"];
+                };
+            };
+            /** @description Partida inexistente (ou sem importação concluída, no POST). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado ou de versão desconhecida). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    purge_preview_route_api_v1_matches__match_id__purge_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurgePreview"];
                 };
             };
             /** @description Partida inexistente (ou sem importação concluída, no POST). */

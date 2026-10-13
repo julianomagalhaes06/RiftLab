@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,6 +20,23 @@ class DatasetManifestModel(UuidPkMixin, CreatedAtMixin, Base):
     task: Mapped[str] = mapped_column(String, nullable=False)
     patch: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False)
+    # CC-603: partidas do dataset conhecidas (lista registrada na criação) e invalidação
+    # quando alguma delas é expurgada; modelos desse dataset não podem mais ser promovidos.
+    match_list_known: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    invalidation_reason: Mapped[str | None] = mapped_column(String(40))
+
+
+class DatasetManifestMatchModel(Base):
+    __tablename__ = "ml_dataset_manifest_matches"
+    __table_args__ = (Index("ix_ml_dataset_manifest_matches_match_id", "match_id"),)
+
+    manifest_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ml_dataset_manifests.id"), primary_key=True
+    )
+    match_id: Mapped[str] = mapped_column(String, primary_key=True)
 
 
 class ModelVersionModel(UuidPkMixin, CreatedAtMixin, Base):
@@ -59,7 +76,8 @@ class ModelEventModel(UuidPkMixin, CreatedAtMixin, Base):
     __tablename__ = "ml_model_events"
     __table_args__ = (
         CheckConstraint(
-            "action IN ('REGISTER', 'PROMOTE', 'RETIRE', 'ROLLBACK')", name="action_known"
+            "action IN ('REGISTER', 'PROMOTE', 'RETIRE', 'ROLLBACK', 'INVALIDATE')",
+            name="action_known",
         ),
     )
 

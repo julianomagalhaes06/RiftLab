@@ -21,6 +21,7 @@ from riftlab.catalog.patches import load_persisted_mapping
 from riftlab.champions.application import ChampionAsset as ChampionAssetData
 from riftlab.errors import ProblemDetail
 from riftlab.ingestion.domain import Match
+from riftlab.ingestion.purge import purge_preview, request_purge
 from riftlab.matches.queries import MatchParticipantFactsView, get_match_detail, list_matches
 from riftlab.preparation.application import (
     PreparationInfo,
@@ -34,7 +35,8 @@ from riftlab.shared.api.common import (
     CursorPage,
     MatchId,
 )
-from riftlab.shared.api.enums import PreparationStatus
+from riftlab.shared.api.enums import ImportJobState, PreparationStatus
+from riftlab.shared.api.imports import ImportJobAccepted
 from riftlab.shared.api.matches import (
     ChampionAsset,
     MatchChampion,
@@ -43,6 +45,7 @@ from riftlab.shared.api.matches import (
     MatchPreparation,
     MatchSummary,
 )
+from riftlab.shared.api.purge import PurgePreview
 from riftlab.shared.errors import SourceSchemaError
 
 router = APIRouter(tags=["matches"])
@@ -151,6 +154,51 @@ async def prepare_match(
     if info.status is PreparationStatus.READY:
         response.status_code = 200
     return _to_preparation(info)
+
+
+@router.get(
+    "/api/v1/matches/{match_id}/purge-preview",
+    response_model=PurgePreview,
+    summary="Prévia do expurgo de uma partida (nada é alterado)",
+    responses={404: _NOT_FOUND, 422: _INVALID},
+)
+async def purge_preview_route(match_id: MatchId, request: Request) -> PurgePreview:
+    return PurgePreview.model_validate(
+        await purge_preview(request.app.state.session_factory, match_id)
+    )
+
+
+@router.delete(
+    "/api/v1/matches/{match_id}",
+    response_model=ImportJobAccepted,
+    status_code=202,
+    summary="Expurga a partida e seus derivados (CC-603)",
+    description=(
+        "Exige `confirm` igual ao id da partida. Cria um job PURGE consultável em "
+        "/api/v1/imports/{jobId} (kind=PURGE). Idempotente: um expurgo ativo é devolvido; "
+        "depois de concluído, repetir devolve o mesmo job."
+    ),
+    responses={
+        404: _NOT_FOUND,
+        422: {"model": ProblemDetail, "description": "Confirmação ausente ou diferente do id."},
+    },
+)
+async def purge_match_route(
+    match_id: MatchId,
+    request: Request,
+    confirm: Annotated[str, Query(min_length=1, max_length=64)],
+) -> ImportJobAccepted:
+    job = await request_purge(
+        request.app.state.session_factory,
+        match_id,
+        confirm,
+        request.app.state.settings.subject_hash_secret,
+    )
+    return ImportJobAccepted(
+        job_id=job.id,
+        status=ImportJobState(job.state.value),
+        status_url=f"/api/v1/imports/{job.id}",
+    )
 
 
 def _to_summary(

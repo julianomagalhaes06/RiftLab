@@ -237,6 +237,49 @@ class DurableRawMatchStore:
             )
         return body
 
+    def purge(self, match_id: str) -> int:
+        """Remove os brutos de uma partida (CC-603) e devolve quantos arquivos saíram.
+
+        Apaga os ponteiros `<match_id>.<kind>.ref`, os blobs que só eles referenciam e o
+        par do formato legado. Idempotente: o que já não existe é ignorado. Nunca sai do
+        diretório do armazenamento: o id passa pelo padrão fechado, cada caminho precisa
+        ficar no diretório raiz ou em `blobs/` depois de resolvido, e link simbólico é
+        removido como link (nunca seguido nem lido).
+        """
+        for kind in _KINDS:
+            self._validate(match_id, kind)
+        root = self._directory.resolve()
+        allowed_parents = {root, self._blobs_directory.resolve()}
+        own_refs = {self._ref_path(match_id, kind) for kind in _KINDS}
+        hashes: set[str] = set()
+        for ref in own_refs:
+            if ref.is_file() and not ref.is_symlink():
+                content = ref.read_text().strip()
+                if _SHA256_HEX_PATTERN.fullmatch(content):
+                    hashes.add(content)
+        still_used: set[str] = set()
+        for other in self._directory.glob("*.ref"):
+            if other in own_refs or other.is_symlink() or not other.is_file():
+                continue
+            still_used.add(other.read_text().strip())
+        targets = [
+            *own_refs,
+            *(
+                self._directory / f"{match_id}.{kind}.{ext}"
+                for kind in _KINDS
+                for ext in ("json", "sha256")
+            ),
+            *(self._blob_path(content) for content in sorted(hashes - still_used)),
+        ]
+        if any(path.parent.resolve() not in allowed_parents for path in targets):
+            raise RawStoreCorruptedError("caminho de expurgo fora do armazenamento; nada removido")
+        removed = 0
+        for path in targets:
+            if path.is_symlink() or path.exists():
+                path.unlink()
+                removed += 1
+        return removed
+
     def _validate(self, match_id: str, kind: str) -> None:
         if not _SAFE_MATCH_ID_PATTERN.fullmatch(match_id):
             raise ValueError(f"match_id fora do formato esperado: {match_id!r}")

@@ -106,7 +106,7 @@ async def get_import_job(session_factory: SessionFactory, job_id: uuid.UUID) -> 
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         job = await repo.get_import_job(job_id)
-    if job is None or job.kind != JobKind.IMPORT:  # preparação tem rotas próprias
+    if job is None or job.kind not in (JobKind.IMPORT, JobKind.PURGE):  # preparação: rotas próprias
         raise NotFoundError(f"import job {job_id} não encontrado")
     return job
 

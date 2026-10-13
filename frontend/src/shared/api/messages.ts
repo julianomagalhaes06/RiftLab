@@ -70,6 +70,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   PREPARATION_CONFLICT:
     "Outra preparação da mesma partida estava em andamento. Tente novamente.",
   MATCH_NOT_FOUND: "A partida não foi encontrada para preparação.",
+  MATCH_PURGED: "Esta partida foi removida a pedido e não pode ser importada de novo.",
+  PURGE_FAILED: "A remoção da partida falhou; o servidor tentará de novo.",
   RECONSTRUCTION_REQUIRED:
     "A partida precisa ser reconstruída antes de extrair as decisões. Tente preparar novamente.",
 

@@ -8,6 +8,7 @@ import { isDemoMatchId } from "../../shared/router/routes";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { DecisionList } from "./DecisionList";
 import { PreparationPanel } from "./PreparationPanel";
+import { PurgePanel } from "./PurgePanel";
 import { ChampionBadge } from "./ChampionBadge";
 import { roleLabel, teamLabel } from "./format";
 
@@ -198,6 +199,8 @@ export function MatchPage({
               )}
             </>
           ) : null}
+
+          <PurgePanel key={match.matchId} matchId={match.matchId} />
         </>
       ) : null}
 

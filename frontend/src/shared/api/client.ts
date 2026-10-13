@@ -13,6 +13,7 @@ export type ImportMode = Schemas["ImportMode"];
 export type ImportJobAccepted = Schemas["ImportJobAccepted"];
 export type ImportJobStatus = Schemas["ImportJobStatus"];
 export type ImportJobState = Schemas["ImportJobState"];
+export type PurgePreview = Schemas["PurgePreview"];
 export type MatchSummary = Schemas["MatchSummary"];
 export type MatchDetail = Schemas["MatchDetail"];
 export type MatchParticipant = Schemas["MatchParticipant"];
@@ -100,6 +101,9 @@ export interface ApiClient {
     signal?: AbortSignal,
   ): Promise<AnalysisResult>;
   interpretObjective(text: string, signal?: AbortSignal): Promise<ObjectiveInterpretation>;
+  getPurgePreview(matchId: string, signal?: AbortSignal): Promise<PurgePreview>;
+  /** CC-603: expurgo com confirmação explícita (o próprio id); devolve o job PURGE. */
+  purgeMatch(matchId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
 }
 
 function queryString(params: Record<string, string | number | null | undefined>): string {
@@ -162,6 +166,10 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
         signal,
       }),
     getMatch: (matchId, signal) => request("GET", `/api/v1/matches/${enc(matchId)}`, { signal }),
+    getPurgePreview: (matchId, signal) =>
+      request("GET", `/api/v1/matches/${enc(matchId)}/purge-preview`, { signal }),
+    purgeMatch: (matchId, signal) =>
+      request("DELETE", `/api/v1/matches/${enc(matchId)}${queryString({ confirm: matchId })}`, { signal }),
     prepareMatch: (matchId, signal) =>
       request("POST", `/api/v1/matches/${enc(matchId)}/preparation`, { signal }),
     listDecisions: (matchId, participantId, params = {}, signal) =>

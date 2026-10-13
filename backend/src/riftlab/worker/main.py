@@ -10,6 +10,7 @@ from riftlab import db
 from riftlab.config import Settings, get_settings
 from riftlab.ingestion.application import process_next_job
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+from riftlab.ingestion.purge import process_next_purge
 from riftlab.observability import configure_logging, safe_exception_description
 from riftlab.preparation.application import process_next_preparation
 from riftlab.shared.db import build_session_factory
@@ -84,7 +85,10 @@ async def run(settings: Settings | None = None, stop_event: asyncio.Event | None
             prepared = await _run_step(
                 "preparacao", lambda: process_next_preparation(session_factory, raw_store, settings)
             )
-            processed = imported or prepared
+            purged = await _run_step(
+                "expurgo", lambda: process_next_purge(session_factory, raw_store, settings)
+            )
+            processed = imported or prepared or purged
             _touch_heartbeat(heartbeat_path)
             if not processed:
                 try:

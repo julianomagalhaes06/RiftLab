@@ -160,6 +160,8 @@ export type RouteKey =
   | "GET /api/v1/matches/:id/decisions"
   | "GET /api/v1/decisions/:id"
   | "GET /api/v1/ranked/me"
+  | "GET /api/v1/matches/:id/purge-preview"
+  | "DELETE /api/v1/matches/:id"
   | "POST /api/v1/objectives/interpret"
   | "GET /api/v1/learning-attempts/progress"
   | "POST /api/v1/learning-attempts"
@@ -178,6 +180,8 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/matches", "GET", /^\/api\/v1\/matches$/],
   ["POST /api/v1/matches/:id/preparation", "POST", /^\/api\/v1\/matches\/[^/]+\/preparation$/],
   ["GET /api/v1/matches/:id/decisions", "GET", /^\/api\/v1\/matches\/[^/]+\/decisions$/],
+  ["GET /api/v1/matches/:id/purge-preview", "GET", /^\/api\/v1\/matches\/[^/]+\/purge-preview$/],
+  ["DELETE /api/v1/matches/:id", "DELETE", /^\/api\/v1\/matches\/[^/]+$/],
   ["GET /api/v1/matches/:id", "GET", /^\/api\/v1\/matches\/[^/]+$/],
   ["GET /api/v1/decisions/:id", "GET", /^\/api\/v1\/decisions\/[^/]+$/],
   ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
@@ -345,6 +349,17 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
         }),
   "GET /api/v1/decisions/:id": () => ok(decisionState()),
   "GET /api/v1/ranked/me": () => ok({ status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }),
+  "GET /api/v1/matches/:id/purge-preview": () =>
+    ok({
+      matchId: "DEMO-0008",
+      counts: { participants: 10, timelineEvents: 40, decisionStates: 6, decisionPoints: 2, analyses: 1, learningAttempts: 1, feedback: 0 },
+      datasets: [],
+      models: [],
+      unverifiableDatasets: 0,
+      limitations: ["Modelos já treinados não desaprendem: os que usaram esta partida saem de ativo."],
+    }),
+  "DELETE /api/v1/matches/:id": () =>
+    ok({ jobId: "9f00e000-0000-4000-8000-000000000001", status: "QUEUED", statusUrl: "/api/v1/imports/9f00e000-0000-4000-8000-000000000001" }, 202),
 };
 
 export interface CallLog {

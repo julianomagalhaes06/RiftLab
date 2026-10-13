@@ -10,10 +10,12 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    UniqueConstraint,
     Uuid,
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from riftlab.shared.db import Base, CreatedAtMixin, UuidPkMixin
@@ -65,7 +67,7 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
         CheckConstraint("attempts >= 0", name="attempts_non_negative"),
         CheckConstraint("lease_generation >= 0", name="lease_generation_non_negative"),
         CheckConstraint("mode IN ('DEMO','RIOT')", name="mode_valid"),
-        CheckConstraint("kind IN ('IMPORT','PREPARE')", name="kind_valid"),
+        CheckConstraint("kind IN ('IMPORT','PREPARE','PURGE')", name="kind_valid"),
         CheckConstraint(
             "state IN ('QUEUED','RUNNING','RETRY_WAIT','SUCCEEDED','FAILED')",
             name="state_valid",
@@ -100,6 +102,13 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
             postgresql_where=text(
                 "kind = 'PREPARE' AND state IN ('QUEUED','RUNNING','RETRY_WAIT')"
             ),
+        ),
+        # Expurgo (CC-603): no máximo um expurgo ativo por partida.
+        Index(
+            "ux_purge_jobs_active_match",
+            "requested_match_id",
+            unique=True,
+            postgresql_where=text("kind = 'PURGE' AND state IN ('QUEUED','RUNNING','RETRY_WAIT')"),
         ),
         Index("ix_import_jobs_state_retry_at", "state", "retry_at"),
     )
@@ -144,3 +153,28 @@ class RiotRateLimitModel(Base):
 
     key: Mapped[str] = mapped_column(String, primary_key=True)
     cooldown_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PurgeTombstoneModel(UuidPkMixin, Base):
+    """Lápide mínima de um expurgo (CC-603): só o HMAC do id da partida, nunca o id.
+
+    Serve para provar que houve expurgo (quando, por quê, quanto foi removido) e para
+    recusar a reimportação real da mesma partida. Não guarda partida, participante nem
+    conteúdo.
+    """
+
+    __tablename__ = "purge_tombstones"
+    __table_args__ = (
+        UniqueConstraint("match_ref", name="uq_purge_tombstones_match_ref"),
+        CheckConstraint("mode IN ('DEMO','RIOT')", name="mode_valid"),
+        CheckConstraint("reason IN ('USER_REQUEST','RETENTION')", name="reason_valid"),
+    )
+
+    match_ref: Mapped[str] = mapped_column(String(64), nullable=False)
+    mode: Mapped[str] = mapped_column(String(8), nullable=False)
+    reason: Mapped[str] = mapped_column(String(20), nullable=False)
+    job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    removed: Mapped[dict[str, int]] = mapped_column(JSONB, nullable=False)
+    purged_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

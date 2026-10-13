@@ -2262,6 +2262,165 @@
         "title": "ProblemDetail",
         "type": "object"
       },
+      "PurgeCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "analyses": {
+            "minimum": 0.0,
+            "title": "Analyses",
+            "type": "integer"
+          },
+          "decisionPoints": {
+            "minimum": 0.0,
+            "title": "Decisionpoints",
+            "type": "integer"
+          },
+          "decisionStates": {
+            "minimum": 0.0,
+            "title": "Decisionstates",
+            "type": "integer"
+          },
+          "feedback": {
+            "minimum": 0.0,
+            "title": "Feedback",
+            "type": "integer"
+          },
+          "learningAttempts": {
+            "minimum": 0.0,
+            "title": "Learningattempts",
+            "type": "integer"
+          },
+          "participants": {
+            "minimum": 0.0,
+            "title": "Participants",
+            "type": "integer"
+          },
+          "timelineEvents": {
+            "minimum": 0.0,
+            "title": "Timelineevents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "participants",
+          "timelineEvents",
+          "decisionStates",
+          "decisionPoints",
+          "analyses",
+          "learningAttempts",
+          "feedback"
+        ],
+        "title": "PurgeCounts",
+        "type": "object"
+      },
+      "PurgeDataset": {
+        "additionalProperties": false,
+        "properties": {
+          "alreadyInvalidated": {
+            "title": "Alreadyinvalidated",
+            "type": "boolean"
+          },
+          "description": {
+            "maxLength": 300,
+            "title": "Description",
+            "type": "string"
+          },
+          "patch": {
+            "maxLength": 20,
+            "title": "Patch",
+            "type": "string"
+          },
+          "task": {
+            "maxLength": 60,
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "patch",
+          "description",
+          "alreadyInvalidated"
+        ],
+        "title": "PurgeDataset",
+        "type": "object"
+      },
+      "PurgeModel": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "maxLength": 20,
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "maxLength": 20,
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "status"
+        ],
+        "title": "PurgeModel",
+        "type": "object"
+      },
+      "PurgePreview": {
+        "additionalProperties": false,
+        "description": "O que o expurgo removeria e invalidaria; nada é alterado por esta leitura.",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/PurgeCounts"
+          },
+          "datasets": {
+            "items": {
+              "$ref": "#/components/schemas/PurgeDataset"
+            },
+            "title": "Datasets",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/PurgeModel"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "unverifiableDatasets": {
+            "minimum": 0.0,
+            "title": "Unverifiabledatasets",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "matchId",
+          "counts",
+          "datasets",
+          "models",
+          "unverifiableDatasets",
+          "limitations"
+        ],
+        "title": "PurgePreview",
+        "type": "object"
+      },
       "RankedMe": {
         "properties": {
           "change": {
@@ -3404,6 +3563,68 @@
       }
     },
     "/api/v1/matches/{match_id}": {
+      "delete": {
+        "description": "Exige `confirm` igual ao id da partida. Cria um job PURGE consultável em /api/v1/imports/{jobId} (kind=PURGE). Idempotente: um expurgo ativo é devolvido; depois de concluído, repetir devolve o mesmo job.",
+        "operationId": "purge_match_route_api_v1_matches__match_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirm",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Confirm",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Partida inexistente (ou sem importação concluída, no POST)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Confirmação ausente ou diferente do id."
+          }
+        },
+        "summary": "Expurga a partida e seus derivados (CC-603)",
+        "tags": [
+          "matches"
+        ]
+      },
       "get": {
         "operationId": "get_imported_match_api_v1_matches__match_id__get",
         "parameters": [
@@ -3604,6 +3825,58 @@
           }
         },
         "summary": "Pede nova tentativa de preparação da partida",
+        "tags": [
+          "matches"
+        ]
+      }
+    },
+    "/api/v1/matches/{match_id}/purge-preview": {
+      "get": {
+        "operationId": "purge_preview_route_api_v1_matches__match_id__purge_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgePreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Partida inexistente (ou sem importação concluída, no POST)."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado ou de versão desconhecida)."
+          }
+        },
+        "summary": "Prévia do expurgo de uma partida (nada é alterado)",
         "tags": [
           "matches"
         ]

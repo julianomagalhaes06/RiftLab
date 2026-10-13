@@ -11,6 +11,7 @@ an active version, the caller gets an explicit baseline fallback with a reason.
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,7 +21,12 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from riftlab.ml.models import DatasetManifestModel, ModelEventModel, ModelVersionModel
+from riftlab.ml.models import (
+    DatasetManifestMatchModel,
+    DatasetManifestModel,
+    ModelEventModel,
+    ModelVersionModel,
+)
 
 
 class RegistryError(RuntimeError):
@@ -54,6 +60,29 @@ def _trusted(path: Path, root: Path) -> Path:
     return resolved
 
 
+def dataset_match_ids(path: Path) -> set[str] | None:
+    """Partidas listadas no artefato (linhas com `matchId` ou listas de partidas por split).
+
+    None quando o formato não permite saber; o expurgo trata esse dataset como não
+    verificável em vez de supor que ele não contém a partida (CC-603).
+    """
+    try:
+        document = json.loads(path.read_bytes())
+    except (OSError, ValueError):
+        return None
+    found: set[str] = set()
+    if isinstance(document, dict):
+        for row in document.get("rows") or []:
+            if isinstance(row, dict) and isinstance(row.get("matchId"), str):
+                found.add(row["matchId"])
+        for listing in (document.get("splits") or {}).values():
+            if isinstance(listing, list):
+                found.update(m for m in listing if isinstance(m, str))
+        if isinstance(document.get("matches"), list):
+            found.update(m for m in document["matches"] if isinstance(m, str))
+    return found or None
+
+
 async def register_dataset(
     session_factory: async_sessionmaker[AsyncSession],
     path: Path,
@@ -63,15 +92,24 @@ async def register_dataset(
     description: str,
 ) -> uuid.UUID:
     digest = _sha(path)
+    matches = dataset_match_ids(path)
     async with session_factory.begin() as session:
         existing = await session.scalar(
             select(DatasetManifestModel).where(DatasetManifestModel.sha256 == digest)
         )
         if existing is not None:
             return existing.id
-        row = DatasetManifestModel(sha256=digest, task=task, patch=patch, description=description)
+        row = DatasetManifestModel(
+            sha256=digest,
+            task=task,
+            patch=patch,
+            description=description,
+            match_list_known=matches is not None,
+        )
         session.add(row)
         await session.flush()
+        for match_id in sorted(matches or ()):
+            session.add(DatasetManifestMatchModel(manifest_id=row.id, match_id=match_id))
         return row.id
 
 
@@ -131,6 +169,11 @@ async def promote(
             assert target.artifact_path is not None
             if _sha(Path(target.artifact_path)) != target.artifact_sha256:
                 raise RegistryError("hash do artefato diverge do registrado; promoção recusada")
+        dataset = await session.get(DatasetManifestModel, target.dataset_manifest_id)
+        if dataset is not None and dataset.invalidated_at is not None:
+            raise RegistryError(
+                "dataset invalidado por expurgo; retreine e revalide antes de promover"
+            )
         now = datetime.now(UTC)
         current = await session.scalar(
             select(ModelVersionModel).where(
@@ -189,6 +232,11 @@ async def resolve_active(
         )
     if row is None:
         return ActiveVersion(None, "BASELINE", "B0", None, None, "NO_ACTIVE_VERSION")
+    async with session_factory() as session:
+        dataset = await session.get(DatasetManifestModel, row.dataset_manifest_id)
+    if dataset is not None and dataset.invalidated_at is not None:
+        _LOADED.pop(key, None)
+        return ActiveVersion(None, "BASELINE", "B0", None, None, "ACTIVE_DATASET_INVALIDATED")
     cached = _LOADED.get(key)
     if cached is not None and cached.version_id == row.id:
         return cached

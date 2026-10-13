@@ -120,7 +120,30 @@ Experimento de ajuste do interpretador (CC-501 a CC-503), com resultado negativo
 
 Depois da comparação (CC-505), a pessoa pode registrar uma reflexão, uma única vez (`POST /api/v1/learning-attempts/{id}/reflection`). Também pode praticar numa decisão diferente sem pistas, no modo transferência, e ver contagens locais de estudo (`GET /api/v1/learning-attempts/progress`); são só contagens, sem nota nem estimativa de habilidade. O relatório (`GET /api/v1/analyses/{id}/report?format=html|json`) traz contexto antes da compra, objetivo e sua origem, alternativas, versões, limites, resposta inicial, pistas e reflexão. Ele não traz identificador de partida, de participante nem de jogador, e o HTML abre sem internet: sem script e com política de conteúdo que bloqueia carregamentos externos. Um revisor pode registrar um julgamento por rubrica (0 a 3 ou abstenção) em `POST /api/v1/analyses/{id}/feedback`. O registro é idempotente, imutável no banco e guarda o pseudônimo só como hash; ele não altera a análise nem é usado para treinar modelos. A interface move o foco para o passo seguinte quando o botão clicado some e anuncia erros. Ela foi validada com API simulada (sem nenhuma requisição para fora da máquina, 360 px, só teclado, interpretador sem resposta, modelo local indisponível, jornada Painel → Histórico → Contexto → Estudo → Comparação → Transferência só pelo formulário) e contra a stack real, incluindo o download e a abertura do relatório.
 
-O OpenAPI servido descreve `/health/*`, importações, partidas (lista, detalhe, preparação e decisões), detalhe de decisão, `/api/v1/ranked/me`, tentativas de estudo (criação, leitura, pistas, resposta, revelação, reflexão e progresso), análises (criação, leitura, julgamento e relatório) e `/api/v1/objectives/interpret`.
+Validação integrada e falhas críticas (CC-601):
+- **Caminho inteiro:** um teste de integração percorre a API num banco limpo, da importação DEMO até o relatório exportado. No mesmo fluxo:
+  - importação e tentativa repetidas não duplicam;
+  - interpretador offline devolve "pedir esclarecimento" e o formulário segue;
+  - modelo ativo com arquivo alterado cai no baseline, e a análise grava o motivo em `versions.registryFallback`, que aparece no relatório e em "Versões usadas".
+- **Sem rede:** os testes do backend bloqueiam qualquer conexão fora da máquina e do banco de teste, e o teste da stack real falha se o navegador pedir host externo.
+- **Falhas das quatro áreas cobertas por testes de interface:** League-V4 sem resposta, conta sem observação, Painel vazio, CDN fora do ar e busca sem resultado no Histórico.
+
+Remoção e retenção de dados (CC-603):
+- **Remover:** a página de cada partida tem "Remover esta partida". A prévia (`GET /api/v1/matches/{id}/purge-preview`) mostra o que sai e quais datasets e modelos registrados são invalidados, e a remoção só é enviada depois de a pessoa digitar o id (`DELETE /api/v1/matches/{id}?confirm=`).
+- **Como o worker remove:** o job `PURGE`, consultável em `/imports/{jobId}`, apaga primeiro os arquivos brutos, restritos ao diretório de armazenamento. Depois, numa transação, apaga todos os dependentes e retira de ativo os modelos treinados com datasets que listam a partida; o registro recusa promovê-los de novo.
+- **O que fica:** uma lápide só com um HMAC do id. Ela impede a reimportação real da mesma partida e permite repetir o pedido com o mesmo resultado.
+- **O que a remoção não desfaz:** remover linhas não desfaz o que um modelo já treinado aprendeu, e a contagem agregada de popularidade versionada no repositório não é recontada sozinha.
+- **Retenção:** `cc retention run` só lista o que passou do prazo (90 dias para partidas importadas, 365 para observações de elo, preservando a mais recente) e apaga apenas com `--execute`.
+
+O OpenAPI servido descreve:
+- `/health/*`;
+- importações;
+- partidas: lista, detalhe, preparação, decisões, prévia e remoção;
+- detalhe de decisão;
+- `/api/v1/ranked/me`;
+- tentativas de estudo: criação, leitura, pistas, resposta, revelação, reflexão e progresso;
+- análises: criação, leitura, julgamento e relatório;
+- `/api/v1/objectives/interpret`.
 
 ## Ambiente de desenvolvimento
 

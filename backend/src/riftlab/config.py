@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     objective_model_version: str = "local_model_unversioned"
     objective_parser_timeout_seconds: float = 15.0
 
+    # CC-603: retenção (cc retention). Só lista por padrão; apagar exige --execute.
+    match_retention_days: int = 90
+    rank_retention_days: int = 365
+
     worker_heartbeat_path: str = "/tmp/riftlab-worker.heartbeat"
     # Toque do heartbeat: a cada ciclo do worker (reserva -> busca -> persiste
     # um job), e a cada espera deste intervalo quando ocioso — substitui o

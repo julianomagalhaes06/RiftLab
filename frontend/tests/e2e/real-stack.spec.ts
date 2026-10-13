@@ -159,6 +159,15 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await row.click();
     await expect(page.getByRole("heading", { name: "Partida DEMO-0008" })).toBeVisible();
 
+    // Remoção (CC-603): prévia, confirmação digitada e job PURGE processado pelo worker real
+    await page.getByRole("button", { name: "Ver o que será removido" }).click();
+    await expect(page.getByText(/eventos da linha do tempo/)).toBeVisible();
+    await page.getByLabel(/Digite o id da partida/).fill("DEMO-0008");
+    await page.getByRole("button", { name: "Remover definitivamente" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Partida removida" })).toBeVisible({ timeout: 60_000 });
+    const gone = await page.request.get("/api/v1/matches/DEMO-0008");
+    expect(gone.status()).toBe(404);
+
     expect(pageErrors).toEqual([]);
     expect(consoleErrors).toEqual([]);
     expect(externalRequests).toEqual([]);

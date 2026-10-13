@@ -13,9 +13,11 @@ from riftlab.errors import ProblemDetail
 from riftlab.ingestion.application import get_import_job, request_import, retry_import
 from riftlab.ingestion.domain import ImportJob
 from riftlab.ingestion.domain import ImportMode as DomainImportMode
+from riftlab.ingestion.domain import JobKind as DomainJobKind
+from riftlab.ingestion.purge import is_purged
 from riftlab.shared.api.enums import ImportJobKind, ImportJobState
 from riftlab.shared.api.imports import ImportJobAccepted, ImportJobStatus, ImportRequest
-from riftlab.shared.errors import RiotKeyMissingError
+from riftlab.shared.errors import ConflictError, RiotKeyMissingError
 
 router = APIRouter(prefix="/api/v1/imports", tags=["imports"])
 
@@ -47,6 +49,12 @@ async def create_import(payload: ImportRequest, request: Request) -> ImportJobAc
         # requisição em si é inválida para este servidor (nenhuma chave
         # configurada), não um conflito de estado nem uma falha interna.
         raise RiotKeyMissingError()
+    if mode == DomainImportMode.RIOT and await is_purged(
+        request.app.state.session_factory,
+        payload.match_id,
+        request.app.state.settings.subject_hash_secret,
+    ):
+        raise ConflictError("MATCH_PURGED")  # CC-603: expurgo pedido não volta por reimportação
     job = await request_import(request.app.state.session_factory, payload.match_id, mode)
     return _to_accepted(job)
 
@@ -92,11 +100,12 @@ def _to_status(job: ImportJob) -> ImportJobStatus:
     # error_code só é != None em FAILED/RETRY_WAIT por construção do
     # repositório (reserve_next_job/mark_import_succeeded sempre limpam),
     # não por checagem defensiva aqui.
+    purge = job.kind == DomainJobKind.PURGE
     return ImportJobStatus(
         status=ImportJobState(job.state.value),
-        kind=ImportJobKind.IMPORT,
+        kind=ImportJobKind.PURGE if purge else ImportJobKind.IMPORT,
         attempts=job.attempts,
         error_code=job.error_code,
         retry_at=job.retry_at,
-        match_id=job.match_id,
+        match_id=None if purge else job.match_id,  # o expurgo nunca devolve o id
     )

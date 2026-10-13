@@ -197,6 +197,47 @@ ml_app = typer.Typer(
     help="Ranking contextual (CC-402): treino e teste único.", no_args_is_help=True
 )
 app.add_typer(ml_app, name="ml")
+retention_app = typer.Typer(help="Retenção e expurgo de dados locais (CC-603).")
+app.add_typer(retention_app, name="retention")
+
+
+@retention_app.command("run")
+def retention_run(
+    execute: bool = typer.Option(False, "--execute", help="Apaga de fato (padrão: só lista)."),
+    match_days: int | None = typer.Option(None, help="Partidas importadas há mais de N dias."),
+    rank_days: int | None = typer.Option(None, help="Observações de elo com mais de N dias."),
+) -> None:
+    """Lista (padrão) ou expurga partidas antigas e observações de elo antigas.
+
+    Preserva a observação de elo mais recente de cada fila e temporada. Só imprime
+    contagens, nunca ids de partida.
+    """
+    import asyncio
+    import json
+
+    from riftlab.db import build_engine
+    from riftlab.ingestion.purge import raw_store_for, retention
+    from riftlab.shared.db import build_session_factory
+
+    settings = get_settings()
+
+    async def _run() -> dict[str, object]:
+        engine = build_engine(settings.database_url)
+        try:
+            return await retention(
+                build_session_factory(engine),
+                raw_store_for(settings),
+                match_days=match_days or settings.match_retention_days,
+                rank_days=rank_days or settings.rank_retention_days,
+                secret=settings.subject_hash_secret,
+                execute=execute,
+            )
+        finally:
+            await engine.dispose()
+
+    typer.echo(json.dumps(asyncio.run(_run()), ensure_ascii=False, sort_keys=True))
+
+
 _CC402 = _REPO_ROOT / ".private" / "validation" / "sprint-4" / "CC-402" / "catalog"
 _ITEMS_16_19 = (
     _REPO_ROOT
