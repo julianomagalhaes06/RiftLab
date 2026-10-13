@@ -480,3 +480,207 @@ def sample_from_run(
     sheet_sha = _write_once(out_sheet, sheet)
     key_sha = _write_once(out_key, key, mode=0o400)
     return {"states": len(sheet["states"]), "sheetSha256": sheet_sha, "keySha256": key_sha}
+
+
+# ---------------------------------------------------------------------------
+# Versão por escolha (13/10/2026): o formulário por nota 0–3 se mostrou longo demais para
+# os revisores. Cada pessoa responde um bloco (~26 situações): escolhe o item que compraria
+# (ou "não sei") e, se quiser, marca os que não fazem sentido. Situações âncora, iguais em
+# todos os blocos, medem a concordância entre todos.
+# ---------------------------------------------------------------------------
+
+ANCHORS = 8
+BLOCKS = 3
+
+
+def plan_blocks(
+    key: Mapping[str, Any], blocks: int = BLOCKS, anchors: int = ANCHORS, seed: int = REVIEW_SEED
+) -> dict[str, Any]:
+    """Âncoras estratificadas (uma por estrato, depois por hash) e o resto distribuído por estrato
+    entre os blocos, para cada bloco ter a mesma mistura de campeão e ordem do item."""
+    states = key["states"]
+    by_stratum: dict[str, list[str]] = defaultdict(list)
+    for state_id in sorted(states, key=lambda s: _digest(seed, "bloco", s)):
+        meta = states[state_id]
+        by_stratum[f"{meta['championId']}:{meta['mainItemOrdinal']}"].append(state_id)
+    chosen: list[str] = []
+    while len(chosen) < anchors and any(by_stratum.values()):
+        for stratum in sorted(by_stratum):
+            if by_stratum[stratum] and len(chosen) < anchors:
+                chosen.append(by_stratum[stratum].pop(0))
+    rest = [s for stratum in sorted(by_stratum) for s in by_stratum[stratum]]
+    assigned: dict[str, list[str]] = {str(b + 1): [] for b in range(blocks)}
+    for index, state_id in enumerate(rest):
+        assigned[str(index % blocks + 1)].append(state_id)
+
+    def shuffled(block: str, ids: list[str]) -> list[str]:
+        return sorted(ids, key=lambda state_id: _digest(seed, "ordem", block, state_id))
+
+    order = {block: shuffled(block, chosen + own) for block, own in assigned.items()}
+    return {"seed": seed, "anchors": sorted(chosen), "blocks": order}
+
+
+def fleiss_kappa(table: Sequence[Sequence[int]]) -> float | None:
+    """Kappa de Fleiss; cada linha conta quantos avaliadores puseram o sujeito em cada categoria.
+    Linhas com menos de 2 avaliadores são ignoradas; avaliadores por linha podem variar."""
+    rows = [list(r) for r in table if sum(r) >= 2]
+    if not rows:
+        return None
+    categories = max(len(r) for r in rows)
+    rows = [r + [0] * (categories - len(r)) for r in rows]
+    agreement = []
+    totals = [0.0] * categories
+    weight = 0
+    for r in rows:
+        n = sum(r)
+        agreement.append((sum(c * c for c in r) - n) / (n * (n - 1)))
+        for j, c in enumerate(r):
+            totals[j] += c
+        weight += n
+    p_bar = sum(agreement) / len(agreement)
+    p_e = sum((t / weight) ** 2 for t in totals)
+    return None if p_e == 1 else (p_bar - p_e) / (1 - p_e)
+
+
+def analyze_choices(
+    key: Mapping[str, Any],
+    responses: Mapping[str, Mapping[str, Any]],
+    plan: Mapping[str, Any],
+    resamples: int = RESAMPLES,
+    seed: int = REVIEW_SEED,
+) -> dict[str, Any]:
+    """Agregado sem identidade da revisão por escolha.
+
+    `responses`: {pseudônimo: {"block": "1", "profile": {...}, "choices": {estado: itemId|None},
+    "rejected": {estado: [itemIds]}}}. Origem da escolha, rejeição por origem, concordância
+    (Fleiss nas âncoras; acordo par a par) e imitação na mesma amostra.
+    """
+    key_states = key["states"]
+    raters = sorted(responses)
+    states = sorted({s for r in raters for s in (responses[r].get("choices") or {})})
+
+    def roles_of(state: str, item: str | None) -> set[str]:
+        if item is None:
+            return {"unsure"}
+        meta = key_states[state]["items"].get(str(item))
+        if meta is None:
+            return set()
+        found = set()
+        if meta["popularityRank"] == 1:
+            found.add("popularity_top1")
+        if meta["popularityRank"] is not None:
+            found.add("popularity_top3")
+        if meta["modelTop1"]:
+            found.add("model_top1")
+        if meta["historical"]:
+            found.add("historical")
+        if meta["control"]:
+            found.add("control")
+        return found
+
+    picks = [
+        (state, r, responses[r]["choices"][state])
+        for r in raters
+        for state in (responses[r].get("choices") or {})
+    ]
+
+    def share(selected: Sequence[str], role: str) -> float | None:
+        chosen = [p for p in picks if p[0] in set(selected)]
+        if not chosen:
+            return None
+        return sum(role in roles_of(state, item) for state, _, item in chosen) / len(chosen)
+
+    def share_statistic(role: str) -> Callable[[Sequence[str]], float | None]:
+        return lambda selected: share(selected, role)
+
+    chosen_by = {
+        role: {
+            "share": None if (v := share(states, role)) is None else round(v, 3),
+            "ci95": _bootstrap(states, share_statistic(role), resamples, seed),
+        }
+        for role in (*ROLES, "unsure")
+    }
+
+    rejections: dict[str, list[int]] = {role: [0, 0] for role in ROLES}
+    for r in raters:
+        rejected = responses[r].get("rejected") or {}
+        for state in responses[r].get("choices") or {}:
+            marked = {str(i) for i in rejected.get(state, [])}
+            for item in key_states[state]["items"]:
+                for role in roles_of(state, item):
+                    if role in rejections:
+                        rejections[role][1] += 1
+                        rejections[role][0] += item in marked
+    rejected_by = {
+        role: {"rate": round(a / b, 3) if b else None, "n": b}
+        for role, (a, b) in rejections.items()
+    }
+
+    def table(selected: Sequence[str]) -> list[list[int]]:
+        rows = []
+        for state in selected:
+            options = [*key_states[state]["items"], None]
+            counts = [0] * len(options)
+            for r in raters:
+                if state in (responses[r].get("choices") or {}):
+                    value = responses[r]["choices"][state]
+                    counts[options.index(None if value is None else str(value))] += 1
+            rows.append(counts)
+        return rows
+
+    anchors = [s for s in plan["anchors"] if s in states]
+    pair_hits = pair_total = 0
+    for state in states:
+        votes = [
+            responses[r]["choices"][state]
+            for r in raters
+            if state in (responses[r].get("choices") or {})
+        ]
+        for i in range(len(votes)):
+            for j in range(i + 1, len(votes)):
+                pair_total += 1
+                pair_hits += votes[i] == votes[j]
+
+    def kappa_of(selected: Sequence[str]) -> float | None:
+        return fleiss_kappa(table(selected))
+
+    kappa_anchor = fleiss_kappa(table(anchors))
+    kappa_all = fleiss_kappa(table(states))
+    hits = [key_states[s]["popularityRanking"][0] == key_states[s]["targetItemId"] for s in states]
+    return {
+        "schemaVersion": 1,
+        "task": "choice_v1",
+        "seed": seed,
+        "synthetic": bool(key.get("synthetic")),
+        "sample": {
+            "states": len(states),
+            "raters": len(raters),
+            "answers": len(picks),
+            "anchors": len(anchors),
+            "raterBlocks": dict(
+                sorted(Counter(str(responses[r].get("block")) for r in raters).items())
+            ),
+        },
+        "raters": [
+            {
+                "ref": f"R{index + 1}",
+                "block": responses[r].get("block"),
+                "experience": (responses[r].get("profile") or {}).get("experience"),
+                "answered": len(responses[r].get("choices") or {}),
+                "unsure": sum(v is None for v in (responses[r].get("choices") or {}).values()),
+            }
+            for index, r in enumerate(raters)
+        ],
+        "agreement": {
+            "fleissAnchors": None if kappa_anchor is None else round(kappa_anchor, 4),
+            "fleissAll": None if kappa_all is None else round(kappa_all, 4),
+            "ci95All": _bootstrap(states, kappa_of, resamples, seed),
+            "pairwiseExact": round(pair_hits / pair_total, 4) if pair_total else None,
+            "pairs": pair_total,
+        },
+        "chosenBy": chosen_by,
+        "rejectedBy": rejected_by,
+        "imitation": {
+            "popularityTop1IsHistorical": round(sum(hits) / len(hits), 4) if hits else None,
+        },
+    }

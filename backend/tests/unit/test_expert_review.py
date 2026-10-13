@@ -160,3 +160,70 @@ def test_disagreeing_reviewers_lower_kappa() -> None:
     assert agreement["weightedKappa"] is not None and agreement["weightedKappa"] < 1.0
     low, high = agreement["ci95"]
     assert low <= agreement["weightedKappa"] <= high
+
+
+def test_blocks_share_stratified_anchors_and_cover_every_state_once() -> None:
+    from riftlab.ml.expert_review import plan_blocks
+
+    _, key = _sample()
+    plan = plan_blocks(key, blocks=3, anchors=8)
+    anchors = set(plan["anchors"])
+    assert len(anchors) == 8
+    strata = {
+        f"{key['states'][s]['championId']}:{key['states'][s]['mainItemOrdinal']}" for s in anchors
+    }
+    assert len(strata) == 3  # as três camadas sintéticas aparecem nas âncoras
+    own = [s for block in plan["blocks"].values() for s in block if s not in anchors]
+    assert sorted(own) == sorted(set(key["states"]) - anchors)  # cada não âncora em um bloco só
+    for block in plan["blocks"].values():
+        assert anchors <= set(block)
+    sizes = [len(b) for b in plan["blocks"].values()]
+    assert max(sizes) - min(sizes) <= 1
+    assert plan == plan_blocks(key, blocks=3, anchors=8)
+
+
+def test_fleiss_kappa_matches_hand_computed_cases() -> None:
+    from riftlab.ml.expert_review import fleiss_kappa
+
+    assert fleiss_kappa([[3, 0], [0, 3]]) == 1.0
+    # P_i = (2² + 1² − 3) / (3 · 2) = 1/3 em cada linha; p_j = 1/2 → Pe = 1/2 → κ = −1/3
+    assert math.isclose(fleiss_kappa([[2, 1], [1, 2]]) or 0, -1 / 3)
+    assert fleiss_kappa([[1, 0]]) is None  # um avaliador só não mede concordância
+
+
+def test_choice_analysis_reports_origin_shares_rejections_and_agreement() -> None:
+    from riftlab.ml.expert_review import analyze_choices, plan_blocks
+
+    _, key = _sample()
+    plan = plan_blocks(key, blocks=3, anchors=8)
+
+    def rater(block: str, unsure: str | None = None) -> dict[str, Any]:
+        choices: dict[str, str | None] = {}
+        rejected: dict[str, list[str]] = {}
+        for state in plan["blocks"][block]:
+            items = key["states"][state]["items"]
+            choices[state] = next(i for i, r in items.items() if r["historical"])
+            rejected[state] = [i for i, r in items.items() if r["control"]]
+        if unsure:
+            choices[unsure] = None
+        return {
+            "block": block,
+            "profile": {"experience": "sintético"},
+            "choices": choices,
+            "rejected": rejected,
+        }
+
+    responses = {f"S{b}{n}": rater(b) for b in "123" for n in "ab"}
+    report = analyze_choices(key, responses, plan, resamples=200)
+    assert report["sample"]["raters"] == 6 and report["sample"]["states"] == 29
+    assert report["chosenBy"]["historical"]["share"] == 1.0
+    assert report["chosenBy"]["control"]["share"] == 0.0
+    assert report["rejectedBy"]["control"]["rate"] == 1.0
+    assert report["agreement"]["fleissAll"] == 1.0 and report["agreement"]["pairwiseExact"] == 1.0
+    assert "SYN_" not in json.dumps(report)
+
+    anchor = plan["anchors"][0]
+    responses["S1a"] = rater("1", unsure=anchor)
+    report = analyze_choices(key, responses, plan, resamples=200)
+    assert report["chosenBy"]["unsure"]["share"] > 0
+    assert report["agreement"]["fleissAnchors"] < 1.0

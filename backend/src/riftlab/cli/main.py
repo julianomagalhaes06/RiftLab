@@ -545,6 +545,28 @@ def ml_review_analyze(
     typer.echo(json.dumps(report["agreement"], sort_keys=True))
 
 
+@ml_app.command("review-analyze-choices")
+def ml_review_analyze_choices(
+    key: Path = typer.Option(_CC602 / "key.json", help="Chave privada da amostra."),
+    plan: Path = typer.Option(_CC602 / "blocos" / "plano.json", help="Plano dos blocos."),
+    responses: Path = typer.Option(..., help="Respostas por escolha (JSON por pessoa)."),
+    output: Path = typer.Option(..., help="Agregado sem identidade."),
+) -> None:
+    """Revisão por escolha (CC-602): origem escolhida, rejeição por origem e concordância."""
+    import json
+
+    from riftlab.ml.experiment import _write_once
+    from riftlab.ml.expert_review import analyze_choices
+
+    report = analyze_choices(
+        json.loads(key.read_bytes()),
+        json.loads(responses.read_bytes()),
+        json.loads(plan.read_bytes()),
+    )
+    _write_once(output, report)
+    typer.echo(json.dumps(report["agreement"], sort_keys=True))
+
+
 @ml_app.command("evaluate-test")
 def ml_evaluate_test(
     run_dir: Path = typer.Option(..., help="Execução já selecionada."),
