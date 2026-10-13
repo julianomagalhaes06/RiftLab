@@ -25,12 +25,16 @@ COPY configs/ranking ./configs/ranking
 
 # ---- test: inclui dependencias de dev (pytest/ruff/mypy) e testes ----
 FROM base AS test
-RUN uv sync --frozen
+# Mesmas dependências da CI (dev + ml: catboost/numpy usados pelos testes de ranking e suporte).
+RUN uv sync --frozen --group ml
 COPY backend/tests ./tests
 # Exemplo público da lista de sementes (CC-206): um teste garante que ele acompanha o carregador.
 COPY configs/collection-seeds.example.yaml ./configs/collection-seeds.example.yaml
 # Registro do gate do interpretador (CC-506): um teste confere que o padrão segue o gate.
 COPY configs/objective-parser-gate.yaml ./configs/objective-parser-gate.yaml
+# Políticas públicas do dataset (CC-401), validadas pelos testes do corpus.
+COPY configs/dataset.yaml ./configs/dataset.yaml
+COPY configs/experiments/dataset-16.19-v2.yaml ./configs/experiments/dataset-16.19-v2.yaml
 COPY backend/openapi.json ./openapi.json
 ENV PATH="/app/.venv/bin:$PATH"
 CMD ["pytest"]

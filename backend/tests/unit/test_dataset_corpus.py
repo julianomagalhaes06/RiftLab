@@ -161,8 +161,16 @@ def test_freeze_writes_once_under_private_with_sidecar(tmp_path: Path) -> None:
         freeze_corpus(tmp_path / "public.json", {"a": store}, policy)
 
 
+def _repo_config(*parts: str) -> Path:
+    here = Path(__file__).resolve()
+    candidates = [root / "configs" / Path(*parts) for root in (here.parents[2], here.parents[3])]
+    found = next((path for path in candidates if path.is_file()), None)  # container (/app) ou host
+    assert found is not None, f"configs/{'/'.join(parts)} não encontrado"
+    return found
+
+
 def test_repository_policy_is_valid() -> None:
-    policy = load_dataset_policy(Path(__file__).resolve().parents[3] / "configs" / "dataset.yaml")
+    policy = load_dataset_policy(_repo_config("dataset.yaml"))
 
     assert (policy.patch, policy.queue_id, policy.map_id) == ("16.19", 420, 11)
     assert policy.exclude_remakes is True
@@ -209,8 +217,6 @@ def test_invalid_validation_fraction_fails_closed(tmp_path: Path, extra: str) ->
 
 
 def test_repository_experiment_policy_is_70_15_15() -> None:
-    policy = load_dataset_policy(
-        Path(__file__).resolve().parents[3] / "configs" / "experiments" / "dataset-16.19-v2.yaml"
-    )
+    policy = load_dataset_policy(_repo_config("experiments", "dataset-16.19-v2.yaml"))
 
     assert (policy.train_fraction, policy.validation_fraction) == (0.7, 0.15)
