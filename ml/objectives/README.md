@@ -59,5 +59,6 @@ Leitura:
 - Ele também não supera as regras de forma mensurável (8 × 6 acertos exclusivos em 100 frases).
 - Por isso o provedor padrão continua sendo o de regras, e o modelo ajustado fica como
   experimento documentado.
-- Limitações: dados sintéticos; regras, gerador e teste do mesmo autor; revisão humana de uma
-  amostra pendente.
+- Limitações: dados sintéticos; regras, gerador e teste do mesmo autor. Um revisor humano
+  confirmou às cegas os 15 rótulos disputados do teste e concordou com 82,5% de uma amostra de 40
+  frases do treino antes de ver o rótulo (97,5% depois; ver `corpus/RUBRIC.md`).

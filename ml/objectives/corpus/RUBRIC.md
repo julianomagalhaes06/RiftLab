@@ -49,5 +49,8 @@ o texto nunca muda legalidade, preço ou atributo.
 ## Origem e revisão
 
 Todos os exemplos são sintéticos (escritos por Claude Opus 5.5, origem `synthetic:model`), sem
-dados de partida, nomes de jogador ou conteúdo de pessoas. Revisão completa por modelo; amostra de
-40 frases reservada para revisão humana, registrada como pendente até ser feita.
+dados de partida, nomes de jogador ou conteúdo de pessoas. Revisão completa por modelo. Revisão
+humana às cegas (um revisor, 12/10/2026): 40 frases sorteadas do treino e da validação, com 82,5%
+de acordo antes de ver o rótulo (κ 0,78) e 97,5% depois, todas as divergências vindas das
+convenções acima (pedir esclarecimento com duas prioridades, fora do domínio, situação direta).
+Também foram revisadas as 15 frases do teste em que algum sistema errou: 15/15 confirmadas.
