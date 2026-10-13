@@ -560,6 +560,8 @@ export interface components {
             objective?: string | null;
             /** Ranking */
             ranking?: string | null;
+            /** Registryfallback */
+            registryFallback?: string | null;
             /** Registryversion */
             registryVersion?: string | null;
         };

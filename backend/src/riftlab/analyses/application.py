@@ -204,6 +204,7 @@ async def create_analysis(
     active = await resolve_active(session_factory, REGISTRY_TASK, patch)
     registry_version = active.version_id
     result["versions"]["registryVersion"] = str(registry_version) if registry_version else None
+    result["versions"]["registryFallback"] = active.fallback_reason
     analysis_id = uuid.uuid4()
     try:
         async with session_factory.begin() as session:

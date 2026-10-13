@@ -91,6 +91,18 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
     expect(screen.getByText(/não são probabilidades/)).toBeInTheDocument();
   });
 
+  it("modelo ativo recusado por hash aparece nas versões usadas", async () => {
+    const refused = { ...COMPARISON, versions: { ...COMPARISON.versions, registryVersion: null, registryFallback: "ACTIVE_ARTIFACT_HASH_MISMATCH" } };
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
+    mock.on("POST", /\/reveal$/, () => json(200, attempt({ status: "REVEALED", analysisId: refused.analysisId, comparison: refused, historicalItemId: 3031 })));
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText("Thornmail");
+    fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
+    await screen.findByRole("heading", { name: "Comparação" });
+    expect(screen.getByText(/versão ativa foi recusada porque o arquivo não confere com o hash/)).toBeInTheDocument();
+  });
+
   it("sem alternativas mostra os motivos em vez de tela vazia", async () => {
     mock.on("POST", /^\/api\/v1\/learning-attempts$/, () =>
       json(201, attempt({ options: [], reasonCodes: ["PATCH_UNSUPPORTED"] })),

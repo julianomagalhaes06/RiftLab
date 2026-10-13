@@ -127,6 +127,12 @@ function Comparison({ attempt, headingRef }: { attempt: LearningAttempt; heading
           <li>Objetivo: {comparison.versions.objective ?? "—"}</li>
           <li>Regras de itens: {comparison.versions.itemRules ?? "—"}</li>
           <li>Modelo: {comparison.versions.model ?? "nenhum (baseline explícito)"}</li>
+          {comparison.versions.registryFallback === "ACTIVE_ARTIFACT_HASH_MISMATCH" ? (
+            <li>
+              Registro de modelos: a versão ativa foi recusada porque o arquivo não confere com o
+              hash registrado; a comparação usa o critério explícito acima.
+            </li>
+          ) : null}
         </ul>
       </details>
     </section>

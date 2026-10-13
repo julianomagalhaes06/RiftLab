@@ -385,6 +385,18 @@
             ],
             "title": "Ranking"
           },
+          "registryFallback": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registryfallback"
+          },
           "registryVersion": {
             "anyOf": [
               {

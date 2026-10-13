@@ -26,6 +26,15 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
         consoleErrors.push(message.text());
       }
     });
+    // CC-601: a demonstração não depende de nada fora da máquina (sem Riot, CDN ou nuvem)
+    const baseHost = new URL(process.env.E2E_BASE_URL ?? "http://127.0.0.1:5173").hostname;
+    const externalRequests: string[] = [];
+    page.on("request", (request) => {
+      const host = new URL(request.url()).hostname;
+      if (!["127.0.0.1", "localhost", baseHost].includes(host) && !request.url().startsWith("data:")) {
+        externalRequests.push(host);
+      }
+    });
 
     // Entrada
     await page.goto("/");
@@ -152,5 +161,6 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
 
     expect(pageErrors).toEqual([]);
     expect(consoleErrors).toEqual([]);
+    expect(externalRequests).toEqual([]);
   });
 });

@@ -46,6 +46,9 @@ class AnalysisVersions(CamelModel):
     objective: str | None = Field(default=None, max_length=40)  # CC-304
     item_rules: str | None = Field(default=None, max_length=60)
     registry_version: UUID | None = None  # CC-405: versão ativa do registro (baseline ou modelo)
+    # CC-601: por que não há versão ativa utilizável (NO_ACTIVE_VERSION ou
+    # ACTIVE_ARTIFACT_HASH_MISMATCH, arquivo do modelo ativo corrompido); nulo quando há.
+    registry_fallback: str | None = Field(default=None, max_length=40)
 
 
 class AnalysisQuality(CamelModel):
