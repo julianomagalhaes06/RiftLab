@@ -460,6 +460,50 @@ def ml_benchmark(
     typer.echo(json.dumps(report, ensure_ascii=False, sort_keys=True))
 
 
+_CC315 = _REPO_ROOT / ".private" / "validation" / "sprint-3" / "CC-315" / "catalog"
+_CC602 = _REPO_ROOT / ".private" / "validation" / "sprint-6" / "CC-602"
+
+
+@ml_app.command("review-sample")
+def ml_review_sample(
+    dataset: Path = typer.Option(..., help="Dataset de planejamento com contexto (CC-408)."),
+    run_dir: Path = typer.Option(..., help="Execução congelada do ranker com esse dataset."),
+    champions: Path = typer.Option(_CC402 / "champion-16.19.1-en_US.json"),
+    items: Path = typer.Option(_ITEMS_16_19),
+    names: Path = typer.Option(_CC315 / "item-16.19.1-pt_BR.json", help="Nomes dos itens."),
+    out_sheet: Path = typer.Option(_CC602 / "sheet.json", help="Folha cega (privada)."),
+    out_key: Path = typer.Option(_CC602 / "key.json", help="Chave com origem (privada)."),
+) -> None:
+    """Amostra cega do teste reservado para os revisores (CC-602); grava uma vez."""
+    import json
+
+    from riftlab.ml.expert_review import ReviewError, sample_from_run
+
+    try:
+        summary = sample_from_run(dataset, run_dir, champions, items, names, out_sheet, out_key)
+    except ReviewError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(summary, sort_keys=True))
+
+
+@ml_app.command("review-analyze")
+def ml_review_analyze(
+    key: Path = typer.Option(_CC602 / "key.json", help="Chave privada da amostra."),
+    answers: Path = typer.Option(..., help="Respostas dos revisores (JSON por revisor)."),
+    output: Path = typer.Option(..., help="Agregado sem identidade."),
+) -> None:
+    """Concordância, distribuição de notas, pertinência por origem e imitação (CC-602)."""
+    import json
+
+    from riftlab.ml.experiment import _write_once
+    from riftlab.ml.expert_review import analyze
+
+    report = analyze(json.loads(key.read_bytes()), json.loads(answers.read_bytes()))
+    _write_once(output, report)
+    typer.echo(json.dumps(report["agreement"], sort_keys=True))
+
+
 @ml_app.command("evaluate-test")
 def ml_evaluate_test(
     run_dir: Path = typer.Option(..., help="Execução já selecionada."),
