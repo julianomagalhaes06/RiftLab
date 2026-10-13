@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   api,
   reportUrl,
@@ -32,11 +32,18 @@ export function Reflection({
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [justSaved, setJustSaved] = useState(false);
+  const savedText = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (justSaved) {
+      savedText.current?.focus(); // o campo sumiu; o foco vai para a reflexão gravada
+    }
+  }, [justSaved]);
   return (
     <section className="section" aria-labelledby="reflection-heading">
       <h4 id="reflection-heading">Reflexão</h4>
       {attempt.reflection ? (
-        <p>
+        <p ref={savedText} tabIndex={-1}>
           Sua reflexão registrada: <q>{attempt.reflection}</q>
         </p>
       ) : (
@@ -63,7 +70,10 @@ export function Reflection({
                 setError(null);
                 api
                   .reflectAttempt(attempt.attemptId, text.trim())
-                  .then(onSaved)
+                  .then((saved) => {
+                    onSaved(saved);
+                    setJustSaved(true);
+                  })
                   .catch(setError)
                   .finally(() => setBusy(false));
               }}
@@ -184,18 +194,20 @@ export function ReviewerFeedback({ attempt }: { attempt: LearningAttempt }) {
         </button>
       </div>
       {error ? <ErrorNotice error={error} /> : null}
-      {saved.length > 0 ? (
-        <ul aria-live="polite">
-          {saved.map((feedback) => (
-            <li key={feedback.feedbackId}>
-              Julgamento registrado:{" "}
-              {candidates.find((c) => c.itemId === feedback.itemId)?.name ?? feedback.itemId} —{" "}
-              {feedback.grade === null || feedback.grade === undefined ? "abstenção" : `nota ${feedback.grade}`}{" "}
-              (revisor {feedback.reviewerRef})
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <div aria-live="polite">
+        {saved.length > 0 ? (
+          <ul>
+            {saved.map((feedback) => (
+              <li key={feedback.feedbackId}>
+                Julgamento registrado:{" "}
+                {candidates.find((c) => c.itemId === feedback.itemId)?.name ?? feedback.itemId} —{" "}
+                {feedback.grade === null || feedback.grade === undefined ? "abstenção" : `nota ${feedback.grade}`}{" "}
+                (revisor {feedback.reviewerRef})
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </details>
   );
 }

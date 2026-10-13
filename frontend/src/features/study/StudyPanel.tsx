@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   api,
   type AnalysisCandidate,
@@ -42,7 +42,7 @@ function name(option: { itemId: number; name?: string | null }): string {
   return option.name ?? `Item ${option.itemId}`;
 }
 
-function Comparison({ attempt }: { attempt: LearningAttempt }) {
+function Comparison({ attempt, headingRef }: { attempt: LearningAttempt; headingRef: RefObject<HTMLHeadingElement | null> }) {
   const comparison = attempt.comparison;
   if (!comparison) {
     return null;
@@ -51,7 +51,9 @@ function Comparison({ attempt }: { attempt: LearningAttempt }) {
   const reasons = comparison.support?.reasonCodes ?? [];
   return (
     <section className="section" aria-labelledby="comparison-heading">
-      <h3 id="comparison-heading">Comparação</h3>
+      <h3 id="comparison-heading" ref={headingRef} tabIndex={-1}>
+        Comparação
+      </h3>
       <p className="muted">
         Objetivo: {objectiveLabel(comparison.objective.priority)} ({objectiveOrigin(comparison.objective)}) ·
         Critério: {ENGINE_TEXT[comparison.engine] ?? comparison.engine}
@@ -280,6 +282,31 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
   const [rationale, setRationale] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  // O botão clicado some quando a tentativa avança; o foco vai para o próximo passo em vez
+  // de cair no topo da página (teclado e leitor de tela).
+  const studyHeading = useRef<HTMLHeadingElement>(null);
+  const choiceLegend = useRef<HTMLLegendElement>(null);
+  const hintList = useRef<HTMLUListElement>(null);
+  const revealButton = useRef<HTMLButtonElement>(null);
+  const comparisonHeading = useRef<HTMLHeadingElement>(null);
+  const previous = useRef<LearningAttempt | null>(null);
+
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = attempt;
+    if (attempt === null || before === attempt) {
+      return;
+    }
+    if (before === null) {
+      (choiceLegend.current ?? studyHeading.current)?.focus();
+    } else if (attempt.status === "REVEALED" && before.status !== "REVEALED") {
+      comparisonHeading.current?.focus();
+    } else if (attempt.hintLevel > before.hintLevel) {
+      hintList.current?.focus();
+    } else if (attempt.status === "ANSWERED" && before.status === "OPEN") {
+      revealButton.current?.focus();
+    }
+  }, [attempt]);
 
   async function run(action: () => Promise<LearningAttempt>) {
     setBusy(true);
@@ -331,7 +358,9 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
   const answered = attempt.status !== "OPEN";
   return (
     <section className="section" aria-labelledby="study-heading">
-      <h3 id="study-heading">Estudar esta decisão</h3>
+      <h3 id="study-heading" ref={studyHeading} tabIndex={-1}>
+        Estudar esta decisão
+      </h3>
       {attempt.mode === "TRANSFER" ? <p className="muted">Modo sem pistas (transferência).</p> : null}
       {attempt.options.length === 0 ? (
         <div className="notice notice--info" role="note">
@@ -344,7 +373,9 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
         </div>
       ) : (
         <fieldset className="field" disabled={answered || busy}>
-          <legend>Qual destas você compraria? (ordem sem significado)</legend>
+          <legend ref={choiceLegend} tabIndex={-1}>
+            Qual destas você compraria? (ordem sem significado)
+          </legend>
           {attempt.options.map((option) => (
             <label key={option.itemId} className="radio-option">
               <input
@@ -375,7 +406,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
         </fieldset>
       )}
       {(attempt.hints ?? []).length > 0 ? (
-        <ul className="hint-text">
+        <ul className="hint-text" ref={hintList} tabIndex={-1} aria-label="Pistas abertas">
           {(attempt.hints ?? []).map((hint) => (
             <li key={hint.text}>
               Pista {hint.level}: {hint.text}
@@ -424,6 +455,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
         ) : null}
         {!revealed ? (
           <button
+            ref={revealButton}
             type="button"
             className="button button--secondary"
             disabled={busy}
@@ -434,7 +466,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
         ) : null}
       </div>
       {error ? <ErrorNotice error={error} /> : null}
-      {revealed ? <Comparison attempt={attempt} /> : null}
+      {revealed ? <Comparison attempt={attempt} headingRef={comparisonHeading} /> : null}
       {revealed ? <Scenario attempt={attempt} /> : null}
       {revealed ? <Reanalysis attempt={attempt} /> : null}
       {revealed ? <Reflection attempt={attempt} onSaved={setAttempt} /> : null}

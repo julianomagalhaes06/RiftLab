@@ -110,8 +110,46 @@ describe("ObjectivePicker (CC-504): texto só vale depois de confirmado", () => 
 
     mock.on("POST", URL, () => problem(500, "INTERNAL_ERROR"));
     typeAndInterpret("quero mana de novo");
-    await screen.findByText(/demorou demais|não respondeu/);
+    await screen.findByText(/O interpretador não respondeu/);
     expect(screen.getByLabelText(/Equilibrado/)).toBeChecked();
+  });
+
+  it("modelo local ativo: nomeia o provedor e a versão, e confirmar devolve o foco ao formulário", async () => {
+    mock.on("POST", URL, () =>
+      json(200, {
+        status: "INTERPRETED",
+        objective: { priority: "UTILITY", parserVersion: "qwen2.5-1.5b-lora-v1" },
+        parserVersion: "qwen2.5-1.5b-lora-v1",
+        provider: "LOCAL_MODEL",
+        reasonCodes: [],
+      }),
+    );
+    render(<Harness onChange={vi.fn()} />);
+    typeAndInterpret("fico sem mana na rota");
+    await screen.findByText(/modelo de linguagem local, versão qwen2.5-1.5b-lora-v1/);
+    expect(screen.getByText(/não diz qual item é melhor/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Usar este objetivo" }));
+    expect(screen.getByText("Objetivo")).toHaveFocus();
+    expect(screen.getByText(/de texto confirmado \(interpretador qwen2.5-1.5b-lora-v1\)/)).toBeInTheDocument();
+  });
+
+  it("editar o texto descarta a sugestão anterior", async () => {
+    mock.on("POST", URL, () =>
+      json(200, {
+        status: "INTERPRETED",
+        objective: { priority: "DAMAGE", parserVersion: "rules_v1" },
+        parserVersion: "rules_v1",
+        provider: "RULES",
+        reasonCodes: [],
+      }),
+    );
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    typeAndInterpret("quero dano");
+    await screen.findByRole("button", { name: "Usar este objetivo" });
+    fireEvent.change(screen.getByLabelText(/descreva em uma frase/), { target: { value: "quero dano não, quero vida" } });
+    expect(screen.queryByRole("button", { name: "Usar este objetivo" })).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("limita o texto a 500 caracteres e escolher no formulário apaga a origem textual", () => {

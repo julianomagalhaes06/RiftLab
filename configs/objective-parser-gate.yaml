@@ -1,0 +1,62 @@
+# Gate do interpretador de objetivo (CC-503/CC-506). Registro da avaliação no teste reservado e
+# da decisão sobre o provedor padrão. O backend só pode ter como padrão um provedor aprovado aqui
+# (tests/unit/test_objective_gate.py). Qualquer nova versão de regras ou de modelo exige nova
+# avaliação, registrada antes de virar padrão, num teste ainda não usado.
+gate:
+  version: objective_gate_v1
+  registeredBeforeTest: "2026-10-12T16:34-03:00"
+  thresholds:
+    jsonValidRate: 0.95            # JSON válido antes do validador
+    macroF1: 0.90                  # 5 saídas, incluindo NEEDS_INPUT
+    maxNeedsInputRecallDrop: 0.05  # em relação à referência (o provedor padrão anterior)
+  reference: rules_v1
+corpus:
+  rubric: ml/objectives/corpus/RUBRIC.md
+  testSha256: c567152c
+  testSize: 100
+  testRuns: 1
+  humanReview: "um revisor, às cegas: 15/15 rótulos disputados do teste confirmados"
+results:
+  # provider, parserVersion, métricas no teste e veredito do gate
+  - parserVersion: rules_v1
+    provider: RULES
+    jsonValidRate: 1.0
+    macroF1: 0.918
+    needsInputRecall: 1.0
+    latencyP50Seconds: 0.0
+    approved: true
+  - parserVersion: qwen2.5-0.5b-base
+    provider: LOCAL_MODEL
+    jsonValidRate: 0.89
+    macroF1: 0.189
+    needsInputRecall: 0.88
+    latencyP50Seconds: 3.30
+    approved: false
+  - parserVersion: qwen2.5-0.5b-lora-v1
+    provider: LOCAL_MODEL
+    jsonValidRate: 1.0
+    macroF1: 0.766
+    needsInputRecall: 0.92
+    latencyP50Seconds: 3.16
+    approved: false
+  - parserVersion: qwen2.5-1.5b-base
+    provider: LOCAL_MODEL
+    jsonValidRate: 0.76
+    macroF1: 0.560
+    needsInputRecall: 0.56
+    latencyP50Seconds: 10.15
+    approved: false
+  - parserVersion: qwen2.5-1.5b-lora-v1
+    provider: LOCAL_MODEL
+    jsonValidRate: 1.0
+    macroF1: 0.934
+    needsInputRecall: 0.88
+    latencyP50Seconds: 10.03
+    approved: false
+decision:
+  defaultProvider: RULES
+  defaultParserVersion: rules_v1
+  note: >-
+    Nenhum modelo ajustado passou: o 1.5B + LoRA cumpre JSON e macro-F1, mas o recall de
+    NEEDS_INPUT cai 0,12 em relação às regras (seguiu uma instrução embutida na frase). O
+    provedor LOCAL_MODEL continua disponível só por configuração explícita, como experimento.

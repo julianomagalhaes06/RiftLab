@@ -65,9 +65,11 @@ export function ObjectivePicker({ idPrefix, value, onChange }: Props) {
       }
     } catch {
       if (controller.current !== own) {
-        return; // substituída por outra interpretação
+        return; // substituída por outra interpretação ou cancelada
       }
-      setPending({ kind: "fallback", message: NEEDS_INPUT_TEXT.TIMEOUT });
+      // abortada pelo relógio do cliente = demorou demais; qualquer outra falha = sem resposta
+      const message = own.signal.aborted ? NEEDS_INPUT_TEXT.TIMEOUT : NEEDS_INPUT_TEXT.PROVIDER_ERROR;
+      setPending({ kind: "fallback", message });
       legend.current?.focus();
     } finally {
       window.clearTimeout(timer);
@@ -96,7 +98,9 @@ export function ObjectivePicker({ idPrefix, value, onChange }: Props) {
               checked={value.priority === objective.value}
               onChange={() => onChange({ priority: objective.value })}
             />
-            {objective.label} <span className="muted">— {objective.hint}</span>
+            <span>
+              {objective.label} <span className="muted">— {objective.hint}</span>
+            </span>
           </label>
         ))}
         <p className="muted">Selecionado: {objectiveLabel(value.priority)}, {objectiveOrigin(value)}.</p>
@@ -107,7 +111,13 @@ export function ObjectivePicker({ idPrefix, value, onChange }: Props) {
           id={`${idPrefix}-text`}
           maxLength={TEXT_LIMIT}
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            setText(event.target.value);
+            // uma sugestão vale só para o texto que a gerou
+            if (pending.kind === "proposal" || pending.kind === "fallback") {
+              setPending({ kind: "idle" });
+            }
+          }}
           aria-describedby={`${idPrefix}-text-help`}
         />
         <p id={`${idPrefix}-text-help`} className="muted">
@@ -149,6 +159,7 @@ export function ObjectivePicker({ idPrefix, value, onChange }: Props) {
                     onChange(pending.result.objective);
                   }
                   setPending({ kind: "idle" });
+                  legend.current?.focus();
                 }}
               >
                 Usar este objetivo

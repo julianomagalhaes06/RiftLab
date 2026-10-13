@@ -101,6 +101,7 @@ body { background: var(--n0); color: var(--ntext); font-family: Inter, sans-seri
 .button, .app a.button { background: var(--accent); border-color: var(--accent); color: #181322; font-weight: 700; text-decoration: none; }
 .button:hover, .app a.button:hover { background: #cbbdff; }
 .button--secondary, .app a.button--secondary { background: var(--n1); color: var(--accent); border-color: var(--nline); }
+.button--secondary:hover, .app a.button--secondary:hover { background: var(--n2); color: var(--accent); border-color: var(--accent); }
 .button--link { color: var(--accent); }
 .app a.button--link { color: var(--accent); }
 .list__item, .details { background: var(--n1); border-color: var(--nline); }

@@ -12,10 +12,14 @@ export const DECISION_2 = "0f92d8d8-319c-4fa4-bca3-49157a1f9e01";
 export const LONG_MATCH_ID = "BR1_31203456789012345678";
 
 export interface MockReply {
+  /** 0 = nunca responde (simula interpretador travado; o cliente decide o timeout). */
   status: number;
   body: unknown;
   contentType?: string;
+  headers?: Record<string, string>;
 }
+
+export const HANG: MockReply = { status: 0, body: null };
 
 export interface MockRequest {
   method: string;
@@ -155,7 +159,17 @@ export type RouteKey =
   | "POST /api/v1/matches/:id/preparation"
   | "GET /api/v1/matches/:id/decisions"
   | "GET /api/v1/decisions/:id"
-  | "GET /api/v1/ranked/me";
+  | "GET /api/v1/ranked/me"
+  | "POST /api/v1/objectives/interpret"
+  | "GET /api/v1/learning-attempts/progress"
+  | "POST /api/v1/learning-attempts"
+  | "POST /api/v1/learning-attempts/:id/hint"
+  | "POST /api/v1/learning-attempts/:id/answer"
+  | "POST /api/v1/learning-attempts/:id/reveal"
+  | "POST /api/v1/learning-attempts/:id/reflection"
+  | "POST /api/v1/analyses"
+  | "POST /api/v1/analyses/:id/feedback"
+  | "GET /api/v1/analyses/:id/report";
 
 const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["POST /api/v1/imports", "POST", /^\/api\/v1\/imports$/],
@@ -167,10 +181,141 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/matches/:id", "GET", /^\/api\/v1\/matches\/[^/]+$/],
   ["GET /api/v1/decisions/:id", "GET", /^\/api\/v1\/decisions\/[^/]+$/],
   ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
+  ["POST /api/v1/objectives/interpret", "POST", /^\/api\/v1\/objectives\/interpret$/],
+  ["GET /api/v1/learning-attempts/progress", "GET", /^\/api\/v1\/learning-attempts\/progress$/],
+  ["POST /api/v1/learning-attempts", "POST", /^\/api\/v1\/learning-attempts$/],
+  ["POST /api/v1/learning-attempts/:id/hint", "POST", /^\/api\/v1\/learning-attempts\/[^/]+\/hint$/],
+  ["POST /api/v1/learning-attempts/:id/answer", "POST", /^\/api\/v1\/learning-attempts\/[^/]+\/answer$/],
+  ["POST /api/v1/learning-attempts/:id/reveal", "POST", /^\/api\/v1\/learning-attempts\/[^/]+\/reveal$/],
+  ["POST /api/v1/learning-attempts/:id/reflection", "POST", /^\/api\/v1\/learning-attempts\/[^/]+\/reflection$/],
+  ["POST /api/v1/analyses", "POST", /^\/api\/v1\/analyses$/],
+  ["POST /api/v1/analyses/:id/feedback", "POST", /^\/api\/v1\/analyses\/[^/]+\/feedback$/],
+  ["GET /api/v1/analyses/:id/report", "GET", /^\/api\/v1\/analyses\/[^/]+\/report$/],
 ];
 
+export const ATTEMPT_ID = "a77e0000-0000-4000-8000-000000000001";
+export const ANALYSIS_ID = "a7a10000-0000-4000-8000-000000000001";
+export const STUDY_OPTIONS = [
+  { itemId: 200001, name: "Item Composto Sintético" },
+  { itemId: 200002, name: "Outro Composto Sintético" },
+  { itemId: 200003, name: "Terceiro Composto Sintético" },
+];
+
+/** Comparação revelada (candidatos do gerador legal, critério identificado, sem gabarito). */
+export function comparison(objective: Record<string, unknown>) {
+  return {
+    analysisId: ANALYSIS_ID,
+    decisionId: DECISION_1,
+    status: "AVAILABLE",
+    engine: "RULES",
+    objective,
+    versions: { model: null, catalog: "DEMO-1/1", features: "feature_schema_v1", candidates: "legal_v1", ranking: "rules_v1", objective: "objective_v1", itemRules: "demo.json" },
+    quality: { budgetSource: "FRAME_ESTIMATE", frameAgeMs: 20000, warnings: [] },
+    support: { level: "SUPPORTED", reasonCodes: [], legalCandidates: 3, referenceDecisions: 0 },
+    candidates: STUDY_OPTIONS.map((option, index) => ({
+      ...option,
+      rank: index + 1,
+      baseRank: index === 0 ? 2 : index === 1 ? 1 : 3,
+      score: 1 - index / 10,
+      remainingCost: 150 + index * 400,
+      affordability: "UNKNOWN",
+      evidenceCodes: [],
+      tags: ["Armor"],
+      explanations: [{ text: `Faltam ${150 + index * 400} de ouro para completar o item.`, source: "candidates.remainingCost" }],
+    })),
+    scoreNote: "Pontuações são relativas a esta decisão; não são probabilidades.",
+  };
+}
+
+/**
+ * Tentativa de estudo com estado por spec (CC-304/305/505): objetivo e modo vêm do POST,
+ * pistas, resposta, revelação e reflexão avançam a mesma tentativa.
+ */
+function studyHandlers(): Partial<Record<RouteKey, Handler>> {
+  let state: Record<string, unknown> = {};
+  const reply = (patch: Record<string, unknown>, status = 200) => {
+    state = { ...state, ...patch };
+    return ok(state, status);
+  };
+  return {
+    "GET /api/v1/learning-attempts/progress": () =>
+      ok({ study: { attempts: 0, reflections: 0, usedHints: 0 }, transfer: { attempts: 0, reflections: 0 } }),
+    "POST /api/v1/learning-attempts": ({ body }) => {
+      const request = body as { objective: Record<string, unknown>; mode?: string; decisionId: string };
+      state = {
+        attemptId: ATTEMPT_ID,
+        decisionId: request.decisionId,
+        status: "OPEN",
+        mode: request.mode ?? "STUDY",
+        objective: request.objective,
+        context: {},
+        options: STUDY_OPTIONS,
+        hintLevel: 0,
+        hints: [],
+        reasonCodes: [],
+        selectedItemId: null,
+        skipped: false,
+        rationale: null,
+        analysisId: null,
+        comparison: null,
+        historicalItemId: null,
+        reflection: null,
+      };
+      return ok(state, 201);
+    },
+    "POST /api/v1/learning-attempts/:id/hint": ({ body }) => {
+      const level = (body as { level: number }).level;
+      const hints = [{ level: 1, text: "O time inimigo tem dois personagens de dano físico.", source: "context.enemies" }];
+      if (level >= 2) {
+        hints.push({ level: 2, text: "Item Composto Sintético: faltam 150 de ouro; atributos: Armor.", source: "candidates.remainingCost" });
+      }
+      return reply({ hintLevel: level, hints });
+    },
+    "POST /api/v1/learning-attempts/:id/answer": ({ body }) => {
+      const answer = body as { itemId: number | null; skipped: boolean; rationale: string | null };
+      return reply({ status: "ANSWERED", selectedItemId: answer.itemId, skipped: answer.skipped, rationale: answer.rationale });
+    },
+    "POST /api/v1/learning-attempts/:id/reveal": () =>
+      reply({
+        status: "REVEALED",
+        analysisId: ANALYSIS_ID,
+        comparison: comparison(state.objective as Record<string, unknown>),
+        historicalItemId: 200002,
+      }),
+    "POST /api/v1/learning-attempts/:id/reflection": ({ body }) =>
+      reply({ reflection: (body as { reflection: string }).reflection }),
+    "POST /api/v1/analyses": ({ body }) =>
+      ok({ ...comparison((body as { objective: Record<string, unknown> }).objective), analysisId: "a7a10000-0000-4000-8000-000000000002" }, 201),
+    "POST /api/v1/analyses/:id/feedback": ({ body }) => {
+      const feedback = body as { itemId: number; grade: number | null; reason: string; rubricVersion: string };
+      return ok({ feedbackId: "fb000000-0000-4000-8000-000000000001", analysisId: ANALYSIS_ID, ...feedback, reviewerRef: "0123456789ab" }, 201);
+    },
+    "GET /api/v1/analyses/:id/report": ({ url }) =>
+      url.searchParams.get("format") === "html"
+        ? {
+            status: 200,
+            contentType: "text/html; charset=utf-8",
+            headers: { "content-disposition": 'attachment; filename="riftlab-relatorio.html"' },
+            body: "<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><title>Relatório RiftLab</title></head><body><h1>Relatório de análise de compra</h1><p>Resposta inicial: Item Composto Sintético</p></body></html>",
+          }
+        : {
+            status: 200,
+            contentType: "application/json",
+            headers: { "content-disposition": 'attachment; filename="riftlab-relatorio.json"' },
+            body: { reportVersion: "report_v1", analysisId: ANALYSIS_ID },
+          },
+    "POST /api/v1/objectives/interpret": ({ body }) => {
+      const text = String((body as { text: string }).text).toLowerCase();
+      const priority = text.includes("aguentar") ? "SURVIVAL" : text.includes("dano") ? "DAMAGE" : null;
+      return priority
+        ? ok({ status: "INTERPRETED", objective: { priority, parserVersion: "rules_v1" }, parserVersion: "rules_v1", provider: "RULES", reasonCodes: [] })
+        : ok({ status: "NEEDS_INPUT", objective: null, parserVersion: "rules_v1", provider: "RULES", reasonCodes: ["AMBIGUOUS_OR_OUT_OF_SCOPE"] });
+    },
+  };
+}
+
 /** Fluxo feliz padrão: demonstração importada e pronta, com decisões e detalhe. */
-export const happyPath: Record<RouteKey, Handler> = {
+export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "POST /api/v1/imports": () =>
     ok({ jobId: JOB_ID, status: "QUEUED", statusUrl: `/api/v1/imports/${JOB_ID}` }, 202),
   "GET /api/v1/imports/:id": () =>
@@ -213,6 +358,7 @@ export async function mockApi(
   overrides: Partial<Record<RouteKey, Handler>> = {},
 ): Promise<CallLog> {
   const calls: string[] = [];
+  const study = studyHandlers();
   await page.route("**/health/live", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: '{"status":"UP"}' }),
   );
@@ -233,16 +379,19 @@ export async function mockApi(
     }
     const key = match[0];
     calls.push(key);
-    const handler = overrides[key] ?? happyPath[key];
+    const handler = (overrides[key] ?? study[key] ?? happyPath[key]) as Handler;
     const reply = handler({
       method: request.method(),
       url,
       body: request.postData() ? JSON.parse(request.postData() as string) : undefined,
     });
+    if (reply.status === 0) {
+      return; // HANG: a requisição fica pendente até o cliente desistir
+    }
     await route.fulfill({
       status: reply.status,
-      contentType: reply.contentType ?? "application/json",
-      body: JSON.stringify(reply.body),
+      headers: { ...reply.headers, "content-type": reply.contentType ?? "application/json" },
+      body: typeof reply.body === "string" ? reply.body : JSON.stringify(reply.body),
     });
   });
   return { calls, count: (key) => calls.filter((call) => call === key).length };

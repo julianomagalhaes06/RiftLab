@@ -191,6 +191,37 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
     expect(mock.callsTo("POST", /\/feedback$/)[0].body).toEqual({ itemId: 3075, grade: null, reason: "ok", rubricVersion: "rubric_v1", reviewerAlias: "rev-a" });
   });
 
+  it("o foco acompanha cada passo quando o botão clicado some", async () => {
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
+    mock.on("POST", /\/hint$/, () =>
+      json(200, attempt({ hintLevel: 1, hints: [{ level: 1, text: "O time inimigo tem dois atiradores.", source: "context.enemies" }] })),
+    );
+    mock.on("POST", /\/answer$/, () => json(200, attempt({ status: "ANSWERED", hintLevel: 1, hints: [{ level: 1, text: "O time inimigo tem dois atiradores.", source: "context.enemies" }], selectedItemId: 3075 })));
+    mock.on("POST", /\/reveal$/, () =>
+      json(200, attempt({ status: "REVEALED", selectedItemId: 3075, analysisId: COMPARISON.analysisId, comparison: COMPARISON, historicalItemId: 3031 })),
+    );
+    mock.on("POST", /\/reflection$/, () =>
+      json(200, attempt({ status: "REVEALED", analysisId: COMPARISON.analysisId, comparison: COMPARISON, historicalItemId: 3031, reflection: "mais armadura" })),
+    );
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await waitFor(() => expect(screen.getByText(/Qual destas você compraria/)).toHaveFocus());
+
+    fireEvent.click(screen.getByRole("button", { name: /observar ameaças/ }));
+    await waitFor(() => expect(screen.getByRole("list", { name: "Pistas abertas" })).toHaveFocus());
+
+    fireEvent.click(screen.getByLabelText("Thornmail"));
+    fireEvent.click(screen.getByRole("button", { name: "Responder" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Revelar/ })).toHaveFocus());
+
+    fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Comparação" })).toHaveFocus());
+
+    fireEvent.change(screen.getByLabelText(/O que mudaria na sua escolha/), { target: { value: "mais armadura" } });
+    fireEvent.click(screen.getByRole("button", { name: "Registrar reflexão" }));
+    await waitFor(() => expect(screen.getByText(/Sua reflexão registrada/)).toHaveFocus());
+  });
+
   it("modo sem pistas cria tentativa TRANSFER e não oferece pistas", async () => {
     mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt({ mode: "TRANSFER" })));
     render(<StudyPanel decisionId={DECISION} />);
