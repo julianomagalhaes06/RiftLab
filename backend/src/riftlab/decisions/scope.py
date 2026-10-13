@@ -53,7 +53,7 @@ class DecisionScope:
         return tuple(reasons)
 
 
-# Recorte SINTÉTICO das fixtures demo (patch DEMO-1, queue/map e campeões/role
+# Recorte SINTÉTICO das fixtures demo (patches DEMO-1 e DEMO-3, queue/map e campeões/role
 # das partidas DEMO). Nunca confundível com o recorte real: origem CURATED_DEMO
 # e versão própria.
 DEMO_SCOPE = DecisionScope(
@@ -61,7 +61,7 @@ DEMO_SCOPE = DecisionScope(
     origin=SourceOrigin.CURATED_DEMO,
     queue=420,
     map_id=11,
-    patches=frozenset({"DEMO-1"}),
+    patches=frozenset({"DEMO-1", "DEMO-3"}),  # DEMO-3: roteiro da demonstração (CC-605)
     role="BOTTOM",
     champion_ids=frozenset({9001, 9002}),
 )

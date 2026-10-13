@@ -78,7 +78,8 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
           <p className="my-rank__record">{position.wins} vitórias · {position.losses} derrotas na fila</p>
         </>}
         {data?.status === "STALE" && <p className="my-rank__stale" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}
-        {position && <p className="my-rank__time">Temporada {position.season} · Riot League-V4 · Observado em {new Date(position.observedAt).toLocaleString("pt-BR")}</p>}
+        {position?.origin === "DEMO_FICTITIOUS" && <p className="my-rank__stale" role="note">Elo fictício de demonstração: não foi consultado na Riot e não pertence a nenhuma conta.</p>}
+        {position && <p className="my-rank__time">Temporada {position.season} · {position.origin === "DEMO_FICTITIOUS" ? "Demonstração (fictício)" : "Riot League-V4"} · Observado em {new Date(position.observedAt).toLocaleString("pt-BR")}</p>}
         {position?.state === "READY" && <ChangeLine data={data?.change ?? null} />}
       </div>
       <div className="my-rank__emblem" aria-hidden="true">{tier ? <img src={`/ranked-emblems/${tier.toLowerCase()}.webp`} alt="" width="180" height="180" /> : <span>RL</span>}</div>

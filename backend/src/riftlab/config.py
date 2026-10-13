@@ -64,6 +64,9 @@ class Settings(BaseSettings):
 
     # CC-603: retenção (cc retention). Só lista por padrão; apagar exige --execute.
     match_retention_days: int = 90
+    # CC-605: na demonstração (sem chave da Riot), Minha posição lê um elo FICTÍCIO marcado
+    # como tal, gravado por `cc ranked demo-seed`; nunca consulta a Riot.
+    demo_ranked: bool = False
     rank_retention_days: int = 365
 
     worker_heartbeat_path: str = "/tmp/riftlab-worker.heartbeat"

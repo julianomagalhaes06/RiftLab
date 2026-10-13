@@ -75,3 +75,14 @@ test("todos os elos preservam rótulo e contraste AA", async ({ page }) => {
     }
   }
 });
+
+test("demonstração: elo fictício aparece marcado e sem atribuição à Riot", async ({ page }) => {
+  await mockApi(page, {
+    "GET /api/v1/ranked/me": () =>
+      ok({ ...rank, position: { ...rank.position, origin: "DEMO_FICTITIOUS", season: "DEMO" } }),
+  });
+  await page.goto("/minha-posicao");
+  await expect(page.getByText(/Elo fictício de demonstração: não foi consultado na Riot/)).toBeVisible();
+  await expect(page.getByText(/Demonstração \(fictício\)/)).toBeVisible();
+  await expect(page.getByText("Riot League-V4", { exact: false })).toHaveCount(0);
+});

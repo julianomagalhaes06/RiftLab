@@ -28,12 +28,19 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /real-stack\.spec\.ts/,
+      testIgnore: /(real-stack|demo)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "real-stack",
       testMatch: /real-stack\.spec\.ts/,
+      fullyParallel: false,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // Roteiro da demonstração (CC-605): stack de demonstração semeada por scripts/demo.sh.
+      name: "demo",
+      testMatch: /demo\.spec\.ts/,
       fullyParallel: false,
       use: { ...devices["Desktop Chrome"] },
     },

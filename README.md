@@ -145,6 +145,64 @@ O OpenAPI servido descreve:
 - análises: criação, leitura, julgamento e relatório;
 - `/api/v1/objectives/interpret`.
 
+## Demonstração reproduzível
+
+**Requisitos:** Docker com Compose v2, Python 3 (só biblioteca padrão) e as portas 8000 e 5173
+livres. A primeira execução precisa de internet para baixar as imagens base e as dependências.
+Depois disso, a demonstração roda sem rede: não usa chave da Riot nem segredo, não consulta a
+Riot nem o Data Dragon, e não usa modelo de linguagem nem serviço pago.
+
+```sh
+scripts/demo.sh up              # constrói, sobe, migra e semeia (partidas DEMO e elo fictício)
+# abra http://127.0.0.1:5173
+scripts/demo.sh parser-offline  # interpretador de texto "fora do ar" (para o cenário 3)
+scripts/demo.sh parser-rules    # volta ao interpretador por regras (padrão)
+scripts/demo.sh reset           # apaga só a demonstração e sobe de novo
+scripts/demo.sh down            # derruba a demonstração e apaga os volumes dela
+```
+
+A demonstração usa o projeto Docker próprio `riftlab-demo`, com volumes separados. `reset` e
+`down` nunca tocam o banco de desenvolvimento nem dados reais, e o script recusa rodar com
+outro `COMPOSE_PROJECT_NAME`. Todas as partidas são sintéticas e marcadas como DEMO. Em Minha
+posição aparece um **elo fictício**, marcado como tal e nunca consultado na Riot.
+
+**Roteiro** (Histórico → partida → participante 1 → decisão):
+
+1. **O contexto muda as alternativas.**
+   - Em DEMO-0009, o atirador carrega duas espadas antes do 1º item, e a comparação traz itens
+     de dano que aproveitam esses componentes.
+   - Em DEMO-0010, o mesmo campeão carrega colete e gema, e a comparação traz itens defensivos.
+   - Cada justificativa cita o campo de origem.
+2. **Evidência insuficiente.** Em DEMO-0011, a destruição de um item que o jogador não tinha
+   deixa o inventário incerto. A decisão aparece como inelegível, com o motivo, e não há
+   alternativas inventadas.
+3. **Interpretador indisponível.** Depois de `scripts/demo.sh parser-offline`, a frase digitada
+   não é interpretada. A tela diz que o interpretador não respondeu, mantém o objetivo e segue
+   pelo formulário.
+
+**Mais o que mostrar:**
+- As quatro áreas (Painel, Campeões, Minha posição, Histórico).
+- A importação de DEMO-0006, que falha de propósito (patch ausente) com mensagem útil.
+- A remoção de uma partida.
+
+**Relatório verificável:** o relatório baixado na comparação (HTML ou JSON) pode ser conferido
+sem rede:
+
+```sh
+python3 scripts/verify_report.py relatorio.html   # ou relatorio.json
+```
+
+O script confere que o relatório:
+- não tem script, URL externa nem identificador de partida, de participante ou de jogador;
+- traz a CSP que impede carregamentos externos;
+- no JSON, traz o objetivo com a origem e as versões usadas.
+
+O roteiro também é um teste de interface contra a stack de demonstração:
+
+```sh
+cd frontend && E2E_BASE_URL=http://127.0.0.1:5173 npm run test:e2e:demo
+```
+
 ## Ambiente de desenvolvimento
 
 Requisitos: Docker e Docker Compose. Comandos validados localmente:

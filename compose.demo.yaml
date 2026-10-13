@@ -1,0 +1,14 @@
+# Demonstração local reproduzível (CC-605). Sempre usada com o projeto próprio
+# `riftlab-demo` (scripts/demo.sh), que tem volumes separados: reset nunca toca o
+# banco de desenvolvimento nem dados reais. Sem chave da Riot e sem segredo: a
+# demonstração não consulta a Riot nem o Data Dragon (patch DEMO-1 sem mapeamento).
+services:
+  api:
+    environment:
+      RIFTLAB_RIOT_API_KEY: ""
+      RIFTLAB_SUBJECT_HASH_SECRET: ""
+      RIFTLAB_DEMO_RANKED: "true"
+  worker:
+    environment:
+      RIFTLAB_RIOT_API_KEY: ""
+      RIFTLAB_SUBJECT_HASH_SECRET: ""

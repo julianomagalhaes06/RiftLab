@@ -8,6 +8,10 @@
     "DEMO-2-INVALID": {
       "file": "catalogs/demo_2_invalid.json",
       "description": "Catálogo com item sem preço; carga deve falhar com diagnóstico identificável."
+    },
+    "DEMO-3": {
+      "file": "catalogs/demo_3.json",
+      "description": "Catálogo demo do roteiro de demonstração (CC-605): 6 componentes e 6 itens completos sintéticos com atributos, para o contexto mudar as alternativas."
     }
   }
 }

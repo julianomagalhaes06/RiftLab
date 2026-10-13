@@ -32,6 +32,18 @@
     "DEMO-0008": {
       "file": "matches/demo_0008_transacao_destroy_compra.json",
       "description": "Forma real do CC-203/204: componentes comprados; no mesmo timestamp, ITEM_DESTROYED dos componentes ANTES da compra do item composto; frames próximos (orçamento fresco)."
+    },
+    "DEMO-0009": {
+      "file": "matches/demo_0009_contexto_dano.json",
+      "description": "Roteiro (CC-605): o atirador carrega duas espadas antes do 1º item; as alternativas favorecem itens de dano que aproveitam esses componentes."
+    },
+    "DEMO-0010": {
+      "file": "matches/demo_0010_contexto_defesa.json",
+      "description": "Roteiro (CC-605): o mesmo atirador, em outra partida, carrega colete e gema; as alternativas favorecem itens defensivos que aproveitam esses componentes."
+    },
+    "DEMO-0011": {
+      "file": "matches/demo_0011_inventario_incerto.json",
+      "description": "Roteiro (CC-605): destruição de um item que o jogador não tinha deixa o inventário incerto; a decisão é marcada inelegível com o motivo, sem alternativas inventadas."
     }
   }
 }

@@ -109,10 +109,55 @@ async def refresh_ranked(
     }
 
 
+DEMO_ACCOUNT_KEY = "demo-ficticio"
+DEMO_ORIGIN = "DEMO_FICTITIOUS"
+
+
+def demo_ranked_active(settings: Settings) -> bool:
+    """Elo fictício só na demonstração: exige a opção e a ausência de chave da Riot."""
+    return settings.demo_ranked and not settings.riot_api_key
+
+
+async def seed_demo_ranked(
+    factory: async_sessionmaker[AsyncSession], settings: Settings, *, now: datetime | None = None
+) -> int:
+    """Duas observações FICTÍCIAS da conta de demonstração (idempotente; nunca consulta a Riot)."""
+    if settings.riot_api_key:
+        raise ValueError("elo fictício só sem chave da Riot (modo demonstração)")
+    stamp = now or datetime.now(UTC)
+    async with unit_of_work(factory) as session:
+        existing = await session.scalar(
+            select(Observation.id).where(Observation.account_key == DEMO_ACCOUNT_KEY).limit(1)
+        )
+        if existing is not None:
+            return 0
+        for captured, points, wins, losses in (
+            (stamp - timedelta(days=1), 28, 10, 9),
+            (stamp, 40, 11, 9),
+        ):
+            session.add(
+                Observation(
+                    account_key=DEMO_ACCOUNT_KEY,
+                    queue=SOLO_QUEUE,
+                    season="DEMO",
+                    captured_at=captured,
+                    state="READY",
+                    tier="SILVER",
+                    division="II",
+                    league_points=points,
+                    wins=wins,
+                    losses=losses,
+                    origin=DEMO_ORIGIN,
+                )
+            )
+    return 2
+
+
 async def ranked_me(
     factory: async_sessionmaker[AsyncSession], settings: Settings, *, now: datetime | None = None
 ) -> dict[str, Any]:
-    key = _identity(settings)
+    demo = demo_ranked_active(settings)
+    key = DEMO_ACCOUNT_KEY if demo else _identity(settings)
     if key is None:
         return {
             "status": "UNAVAILABLE",
@@ -161,7 +206,9 @@ async def ranked_me(
         previous = successes[1] if len(successes) > 1 else None
         status = current.state
         reason = None
-        if latest.state == "FAILED":
+        if demo:
+            pass  # fictício por definição: sem chave nem frescor a exigir
+        elif latest.state == "FAILED":
             status, reason = "STALE", latest.error_code
         elif not settings.riot_api_key:
             status, reason = "STALE", "RIOT_KEY_MISSING"

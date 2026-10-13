@@ -1,0 +1,11 @@
+{
+  "version": "item_rules_demo_3_v1",
+  "gamePatch": "DEMO-3",
+  "curationRulesVersion": "curated_demo_v1",
+  "excludedIds": [],
+  "exclusiveGroups": [],
+  "exclusiveCoverage": true,
+  "uniqueItemIds": true,
+  "highIdNamespaceExcluded": false,
+  "evidence": "SINTÉTICO: catálogo do roteiro de demonstração com 6 componentes e 6 itens completos fictícios, sem grupos exclusivos por construção. Serve só para a demonstração sem rede; não é regra do jogo."
+}

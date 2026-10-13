@@ -1254,6 +1254,32 @@ ranked_app = typer.Typer(help="Atualização explícita da posição da conta lo
 app.add_typer(ranked_app, name="ranked")
 
 
+@ranked_app.command("demo-seed")
+def ranked_demo_seed() -> None:
+    """Grava o elo FICTÍCIO da demonstração (CC-605). Recusa se houver chave da Riot."""
+    import asyncio
+
+    from riftlab.db import build_engine
+    from riftlab.ranked.application import seed_demo_ranked
+    from riftlab.shared.db import build_session_factory
+
+    settings = get_settings()
+
+    async def _run() -> int:
+        engine = build_engine(settings.database_url)
+        try:
+            return await seed_demo_ranked(build_session_factory(engine), settings)
+        finally:
+            await engine.dispose()
+
+    try:
+        created = asyncio.run(_run())
+    except ValueError as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"observações fictícias criadas: {created}")
+
+
 @ranked_app.command("refresh")
 def ranked_refresh(
     season: str = typer.Option(..., help="Temporada explícita, ex.: 2026 ou 2026-3."),

@@ -159,13 +159,16 @@ function Scenario({ attempt }: { attempt: LearningAttempt }) {
     <section className="section" aria-labelledby="scenario-heading">
       <h4 id="scenario-heading">Cenário: e se eu tivesse outro ouro?</h4>
       <p className="muted">O cenário é separado do histórico: não muda o que aconteceu na partida.</p>
-      <label htmlFor="scenario-gold">Ouro</label>
-      <input
-        id="scenario-gold"
-        inputMode="numeric"
-        value={gold}
-        onChange={(event) => setGold(event.target.value)}
-      />
+      <div className="field">
+        <label htmlFor="scenario-gold">Ouro</label>
+        <input
+          id="scenario-gold"
+          className="form__input"
+          inputMode="numeric"
+          value={gold}
+          onChange={(event) => setGold(event.target.value)}
+        />
+      </div>
       <div className="actions">
         <button
           type="button"

@@ -13,7 +13,8 @@
     "test:e2e": "playwright test --project=chromium",
     "generate:api-types": "openapi-typescript ../backend/openapi.json -o src/shared/api/types.ts",
     "check:api-types": "openapi-typescript ../backend/openapi.json -o /tmp/riftlab-api-types-check.ts && diff -u src/shared/api/types.ts /tmp/riftlab-api-types-check.ts",
-    "test:e2e:stack": "playwright test --project=real-stack"
+    "test:e2e:stack": "playwright test --project=real-stack",
+    "test:e2e:demo": "playwright test --project=demo"
   },
   "dependencies": {
     "react": "^19.3.0",

@@ -1,0 +1,281 @@
+{
+  "schemaVersion": "v1",
+  "gamePatch": "DEMO-3",
+  "dataDragonVersion": "demo-datadragon-3",
+  "mappingVersion": "v1",
+  "curationRulesVersion": "curated_demo_v1",
+  "items": [
+    {
+      "itemId": 300001,
+      "price": 350,
+      "recipe": [],
+      "attributes": {
+        "name": "Espada Longa Sintética",
+        "tags": [
+          "Damage"
+        ]
+      },
+      "flags": {
+        "completed": false,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300002,
+      "price": 300,
+      "recipe": [],
+      "attributes": {
+        "name": "Adaga Sintética",
+        "tags": [
+          "AttackSpeed"
+        ]
+      },
+      "flags": {
+        "completed": false,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300003,
+      "price": 300,
+      "recipe": [],
+      "attributes": {
+        "name": "Colete Sintético",
+        "tags": [
+          "Armor"
+        ]
+      },
+      "flags": {
+        "completed": false,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300004,
+      "price": 400,
+      "recipe": [],
+      "attributes": {
+        "name": "Gema de Vida Sintética",
+        "tags": [
+          "Health"
+        ]
+      },
+      "flags": {
+        "completed": false,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300005,
+      "price": 450,
+      "recipe": [],
+      "attributes": {
+        "name": "Manto Nulo Sintético",
+        "tags": [
+          "SpellBlock"
+        ]
+      },
+      "flags": {
+        "completed": false,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300006,
+      "price": 400,
+      "recipe": [],
+      "attributes": {
+        "name": "Tomo Sintético",
+        "tags": [
+          "CooldownReduction"
+        ]
+      },
+      "flags": {
+        "completed": false,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300010,
+      "price": 3000,
+      "recipe": [
+        {
+          "itemId": 300001,
+          "quantity": 2
+        }
+      ],
+      "attributes": {
+        "name": "Lâmina Crítica Sintética",
+        "tags": [
+          "Damage",
+          "CriticalStrike"
+        ]
+      },
+      "flags": {
+        "completed": true,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300011,
+      "price": 2600,
+      "recipe": [
+        {
+          "itemId": 300001,
+          "quantity": 1
+        },
+        {
+          "itemId": 300002,
+          "quantity": 1
+        }
+      ],
+      "attributes": {
+        "name": "Arco Veloz Sintético",
+        "tags": [
+          "Damage",
+          "AttackSpeed"
+        ]
+      },
+      "flags": {
+        "completed": true,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300012,
+      "price": 2700,
+      "recipe": [
+        {
+          "itemId": 300003,
+          "quantity": 1
+        },
+        {
+          "itemId": 300004,
+          "quantity": 1
+        }
+      ],
+      "attributes": {
+        "name": "Couraça Sintética",
+        "tags": [
+          "Armor",
+          "Health"
+        ]
+      },
+      "flags": {
+        "completed": true,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300013,
+      "price": 2600,
+      "recipe": [
+        {
+          "itemId": 300005,
+          "quantity": 1
+        },
+        {
+          "itemId": 300004,
+          "quantity": 1
+        }
+      ],
+      "attributes": {
+        "name": "Véu Sintético",
+        "tags": [
+          "SpellBlock",
+          "Health"
+        ]
+      },
+      "flags": {
+        "completed": true,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300014,
+      "price": 2800,
+      "recipe": [
+        {
+          "itemId": 300006,
+          "quantity": 1
+        },
+        {
+          "itemId": 300001,
+          "quantity": 1
+        }
+      ],
+      "attributes": {
+        "name": "Coroa Sintética",
+        "tags": [
+          "CooldownReduction",
+          "Damage"
+        ]
+      },
+      "flags": {
+        "completed": true,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    },
+    {
+      "itemId": 300015,
+      "price": 2500,
+      "recipe": [
+        {
+          "itemId": 300003,
+          "quantity": 1
+        },
+        {
+          "itemId": 300005,
+          "quantity": 1
+        }
+      ],
+      "attributes": {
+        "name": "Escudo Sintético",
+        "tags": [
+          "Armor",
+          "SpellBlock"
+        ]
+      },
+      "flags": {
+        "completed": true,
+        "purchasable": true,
+        "maps": [
+          11
+        ]
+      }
+    }
+  ]
+}

@@ -300,3 +300,35 @@ async def test_transition_correction_and_tied_observations(session_factory, tmp_
     finally:
         async with unit_of_work(session_factory) as session:
             await session.execute(delete(Observation).where(Observation.account_key == key))
+
+
+@pytest.mark.asyncio
+async def test_demo_ranked_is_fictitious_marked_and_never_used_with_a_riot_key(
+    session_factory, tmp_path: Path
+) -> None:
+    """CC-605: elo FICTÍCIO só na demonstração (sem chave), marcado na origem."""
+    from riftlab.ranked.application import DEMO_ACCOUNT_KEY, DEMO_ORIGIN, seed_demo_ranked
+
+    async with unit_of_work(session_factory) as session:
+        await session.execute(
+            delete(Observation).where(Observation.account_key == DEMO_ACCOUNT_KEY)
+        )
+    with_key = Settings(riot_api_key="RGAPI-fake-test-key-not-real", demo_ranked=True)
+    with pytest.raises(ValueError, match="sem chave"):
+        await seed_demo_ranked(session_factory, with_key)
+
+    demo = Settings(riot_api_key=None, demo_ranked=True)
+    assert await seed_demo_ranked(session_factory, demo) == 2
+    assert await seed_demo_ranked(session_factory, demo) == 0  # idempotente
+    shown = await ranked_me(session_factory, demo)
+    assert shown["status"] == "READY" and shown["reason"] is None
+    assert shown["position"]["origin"] == DEMO_ORIGIN and shown["position"]["tier"] == "SILVER"
+    assert shown["change"]["leaguePointsDelta"] == 12
+
+    # com chave da Riot a opção é ignorada: a conta fictícia nunca aparece
+    real = Settings(
+        riot_api_key="RGAPI-fake-test-key-not-real",
+        demo_ranked=True,
+        ranked_account_file=str(tmp_path / "sem-conta.json"),
+    )
+    assert (await ranked_me(session_factory, real))["reason"] == "ACCOUNT_OR_SECRET_MISSING"
