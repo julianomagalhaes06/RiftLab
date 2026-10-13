@@ -489,7 +489,7 @@ def sample_from_run(
 # todos os blocos, medem a concordância entre todos.
 # ---------------------------------------------------------------------------
 
-ANCHORS = 8
+ANCHORS = 6  # uma por estrato (campeão × ordem); 6 + 19 = 25 situações por bloco
 BLOCKS = 3
 
 
