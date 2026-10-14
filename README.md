@@ -24,7 +24,7 @@ A interface distingue recomendação disponível, suporte limitado, estado incom
 
 - Análise exclusivamente pós-partida, Summoner’s Rift, fila ranqueada solo/duo.
 - Região inicial BR1; roteamento regional Americas.
-- Uma função e três campeões, escolhidos após auditoria da amostra.
+- Uma função e dez atiradores: os três da auditoria inicial e mais sete medidos no corpus 16.19 antes de entrar no produto.
 - Próximo item completo em pontos anteriores ao primeiro ou segundo item principal; componentes existentes considerados no custo restante.
 - Ranking supervisionado, comparação com baselines, análise de confiança e experimento de agrupamento de contextos.
 - Interpretação de objetivos em linguagem natural, com experimento de ajuste supervisionado de um modelo pré-treinado comparado a regras explícitas e ao formulário estruturado.
@@ -106,8 +106,14 @@ Recorte ampliado para dez atiradores, como experimento (CC-702). O mesmo corpus 
 - **Dados:** sem rede e sem coleta nova. As decisões elegíveis passaram de 676 para 1.685 (treino 1.176, validação 284, teste 225), com elegibilidade parecida em todos os campeões (29% a 36%). As linhas dos três campeões originais saíram idênticas às anteriores.
 - **Fatias:** `cc ml evaluate-test` também reporta as fatias que o dataset declara por linha (campeões originais, novos e cada campeão), na mesma execução única do teste.
 - **Resultado:** no planejamento sem ouro, o teste deu MRR 0,75 para a popularidade, 0,74 para o CatBoost e 0,74 com contexto rico. Nos campeões novos, cujo teste nunca tinha sido visto, deu 0,75 contra 0,75. No instante da compra o padrão do CC-402 se repete (0,76 contra 0,94, com o ganho vindo do ouro). **Resultado negativo confirmado com 2,5 vezes mais dados e intervalos mais estreitos.**
-- **Produto:** `configs/scope.yaml` continua com três campeões.
+- **Produto:** o produto continuou com três campeões até o CC-704.
 - **Limites:** a mesma amostra de conveniência em bola de neve, um patch e fatias por campeão pequenas (14 a 44 decisões de teste).
+
+Dez atiradores no produto (CC-704). `configs/scope.yaml` passou à v2, com os dez campeões do CC-702.
+- **Popularidade:** o critério servido passou a `configs/ranking/popularity-16.19-v2.json`, com 20 células (campeão × ordem do item), exportado por `cc dataset export-popularity` a partir do treino do dataset v3. O mesmo comando reproduz o v1 byte a byte, e as seis células dos campeões originais não mudaram.
+- **Suporte:** o menor grupo tem 26 decisões de treino. O limiar escolhido na validação continua zero, com cobertura total e erro fora do top-3 de 0,10 na validação e 0,08 no teste.
+- **Partidas já preparadas:** são reextraídas na próxima preparação, porque a versão do recorte mudou.
+- **O que não mudou:** o v1 continua no repositório, para o histórico das análises que o registraram.
 
 Suporte, registro de modelos e desempenho (CC-403 a CC-406). Clusters de contexto (KMeans ajustado só no treino, k = 3, 5 e 8) não mostraram estrutura (silhueta perto de zero) nem ganho na validação e foram descartados. O ranking ativo é a popularidade, servida atrás de uma barreira de validade e de um suporte por célula (campeão × ordem do item): estado incerto, campeão sem dados ou patch sem regras recebem `INSUFFICIENT_EVIDENCE` com motivo legível, nunca uma lista; no recorte atual todas as células têm dados suficientes, então a cobertura é total, com erro (fora do top-3) de 0,11 no teste. Um registro de modelos no PostgreSQL (`cc ml registry-*`) aceita só artefatos locais com hash conferido, promove de forma atômica (uma versão ativa por tarefa), faz rollback e mantém versões aposentadas no histórico; sem versão ativa, o fallback para a popularidade é explícito. Num i3-7020U com 1 thread, 100 consultas de 106 candidatos levam p95 de 163 ms para enumerar os itens legais, 2,5 ms para o ranking com suporte e 18 ms para pontuar com o CatBoost. Os motivos de abstenção aparecem na tela de estudo e cada análise guarda a versão ativa do registro (CC-304/306).
 

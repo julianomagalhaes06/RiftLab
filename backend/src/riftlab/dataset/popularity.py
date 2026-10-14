@@ -97,3 +97,34 @@ def evaluate(model: PopularityModel, rows: Iterable[Mapping[str, Any]]) -> dict[
         "measures": "IMITATION_OF_HISTORICAL_CHOICE",
         "doesNotMeasure": "PERTINENCE_OR_PURCHASE_QUALITY",
     }
+
+
+def export_cells(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    version: str,
+    game_patch: str,
+    source: str,
+    dataset_sha256: str,
+) -> dict[str, Any]:
+    """Served popularity artifact (configs/ranking): the train cell counts of `fit`, nothing
+    else — aggregate counts by champion and main item ordinal, no identifiers (CC-704)."""
+    model = fit(row for row in rows if row["split"] == "train")
+    cells = dict(
+        sorted(
+            (
+                f"{champion}|{ordinal}",
+                {str(item): count for item, count in counter.most_common()},
+            )
+            for (champion, ordinal), counter in model.by_cell.items()
+        )
+    )
+    return {
+        "schemaVersion": 1,
+        "version": version,
+        "gamePatch": game_patch,
+        "source": source,
+        "datasetSha256": dataset_sha256,
+        "smoothing": {"alpha": ALPHA, "prior": "frequência da mesma ordem do item"},
+        "cells": cells,
+    }

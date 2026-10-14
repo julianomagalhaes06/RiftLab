@@ -666,6 +666,34 @@ def dataset_baseline(
     typer.echo(json.dumps(report, sort_keys=True, ensure_ascii=False))
 
 
+@dataset_app.command("export-popularity")
+def dataset_export_popularity(
+    dataset: Path = typer.Option(..., help="Dataset congelado (JSON com sidecar)."),
+    output: Path = typer.Option(..., help="Artefato servido em configs/ranking (novo)."),
+    version: str = typer.Option(..., help="Versão do artefato, ex.: popularity_16_19_v2."),
+    source: str = typer.Option(..., help="Origem declarada no artefato."),
+) -> None:
+    """Exporta as contagens de treino por campeão × ordem do item (CC-704), sem ids."""
+    import hashlib
+    import json
+
+    from riftlab.dataset.popularity import export_cells
+
+    if output.exists():
+        typer.echo("BLOCKED: artefato já existe; versão servida não se sobrescreve", err=True)
+        raise typer.Exit(code=1)
+    artifact = _verified_private_json(dataset)
+    document = export_cells(
+        artifact["rows"],
+        version=version,
+        game_patch=str(artifact["patch"]),
+        source=source,
+        dataset_sha256=hashlib.sha256(dataset.read_bytes()).hexdigest(),
+    )
+    output.write_text(json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    typer.echo(json.dumps({"cells": len(document["cells"]), "version": version}))
+
+
 @dataset_app.command("freeze-corpus")
 def dataset_freeze_corpus(
     output: Path = typer.Option(

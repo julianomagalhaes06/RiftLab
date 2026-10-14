@@ -89,3 +89,51 @@ def test_planning_anchor_never_lies_after_the_target() -> None:
     assert planning_anchor(states, ordinal=2, first_main_index=35, target_index=50) == 50
     assert planning_anchor(states, ordinal=2, first_main_index=None, target_index=50) is None
     assert planning_anchor(states, ordinal=2, first_main_index=50, target_index=50) is None
+
+
+def test_export_cells_keeps_only_train_legal_counts_and_feeds_the_served_engine() -> None:
+    from riftlab.dataset.popularity import export_cells
+    from riftlab.ranking.engine import DecisionFacts, Popularity
+
+    rows = [
+        {**row("train", 222, 1, 10, [10, 20]), "matchId": "BR1_1"},
+        {**row("train", 222, 1, 10, [10, 20]), "matchId": "BR1_2"},
+        {**row("train", 222, 1, 20, [10, 20]), "matchId": "BR1_3"},
+        {**row("train", 222, 2, 99, [10, 20]), "matchId": "BR1_4"},  # illegal target
+        {**row("test", 222, 1, 20, [10, 20]), "matchId": "BR1_5"},  # never counted
+    ]
+
+    document = export_cells(
+        rows, version="popularity_test_v2", game_patch="16.19", source="s", dataset_sha256="0" * 64
+    )
+
+    assert document["cells"] == {"222|1": {"10": 2, "20": 1}}
+    assert "BR1_" not in str(document)
+    served = Popularity.load_document(document)
+    assert served.support(DecisionFacts(222, 1, None, None)) == 3
+
+
+def test_cli_export_popularity_never_overwrites_a_served_version(tmp_path: Any) -> None:
+    import hashlib
+    import json
+
+    import typer
+
+    from riftlab.cli.main import dataset_export_popularity
+
+    dataset = tmp_path / ".private" / "dataset.json"
+    dataset.parent.mkdir()
+    raw = json.dumps({"patch": "16.19", "rows": [row("train", 22, 1, 10, [10])]}).encode()
+    dataset.write_bytes(raw)
+    dataset.with_suffix(".json.sha256").write_text(
+        f"{hashlib.sha256(raw).hexdigest()}  {dataset.name}\n", encoding="ascii"
+    )
+    output = tmp_path / "popularity-16.19-v9.json"
+
+    dataset_export_popularity(dataset=dataset, output=output, version="v9", source="teste")
+    exported = json.loads(output.read_text(encoding="utf-8"))
+    assert exported["cells"] == {"22|1": {"10": 1}}
+    assert exported["datasetSha256"] == hashlib.sha256(raw).hexdigest()
+
+    with pytest.raises(typer.Exit):
+        dataset_export_popularity(dataset=dataset, output=output, version="v9", source="teste")

@@ -55,7 +55,10 @@ class Popularity:
 
     @classmethod
     def load(cls, path: Path) -> Popularity:
-        document = json.loads(path.read_text(encoding="utf-8"))
+        return cls.load_document(json.loads(path.read_text(encoding="utf-8")))
+
+    @classmethod
+    def load_document(cls, document: Mapping[str, Any]) -> Popularity:
         return cls(document["version"], document["cells"])
 
     def support(self, decision: DecisionFacts) -> int:
@@ -216,8 +219,13 @@ def explain(
     return tuple(out)
 
 
+# CC-704: v2 covers the ten marksmen of the expanded scope (v1, three champions, stays for
+# the history of analyses that recorded it).
+POPULARITY_ARTIFACT_VERSION = "v2"
+
+
 def load_default(configs: Path, patch: str) -> tuple[Popularity | None, Rules, Objective]:
-    popularity_path = configs / "ranking" / f"popularity-{patch}-v1.json"
+    popularity_path = configs / "ranking" / f"popularity-{patch}-{POPULARITY_ARTIFACT_VERSION}.json"
     popularity = Popularity.load(popularity_path) if popularity_path.exists() else None
     return (
         popularity,

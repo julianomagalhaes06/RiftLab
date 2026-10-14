@@ -5,9 +5,12 @@
 # de conta) aparece neste arquivo; os corpos brutos e a auditoria completa
 # ficam em diretórios locais fora do Git (ver docs/domain-model.md).
 
-schemaVersion: v1
-frozenAt: "2026-09-14"
-frozenByCard: CC-105
+schemaVersion: v2
+frozenAt: "2026-10-14"
+frozenByCard: CC-704
+# v1 (CC-105, 14/09/2026) tinha 3 campeões. A v2 amplia para os 10 atiradores do
+# experimento CC-702 (configs/experiments/scope-16.19-marksmen10.yaml), medidos no corpus
+# 16.19 antes de entrar no produto. Fila, mapa, função e janela não mudaram.
 
 # Ranqueada solo/duo, Summoner's Rift (docs/evaluation.md).
 queue: 420
@@ -17,12 +20,20 @@ map: 11
 # a maior concentração observada de campeões recorrentes na amostra real.
 role: BOTTOM
 
-# Os 3 campeões com maior cobertura real observada em BOTTOM, dentro da
-# janela histórica da auditoria (não da amostra bruta inteira; ver historicalPatches).
+# v2 (CC-704): atiradores com pelo menos 60 partidas como BOTTOM na parte de treino do
+# corpus 16.19 v2 (regra do CC-702, fixada antes da medição). Os 3 primeiros vêm da v1
+# (CC-105: 18, 14 e 12 partidas na janela da auditoria).
 championIds:
-  - 145 # 18 partidas observadas na janela
-  - 51 # 14 partidas observadas na janela
-  - 81 # 12 partidas observadas na janela
+  - 145 # Kai'Sa
+  - 51 # Caitlyn
+  - 81 # Ezreal
+  - 222 # Jinx
+  - 202 # Jhin
+  - 804 # Yunara
+  - 18 # Tristana
+  - 22 # Ashe
+  - 21 # Miss Fortune
+  - 29 # Twitch
 
 # Os dois patches minor adjacentes com maior volume real na amostra bruta
 # (que cobre 15 patches distintos ao longo de mais de um ano — misturar
@@ -49,6 +60,8 @@ historicalPatches:
 # não presumida. A sincronização completa do catálogo (itens/preços/receitas
 # reais) é entrega do CC-202; este card só registra a correspondência.
 
+# Cobertura da auditoria do CC-105 (v1, 3 campeões), mantida como histórico. A cobertura
+# dos 10 atiradores no corpus 16.19 está no relatório do CC-702.
 coverage:
   totalMatchesAudited: 122
   matchesInPatchWindow: 63
