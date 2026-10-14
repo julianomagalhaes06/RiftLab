@@ -1,11 +1,17 @@
-"""CC-323: snowball collection of patch 16.19 match+timeline pairs for the CC-302 dataset.
+"""CC-323/CC-703: snowball collection of patch 16.19 match+timeline pairs for the datasets.
 
 Expansion starts at the consented seed accounts and follows every participant of
 the matches it finds (opponents and teammates) with no fixed hop limit. Players
-seen in the scope (BOTTOM with Caitlyn, Ezreal or Kai'Sa) are listed before the
-others. Only completed 16.19 / queue 420 / map 11 matches are stored, as
+seen in the campaign scope (BOTTOM with one of its champions) are listed before
+the others. Only completed 16.19 / queue 420 / map 11 matches are stored, as
 write-once pairs in a private raw store. PUUIDs stay in memory and inside the
 private raw bodies; journals and reports carry none.
+
+A `Campaign` fixes everything one authorization covers: identity, output directory,
+window, caps, scope and how a player's listing is reduced. CC-323 keeps the most
+recent matches of each player; CC-703 (CC-702 scope, ten marksmen) lists up to 100
+matches in the window and keeps a salted-hash sample, so a player's matches spread
+over the patch at the same request cost.
 """
 
 from __future__ import annotations
@@ -77,6 +83,7 @@ _LOCAL_STOPS = {
 }
 _PROGRESS_COUNTS = frozenset(
     {
+        "LISTED_IDS_NOT_SAMPLED",
         "MATCHES_FETCHED",
         "MATCHES_LISTED",
         "PAIRS_STORED",
@@ -87,6 +94,70 @@ _PROGRESS_COUNTS = frozenset(
     }
 )
 _SEED_PRIORITY, _SCOPE_PRIORITY, _OTHER_PRIORITY = 0, 1, 2
+
+
+@dataclass(frozen=True, slots=True)
+class Campaign:
+    campaign_id: str
+    output_dir_name: str
+    window_start: int
+    window_end: int
+    max_pairs: int
+    max_requests: int
+    max_seconds: int
+    scope_champions: frozenset[int]
+    listing_count: int
+    # None keeps the `listing_count` most recent matches (CC-323). An int keeps that
+    # many of the listed IDs, ordered by sha256(salt|puuid|matchId): same request cost,
+    # matches spread over the player's whole window, reproducible without RNG state.
+    sample_per_player: int | None = None
+    sample_salt: str = ""
+    known_raw_subdirectories: tuple[str, ...] = ("cc316/raw-exploration", "cc316/raw-confirmation")
+
+    @property
+    def kept_per_player(self) -> int:
+        return self.listing_count if self.sample_per_player is None else self.sample_per_player
+
+    def keep(self, puuid: str, match_ids: Sequence[str]) -> list[str]:
+        if self.sample_per_player is None:
+            return list(match_ids)
+        ranked = sorted(
+            dict.fromkeys(match_ids),
+            key=lambda match_id: hashlib.sha256(
+                f"{self.sample_salt}|{puuid}|{match_id}".encode()
+            ).hexdigest(),
+        )
+        return ranked[: self.sample_per_player]
+
+
+CC323 = Campaign(
+    campaign_id=CAMPAIGN_ID,
+    output_dir_name="cc323",
+    window_start=WINDOW_START,
+    window_end=WINDOW_END,
+    max_pairs=MAX_PAIRS,
+    max_requests=MAX_REQUESTS,
+    max_seconds=MAX_SECONDS,
+    scope_champions=SCOPE_CHAMPIONS,
+    listing_count=LISTING_COUNT,
+)
+# CC-703 (user decision 14/10/2026): up to 10,000 new pairs, 24,000 requests and 10 h,
+# prioritising the ten marksmen of configs/experiments/scope-16.19-marksmen10.yaml.
+CC703 = Campaign(
+    campaign_id="CC-703",
+    output_dir_name="cc703",
+    window_start=WINDOW_START,
+    window_end=WINDOW_END,
+    max_pairs=10_000,
+    max_requests=24_000,
+    max_seconds=36_000,
+    scope_champions=frozenset({18, 21, 22, 29, 51, 81, 145, 202, 222, 804}),
+    listing_count=100,
+    sample_per_player=5,
+    sample_salt="CC-703-listing-v1",
+    known_raw_subdirectories=("cc316/raw-exploration", "cc316/raw-confirmation", "cc323/raw"),
+)
+CAMPAIGNS = {campaign.campaign_id: campaign for campaign in (CC323, CC703)}
 
 
 class CollectionTransport(Protocol):
@@ -213,19 +284,22 @@ def prior_campaign_usage(output_dir: Path, attempt_number: int) -> tuple[int, in
     return requests, elapsed_ns
 
 
-def load_collection_authorization(path: Path, *, attempt_number: int) -> CollectionAuthorization:
-    """Verify the user's authorization of one CC-323 attempt (JSON with SHA-256 sidecar)."""
+def load_collection_authorization(
+    path: Path, *, attempt_number: int, campaign: Campaign = CC323
+) -> CollectionAuthorization:
+    """Verify the user's authorization of one campaign attempt (JSON with SHA-256 sidecar)."""
+    label = f"autorização {campaign.campaign_id} inválida"
 
     def require(condition: bool, message: str) -> None:
         if not condition:
-            raise DiscoveryError(f"autorização CC-323 inválida: {message}")
+            raise DiscoveryError(f"{label}: {message}")
 
     private_root = private_root_for(path)
-    raw, _digest = read_private_with_sidecar(path, "autorização CC-323")
+    raw, _digest = read_private_with_sidecar(path, f"autorização {campaign.campaign_id}")
     try:
         document = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise DiscoveryError("autorização CC-323 inválida: JSON ilegível") from exc
+        raise DiscoveryError(f"{label}: JSON ilegível") from exc
     require(isinstance(document, dict), "raiz deve ser objeto")
     state = cast(dict[str, object], document)
     require(
@@ -246,7 +320,7 @@ def load_collection_authorization(path: Path, *, attempt_number: int) -> Collect
     )
     require(
         state["schemaVersion"] == 1
-        and state["campaign"] == CAMPAIGN_ID
+        and state["campaign"] == campaign.campaign_id
         and state["scope"] == AUTHORIZATION_SCOPE,
         "versão, campanha ou escopo",
     )
@@ -256,16 +330,16 @@ def load_collection_authorization(path: Path, *, attempt_number: int) -> Collect
         "tentativa autorizada diverge da solicitada",
     )
     require(
-        state["maxPairs"] == MAX_PAIRS
-        and state["maxSeconds"] == MAX_SECONDS
-        and state["window"] == {"startTime": WINDOW_START, "endTime": WINDOW_END},
+        state["maxPairs"] == campaign.max_pairs
+        and state["maxSeconds"] == campaign.max_seconds
+        and state["window"] == {"startTime": campaign.window_start, "endTime": campaign.window_end},
         "teto de pares, teto de tempo ou janela divergem dos valores fixados",
     )
     max_requests = state["maxRequests"]
     require(
         isinstance(max_requests, int)
         and not isinstance(max_requests, bool)
-        and 1 <= max_requests <= MAX_REQUESTS,
+        and 1 <= max_requests <= campaign.max_requests,
         "teto de requisições fora do intervalo",
     )
     seeds_sha256 = state["seedsSha256"]
@@ -289,7 +363,7 @@ def load_collection_authorization(path: Path, *, attempt_number: int) -> Collect
     try:
         record_bytes = (private_root / cast(str, relative)).read_bytes()
     except OSError as exc:
-        raise DiscoveryError("autorização CC-323 inválida: registro da decisão ausente") from exc
+        raise DiscoveryError(f"{label}: registro da decisão ausente") from exc
     require(hashlib.sha256(record_bytes).hexdigest() == digest, "registro da decisão alterado")
     return CollectionAuthorization(
         max_requests=cast(int, max_requests), seeds_sha256=cast(str, seeds_sha256)
@@ -324,7 +398,9 @@ def _target_mismatch(document: object, match_id: str) -> str | None:
     return None
 
 
-def _participants(document: object) -> list[tuple[str, bool]]:
+def _participants(
+    document: object, scope_champions: frozenset[int] = SCOPE_CHAMPIONS
+) -> list[tuple[str, bool]]:
     """(puuid, played the scope) per well-formed participant; malformed entries are skipped."""
     info = document.get("info") if isinstance(document, dict) else None
     entries = info.get("participants") if isinstance(info, dict) else None
@@ -336,7 +412,7 @@ def _participants(document: object) -> list[tuple[str, bool]]:
         if not isinstance(puuid, str) or not puuid or len(puuid) > 256:
             continue
         in_scope = (
-            entry.get("championId") in SCOPE_CHAMPIONS
+            entry.get("championId") in scope_champions
             and entry.get("teamPosition") == SCOPE_POSITION
         )
         found.append((puuid, in_scope))
@@ -371,7 +447,9 @@ class _Expansion:
         known: dict[str, DurableRawMatchStore],
         max_pairs: int,
         before_request: Callable[[], None],
+        campaign: Campaign = CC323,
     ) -> None:
+        self.campaign = campaign
         self.transport = transport
         self.store = store
         self.stored = stored
@@ -416,18 +494,21 @@ class _Expansion:
             self._listed.add(puuid)
             self.before_request()
             try:
-                match_ids = await self.transport.list_match_ids_by_puuid(
+                listed = await self.transport.list_match_ids_by_puuid(
                     puuid,
                     queue=TARGET_QUEUE,
                     start=0,
-                    count=LISTING_COUNT,
-                    start_time=WINDOW_START,
-                    end_time=WINDOW_END,
+                    count=self.campaign.listing_count,
+                    start_time=self.campaign.window_start,
+                    end_time=self.campaign.window_end,
                 )
             except (SourceNotFoundError, SourceSchemaError):
                 self.counts["PLAYER_LISTING_UNAVAILABLE"] += 1
                 continue
             self.counts["PLAYERS_LISTED"] += 1
+            match_ids = self.campaign.keep(puuid, listed)
+            if len(listed) > len(match_ids):
+                self.counts["LISTED_IDS_NOT_SAMPLED"] += len(listed) - len(match_ids)
             for match_id in match_ids:
                 if self.pair_cap_reached:
                     break
@@ -498,7 +579,7 @@ class _Expansion:
         return _json_or_none(body)
 
     def _expand(self, document: object, *, new_pair: bool) -> None:
-        participants = _participants(document)
+        participants = _participants(document, self.campaign.scope_champions)
         if new_pair:
             self.counts["SCOPE_SLOTS_IN_NEW_PAIRS"] += sum(1 for _, scope in participants if scope)
         for puuid, in_scope in participants:
@@ -513,9 +594,10 @@ async def run_dataset_collection(
     attempt_number: int,
     authorized_max_requests: int,
     known_raw_directories: Sequence[Path] = (),
-    max_pairs: int = MAX_PAIRS,
-    max_requests: int = MAX_REQUESTS,
-    max_seconds: int = MAX_SECONDS,
+    max_pairs: int | None = None,
+    max_requests: int | None = None,
+    max_seconds: int | None = None,
+    campaign: Campaign = CC323,
     clock: Callable[[], float] = time.monotonic,
     process_started_monotonic_ns: int | None = None,
     clock_ns: Callable[[], int] = time.monotonic_ns,
@@ -525,8 +607,12 @@ async def run_dataset_collection(
     Every HTTP attempt is reserved durably before it is sent. Pairs already in
     the campaign store or in `known_raw_directories` (opened read-only) cost no
     request and still feed the expansion. A source failure ends the attempt
-    with a partial report; only a local fault raises.
+    with a partial report; only a local fault raises. Caps default to the campaign's.
     """
+    max_pairs = campaign.max_pairs if max_pairs is None else max_pairs
+    max_requests = campaign.max_requests if max_requests is None else max_requests
+    max_seconds = campaign.max_seconds if max_seconds is None else max_seconds
+    name = campaign.output_dir_name
     if (
         isinstance(attempt_number, bool)
         or not isinstance(attempt_number, int)
@@ -545,14 +631,14 @@ async def run_dataset_collection(
         raise DiscoveryError(
             "transporte já emitiu requisições; nova tentativa exige instância limpa"
         )
-    if output_dir.name != "cc323" or not any(part == ".private" for part in output_dir.parts):
-        raise DiscoveryError("saída deve ser o diretório privado cc323")
+    if output_dir.name != name or not any(part == ".private" for part in output_dir.parts):
+        raise DiscoveryError(f"saída deve ser o diretório privado {name}")
     try:
         output_mode = stat.S_IMODE(output_dir.stat().st_mode)
     except OSError as exc:
-        raise DiscoveryError("diretório privado cc323 ausente") from exc
+        raise DiscoveryError(f"diretório privado {name} ausente") from exc
     if output_mode & 0o077:
-        raise DiscoveryError("diretório cc323 deve usar modo privado")
+        raise DiscoveryError(f"diretório {name} deve usar modo privado")
 
     paths = attempt_paths(output_dir, attempt_number)
     started = clock()
@@ -595,12 +681,12 @@ async def run_dataset_collection(
     if len(stored) >= max_pairs:
         raise DiscoveryError("teto de pares da campanha já alcançado")
 
-    lock_handle = (output_dir / ".cc323-collection.lock").open("a+")
+    lock_handle = (output_dir / f".{name}-collection.lock").open("a+")
     try:
         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError as exc:
         lock_handle.close()
-        raise DiscoveryError("há outra execução CC-323 em andamento") from exc
+        raise DiscoveryError(f"há outra execução {campaign.campaign_id} em andamento") from exc
     try:
         marker_fd = os.open(paths["marker"], os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError as exc:
@@ -640,6 +726,7 @@ async def run_dataset_collection(
                 known=known,
                 max_pairs=max_pairs,
                 before_request=before_request,
+                campaign=campaign,
             )
             journal_status, failure_code = "COMPLETED", None
             try:
@@ -667,7 +754,7 @@ async def run_dataset_collection(
             elapsed_seconds = round(clock() - started, 3)
             report: dict[str, object] = {
                 "schemaVersion": 1,
-                "campaign": CAMPAIGN_ID,
+                "campaign": campaign.campaign_id,
                 "attemptNumber": attempt_number,
                 "status": status,
                 "target": {
@@ -676,15 +763,21 @@ async def run_dataset_collection(
                     "mapId": TARGET_MAP,
                     "gameComplete": True,
                 },
-                "window": {"startTime": WINDOW_START, "endTime": WINDOW_END},
+                "window": {"startTime": campaign.window_start, "endTime": campaign.window_end},
                 "expansion": {
                     "source": "CONSENTED_SEEDS_PLUS_ALL_PARTICIPANTS",
                     "maximumParticipantHops": None,
-                    "matchesListedPerPlayer": LISTING_COUNT,
+                    "matchesListedPerPlayer": campaign.kept_per_player,
+                    "listingRequestedPerPlayer": campaign.listing_count,
+                    "listingSelection": (
+                        "MOST_RECENT"
+                        if campaign.sample_per_player is None
+                        else "SALTED_HASH_SAMPLE"
+                    ),
                     "priority": ["SEED", "SCOPE_PLAYER", "OTHER_PLAYER"],
                     "scope": {
                         "teamPosition": SCOPE_POSITION,
-                        "championIds": sorted(SCOPE_CHAMPIONS),
+                        "championIds": sorted(campaign.scope_champions),
                     },
                     "seedCount": len(seeds),
                 },

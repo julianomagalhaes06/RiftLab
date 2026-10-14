@@ -147,7 +147,16 @@ def test_catboost_smoke_and_single_test_run(tmp_path: Path) -> None:
         "M1-no_rich_context",
     }
     assert (tmp_path / "run" / "m1-full.cbm").exists()
+    assert (report["environment"]["taskType"], report["environment"]["threads"]) == ("CPU", 1)
     result = test_run(tmp_path / "run", dataset, champions, items)
     assert result["test"]["M1-full"]["all"]["decisions"] == 5
     with pytest.raises(ExperimentError, match="já executado"):
         test_run(tmp_path / "run", dataset, champions, items)
+
+
+def test_train_and_select_rejects_unknown_device_or_threads() -> None:
+    from riftlab.ml import ranker
+
+    for kwargs in ({"task_type": "TPU"}, {"thread_count": 0}):
+        with pytest.raises(ValueError, match="task_type"):
+            ranker.train_and_select([], [], CATALOGS, **kwargs)

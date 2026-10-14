@@ -88,8 +88,17 @@ def train_and_select(
     validation: Sequence[Mapping[str, Any]],
     catalogs: Catalogs,
     drop: frozenset[str] = frozenset(),
+    *,
+    task_type: str = "CPU",
+    thread_count: int = 1,
 ) -> dict[str, Any]:
-    """Train every grid configuration; pick the best validation MRR (ties: fewer trees)."""
+    """Train every grid configuration; pick the best validation MRR (ties: fewer trees).
+
+    CPU with 1 thread is the protocol default (CC-402). `task_type="GPU"` (CC-703, Colab)
+    trains the same grid on the GPU; CatBoost's GPU trees are not bit-identical to CPU ones,
+    so a GPU run is a declared deviation recorded in the run manifest."""
+    if task_type not in ("CPU", "GPU") or thread_count < 1:
+        raise ValueError("task_type deve ser CPU ou GPU e thread_count >= 1")
     from catboost import CatBoostRanker
 
     train_rows = [r for r in train if r.get("candidates") and r.get("targetLegal")]
@@ -104,7 +113,8 @@ def train_and_select(
             od_type="Iter",
             od_wait=EARLY_STOPPING,
             random_seed=SEED,
-            thread_count=1,
+            thread_count=thread_count,
+            task_type=task_type,
             verbose=False,
             allow_writing_files=False,
             **config,

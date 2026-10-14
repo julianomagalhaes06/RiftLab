@@ -51,7 +51,13 @@ def _load(
 
 
 def train_run(
-    dataset_path: Path, champion_path: Path, item_path: Path, run_dir: Path
+    dataset_path: Path,
+    champion_path: Path,
+    item_path: Path,
+    run_dir: Path,
+    *,
+    task_type: str = "CPU",
+    thread_count: int = 1,
 ) -> dict[str, Any]:
     if run_dir.exists():
         raise ExperimentError("diretório da execução já existe; nunca sobrescrito")
@@ -76,7 +82,8 @@ def train_run(
             "catboost": catboost.__version__,
             "numpy": numpy.__version__,
             "machine": platform.machine(),
-            "threads": 1,
+            "threads": thread_count,
+            "taskType": task_type,
         },
         "grid": list(GRID),
         "validation": {
@@ -86,7 +93,9 @@ def train_run(
         "models": {},
     }
     for name, drop in ABLATIONS.items():
-        selected = train_and_select(train, validation, catalogs, drop)
+        selected = train_and_select(
+            train, validation, catalogs, drop, task_type=task_type, thread_count=thread_count
+        )
         model_path = run_dir / f"m1-{name}.cbm"
         selected["model"].save_model(str(model_path))
         report["validation"][f"M1-{name}"] = evaluate(

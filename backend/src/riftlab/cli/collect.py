@@ -21,10 +21,13 @@ import json
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import typer
+
+if TYPE_CHECKING:
+    from riftlab.collection.dataset_collection import Campaign
 
 collect_app = typer.Typer(
     help="Coleta incremental de partidas por lista permitida de sementes (CC-206).",
@@ -440,6 +443,39 @@ def collect_dataset_16_19(
     env_file: Path | None = typer.Option(None, help="Arquivo de ambiente Riot local."),
 ) -> None:
     """Coleta CC-323: pares 16.19 por expansão a partir das sementes consentidas (sem banco)."""
+    import riftlab.collection.dataset_collection as dataset
+
+    _run_dataset_campaign(dataset.CC323, attempt, authorization, seeds_file, output_dir, env_file)
+
+
+@collect_app.command("dataset-16-19-scale")
+def collect_dataset_16_19_scale(
+    attempt: int = typer.Option(..., min=1, help="Tentativa autorizada da campanha CC-703."),
+    authorization: Path = typer.Option(
+        ..., help="Autorização privada da tentativa (JSON com sidecar SHA-256)."
+    ),
+    seeds_file: Path = typer.Option(
+        _DEFAULT_CC316_SEEDS, help="Lista privada de sementes com consentimento registrado."
+    ),
+    output_dir: Path = typer.Option(
+        _DEFAULT_CC323_OUTPUT.parent / "cc703", help="Diretório privado cc703 da coleta."
+    ),
+    env_file: Path | None = typer.Option(None, help="Arquivo de ambiente Riot local."),
+) -> None:
+    """Coleta CC-703: até 10 mil pares 16.19, dez atiradores, 5 partidas sorteadas por jogador."""
+    import riftlab.collection.dataset_collection as dataset
+
+    _run_dataset_campaign(dataset.CC703, attempt, authorization, seeds_file, output_dir, env_file)
+
+
+def _run_dataset_campaign(
+    campaign: Campaign,
+    attempt: int,
+    authorization: Path,
+    seeds_file: Path,
+    output_dir: Path,
+    env_file: Path | None,
+) -> None:
     current_process_started_monotonic_ns = time.monotonic_ns()
     import riftlab.collection.dataset_collection as dataset
     from riftlab.cli.env_file import load_settings
@@ -452,12 +488,15 @@ def collect_dataset_16_19(
         RiotHttpTransport,
     )
 
+    name = campaign.output_dir_name
     try:
-        granted = dataset.load_collection_authorization(authorization, attempt_number=attempt)
+        granted = dataset.load_collection_authorization(
+            authorization, attempt_number=attempt, campaign=campaign
+        )
     except DiscoveryError as exc:
         raise _blocked(str(exc)) from exc
-    if output_dir.name != "cc323" or ".private" not in output_dir.parts:
-        raise _blocked("saída deve ser o subdiretório cc323 sob .private")
+    if output_dir.name != name or ".private" not in output_dir.parts:
+        raise _blocked(f"saída deve ser o subdiretório {name} sob .private")
     try:
         output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         output_dir.chmod(0o700)
@@ -481,8 +520,7 @@ def collect_dataset_16_19(
     known_raw_directories = [
         directory
         for directory in (
-            output_dir.parent / "cc316" / "raw-exploration",
-            output_dir.parent / "cc316" / "raw-confirmation",
+            output_dir.parent / relative for relative in campaign.known_raw_subdirectories
         )
         if directory.is_dir()
     ]
@@ -512,10 +550,10 @@ def collect_dataset_16_19(
             transport = RiotHttpTransport(
                 api_key=settings.riot_api_key or "",
                 budget=RiotFetchBudget(
-                    max_matches=dataset.MAX_PAIRS,
-                    max_requests=dataset.MAX_REQUESTS,
+                    max_matches=campaign.max_pairs,
+                    max_requests=campaign.max_requests,
                     max_attempts_per_request=5,
-                    max_total_seconds=dataset.MAX_SECONDS,
+                    max_total_seconds=campaign.max_seconds,
                     request_timeout_seconds=10,
                 ),
                 rate_limiter=RiotRateLimiter(),
@@ -527,6 +565,7 @@ def collect_dataset_16_19(
                 attempt_number=attempt,
                 authorized_max_requests=granted.max_requests,
                 known_raw_directories=known_raw_directories,
+                campaign=campaign,
                 process_started_monotonic_ns=lifecycle.process_started_monotonic_ns,
             )
         finally:
@@ -549,7 +588,8 @@ def collect_dataset_16_19(
 
     if run_error is not None:
         typer.echo(
-            f"CC-323 interrompido: {type(run_error).__name__}; consulte o diário privado.",
+            f"{campaign.campaign_id} interrompido: {type(run_error).__name__}; "
+            "consulte o diário privado.",
             err=True,
         )
         raise typer.Exit(code=EXIT_INCOMPLETE) from run_error

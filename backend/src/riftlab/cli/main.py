@@ -139,6 +139,16 @@ def _verified_private_json(path: Path) -> Any:
     return json.loads(raw)
 
 
+_RAW_SUBDIRECTORIES = ("cc316/raw-exploration", "cc316/raw-confirmation", "cc323/raw")
+_CC703_RAW = "cc703/raw"
+
+
+def _raw_directories(collection_dir: Path) -> list[Path]:
+    """Private raw stores read by dataset commands; the CC-703 store when it exists."""
+    extra = [collection_dir / _CC703_RAW] if (collection_dir / _CC703_RAW).is_dir() else []
+    return [collection_dir / sub for sub in _RAW_SUBDIRECTORIES] + extra
+
+
 @dataset_app.command("build-rows")
 def dataset_build_rows(
     manifest: Path = typer.Option(
@@ -256,6 +266,8 @@ def ml_train_ranker(
     run_dir: Path = typer.Option(..., help="Diretório novo da execução (artefatos privados)."),
     champions: Path = typer.Option(_CC402 / "champion-16.19.1-en_US.json"),
     items: Path = typer.Option(_ITEMS_16_19),
+    task_type: str = typer.Option("CPU", help="CPU (protocolo) ou GPU (Colab, CC-703)."),
+    threads: int = typer.Option(1, min=1, help="Threads do CatBoost (protocolo: 1)."),
 ) -> None:
     """Seleciona B0/B1/M1 e ablações só na validação; o teste fica fechado."""
     import json
@@ -263,7 +275,9 @@ def ml_train_ranker(
     from riftlab.ml.experiment import ExperimentError, train_run
 
     try:
-        report = train_run(dataset, champions, items, run_dir)
+        report = train_run(
+            dataset, champions, items, run_dir, task_type=task_type, thread_count=threads
+        )
     except ExperimentError as exc:
         typer.echo(f"BLOCKED: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -317,10 +331,7 @@ def ml_enrich_context(
         for i, c in table.by_item_id.items()
         if c.item_class is ItemClass.MAIN
     }
-    stores = [
-        DurableRawMatchStore(collection_dir / d, create=False)
-        for d in ("cc316/raw-exploration", "cc316/raw-confirmation", "cc323/raw")
-    ]
+    stores = [DurableRawMatchStore(d, create=False) for d in _raw_directories(collection_dir)]
     cache: dict[str, Any] = {}
 
     def bodies(match_id: str) -> Any:
@@ -628,11 +639,7 @@ def dataset_freeze_final(
     artifact = build_final_dataset(
         rows_artifact,
         corpus,
-        [
-            collection_dir / "cc316" / "raw-exploration",
-            collection_dir / "cc316" / "raw-confirmation",
-            collection_dir / "cc323" / "raw",
-        ],
+        _raw_directories(collection_dir),
         rows_sha256=hashlib.sha256(rows_path.read_bytes()).hexdigest(),
         manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest(),
     )
@@ -706,8 +713,11 @@ def dataset_freeze_corpus(
     collection_dir: Path = typer.Option(
         _REPO_ROOT / ".private" / "collection", help="Raiz privada das coletas."
     ),
+    include_cc703: bool = typer.Option(
+        False, "--include-cc703", help="Inclui a coleta em escala do CC-703 (corpus v3)."
+    ),
 ) -> None:
-    """Congela o corpus do patch (CC-316 + CC-323) e a divisão treino/teste, sem rede nem banco."""
+    """Congela o corpus do patch (CC-316 + CC-323 [+ CC-703]) e a divisão, sem rede nem banco."""
     import json
 
     from riftlab.dataset.corpus import CorpusError, freeze_corpus
@@ -717,6 +727,8 @@ def dataset_freeze_corpus(
         "cc316-confirmation": collection_dir / "cc316" / "raw-confirmation",
         "cc323": collection_dir / "cc323" / "raw",
     }
+    if include_cc703:
+        sources["cc703"] = collection_dir / _CC703_RAW
     try:
         manifest, digest = freeze_corpus(output, sources, policy)
     except CorpusError as exc:

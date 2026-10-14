@@ -896,3 +896,185 @@ def test_cli_runs_one_attempt_with_lifecycle_and_prints_aggregates(
     lifecycle = json.loads((output_dir / "process-lifecycle-01.json").read_text())
     assert (lifecycle["lifecycleStatus"], lifecycle["runOutcome"]) == ("COMPLETE", "COMPLETED")
     assert dataset.prior_campaign_usage(output_dir, 2)[0] == 13
+
+
+# --- CC-703: the CC-702 scope at scale, with a spread listing --------------------------
+
+JINX = 222
+
+
+def _output_dir_703(tmp_path: Path) -> Path:
+    private_dir(tmp_path / ".private" / "collection")
+    return private_dir(tmp_path / ".private" / "collection" / "cc703")
+
+
+def _wide_world(count: int = 20) -> World:
+    world = World()
+    world.listings = {"puuid-seed": [f"BR1_{n}" for n in range(1, count + 1)]}
+    for n in range(1, count + 1):
+        world.match(f"BR1_{n}", [("puuid-seed", OTHER, "MIDDLE")])
+    return world
+
+
+@pytest.mark.asyncio
+async def test_cc703_lists_the_whole_window_and_keeps_a_reproducible_spread_sample(
+    tmp_path: Path,
+) -> None:
+    runs = []
+    for name in ("a", "b"):
+        output_dir = _output_dir_703(tmp_path / name)
+        transport = FakeTransport(_wide_world())
+        summary = await _collect(output_dir, transport, campaign=dataset.CC703)
+        runs.append((transport, summary, output_dir))
+
+    first, second = runs[0][0], runs[1][0]
+    assert first.listing_params == [
+        {
+            "queue": 420,
+            "start": 0,
+            "count": 100,
+            "startTime": dataset.WINDOW_START,
+            "endTime": dataset.WINDOW_END,
+        }
+    ]
+    sampled = first.fetched()
+    assert len(sampled) == 5 and sampled == second.fetched()
+    # Not the five most recent: the sample spreads over the player's listing.
+    assert sampled != [f"BR1_{n}" for n in range(1, 6)]
+    assert set(sampled) == set(
+        dataset.CC703.keep("puuid-seed", _wide_world().listings["puuid-seed"])
+    )
+    report = json.loads((runs[0][2] / "collection-attempt-01.json").read_text(encoding="utf-8"))
+    assert report["campaign"] == "CC-703"
+    assert report["expansion"]["listingSelection"] == "SALTED_HASH_SAMPLE"
+    assert report["expansion"]["matchesListedPerPlayer"] == 5
+    assert report["expansion"]["scope"]["championIds"] == sorted(dataset.CC703.scope_champions)
+    assert report["counts"]["LISTED_IDS_NOT_SAMPLED"] == 15
+    assert "LISTED_IDS_NOT_SAMPLED" not in runs[0][1].discarded
+
+
+@pytest.mark.asyncio
+async def test_cc703_lists_players_of_the_ten_marksmen_first(tmp_path: Path) -> None:
+    world = World()
+    world.listings = {"puuid-seed": ["BR1_1"], "puuid-jinx": [], "puuid-other": []}
+    world.match(
+        "BR1_1",
+        [
+            ("puuid-seed", OTHER, "MIDDLE"),
+            ("puuid-other", OTHER, "TOP"),
+            ("puuid-jinx", JINX, "BOTTOM"),
+        ],
+    )
+    transport = FakeTransport(world)
+
+    await _collect(_output_dir_703(tmp_path), transport, campaign=dataset.CC703)
+
+    assert transport.listed() == ["puuid-seed", "puuid-jinx", "puuid-other"]
+    # The CC-323 scope keeps Jinx with everyone else.
+    legacy = FakeTransport(world)
+    await _collect(_output_dir(tmp_path / "legacy"), legacy)
+    assert legacy.listed() == ["puuid-seed", "puuid-other", "puuid-jinx"]
+
+
+@pytest.mark.asyncio
+async def test_cc703_reuses_cc323_pairs_without_requests_and_owns_its_directory(
+    tmp_path: Path,
+) -> None:
+    world = _snowball_world()
+    cc323_raw = private_dir(_output_dir(tmp_path) / "raw")
+    _store_pair(cc323_raw, "BR1_4", world.matches["BR1_4"])
+    output_dir = _output_dir_703(tmp_path)
+    transport = FakeTransport(world)
+
+    await _collect(output_dir, transport, campaign=dataset.CC703, known_raw_directories=[cc323_raw])
+
+    assert "BR1_4" not in transport.fetched()
+    with pytest.raises(DiscoveryError, match="cc703"):
+        await _collect(
+            _output_dir(tmp_path / "wrong"), FakeTransport(world), campaign=dataset.CC703
+        )
+
+
+def _write_authorization_703(tmp_path: Path, **overrides: object) -> Path:
+    path = _write_authorization(
+        tmp_path,
+        overrides={
+            "campaign": "CC-703",
+            "maxPairs": 10_000,
+            "maxRequests": 24_000,
+            "maxSeconds": 36_000,
+            **overrides,
+        },
+    )
+    return path
+
+
+def test_cc703_authorization_is_bound_to_its_own_caps(tmp_path: Path) -> None:
+    granted = dataset.load_collection_authorization(
+        _write_authorization_703(tmp_path), attempt_number=1, campaign=dataset.CC703
+    )
+    assert granted.max_requests == 24_000
+    for name, overrides in {
+        "legacy_caps": {"maxPairs": dataset.MAX_PAIRS, "maxSeconds": dataset.MAX_SECONDS},
+        "above_cap": {"maxRequests": 24_001},
+        "other_campaign": {"campaign": "CC-323"},
+    }.items():
+        path = _write_authorization_703(tmp_path / name, **overrides)
+        with pytest.raises(DiscoveryError, match="CC-703"):
+            dataset.load_collection_authorization(path, attempt_number=1, campaign=dataset.CC703)
+    # A CC-703 authorization never opens the CC-323 campaign.
+    with pytest.raises(DiscoveryError, match="CC-323"):
+        dataset.load_collection_authorization(
+            _write_authorization_703(tmp_path / "cross"), attempt_number=1
+        )
+
+
+def test_cli_scale_command_runs_the_cc703_campaign(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from riftlab.cli.collect import collect_dataset_16_19_scale
+
+    authorization = _write_authorization_703(tmp_path)
+    seeds_file = private_dir(tmp_path / ".private" / "collection") / "seeds.yaml"
+    seeds_file.write_bytes(SEEDS_BYTES)
+    monkeypatch.setattr("riftlab.collection.seeds.load_seeds", lambda _path: [SEED])
+    monkeypatch.setattr(
+        "riftlab.cli.env_file.load_settings",
+        lambda _env_file: SimpleNamespace(riot_api_key="synthetic-key"),
+    )
+    monkeypatch.setattr(exploration_module, "connectivity_preflight", lambda: None)
+    world = _snowball_world()
+    cc323_raw = private_dir(_output_dir(tmp_path) / "raw")
+    _store_pair(cc323_raw, "BR1_4", world.matches["BR1_4"])
+    built: list[FakeTransport] = []
+
+    class CliTransport(FakeTransport):
+        def __init__(self, **kwargs: Any) -> None:
+            assert kwargs["budget"].max_requests == 24_000
+            assert kwargs["budget"].max_matches == 10_000
+            super().__init__(world)
+            built.append(self)
+
+        async def aclose(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "riftlab.ingestion.infrastructure.riot_transport.RiotHttpTransport", CliTransport
+    )
+    output_dir = tmp_path / ".private" / "collection" / "cc703"
+
+    collect_dataset_16_19_scale(
+        attempt=1,
+        authorization=authorization,
+        seeds_file=seeds_file,
+        output_dir=output_dir,
+        env_file=None,
+    )
+
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["status"] == "QUEUE_EXHAUSTED" and "puuid-" not in json.dumps(printed)
+    assert built[0].request_limit == 24_000
+    assert "BR1_4" not in built[0].fetched()
+    assert (
+        json.loads((output_dir / "collection-attempt-01.json").read_text())["campaign"] == "CC-703"
+    )
