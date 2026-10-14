@@ -62,7 +62,9 @@ def evaluate(
     resamples: int = 2000,
     seed: int = 401,
 ) -> dict[str, Any]:
-    """Metrics over evaluable decisions (legal target, >=1 candidate): all and player-disjoint."""
+    """Metrics over evaluable decisions (legal target, >=1 candidate): all, player-disjoint and
+    the slices a frozen dataset declares per row in `subsets` (CC-702: champion slices), so a
+    single test run reports every slice."""
     per_subset: dict[str, list[tuple[str, int]]] = {"all": [], "playerDisjoint": []}
     skipped = 0
     for row in rows:
@@ -74,6 +76,10 @@ def evaluate(
         per_subset["all"].append((row["matchId"], rank))
         if row.get("playerSeenInTrain") is False:
             per_subset["playerDisjoint"].append((row["matchId"], rank))
+        for name in row.get("subsets") or ():
+            if name in ("all", "playerDisjoint"):
+                raise ValueError(f"subset reservado: {name}")
+            per_subset.setdefault(name, []).append((row["matchId"], rank))
     return {
         "skipped": skipped,
         **{

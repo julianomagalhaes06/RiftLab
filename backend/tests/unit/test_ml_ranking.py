@@ -74,6 +74,23 @@ def test_evaluate_reports_player_disjoint_subset_and_skips_unlabelled() -> None:
     )
 
 
+def test_evaluate_reports_declared_slices_and_rejects_reserved_names() -> None:
+    rows = [
+        {**_row("m1", 3031), "subsets": ["scopeNew", "champion:222"]},
+        {**_row("m2", 6672), "subsets": ["scopeOriginal"]},
+        {**_row("m3", 6672), "subsets": ["scopeOriginal"]},
+        _row("m4", 3031),
+    ]
+    report = evaluate(rows, lambda r: [1.0, 0.0], resamples=0)
+    assert report["all"]["decisions"] == 4
+    assert report["scopeNew"]["decisions"] == 1 and report["scopeNew"]["point"]["mrr"] == 1.0
+    assert report["champion:222"]["decisions"] == 1
+    assert report["scopeOriginal"]["decisions"] == 2
+    assert report["scopeOriginal"]["point"]["mrr"] == pytest.approx(0.5)
+    with pytest.raises(ValueError, match="reservado"):
+        evaluate([{**_row("m1", 3031), "subsets": ["all"]}], lambda r: [1.0, 0.0], resamples=0)
+
+
 def test_features_keep_missing_values_as_nan_and_derive_composition() -> None:
     vectors = decision_vectors(_row("m1", 3031, gold=None), CATALOGS)
     first = vectors[0]

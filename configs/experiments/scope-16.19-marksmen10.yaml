@@ -1,0 +1,31 @@
+# Recorte EXPERIMENTAL do CC-702: o mesmo corpus 16.19 com mais atiradores. Não é o recorte
+# do produto (configs/scope.yaml continua com 3 campeões); serve só para remedição, dataset e
+# avaliação. Nenhum identificador pessoal aparece aqui.
+
+schemaVersion: v1-marksmen10
+frozenAt: "2026-10-13"
+frozenByCard: CC-702
+
+queue: 420
+map: 11
+role: BOTTOM
+
+# Regra fixada antes da medição: tag Marksman no Data Dragon 16.19.1 e pelo menos 60 partidas
+# como BOTTOM na parte de TREINO do corpus 16.19 v2 (validação e teste fora da contagem).
+# O limiar dá cerca de 20 decisões de 2º item por campeão no treino, o piso de suporte de
+# docs/evaluation.md. Contagens de partidas de treino nos comentários.
+championIds:
+  - 51 # Caitlyn, 177
+  - 145 # Kai'Sa, 146
+  - 222 # Jinx, 126
+  - 81 # Ezreal, 118
+  - 202 # Jhin, 118
+  - 804 # Yunara, 86
+  - 18 # Tristana, 81
+  - 22 # Ashe, 81
+  - 21 # Miss Fortune, 62
+  - 29 # Twitch, 61
+
+# Patch fixo: o corpus e as regras empíricas de inventário são só do 16.19.
+patches:
+  - gamePatch: "16.19"
