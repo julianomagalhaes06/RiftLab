@@ -45,7 +45,7 @@ test("Minha posição: sem observação e API fora do ar não inventam elo", asy
   await expect(page.locator("body")).not.toContainText(/Elo (Ferro|Bronze|Prata|Ouro)/);
 });
 
-test("Campeões: área ainda não construída diz isso e não chama o CDN", async ({ page }) => {
+test("Campeões: amostra vazia não inventa padrões e não chama o CDN", async ({ page }) => {
   const external: string[] = [];
   await page.route("**/*", (route) => {
     const host = new URL(route.request().url()).hostname;
@@ -57,9 +57,9 @@ test("Campeões: área ainda não construída diz isso e não chama o CDN", asyn
   });
   await mockApi(page);
   await page.goto("/campeoes");
-  await expect(page.getByRole("heading", { name: "Visão por campeão ainda não construída" })).toBeVisible();
-  await expect(page.getByText(/Nenhuma build ou recomendação é inferida/)).toBeVisible();
-  await page.getByRole("link", { name: "Examinar partidas importadas" }).click();
+  await expect(page.getByRole("heading", { name: "Ainda não há trajetos elegíveis neste filtro" })).toBeVisible();
+  await expect(page.getByText(/Nenhum padrão é preenchido por estimativa/)).toBeVisible();
+  await page.getByRole("link", { name: "Examinar partidas no Histórico" }).click();
   await expect(page.getByRole("heading", { name: "Partidas para estudar" })).toBeVisible();
   expect(external).toEqual([]);
 });

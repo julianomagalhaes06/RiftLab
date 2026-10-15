@@ -1,4 +1,5 @@
 import type { Page, Request } from "@playwright/test";
+import { championPatterns } from "../../../src/test/championPatterns";
 
 /**
  * API simulada via `page.route` para os specs que precisam de controle total do
@@ -151,6 +152,7 @@ export function decisionState(overrides: Record<string, unknown> = {}) {
 }
 
 export type RouteKey =
+  | "GET /api/v1/champions/patterns"
   | "POST /api/v1/imports"
   | "GET /api/v1/imports/:id"
   | "POST /api/v1/imports/:id/retry"
@@ -174,6 +176,7 @@ export type RouteKey =
   | "GET /api/v1/analyses/:id/report";
 
 const PATTERNS: Array<[RouteKey, string, RegExp]> = [
+  ["GET /api/v1/champions/patterns", "GET", /^\/api\/v1\/champions\/patterns$/],
   ["POST /api/v1/imports", "POST", /^\/api\/v1\/imports$/],
   ["POST /api/v1/imports/:id/retry", "POST", /^\/api\/v1\/imports\/[^/]+\/retry$/],
   ["GET /api/v1/imports/:id", "GET", /^\/api\/v1\/imports\/[^/]+$/],
@@ -320,6 +323,7 @@ function studyHandlers(): Partial<Record<RouteKey, Handler>> {
 
 /** Fluxo feliz padrão: demonstração importada e pronta, com decisões e detalhe. */
 export const happyPath: Partial<Record<RouteKey, Handler>> = {
+  "GET /api/v1/champions/patterns": () => ok(championPatterns({ champions: [], status: "EMPTY", patterns: [], situations: [] })),
   "POST /api/v1/imports": () =>
     ok({ jobId: JOB_ID, status: "QUEUED", statusUrl: `/api/v1/imports/${JOB_ID}` }, 202),
   "GET /api/v1/imports/:id": () =>

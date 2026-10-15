@@ -18,6 +18,7 @@ export type MatchSummary = Schemas["MatchSummary"];
 export type MatchDetail = Schemas["MatchDetail"];
 export type MatchParticipant = Schemas["MatchParticipant"];
 export type ChampionAsset = Schemas["ChampionAsset"];
+export type ChampionPatterns = Schemas["ChampionPatterns"];
 export type MatchPreparation = Schemas["MatchPreparation"];
 export type PreparationStatus = Schemas["PreparationStatus"];
 export type MatchPage = Schemas["CursorPage_MatchSummary_"];
@@ -51,6 +52,7 @@ interface RequestOptions {
 }
 
 export interface ApiClient {
+  getChampionPatterns(params: { championId?: number; patch?: string; phase?: "first" | "second" | "sequence" }, signal?: AbortSignal): Promise<ChampionPatterns>;
   getRankedMe(signal?: AbortSignal): Promise<RankedMe>;
   createImport(matchId: string, mode: ImportMode, signal?: AbortSignal): Promise<ImportJobAccepted>;
   getImport(jobId: string, signal?: AbortSignal): Promise<ImportJobStatus>;
@@ -154,6 +156,7 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
   const enc = encodeURIComponent;
 
   return {
+    getChampionPatterns: (params, signal) => request("GET", `/api/v1/champions/patterns${queryString(params)}`, { signal }),
     getRankedMe: (signal) => request("GET", "/api/v1/ranked/me", { signal }),
     // Modo RIOT sem chave no servidor: 422 com code=RIOT_KEY_MISSING (tabela de mensagens).
     createImport: (matchId, mode, signal) =>

@@ -34,23 +34,6 @@ export function PanelPage() {
   );
 }
 
-export function ChampionsPage() {
-  return (
-    <div className="area-page">
-      <div className="page-intro">
-        <p className="page-intro__kicker">Campeões</p>
-        <h2>Contexto por campeão</h2>
-        <p>Esta área reunirá padrões por campeão, papel e patch quando houver amostra suficiente, sem afirmar build ideal por frequência.</p>
-      </div>
-      <section className="quiet-surface quiet-surface--wide">
-        <h3>Visão por campeão ainda não construída</h3>
-        <p>Por enquanto, nomes e retratos oficiais aparecem no Contexto de cada partida, e cada decisão é estudada a partir do Histórico. Nenhuma build ou recomendação é inferida da frequência de compra.</p>
-        <Link to="/historico">Examinar partidas importadas</Link>
-      </section>
-    </div>
-  );
-}
-
 export function PositionPage() {
   return (
     <div className="area-page">

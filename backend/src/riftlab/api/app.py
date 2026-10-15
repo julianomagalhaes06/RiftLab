@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from riftlab import db
 from riftlab.api.routes.analyses import router as analyses_router
+from riftlab.api.routes.champions import router as champions_router
 from riftlab.api.routes.decisions import router as decisions_router
 from riftlab.api.routes.health import router as health_router
 from riftlab.api.routes.imports import router as imports_router
@@ -41,6 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="RiftLab API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router)
+    app.include_router(champions_router)
     app.include_router(imports_router)
     app.include_router(matches_router)
     app.include_router(decisions_router)

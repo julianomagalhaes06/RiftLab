@@ -79,6 +79,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/champions/patterns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Champion Patterns */
+        get: operations["get_champion_patterns_api_v1_champions_patterns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decisions/{decision_id}": {
         parameters: {
             query?: never;
@@ -608,6 +625,100 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** ChampionChoice */
+        ChampionChoice: {
+            champion: components["schemas"]["ChampionAsset"] | null;
+            /** Championid */
+            championId: number;
+            /** Matches */
+            matches: number;
+        };
+        /** ChampionPatterns */
+        ChampionPatterns: {
+            /** Championid */
+            championId: number | null;
+            /** Champions */
+            champions: components["schemas"]["ChampionChoice"][];
+            /**
+             * Eligibledecisions
+             * @default 0
+             */
+            eligibleDecisions: number;
+            /**
+             * Minimumsample
+             * @default 5
+             */
+            minimumSample: number;
+            /**
+             * Observeddecisions
+             * @default 0
+             */
+            observedDecisions: number;
+            /** Patch */
+            patch: string | null;
+            /** Patches */
+            patches: string[];
+            /**
+             * Patterndenominator
+             * @default 0
+             */
+            patternDenominator: number;
+            /** Patterns */
+            patterns?: components["schemas"]["ObservedPattern"][];
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "first" | "second" | "sequence";
+            /**
+             * Role
+             * @default BOTTOM
+             * @constant
+             */
+            role: "BOTTOM";
+            /**
+             * Samplelimit
+             * @default 200
+             */
+            sampleLimit: number;
+            /**
+             * Sampledparticipations
+             * @default 0
+             */
+            sampledParticipations: number;
+            /** Situations */
+            situations?: components["schemas"]["ChampionSituation"][];
+            /**
+             * Source
+             * @default IMPORTED_REAL_MATCHES
+             * @constant
+             */
+            source: "IMPORTED_REAL_MATCHES";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "AVAILABLE" | "SMALL_SAMPLE" | "NO_ELIGIBLE" | "OUT_OF_SCOPE" | "EMPTY";
+            /**
+             * Totalparticipations
+             * @default 0
+             */
+            totalParticipations: number;
+        };
+        /** ChampionSituation */
+        ChampionSituation: {
+            /**
+             * Decisionid
+             * Format: uuid
+             */
+            decisionId: string;
+            /** Matchid */
+            matchId: string;
+            /** Participantid */
+            participantId: number;
+            /** Timestampms */
+            timestampMs: number;
+        };
         /** Change */
         Change: {
             /**
@@ -817,6 +928,11 @@ export interface components {
             reviewerRef: string;
             /** Rubricversion */
             rubricVersion: string;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
         };
         /**
          * ImportJobAccepted
@@ -1261,6 +1377,15 @@ export interface components {
              */
             status: "INTERPRETED" | "NEEDS_INPUT";
         };
+        /** ObservedItem */
+        ObservedItem: {
+            /** Datadragonversion */
+            dataDragonVersion: string;
+            /** Itemid */
+            itemId: number;
+            /** Name */
+            name: string | null;
+        };
         /**
          * ObservedLevel
          * @description Nível do mesmo frame estritamente anterior usado para o ouro; ausência
@@ -1273,6 +1398,15 @@ export interface components {
             frameAgeMs?: number | null;
             /** Value */
             value?: number | null;
+        };
+        /** ObservedPattern */
+        ObservedPattern: {
+            /** Count */
+            count: number;
+            /** Denominator */
+            denominator: number;
+            /** Items */
+            items: components["schemas"]["ObservedItem"][];
         };
         /** Position */
         Position: {
@@ -1437,6 +1571,19 @@ export interface components {
              * @constant
              */
             source: "USER_PROVIDED";
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
         };
     };
     responses: never;
@@ -1653,6 +1800,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_champion_patterns_api_v1_champions_patterns_get: {
+        parameters: {
+            query?: {
+                championId?: number | null;
+                patch?: string | null;
+                phase?: "first" | "second" | "sequence";
+                role?: "BOTTOM";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChampionPatterns"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

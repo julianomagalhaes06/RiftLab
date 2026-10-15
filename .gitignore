@@ -1,11 +1,15 @@
 # Local workspace files
 .private/
+/backup_riftlab_ignored.sh
 /docs/
 /AGENTS.md
 /CLAUDE.md
 /.agents/
 /.codex/
 /.claude/
+/.aws
+/skills-lock.json
+/*.gpg
 .env
 .env.*
 !.env.example

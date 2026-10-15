@@ -61,13 +61,13 @@ flowchart LR
 | 5 | Objetivos e revisão assistida | Experimento de fine-tuning, formulário alternativo e feedback |
 | 6 | Validação e entrega | Experimentos, testes integrados, relatório e demonstração |
 
-## Estado da entrega (13/10/2026)
+## Estado da entrega (15/10/2026)
 
 | Situação | O quê |
 | --- | --- |
 | **Entregue** | Importação BR1 e demonstração offline. Reconstrução do estado anterior à compra com proveniência e incerteza explícita. Decisões elegíveis. Candidatos legais do catálogo do patch. Comparação de até três alternativas com custo restante. Popularidade versionada com suporte e abstenção. Objetivo por formulário ou texto confirmado. Estudo com escolha antes da revelação, pistas, reflexão e transferência. Julgamento por rubrica e relatório JSON/HTML verificável. Registro de modelos. Expurgo com confirmação e retenção. Navegação Painel, Campeões, Minha posição e Histórico. Minha posição da conta própria. Demonstração reproduzível. |
 | **Experimentos com resultado negativo** | Ranker contextual (CatBoost) sem ganho sobre a popularidade no planejamento do próximo item, também com dez atiradores. Clusters de contexto sem estrutura. Ajuste LoRA do interpretador reprovado no gate de ambiguidade. Regras de inventário em 16.16/16.17 não liberadas. |
-| **Pendente** | Revisão estratégica por especialistas (ferramenta pronta, aguardando os revisores). Estatísticas pessoais no Painel (taxa de vitória, KDA, decisões revistas). Guia de estudo por campeão. Glossário no estudo real. Piloto pedagógico com voluntários. |
+| **Pendente** | Revisão estratégica por especialistas (ferramenta pronta, aguardando os revisores). Estatísticas pessoais no Painel (taxa de vitória, KDA, decisões revistas). Glossário no estudo real. Piloto pedagógico com voluntários. |
 | **Fora do escopo** | Overlay ao vivo e partidas em andamento. Automação de compras. Treinar modelo de linguagem do zero. Aprendizado por reforço. Aplicativo móvel nativo. Outros jogos. Uso multiusuário ou exposição pública da API. |
 
 ## Situação atual
@@ -173,6 +173,12 @@ O OpenAPI servido descreve:
 - tentativas de estudo: criação, leitura, pistas, resposta, revelação, reflexão e progresso;
 - análises: criação, leitura, julgamento e relatório;
 - `/api/v1/objectives/interpret`.
+
+### Padrões por campeão
+
+A área **Campeões** explora compras principais observadas nas partidas reais importadas, por campeão, patch e etapa (primeiro item, segundo item ou sequência dos dois). A função suportada é BOTTOM. Nomes e retratos vêm do catálogo fixado para o patch; os itens preservam o nome e a versão do catálogo da reconstrução. Os filtros ficam na URL e as situações elegíveis abrem diretamente o estudo ou o contexto da partida.
+
+A amostra considera até 200 participações recentes por campeão e mostra total disponível, decisões elegíveis e denominador dos trajetos completos. Só as versões correntes entram no guia; compras incertas não preenchem lacunas de uma sequência. Abaixo de cinco participações completas e elegíveis, o guia se abstém de publicar padrões, mantendo o acesso às situações de estudo. Esse mínimo é uma regra de apresentação, não validação estatística. Frequência não indica qualidade estratégica ou build ideal: a amostra descritiva local é separada do baseline versionado usado na comparação. A consulta não coleta dados nem altera datasets ou modelos.
 
 ## Demonstração reproduzível
 

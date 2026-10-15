@@ -457,6 +457,198 @@
         "title": "ChampionAsset",
         "type": "object"
       },
+      "ChampionChoice": {
+        "additionalProperties": false,
+        "properties": {
+          "champion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChampionAsset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "championId": {
+            "title": "Championid",
+            "type": "integer"
+          },
+          "matches": {
+            "title": "Matches",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "championId",
+          "champion",
+          "matches"
+        ],
+        "title": "ChampionChoice",
+        "type": "object"
+      },
+      "ChampionPatterns": {
+        "additionalProperties": false,
+        "properties": {
+          "championId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Championid"
+          },
+          "champions": {
+            "items": {
+              "$ref": "#/components/schemas/ChampionChoice"
+            },
+            "title": "Champions",
+            "type": "array"
+          },
+          "eligibleDecisions": {
+            "default": 0,
+            "title": "Eligibledecisions",
+            "type": "integer"
+          },
+          "minimumSample": {
+            "default": 5,
+            "title": "Minimumsample",
+            "type": "integer"
+          },
+          "observedDecisions": {
+            "default": 0,
+            "title": "Observeddecisions",
+            "type": "integer"
+          },
+          "patch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patch"
+          },
+          "patches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Patches",
+            "type": "array"
+          },
+          "patternDenominator": {
+            "default": 0,
+            "title": "Patterndenominator",
+            "type": "integer"
+          },
+          "patterns": {
+            "items": {
+              "$ref": "#/components/schemas/ObservedPattern"
+            },
+            "title": "Patterns",
+            "type": "array"
+          },
+          "phase": {
+            "enum": [
+              "first",
+              "second",
+              "sequence"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "role": {
+            "const": "BOTTOM",
+            "default": "BOTTOM",
+            "title": "Role",
+            "type": "string"
+          },
+          "sampleLimit": {
+            "default": 200,
+            "title": "Samplelimit",
+            "type": "integer"
+          },
+          "sampledParticipations": {
+            "default": 0,
+            "title": "Sampledparticipations",
+            "type": "integer"
+          },
+          "situations": {
+            "items": {
+              "$ref": "#/components/schemas/ChampionSituation"
+            },
+            "title": "Situations",
+            "type": "array"
+          },
+          "source": {
+            "const": "IMPORTED_REAL_MATCHES",
+            "default": "IMPORTED_REAL_MATCHES",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "AVAILABLE",
+              "SMALL_SAMPLE",
+              "NO_ELIGIBLE",
+              "OUT_OF_SCOPE",
+              "EMPTY"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "totalParticipations": {
+            "default": 0,
+            "title": "Totalparticipations",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "patches",
+          "patch",
+          "phase",
+          "champions",
+          "championId",
+          "status"
+        ],
+        "title": "ChampionPatterns",
+        "type": "object"
+      },
+      "ChampionSituation": {
+        "additionalProperties": false,
+        "properties": {
+          "decisionId": {
+            "format": "uuid",
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "participantId": {
+            "title": "Participantid",
+            "type": "integer"
+          },
+          "timestampMs": {
+            "title": "Timestampms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "matchId",
+          "participantId",
+          "decisionId",
+          "timestampMs"
+        ],
+        "title": "ChampionSituation",
+        "type": "object"
+      },
       "Change": {
         "properties": {
           "kind": {
@@ -1005,6 +1197,19 @@
           "reviewerRef"
         ],
         "title": "FeedbackResult",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
         "type": "object"
       },
       "ImportJobAccepted": {
@@ -2059,6 +2264,37 @@
         "title": "ObjectiveInterpretResult",
         "type": "object"
       },
+      "ObservedItem": {
+        "additionalProperties": false,
+        "properties": {
+          "dataDragonVersion": {
+            "title": "Datadragonversion",
+            "type": "string"
+          },
+          "itemId": {
+            "title": "Itemid",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "itemId",
+          "name",
+          "dataDragonVersion"
+        ],
+        "title": "ObservedItem",
+        "type": "object"
+      },
       "ObservedLevel": {
         "additionalProperties": false,
         "description": "Nível do mesmo frame estritamente anterior usado para o ouro; ausência\nexplícita (`value` null com `absent_reason`), nunca 0.",
@@ -2101,6 +2337,33 @@
           }
         },
         "title": "ObservedLevel",
+        "type": "object"
+      },
+      "ObservedPattern": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "denominator": {
+            "title": "Denominator",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ObservedItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "count",
+          "denominator"
+        ],
+        "title": "ObservedPattern",
         "type": "object"
       },
       "Position": {
@@ -2521,6 +2784,46 @@
         ],
         "title": "UserProvidedBudget",
         "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
       }
     }
   },
@@ -2836,6 +3139,99 @@
         "summary": "Read Report",
         "tags": [
           "analyses"
+        ]
+      }
+    },
+    "/api/v1/champions/patterns": {
+      "get": {
+        "operationId": "get_champion_patterns_api_v1_champions_patterns_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "championId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Championid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "patch",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,3}\\.\\d{1,3}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Patch"
+            }
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "default": "sequence",
+              "enum": [
+                "first",
+                "second",
+                "sequence"
+              ],
+              "title": "Phase",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "const": "BOTTOM",
+              "default": "BOTTOM",
+              "title": "Role",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChampionPatterns"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Champion Patterns",
+        "tags": [
+          "champions"
         ]
       }
     },
