@@ -19,8 +19,11 @@ for (const width of [360, 1280]) {
         change: { ...rank.change, leaguePointsDelta: -8 } }
       : rank) });
     await page.goto("/minha-posicao");
-    await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
+    await expect(page.getByText("Elo Diamante IV, 29 de 100 PDL")).toBeVisible();
     const selector = page.getByLabel("Fila ranqueada");
+    await expect(selector).toHaveValue("RANKED_FLEX_SR");
+    await expect(page.getByText("Seleção automática · melhor classificação disponível")).toBeVisible();
+    await selector.selectOption("RANKED_SOLO_5x5");
     await selector.focus();
     await page.keyboard.press("End");
     await page.keyboard.press("Enter");
@@ -53,7 +56,7 @@ test("Flex sem observação e não classificado não herda a posição Solo/Duo"
   await expect(page.getByText(/Ainda não há observação/)).toBeVisible();
   await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toHaveCount(0);
   unranked = true;
-  await page.getByLabel("Fila ranqueada").selectOption("RANKED_SOLO_5x5");
+  await page.reload();
   await page.getByLabel("Fila ranqueada").selectOption("RANKED_FLEX_SR");
   await expect(page.getByText("Não classificado na Flex nesta observação válida.")).toBeVisible();
 });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockApi, json, type MockApi } from "../../test/mockApi";
 import { MyRank } from "./MyRank";
@@ -20,9 +20,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Minha posição por fila", () => {
+  it("abre automaticamente na Flex quando só ela possui classificação", async () => {
+    mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, search.get("queue") === "RANKED_FLEX_SR"
+      ? rank("RANKED_FLEX_SR") : { ...rank(), status: "UNRANKED", position: { ...rank().position,
+        state: "UNRANKED", tier: null, division: null, leaguePoints: null, wins: null, losses: null } }));
+    render(<MyRank />);
+    await screen.findByText("Elo Platina IV, 75 de 100 PDL");
+    expect(screen.getByLabelText("Fila ranqueada")).toHaveValue("RANKED_FLEX_SR");
+    expect(screen.getByText("Seleção automática · melhor classificação disponível")).toBeInTheDocument();
+  });
   it.each([false, true])("separa Solo/Duo e Flex, inclusive no card compacto (%s)", async (compact) => {
     mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, rank(search.get("queue")!)));
     render(<MyRank compact={compact} />);
+    await screen.findByText("Elo Platina IV, 75 de 100 PDL");
+    expect(screen.getByLabelText("Fila ranqueada")).toHaveValue("RANKED_FLEX_SR");
+    fireEvent.change(screen.getByLabelText("Fila ranqueada"), { target: { value: "RANKED_SOLO_5x5" } });
     await screen.findByText("Elo Ouro IV, 20 de 100 PDL");
     fireEvent.change(screen.getByLabelText("Fila ranqueada"), { target: { value: "RANKED_FLEX_SR" } });
     expect(screen.queryByText("Elo Ouro IV, 20 de 100 PDL")).not.toBeInTheDocument();
@@ -40,10 +52,12 @@ describe("Minha posição por fila", () => {
     render(<MyRank />);
     fireEvent.change(screen.getByLabelText("Fila ranqueada"), { target: { value: "RANKED_FLEX_SR" } });
     await screen.findByText("Elo Platina IV, 75 de 100 PDL");
-    resolveSolo(json(200, rank()));
-    await Promise.resolve();
+    await act(async () => {
+      resolveSolo(json(200, { ...rank(), position: { ...rank().position, tier: "CHALLENGER", division: null, leaguePoints: 900 } }));
+    });
     expect(screen.queryByText("Elo Ouro IV, 20 de 100 PDL")).not.toBeInTheDocument();
     expect(screen.getByText("Elo Platina IV, 75 de 100 PDL")).toBeInTheDocument();
+    expect(screen.queryByText(/Elo Desafiante/)).not.toBeInTheDocument();
   });
 
   it("ausência de observação Flex não reaproveita elo Solo", async () => {

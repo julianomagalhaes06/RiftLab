@@ -176,6 +176,8 @@ O OpenAPI servido descreve:
 
 ### Classificação Solo/Duo e Flex
 
+A interface abre automaticamente na melhor classificação disponível: primeiro uma fila com elo, priorizando observações válidas sobre antigas; depois compara elo, divisão e PDL. Empates usam Solo/Duo. Se apenas Flex tiver classificação, ela já aparece selecionada. O seletor permanece acessível por teclado e permite escolher outra fila manualmente, sem que uma resposta atrasada altere essa escolha. As duas observações são carregadas em paralelo do banco ao abrir a página, com limite de dez segundos por consulta; alternar entre elas não faz novas chamadas à Riot nem recarrega a mesma observação.
+
 O seletor **Fila ranqueada**, disponível em Minha posição e no card do Painel, alterna entre **Solo/Duo** (padrão) e **Flex**. Elo, PDL, vitórias, derrotas e variações usam observações independentes por fila e temporada. `GET /api/v1/ranked/me?queue=RANKED_FLEX_SR` consulta Flex; `RANKED_SOLO_5x5` consulta Solo/Duo. Sem parâmetro, a API preserva Solo/Duo; filas diferentes dessas são rejeitadas. A atualização administrativa existente coleta ambas as filas; falhas preservam a última observação válida de cada uma. Sem observação de Flex, a interface informa a ausência em vez de repetir o elo Solo/Duo. O modo demonstração não inventa uma classificação Flex.
 
 ### Idioma e imagens dos itens

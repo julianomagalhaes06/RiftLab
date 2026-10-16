@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { api, type RankedMe, type RankedQueue } from "../../shared/api/client";
 import "./ranked.css";
+import { preferredQueue } from "./preferredQueue";
 
 const tierNames: Record<string, string> = {
   IRON: "Ferro", BRONZE: "Bronze", SILVER: "Prata", GOLD: "Ouro",
@@ -46,23 +47,25 @@ function ChangeLine({ data }: { data: RankedMe["change"] }) {
 }
 
 export function MyRank({ compact = false }: { compact?: boolean }) {
-  const [queue, setQueue] = useState<RankedQueue>("RANKED_SOLO_5x5");
-  const [result, setResult] = useState<{ queue: RankedQueue; data: RankedMe } | null>(null);
-  const [failedQueue, setFailedQueue] = useState<RankedQueue | null>(null);
+  const [selection, setSelection] = useState<RankedQueue | null>(null);
+  const [results, setResults] = useState<Partial<Record<RankedQueue, { data?: RankedMe; failed?: boolean }>>>({});
+  const queueId = useId();
   useEffect(() => {
     const controller = new AbortController();
-    api.getRankedMe(controller.signal, queue).then((data) => {
-      if (!controller.signal.aborted) {
-        setResult({ queue, data });
-        setFailedQueue(null);
-      }
-    }).catch((cause: unknown) => {
-      if (!controller.signal.aborted && !(cause instanceof DOMException && cause.name === "AbortError")) setFailedQueue(queue);
-    });
+    for (const queue of ["RANKED_SOLO_5x5", "RANKED_FLEX_SR"] as const) {
+      const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]);
+      api.getRankedMe(signal, queue).then((data) => {
+        if (data.position && data.position.queue !== queue) throw new Error("Fila da resposta divergente");
+        if (!controller.signal.aborted) setResults((current) => ({ ...current, [queue]: { data } }));
+      }).catch(() => {
+        if (!controller.signal.aborted) setResults((current) => ({ ...current, [queue]: { failed: true } }));
+      });
+    }
     return () => controller.abort();
-  }, [queue]);
-  const data = result?.queue === queue ? result.data : null;
-  const error = failedQueue === queue;
+  }, []);
+  const queue = selection ?? preferredQueue(results.RANKED_SOLO_5x5?.data, results.RANKED_FLEX_SR?.data);
+  const data = results[queue]?.data ?? null;
+  const error = results[queue]?.failed === true;
   const queueLabel = queue === "RANKED_SOLO_5x5" ? "Solo/Duo" : "Flex";
   const position = data?.position;
   const tier = position?.tier && tierNames[position.tier] ? position.tier : null;
@@ -73,13 +76,18 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
       <div className="my-rank__copy">
         <p className="my-rank__eyebrow">Fila {queueLabel} · BR1</p>
         <h3 id={`my-rank-heading-${compact ? "panel" : "page"}`}>Minha posição</h3>
-        <label className="my-rank__queue">
-          Fila ranqueada
-          <select value={queue} onChange={(event) => setQueue(event.target.value as RankedQueue)}>
-            <option value="RANKED_SOLO_5x5">Solo/Duo</option>
-            <option value="RANKED_FLEX_SR">Flex</option>
-          </select>
-        </label>
+        <div className="my-rank__queue">
+          <label htmlFor={queueId}>Fila ranqueada</label>
+          <div className="my-rank__select-shell">
+            <svg className="my-rank__queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z" /><path d="m8 12 3 3 5-6" /></svg>
+            <select id={queueId} aria-describedby={`${queueId}-hint`} value={queue} onChange={(event) => setSelection(event.target.value as RankedQueue)}>
+              <option value="RANKED_SOLO_5x5">Solo/Duo</option>
+              <option value="RANKED_FLEX_SR">Flex</option>
+            </select>
+            <svg className="my-rank__queue-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+          </div>
+          <small id={`${queueId}-hint`}>{selection === null ? "Seleção automática · melhor classificação disponível" : "Seleção manual · válida nesta página"}</small>
+        </div>
         {!data && !error && <p role="status">Carregando posição observada…</p>}
         {error && <p role="alert">Não foi possível consultar a posição armazenada.</p>}
         {data?.status === "UNAVAILABLE" && <p role="status">{reasonNames[data.reason ?? ""] ?? "Posição indisponível para esta conta."}</p>}

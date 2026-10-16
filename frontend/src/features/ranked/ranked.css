@@ -11,8 +11,17 @@
 .my-rank[data-tier="CHALLENGER"] { --tier-accent: #f7dea6; --tier-glow: #554022; }
 .my-rank__copy { position: relative; z-index: 1; min-width: 0; }
 .my-rank__eyebrow { color: var(--tier-accent); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; }
-.my-rank__queue { display: grid; gap: 6px; max-width: 260px; margin-bottom: 18px; color: var(--ntext-muted); font-size: .85rem; }
-.my-rank__queue select { min-height: 44px; width: 100%; padding: 8px 12px; color: var(--ntext); background: var(--n1); border: 1px solid var(--nline); border-radius: 6px; }
+.my-rank__queue { display: grid; gap: 8px; max-width: 330px; margin-bottom: 24px; color: var(--ntext-muted); font-size: .85rem; }
+.my-rank__queue label { font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.my-rank__select-shell { position: relative; border: 1px solid var(--nline); border-radius: 10px; background: linear-gradient(135deg, var(--n1), var(--n0)); box-shadow: 0 2px 6px rgb(0 0 0 / .16); }
+.my-rank__select-shell:hover { border-color: var(--tier-accent); }
+.my-rank__select-shell:focus-within { border-color: var(--tier-accent); box-shadow: 0 0 0 3px rgb(185 166 255 / .18); }
+.my-rank__queue select { appearance: none; min-height: 52px; width: 100%; padding: 12px 42px 12px 44px; color: var(--ntext); background: transparent; border: 0; border-radius: 9px; font: inherit; font-weight: 600; cursor: pointer; outline-offset: 4px; }
+.my-rank__queue select option { color: var(--ntext); background: var(--n1); }
+.my-rank__queue-icon, .my-rank__queue-arrow { position: absolute; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.my-rank__queue-icon { left: 14px; width: 20px; height: 20px; color: var(--tier-accent); }
+.my-rank__queue-arrow { right: 14px; width: 18px; height: 18px; color: var(--ntext-muted); }
+.my-rank__queue small { font-size: .75rem; line-height: 1.5; }
 .my-rank h3 { font: 600 clamp(1.5rem, 3vw, 2.3rem)/1.15 'Chakra Petch', Inter, sans-serif; margin: 0 0 14px; }
 .my-rank__title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 22px; color: var(--ntext); font: 600 clamp(1.8rem, 4vw, 3rem)/1.2 'Chakra Petch', Inter, sans-serif; margin: 0 0 15px; }
 .my-rank__title strong { color: var(--tier-accent); white-space: nowrap; }
