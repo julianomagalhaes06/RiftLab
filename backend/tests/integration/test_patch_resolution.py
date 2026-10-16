@@ -75,7 +75,7 @@ async def test_detected_patch_is_recorded_without_any_match_collection(session_f
     scope = load_real_scope(scope_file, window)
     assert scope.patches == {"16.19", "16.18"}
     assert "16.19,16.18" in scope.version
-    filters = MatchFilterConfig(scope.queue, scope.map_id, scope.patches, scope.version)
+    filters = MatchFilterConfig(scope.queues, scope.map_id, scope.patches, scope.version)
 
     def match_body(patch: str) -> bytes:
         return json.dumps(

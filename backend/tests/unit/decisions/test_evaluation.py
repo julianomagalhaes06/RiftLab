@@ -93,7 +93,7 @@ def _scope(origin: SourceOrigin = DEMO, **overrides: Any) -> DecisionScope:
     base = dict(
         version="test_scope_v1",
         origin=origin,
-        queue=420,
+        queues=frozenset({420}),
         map_id=11,
         patches=frozenset({"P-1"}),
         role="BOTTOM",
@@ -101,6 +101,15 @@ def _scope(origin: SourceOrigin = DEMO, **overrides: Any) -> DecisionScope:
     )
     base.update(overrides)
     return DecisionScope(**base)  # type: ignore[arg-type]
+
+
+def test_queue_is_in_scope_when_it_belongs_to_the_scope_queues() -> None:
+    scope = _scope(queues=frozenset({420, 440}))
+    flex = MatchContext(MATCH_ID, 440, 11, "P-1")
+    aram = MatchContext(MATCH_ID, 450, 11, "P-1")
+
+    assert scope.out_of_scope_reasons(flex, PARTICIPANTS[0]) == ()
+    assert "QUEUE_OUT_OF_SCOPE" in scope.out_of_scope_reasons(aram, PARTICIPANTS[0])
 
 
 def _ev(source_index: int, ts: int, type_: str, **payload: Any) -> TimelineEvent:

@@ -5,15 +5,18 @@
 # de conta) aparece neste arquivo; os corpos brutos e a auditoria completa
 # ficam em diretórios locais fora do Git (ver docs/domain-model.md).
 
-schemaVersion: v2
-frozenAt: "2026-10-14"
+schemaVersion: v3
+frozenAt: "2026-10-16"
 frozenByCard: CC-704
 # v1 (CC-105, 14/09/2026) tinha 3 campeões. A v2 amplia para os 10 atiradores do
 # experimento CC-702 (configs/experiments/scope-16.19-marksmen10.yaml), medidos no corpus
-# 16.19 antes de entrar no produto. Fila, mapa, função e janela não mudaram.
+# 16.19 antes de entrar no produto. A v3 (16/10/2026) aceita também a ranqueada Flex;
+# campeões, mapa, função e janela não mudaram.
 
-# Ranqueada solo/duo, Summoner's Rift (docs/evaluation.md).
-queue: 420
+# Ranqueadas de Summoner's Rift: Solo/Duo (420) e Flex (440). As regras empíricas, o
+# dataset e a popularidade servida foram medidos só em Solo/Duo (docs/evaluation.md);
+# em Flex são aplicados sem medição própria.
+queues: [420, 440]
 map: 11
 
 # Avaliada primeiro, conforme o plano do card. Escolhida por ser a role com

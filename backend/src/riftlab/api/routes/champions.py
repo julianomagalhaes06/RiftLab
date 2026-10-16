@@ -64,7 +64,7 @@ async def get_champion_patterns(
             .where(
                 MatchModel.match_id.like("BR1_%"),
                 MatchModel.patch == chosen_patch,
-                MatchModel.queue == scope.queue,
+                MatchModel.queue.in_(scope.queues),
                 MatchModel.map_id == scope.map_id,
                 ParticipantModel.role == role,
                 ParticipantModel.champion_id.in_(scope.champion_ids),
@@ -112,7 +112,7 @@ async def get_champion_patterns(
                 .where(
                     MatchModel.match_id.like("BR1_%"),
                     MatchModel.patch == chosen_patch,
-                    MatchModel.queue == scope.queue,
+                    MatchModel.queue.in_(scope.queues),
                     MatchModel.map_id == scope.map_id,
                     ParticipantModel.champion_id == chosen,
                     ParticipantModel.role == role,

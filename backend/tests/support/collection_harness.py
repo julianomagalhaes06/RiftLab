@@ -24,7 +24,9 @@ from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfig
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RateWindow, RiotRateLimiter
 from support.riot_stub import API_KEY, HASH_SECRET, RiotStub
 
-FILTERS = MatchFilterConfig(queue=420, map_id=11, patches=frozenset({"16.16", "16.17"}))
+FILTERS = MatchFilterConfig(
+    queues=frozenset({420}), map_id=11, patches=frozenset({"16.16", "16.17"})
+)
 SEED_A_PUUID = "puuid-sentinela-semente-A"
 SEED_B_PUUID = "puuid-sentinela-semente-B"
 NAME_A, TAG_A = "NomeSentinelaAlfa", "TGA"

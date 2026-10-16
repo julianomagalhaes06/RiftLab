@@ -56,7 +56,7 @@ export function EntradaScreen({ onOpenSuccess, onOpenUnavailable, onOpenSchema }
       </StepHeading>
       <PrototypeBanner />
       <p>
-        Análise exclusivamente pós-partida, fila ranqueada solo/duo, região BR1. Modo
+        Análise exclusivamente pós-partida, filas ranqueadas Solo/Duo e Flex, região BR1. Modo
         demonstração não exige chave da Riot.
       </p>
 

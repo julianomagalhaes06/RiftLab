@@ -55,3 +55,39 @@ patches: [{gamePatch: "16.16"}, {gamePatch: "16.17"}]
     assert legacy.patches == {"16.16", "16.17"}
     assert current.patches == {"16.19", "16.18"}
     assert current.version != legacy.version
+
+
+_SCOPE_BODY = b"""
+schemaVersion: v3
+frozenAt: "2026-10-16"
+queues: [420, 440]
+map: 11
+role: BOTTOM
+championIds: [145]
+patches: [{gamePatch: "16.19"}]
+"""
+
+
+def test_scope_accepts_a_list_of_queues_and_the_legacy_single_queue() -> None:
+    both = parse_real_scope_document(_SCOPE_BODY)
+    legacy = parse_real_scope_document(_SCOPE_BODY.replace(b"queues: [420, 440]", b"queue: 420"))
+
+    assert both.queues == {420, 440}
+    assert legacy.queues == {420}
+
+
+@pytest.mark.parametrize(
+    "queues_line",
+    [
+        b"queues: []",
+        b"queues: [420, 420]",
+        b"queues: [420, true]",
+        b"queues: 420",
+        b"queues: [420]\nqueue: 420",
+    ],
+)
+def test_invalid_queue_lists_fail_closed(queues_line: bytes) -> None:
+    from riftlab.decisions.domain import DecisionConfigError
+
+    with pytest.raises(DecisionConfigError):
+        parse_real_scope_document(_SCOPE_BODY.replace(b"queues: [420, 440]", queues_line))

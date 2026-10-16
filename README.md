@@ -30,7 +30,7 @@ A interface distingue recomendação disponível, suporte limitado, estado incom
 
 ## Escopo inicial
 
-- Análise exclusivamente pós-partida, Summoner’s Rift, fila ranqueada solo/duo.
+- Análise exclusivamente pós-partida, Summoner’s Rift, filas ranqueadas Solo/Duo e Flex.
 - Região inicial BR1; roteamento regional Americas.
 - Uma função e dez atiradores: os três da auditoria inicial e mais sete medidos no corpus 16.19 antes de entrar no produto.
 - Próximo item completo em pontos anteriores ao primeiro ou segundo item principal; componentes existentes considerados no custo restante.
@@ -187,6 +187,10 @@ O OpenAPI servido descreve:
 A interface abre automaticamente na melhor classificação disponível: primeiro uma fila com elo, priorizando observações válidas sobre antigas; depois compara elo, divisão e PDL. Empates usam Solo/Duo. Se apenas Flex tiver classificação, ela já aparece selecionada. O seletor permanece acessível por teclado e permite escolher outra fila manualmente, sem que uma resposta atrasada altere essa escolha. As duas observações são carregadas em paralelo do banco ao abrir a página, com limite de dez segundos por consulta; alternar entre elas não faz novas chamadas à Riot nem recarrega a mesma observação.
 
 O seletor **Fila ranqueada**, disponível em Minha posição e no card do Painel, alterna entre **Solo/Duo** (padrão) e **Flex**. Elo, PDL, vitórias, derrotas e variações usam observações independentes por fila e temporada. `GET /api/v1/ranked/me?queue=RANKED_FLEX_SR` consulta Flex; `RANKED_SOLO_5x5` consulta Solo/Duo. Sem parâmetro, a API preserva Solo/Duo; filas diferentes dessas são rejeitadas. A atualização administrativa existente coleta ambas as filas; falhas preservam a última observação válida de cada uma. Sem observação de Flex, a interface informa a ausência em vez de repetir o elo Solo/Duo. O modo demonstração não inventa uma classificação Flex.
+
+### Partidas da ranqueada Flex
+
+O recorte do produto (`configs/scope.yaml` v3) aceita as filas 420 (Solo/Duo) e 440 (Flex). `cc collect run` lista as partidas da conta com `type=ranked` e o filtro do documento mantém só essas duas filas; a importação, a preparação e a elegibilidade das decisões tratam as duas do mesmo modo, e a página Campeões conta ambas. Como a versão do recorte mudou, partidas já preparadas são reextraídas na próxima preparação. **Limites:** as regras empíricas de inventário, o dataset e a popularidade servida foram medidos só em Solo/Duo e são aplicados em Flex sem medição própria; o Painel descritivo continua restrito a Solo/Duo.
 
 ### Idioma e imagens dos itens
 

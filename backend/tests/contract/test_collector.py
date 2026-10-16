@@ -16,6 +16,7 @@ from riftlab.collection.collector import (
     CollectionCeilings,
     StopReason,
 )
+from riftlab.collection.filters import MatchFilterConfig
 from riftlab.collection.manifest import CollectionManifest, ManifestLockedError, SeedCursor
 from riftlab.collection.report import build_collection_report, render_collection_report
 from riftlab.ingestion.application import raw_pair_available
@@ -568,6 +569,19 @@ async def test_time_window_is_sent_to_the_listing_only_when_requested(tmp_path) 
     assert h.stub.list_params[0]["endTime"] == "1790000000"
     assert "startTime" not in h.stub.list_params[-1]
     assert all(p["queue"] == "420" for p in h.stub.list_params)
+
+
+async def test_solo_duo_and_flex_are_listed_as_ranked_and_both_stored(tmp_path) -> None:
+    h = one_seed(tmp_path, ["BR1_1"])
+    h.filters = MatchFilterConfig(frozenset({420, 440}), 11, h.filters.patches)
+    h.stub.add_match("BR1_2", seed_puuid=SEED_A_PUUID, queue=440)
+    h.stub.add_match("BR1_3", seed_puuid=SEED_A_PUUID, queue=450)
+
+    report = await h.run()
+
+    assert report.new_valid == 2
+    assert set(h.manifest().fetched_ids()) == {"BR1_1", "BR1_2"}
+    assert all(p["type"] == "ranked" and "queue" not in p for p in h.stub.list_params)
 
 
 # ---------------------------------------------------------------------------

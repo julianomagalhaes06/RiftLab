@@ -32,10 +32,25 @@ class FilterReason(StrEnum):
 class MatchFilterConfig:
     """Recorte da coleta: vem de `configs/scope.yaml` (nunca alarga o recorte)."""
 
-    queue: int
+    queues: frozenset[int]
     map_id: int
     patches: frozenset[str]
     scope_version: str | None = None
+
+
+# Filas ranqueadas de Summoner's Rift: Solo/Duo (420) e Flex (440). A listagem da
+# Riot aceita uma única `queue`; para as duas, pede `type=ranked` e o filtro do
+# documento continua decidindo a fila exata.
+RANKED_QUEUES = frozenset({420, 440})
+
+
+def listing_filter(queues: frozenset[int]) -> tuple[int | None, str | None]:
+    """(`queue`, `type`) da listagem por conta: o menor superconjunto expressável."""
+    if len(queues) == 1:
+        return next(iter(queues)), None
+    if queues <= RANKED_QUEUES:
+        return None, "ranked"
+    return None, None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +85,7 @@ def evaluate_match_document(
         return FilterResult(FilterReason.MATCH_DOCUMENT_INVALID)
 
     game_date = _game_date(info.get("gameStartTimestamp"))
-    if info.get("queueId") != config.queue:
+    if info.get("queueId") not in config.queues:
         return FilterResult(FilterReason.QUEUE_OUT_OF_SCOPE, game_date=game_date)
     if info.get("mapId") != config.map_id:
         return FilterResult(FilterReason.MAP_OUT_OF_SCOPE, game_date=game_date)

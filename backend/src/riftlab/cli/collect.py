@@ -833,7 +833,7 @@ def collect_run(
                 manifest=CollectionManifest(manifest_dir),
                 seeds=seeds,
                 filters=MatchFilterConfig(
-                    real_scope.queue, real_scope.map_id, selected, real_scope.version
+                    real_scope.queues, real_scope.map_id, selected, real_scope.version
                 ),
                 subject_hash_secret=settings.subject_hash_secret,
                 ceilings=ceilings,

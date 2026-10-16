@@ -12,6 +12,7 @@ from riftlab.collection.filters import (
     MatchFilterConfig,
     evaluate_match_document,
     evaluate_match_id,
+    listing_filter,
 )
 from riftlab.collection.manifest import (
     CollectionManifest,
@@ -216,7 +217,9 @@ def test_transient_failures_are_counted_per_match_and_cleared_on_success(tmp_pat
 # filtros
 # ---------------------------------------------------------------------------
 
-_CONFIG = MatchFilterConfig(queue=420, map_id=11, patches=frozenset({"16.16", "16.17"}))
+_CONFIG = MatchFilterConfig(
+    queues=frozenset({420}), map_id=11, patches=frozenset({"16.16", "16.17"})
+)
 _PUUID = "puuid-semente"
 
 
@@ -244,6 +247,24 @@ def test_each_filter_has_its_own_reason(overrides, reason) -> None:
     result = evaluate_match_document(_body(**overrides), _CONFIG, _PUUID)
 
     assert result.reason is reason and result.patch is None
+
+
+def test_any_queue_of_the_config_is_accepted() -> None:
+    config = MatchFilterConfig(frozenset({420, 440}), 11, frozenset({"16.16"}))
+
+    assert evaluate_match_document(_body(queue=440, patch="16.16"), config, _PUUID).accepted
+    assert (
+        evaluate_match_document(_body(queue=450, patch="16.16"), config, _PUUID).reason
+        is FilterReason.QUEUE_OUT_OF_SCOPE
+    )
+
+
+@pytest.mark.parametrize(
+    ("queues", "expected"),
+    [({420}, (420, None)), ({420, 440}, (None, "ranked")), ({420, 450}, (None, None))],
+)
+def test_listing_filter_is_the_narrowest_expressible_superset(queues, expected) -> None:
+    assert listing_filter(frozenset(queues)) == expected
 
 
 def test_first_failing_filter_wins_in_the_documented_order() -> None:

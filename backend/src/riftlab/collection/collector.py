@@ -46,6 +46,7 @@ from riftlab.collection.filters import (
     MatchFilterConfig,
     evaluate_match_document,
     evaluate_match_id,
+    listing_filter,
 )
 from riftlab.collection.manifest import (
     MAX_TRANSIENT_FAILURES_PER_MATCH,
@@ -452,9 +453,11 @@ class _Collector:
             position += len(page)
 
     async def _list_page(self, puuid: str, position: int) -> list[str]:
+        queue, match_type = listing_filter(self._filters.queues)
         return await self._transport.list_match_ids_by_puuid(
             puuid,
-            queue=self._filters.queue,
+            queue=queue,
+            match_type=match_type,
             start=position,
             count=self._ceilings.page_size,
             start_time=self._start_time,

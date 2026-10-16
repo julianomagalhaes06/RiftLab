@@ -105,7 +105,7 @@ def test_composition_aggregates_are_declared_unavailable(schema: dict[str, Any])
 def test_real_scope_yaml_is_parsed_without_being_changed() -> None:
     scope = load_real_scope(_config_path("scope.yaml"), ("16.19", "16.18", "16.17"))
     assert scope.origin is SourceOrigin.COMPLETED_MATCH
-    assert (scope.queue, scope.map_id, scope.role) == (420, 11, "BOTTOM")
+    assert (scope.queues, scope.map_id, scope.role) == ({420, 440}, 11, "BOTTOM")
     assert scope.champion_ids == frozenset({145, 51, 81, 222, 202, 804, 18, 22, 21, 29})
     assert scope.patches == frozenset({"16.19", "16.18"})
-    assert scope.version == "scope_yaml:v2:2026-10-14:16.19,16.18"
+    assert scope.version == "scope_yaml:v3:2026-10-16:16.19,16.18"

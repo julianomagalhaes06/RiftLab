@@ -26,7 +26,7 @@ DEMO_SCOPE_VERSION = "demo_scope_v1"
 class DecisionScope:
     version: str
     origin: SourceOrigin
-    queue: int
+    queues: frozenset[int]
     map_id: int
     patches: frozenset[str]
     role: str
@@ -38,7 +38,7 @@ class DecisionScope:
         """Sub-motivos (vazio = dentro do recorte). Role ausente nunca casa:
         `None` não é a role do recorte."""
         reasons: list[str] = []
-        if match.queue != self.queue:
+        if match.queue not in self.queues:
             reasons.append("QUEUE_OUT_OF_SCOPE")
         if match.map_id != self.map_id:
             reasons.append("MAP_OUT_OF_SCOPE")
@@ -59,7 +59,7 @@ class DecisionScope:
 DEMO_SCOPE = DecisionScope(
     version=DEMO_SCOPE_VERSION,
     origin=SourceOrigin.CURATED_DEMO,
-    queue=420,
+    queues=frozenset({420}),
     map_id=11,
     patches=frozenset({"DEMO-1", "DEMO-3"}),  # DEMO-3: roteiro da demonstração (CC-605)
     role="BOTTOM",
@@ -76,6 +76,23 @@ def _is_int(value: Any) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+def _queues(document: dict[str, Any]) -> frozenset[int]:
+    """`queues` (lista, v3+) ou `queue` (inteiro, v1/v2); nunca os dois nem lista vazia."""
+    if "queues" in document:
+        _require("queue" not in document, "queue e queues ao mesmo tempo")
+        queues = document["queues"]
+        _require(
+            isinstance(queues, list)
+            and bool(queues)
+            and all(map(_is_int, queues))
+            and len(set(queues)) == len(queues),
+            "queues inválido",
+        )
+        return frozenset(queues)
+    _require(_is_int(document.get("queue")), "queue inválido")
+    return frozenset({document["queue"]})
+
+
 def parse_real_scope_document(
     content: bytes, adjacent_patches: tuple[str, ...] | None = None
 ) -> DecisionScope:
@@ -89,7 +106,7 @@ def parse_real_scope_document(
     schema_version, frozen_at = document.get("schemaVersion"), document.get("frozenAt")
     _require(isinstance(schema_version, str) and bool(schema_version), "schemaVersion ausente")
     _require(isinstance(frozen_at, str) and bool(frozen_at), "frozenAt ausente")
-    _require(_is_int(document.get("queue")), "queue inválido")
+    queues = _queues(document)
     _require(_is_int(document.get("map")), "map inválido")
     role = document.get("role")
     _require(isinstance(role, str) and bool(role), "role inválido")
@@ -131,7 +148,7 @@ def parse_real_scope_document(
             else f"scope_yaml:{schema_version}:{frozen_at}"
         ),
         origin=SourceOrigin.COMPLETED_MATCH,
-        queue=document["queue"],
+        queues=queues,
         map_id=document["map"],
         patches=frozenset(game_patches),
         role=role,

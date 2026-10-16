@@ -85,7 +85,7 @@ class Sample:
         self.patch = unique_patch()
         self.ids = _ids(count)
         self.h: Harness = one_seed(tmp_path, []) if seeds == 1 else two_seeds(tmp_path)
-        self.h.filters = MatchFilterConfig(420, 11, frozenset({self.patch}))
+        self.h.filters = MatchFilterConfig(frozenset({420}), 11, frozenset({self.patch}))
         for match_id in self.ids:
             self.h.stub.add_match(
                 match_id,

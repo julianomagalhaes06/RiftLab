@@ -345,18 +345,24 @@ class RiotHttpTransport:
         self,
         puuid: str,
         *,
-        queue: int,
+        queue: int | None,
         start: int,
         count: int,
         start_time: int | None = None,
         end_time: int | None = None,
+        match_type: str | None = None,
     ) -> list[str]:
         """Só esta conta pode originar sementes (CC-105); o chamador nunca deve
         repassar um puuid vindo de outro lugar. Nunca loga o puuid.
         `start_time`/`end_time` (epoch em segundos) restringem a janela de datas da
-        listagem (CC-206); sem eles a chamada é idêntica à anterior."""
+        listagem (CC-206); sem eles a chamada é idêntica à anterior. `queue=None` com
+        `match_type` (ex.: "ranked") lista várias filas de uma vez."""
         path = f"/lol/match/v5/matches/by-puuid/{quote(puuid, safe='')}/ids"
-        params = {"queue": str(queue), "start": str(start), "count": str(count)}
+        params = {"start": str(start), "count": str(count)}
+        if queue is not None:
+            params["queue"] = str(queue)
+        if match_type is not None:
+            params["type"] = match_type
         if start_time is not None:
             params["startTime"] = str(start_time)
         if end_time is not None:

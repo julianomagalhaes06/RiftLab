@@ -803,6 +803,22 @@ async def test_list_match_ids_by_puuid_success() -> None:
     assert request.url.params["count"] == "20"
 
 
+async def test_list_match_ids_by_type_omits_the_queue() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, content=b"[]")
+
+    transport = _transport(handler)
+    await transport.list_match_ids_by_puuid(
+        "PUUID-SINTETICO", queue=None, match_type="ranked", start=0, count=20
+    )
+    await transport.aclose()
+
+    assert dict(seen[0].url.params) == {"type": "ranked", "start": "0", "count": "20"}
+
+
 async def test_list_match_ids_by_puuid_unexpected_format_raises_schema_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=json.dumps({"not": "a list"}).encode())
