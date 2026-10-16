@@ -1,6 +1,6 @@
 import { Link } from "../shared/router/Link";
 import { MyRank } from "../features/ranked/MyRank";
-import { RecentMatches } from "../features/history/RecentMatches";
+import { Dashboard } from "../features/dashboard/Dashboard";
 
 export function PanelPage() {
   return (
@@ -19,7 +19,7 @@ export function PanelPage() {
             </div>
             <Link to="/historico" className="button">Começar pelo Histórico</Link>
           </section>
-          <RecentMatches />
+          <Dashboard />
         </div>
         <div className="panel-side">
           <MyRank compact />

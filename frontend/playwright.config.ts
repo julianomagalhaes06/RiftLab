@@ -9,6 +9,8 @@ import { defineConfig, devices } from "@playwright/test";
  *   servidor local é iniciado nesse caso.
  */
 const externalBaseUrl = process.env.E2E_BASE_URL;
+// Diagnóstico local opt-in: Chromium completo em headless, sem trocar o padrão da CI.
+const captureChannel = process.env.RIFTLAB_E2E_CHANNEL === "chromium" ? "chromium" : undefined;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -29,7 +31,7 @@ export default defineConfig({
     {
       name: "chromium",
       testIgnore: /(real-stack|demo)\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], channel: captureChannel },
     },
     {
       name: "real-stack",

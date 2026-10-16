@@ -96,6 +96,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Painel descritivo da conta própria ou demonstração explícita
+         * @description Só leitura no banco. Sem rede, coleta ou identificação de terceiros. DEMO usa o participante sintético 1; progresso é local, por origem e de todas as datas.
+         */
+        get: operations["get_dashboard_api_v1_dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decisions/{decision_id}": {
         parameters: {
             query?: never;
@@ -757,6 +777,76 @@ export interface components {
             items: components["schemas"]["MatchSummary"][];
             /** Nextcursor */
             nextCursor?: string | null;
+        };
+        /** Dashboard */
+        Dashboard: {
+            /** Champions */
+            champions: components["schemas"]["DashboardChampion"][];
+            /** Distinctchampions */
+            distinctChampions: number;
+            /** Kda */
+            kda: number | null;
+            /** Kdasamples */
+            kdaSamples: number;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "REAL" | "DEMO";
+            progress: components["schemas"]["DashboardProgress"];
+            /** Queue */
+            queue: number;
+            /** Recentmatches */
+            recentMatches: components["schemas"]["DashboardMatch"][];
+            /** Sampledmatches */
+            sampledMatches: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "READY" | "EMPTY" | "IDENTITY_UNAVAILABLE";
+            /** Totalmatches */
+            totalMatches: number;
+            /** Winrate */
+            winRate: number | null;
+            /** Winsamples */
+            winSamples: number;
+            /** Window */
+            window: number;
+            /** Wins */
+            wins: number;
+        };
+        /** DashboardChampion */
+        DashboardChampion: {
+            champion: components["schemas"]["ChampionAsset"] | null;
+            /** Championid */
+            championId: number;
+            /** Matches */
+            matches: number;
+        };
+        /** DashboardMatch */
+        DashboardMatch: {
+            /** Durationseconds */
+            durationSeconds: number;
+            /**
+             * Endedat
+             * Format: date-time
+             */
+            endedAt: string;
+            /** Matchid */
+            matchId: string;
+            participant: components["schemas"]["MatchParticipant"];
+        };
+        /** DashboardProgress */
+        DashboardProgress: {
+            /** Attempts */
+            attempts: number;
+            /** Matches */
+            matches: number;
+            /** Reflections */
+            reflections: number;
+            /** Revealed */
+            revealed: number;
         };
         /**
          * DecisionBudget
@@ -1825,6 +1915,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChampionPatterns"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_api_v1_dashboard_get: {
+        parameters: {
+            query?: {
+                window?: number;
+                origin?: "REAL" | "DEMO";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
                 };
             };
             /** @description Validation Error */

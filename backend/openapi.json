@@ -758,6 +758,206 @@
         "title": "CursorPage[MatchSummary]",
         "type": "object"
       },
+      "Dashboard": {
+        "additionalProperties": false,
+        "properties": {
+          "champions": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardChampion"
+            },
+            "title": "Champions",
+            "type": "array"
+          },
+          "distinctChampions": {
+            "title": "Distinctchampions",
+            "type": "integer"
+          },
+          "kda": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kda"
+          },
+          "kdaSamples": {
+            "title": "Kdasamples",
+            "type": "integer"
+          },
+          "origin": {
+            "enum": [
+              "REAL",
+              "DEMO"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/DashboardProgress"
+          },
+          "queue": {
+            "title": "Queue",
+            "type": "integer"
+          },
+          "recentMatches": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardMatch"
+            },
+            "title": "Recentmatches",
+            "type": "array"
+          },
+          "sampledMatches": {
+            "title": "Sampledmatches",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "READY",
+              "EMPTY",
+              "IDENTITY_UNAVAILABLE"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "totalMatches": {
+            "title": "Totalmatches",
+            "type": "integer"
+          },
+          "winRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winrate"
+          },
+          "winSamples": {
+            "title": "Winsamples",
+            "type": "integer"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "origin",
+          "status",
+          "window",
+          "queue",
+          "totalMatches",
+          "sampledMatches",
+          "winSamples",
+          "wins",
+          "winRate",
+          "kdaSamples",
+          "kda",
+          "distinctChampions",
+          "champions",
+          "recentMatches",
+          "progress"
+        ],
+        "title": "Dashboard",
+        "type": "object"
+      },
+      "DashboardChampion": {
+        "additionalProperties": false,
+        "properties": {
+          "champion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChampionAsset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "championId": {
+            "title": "Championid",
+            "type": "integer"
+          },
+          "matches": {
+            "title": "Matches",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "championId",
+          "champion",
+          "matches"
+        ],
+        "title": "DashboardChampion",
+        "type": "object"
+      },
+      "DashboardMatch": {
+        "additionalProperties": false,
+        "properties": {
+          "durationSeconds": {
+            "title": "Durationseconds",
+            "type": "integer"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "title": "Endedat",
+            "type": "string"
+          },
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "participant": {
+            "$ref": "#/components/schemas/MatchParticipant"
+          }
+        },
+        "required": [
+          "matchId",
+          "endedAt",
+          "durationSeconds",
+          "participant"
+        ],
+        "title": "DashboardMatch",
+        "type": "object"
+      },
+      "DashboardProgress": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "matches": {
+            "title": "Matches",
+            "type": "integer"
+          },
+          "reflections": {
+            "title": "Reflections",
+            "type": "integer"
+          },
+          "revealed": {
+            "title": "Revealed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attempts",
+          "revealed",
+          "reflections",
+          "matches"
+        ],
+        "title": "DashboardProgress",
+        "type": "object"
+      },
       "DecisionBudget": {
         "additionalProperties": false,
         "description": "Orçamento imediato, separado da elegibilidade. `value` é null quando\ndesconhecido (nunca 0). STALE_FRAME/UNKNOWN_BUDGET em `codes` impedem\nafirmar compra imediata, mas não tornam a decisão inelegível.",
@@ -3232,6 +3432,66 @@
         "summary": "Get Champion Patterns",
         "tags": [
           "champions"
+        ]
+      }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "description": "Só leitura no banco. Sem rede, coleta ou identificação de terceiros. DEMO usa o participante sintético 1; progresso é local, por origem e de todas as datas.",
+        "operationId": "get_dashboard_api_v1_dashboard_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Window",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "origin",
+            "required": false,
+            "schema": {
+              "default": "REAL",
+              "enum": [
+                "REAL",
+                "DEMO"
+              ],
+              "title": "Origin",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Painel descritivo da conta própria ou demonstração explícita",
+        "tags": [
+          "dashboard"
         ]
       }
     },

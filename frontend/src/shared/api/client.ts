@@ -8,6 +8,7 @@ import type { components } from "./types";
  */
 type Schemas = components["schemas"];
 
+export type Dashboard = Schemas["Dashboard"];
 export type RankedMe = Schemas["RankedMe"];
 export type ImportMode = Schemas["ImportMode"];
 export type ImportJobAccepted = Schemas["ImportJobAccepted"];
@@ -52,6 +53,7 @@ interface RequestOptions {
 }
 
 export interface ApiClient {
+  getDashboard(params: { origin: "REAL" | "DEMO"; window: number }, signal?: AbortSignal): Promise<Dashboard>;
   getChampionPatterns(params: { championId?: number; patch?: string; phase?: "first" | "second" | "sequence" }, signal?: AbortSignal): Promise<ChampionPatterns>;
   getRankedMe(signal?: AbortSignal): Promise<RankedMe>;
   createImport(matchId: string, mode: ImportMode, signal?: AbortSignal): Promise<ImportJobAccepted>;
@@ -157,6 +159,7 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
 
   return {
     getChampionPatterns: (params, signal) => request("GET", `/api/v1/champions/patterns${queryString(params)}`, { signal }),
+    getDashboard: (params, signal) => request("GET", `/api/v1/dashboard?origin=${params.origin}&window=${params.window}`, { signal }),
     getRankedMe: (signal) => request("GET", "/api/v1/ranked/me", { signal }),
     // Modo RIOT sem chave no servidor: 422 com code=RIOT_KEY_MISSING (tabela de mensagens).
     createImport: (matchId, mode, signal) =>

@@ -3,6 +3,7 @@
 docs
 AGENTS.md
 CLAUDE.md
+RTK.md
 .agents
 .codex
 .claude

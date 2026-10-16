@@ -1,0 +1,20 @@
+.dashboard { min-width: 0; padding: 24px; background: var(--n1); border-radius: 12px; }
+.dashboard h3, .dashboard h4 { margin: 0 0 12px; }
+.dashboard p, .dashboard small { color: var(--ntext-muted); }
+.dashboard__heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 16px; }
+.dashboard__filters { display: flex; flex-wrap: wrap; gap: 12px; }
+.dashboard__filters label { display: grid; gap: 6px; font-size: .875rem; }
+.dashboard select { min-height: 44px; max-width: 100%; }
+.dashboard__source { padding-block: 12px; border-block: 1px solid var(--nline); }
+.dashboard__metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 24px; margin-block: 24px; }
+.dashboard__metrics dt { color: var(--ntext-muted); }
+.dashboard__metrics dd { margin: 8px 0; font: 600 2rem 'Chakra Petch', sans-serif; }
+.dashboard__metrics small { display: block; font: 400 .875rem/1.6 Inter, sans-serif; }
+.dashboard__champions, .dashboard__recent, .dashboard__progress { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--nline); }
+.dashboard ul { list-style: none; margin: 0; padding: 0; }
+.dashboard li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding-block: 16px; border-bottom: 1px solid var(--nline); }
+.dashboard li > div { display: grid; gap: 8px; min-width: 0; }
+.dashboard a { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
+.dashboard__empty { margin-block: 24px; }
+.dashboard__recent time { color: var(--ntext-muted); font-size: .875rem; }
+@media (max-width: 600px) { .dashboard { padding: 16px; } .dashboard__filters, .dashboard__filters label { width: 100%; } .dashboard li { align-items: start; } }

@@ -1,4 +1,5 @@
 import type { Page, Request } from "@playwright/test";
+import { dashboard } from "../../../src/test/dashboard";
 import { championPatterns } from "../../../src/test/championPatterns";
 
 /**
@@ -161,6 +162,7 @@ export type RouteKey =
   | "POST /api/v1/matches/:id/preparation"
   | "GET /api/v1/matches/:id/decisions"
   | "GET /api/v1/decisions/:id"
+  | "GET /api/v1/dashboard"
   | "GET /api/v1/ranked/me"
   | "GET /api/v1/matches/:id/purge-preview"
   | "DELETE /api/v1/matches/:id"
@@ -187,6 +189,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["DELETE /api/v1/matches/:id", "DELETE", /^\/api\/v1\/matches\/[^/]+$/],
   ["GET /api/v1/matches/:id", "GET", /^\/api\/v1\/matches\/[^/]+$/],
   ["GET /api/v1/decisions/:id", "GET", /^\/api\/v1\/decisions\/[^/]+$/],
+  ["GET /api/v1/dashboard", "GET", /^\/api\/v1\/dashboard$/],
   ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
   ["POST /api/v1/objectives/interpret", "POST", /^\/api\/v1\/objectives\/interpret$/],
   ["GET /api/v1/learning-attempts/progress", "GET", /^\/api\/v1\/learning-attempts\/progress$/],
@@ -352,6 +355,7 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
           nextCursor: "PROXIMA_PAGINA",
         }),
   "GET /api/v1/decisions/:id": () => ok(decisionState()),
+  "GET /api/v1/dashboard": () => ok(dashboard({ status: "IDENTITY_UNAVAILABLE", totalMatches: 0, sampledMatches: 0, winSamples: 0, wins: 0, winRate: null, kdaSamples: 0, kda: null, distinctChampions: 0, champions: [], recentMatches: [], progress: { attempts: 0, revealed: 0, reflections: 0, matches: 0 } })),
   "GET /api/v1/ranked/me": () => ok({ status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }),
   "GET /api/v1/matches/:id/purge-preview": () =>
     ok({
