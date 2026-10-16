@@ -237,10 +237,15 @@ fieldset legend {
 .glossary summary {
   cursor: pointer;
   font-weight: 700;
+  min-height: 44px;
+  align-content: center;
+  padding: var(--space-1) 0;
 }
 
 .glossary__entry {
-  margin: var(--space-1) 0;
+  margin: var(--space-2) 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .glossary__entry dt {

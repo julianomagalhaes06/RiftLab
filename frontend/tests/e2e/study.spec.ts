@@ -135,13 +135,13 @@ test("modelo local ativo e depois indisponível: o formulário segue e a compara
   await page.getByRole("button", { name: "Interpretar texto" }).click();
   await expect(page.getByText(/modelo de linguagem local, versão qwen2.5-1.5b-lora-v1/)).toBeVisible();
   await page.getByRole("button", { name: "Prefiro escolher no formulário" }).click();
-  await expect(page.getByText("Objetivo", { exact: true })).toBeFocused();
+  await expect(page.getByRole("group", { name: "Objetivo", exact: true }).locator("legend")).toBeFocused();
   await expect(page.getByLabel(/Equilibrado/)).toBeChecked();
 
   await text.fill("fico sem mana, o que eu faço?");
   await page.getByRole("button", { name: "Interpretar texto" }).click();
   await expect(page.getByText(/O interpretador não respondeu\. Escolha o objetivo no formulário/)).toBeVisible();
-  await expect(page.getByText("Objetivo", { exact: true })).toBeFocused();
+  await expect(page.getByRole("group", { name: "Objetivo", exact: true }).locator("legend")).toBeFocused();
   await page.screenshot({ path: `${evidence}/modelo-indisponivel-1280.png`, fullPage: true });
 
   await page.getByLabel(/Utilidade/).check();

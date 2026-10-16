@@ -234,15 +234,32 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
     await waitFor(() => expect(screen.getByText(/Sua reflexão registrada/)).toHaveFocus());
   });
 
-  it("modo sem pistas cria tentativa TRANSFER e não oferece pistas", async () => {
+  it("glossário curado está disponível antes e durante o estudo sem abrir pistas ou revelar respostas", async () => {
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
+    render(<StudyPanel decisionId={DECISION} />);
+    expect(screen.getByText("Glossário")).toBeInTheDocument();
+    expect(screen.getByText("Custo restante")).toBeInTheDocument();
+    expect(screen.getByText(/Uma compra frequente não é necessariamente/)).toBeInTheDocument();
+    expect(mock.callsTo("POST", /^\/api\/v1\/learning-attempts$/)).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText("Thornmail");
+    expect(screen.getByText("Glossário")).toBeInTheDocument();
+    expect(mock.callsTo("POST", /\/hint$/)).toHaveLength(0);
+    expect(mock.callsTo("POST", /\/reveal$/)).toHaveLength(0);
+    expect(screen.queryByText(/Compra histórica/)).not.toBeInTheDocument();
+  });
+
+  it("modo sem pistas cria tentativa TRANSFER e não oferece pistas ou glossário", async () => {
     mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt({ mode: "TRANSFER" })));
     render(<StudyPanel decisionId={DECISION} />);
     fireEvent.click(screen.getByLabelText(/Praticar sem pistas/));
+    expect(screen.queryByText("Glossário")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
     await screen.findByText("Thornmail");
     expect(mock.callsTo("POST", /^\/api\/v1\/learning-attempts$/)[0].body).toMatchObject({ mode: "TRANSFER" });
     expect(screen.getByText(/Modo sem pistas \(transferência\)/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Pista/ })).toBeNull();
+    expect(screen.queryByText("Glossário")).not.toBeInTheDocument();
   });
 });
 

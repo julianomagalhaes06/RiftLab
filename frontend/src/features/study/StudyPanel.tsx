@@ -11,6 +11,7 @@ import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { ObjectivePicker } from "../objectives/ObjectivePicker";
 import { ExportLinks, Reflection, ReviewerFeedback } from "../reports/AfterComparison";
 import { objectiveLabel, objectiveOrigin } from "../objectives/objectiveText";
+import { GlossaryDisclosure } from "../review/components/GlossaryDisclosure";
 import "../review/review.css";
 
 /**
@@ -334,6 +335,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
       <section className="section" aria-labelledby="study-heading">
         <h3 id="study-heading">Estudar esta decisão</h3>
         <p className="muted">Escolha o que você queria priorizar antes de ver as alternativas.</p>
+        {!transfer ? <GlossaryDisclosure /> : null}
         <ObjectivePicker idPrefix="study" value={objective} onChange={setObjective} />
         <label className="radio-option">
           <input type="checkbox" checked={transfer} onChange={(event) => setTransfer(event.target.checked)} />
@@ -371,6 +373,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
         Estudar esta decisão
       </h3>
       {attempt.mode === "TRANSFER" ? <p className="muted">Modo sem pistas (transferência).</p> : null}
+      {attempt.mode !== "TRANSFER" ? <GlossaryDisclosure /> : null}
       {attempt.options.length === 0 ? (
         <div className="notice notice--info" role="note">
           <p>Não há alternativas para estudar nesta decisão.</p>

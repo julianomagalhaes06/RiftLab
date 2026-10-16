@@ -67,7 +67,7 @@ flowchart LR
 | --- | --- |
 | **Entregue** | Importação BR1 e demonstração offline. Reconstrução do estado anterior à compra com proveniência e incerteza explícita. Decisões elegíveis. Candidatos legais do catálogo do patch. Comparação de até três alternativas com custo restante. Popularidade versionada com suporte e abstenção. Objetivo por formulário ou texto confirmado. Estudo com escolha antes da revelação, pistas, reflexão e transferência. Julgamento por rubrica e relatório JSON/HTML verificável. Registro de modelos. Expurgo com confirmação e retenção. Navegação Painel, Campeões, Minha posição e Histórico. Minha posição da conta própria. Demonstração reproduzível. |
 | **Experimentos com resultado negativo** | Ranker contextual (CatBoost) sem ganho sobre a popularidade no planejamento do próximo item, também com dez atiradores. Clusters de contexto sem estrutura. Ajuste LoRA do interpretador reprovado no gate de ambiguidade. Regras de inventário em 16.16/16.17 não liberadas. |
-| **Pendente** | Revisão estratégica por especialistas (ferramenta pronta, aguardando os revisores). Estatísticas pessoais no Painel (taxa de vitória, KDA, decisões revistas). Glossário no estudo real. Piloto pedagógico com voluntários. |
+| **Pendente** | Revisão estratégica por especialistas (ferramenta pronta, aguardando os revisores). Estatísticas pessoais no Painel (taxa de vitória, KDA, decisões revistas). Piloto pedagógico com voluntários. |
 | **Fora do escopo** | Overlay ao vivo e partidas em andamento. Automação de compras. Treinar modelo de linguagem do zero. Aprendizado por reforço. Aplicativo móvel nativo. Outros jogos. Uso multiusuário ou exposição pública da API. |
 
 ## Situação atual
@@ -173,6 +173,10 @@ O OpenAPI servido descreve:
 - tentativas de estudo: criação, leitura, pistas, resposta, revelação, reflexão e progresso;
 - análises: criação, leitura, julgamento e relatório;
 - `/api/v1/objectives/interpret`.
+
+### Glossário no modo Estudo
+
+O modo Estudo oferece um glossário curado e acessível por teclado, disponível antes da escolha e durante a comparação. Ele explica composição, componentes, custo restante, orçamento, elegibilidade, popularidade e abstenção, sem depender de um modelo ou revelar a compra histórica. Consultar o glossário não abre pistas nem modifica a tentativa. Na prática de transferência sem ajuda, o glossário fica oculto.
 
 ### Padrões por campeão
 
