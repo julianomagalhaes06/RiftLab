@@ -38,7 +38,7 @@ describe("Painel com partidas importadas recentes", () => {
     expect(within(list).getByText("Campeões presentes: não disponíveis")).toBeInTheDocument();
     expect(screen.getByText(/Mostrando 2 partidas importadas recentes/)).toBeInTheDocument();
     expect(screen.getByText(/Total no servidor não informado/)).toBeInTheDocument();
-    expect(screen.getByText(/Ainda não há observação desta conta/)).toBeInTheDocument();
+    expect(screen.getByText(/Ainda não há observação desta fila/)).toBeInTheDocument();
     expect(screen.queryByText(/vitória|derrota|KDA|tropas/i)).not.toBeInTheDocument();
     const calls = api.callsTo("GET", /^\/api\/v1\/matches$/);
     expect(calls).toHaveLength(1);

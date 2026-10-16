@@ -40,7 +40,7 @@ export function PositionPage() {
       <div className="page-intro">
         <p className="page-intro__kicker">Minha posição</p>
         <h2>Classificação da conta própria</h2>
-        <p>Observações da fila Solo/Duo da conta configurada localmente. Nas divisões até Diamante, a promoção ocorre ao alcançar 100 PDL; pontos excedentes podem seguir para a próxima divisão. Atualizações exigem o comando administrativo de refresh.</p>
+        <p>Observações das filas Solo/Duo e Flex da conta configurada localmente, com histórico e PDL separados por fila. Nas divisões até Diamante, a promoção ocorre ao alcançar 100 PDL; pontos excedentes podem seguir para a próxima divisão. Atualizações exigem o comando administrativo de refresh.</p>
       </div>
       <MyRank />
     </div>

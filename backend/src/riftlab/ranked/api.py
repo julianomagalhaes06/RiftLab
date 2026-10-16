@@ -8,13 +8,14 @@ from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from riftlab.ranked.application import ranked_me
+from riftlab.ranked.domain import SOLO_QUEUE, RankedQueue
 
 router = APIRouter(tags=["ranked"])
 
 
 class Position(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
-    queue: str
+    queue: RankedQueue
     season: str
     observed_at: datetime
     origin: str
@@ -45,9 +46,11 @@ class RankedMe(BaseModel):
 @router.get(
     "/api/v1/ranked/me",
     response_model=RankedMe,
-    summary="Posição Solo/Duo da conta local",
+    summary="Posição Solo/Duo ou Flex da conta local",
     description="Somente banco e conta local configurada; nenhuma chamada à Riot.",
 )
-async def get_ranked_me(request: Request) -> RankedMe:
-    data = await ranked_me(request.app.state.session_factory, request.app.state.settings)
+async def get_ranked_me(request: Request, queue: RankedQueue = SOLO_QUEUE) -> RankedMe:
+    data = await ranked_me(
+        request.app.state.session_factory, request.app.state.settings, queue=queue
+    )
     return RankedMe.model_validate(data)

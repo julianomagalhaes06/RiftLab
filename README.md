@@ -174,7 +174,11 @@ O OpenAPI servido descreve:
 - análises: criação, leitura, julgamento e relatório;
 - `/api/v1/objectives/interpret`.
 
-### Idioma dos itens
+### Classificação Solo/Duo e Flex
+
+O seletor **Fila ranqueada**, disponível em Minha posição e no card do Painel, alterna entre **Solo/Duo** (padrão) e **Flex**. Elo, PDL, vitórias, derrotas e variações usam observações independentes por fila e temporada. `GET /api/v1/ranked/me?queue=RANKED_FLEX_SR` consulta Flex; `RANKED_SOLO_5x5` consulta Solo/Duo. Sem parâmetro, a API preserva Solo/Duo; filas diferentes dessas são rejeitadas. A atualização administrativa existente coleta ambas as filas; falhas preservam a última observação válida de cada uma. Sem observação de Flex, a interface informa a ausência em vez de repetir o elo Solo/Duo. O modo demonstração não inventa uma classificação Flex.
+
+### Idioma e imagens dos itens
 
 Os nomes dos itens no inventário, nas alternativas de estudo e nos padrões por campeão são exibidos em português brasileiro com o catálogo oficial do Data Dragon da versão fixada para a decisão ou padrão. A tradução altera apenas a apresentação: IDs, receitas, preços, regras e resultados permanecem os mesmos. Se o catálogo traduzido estiver indisponível ou não contiver o item, o nome original é preservado; sem nome, aparece o ID. A consulta ao catálogo oficial ocorre no navegador, sem credenciais, e não é necessária para analisar a decisão.
 

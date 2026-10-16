@@ -11,6 +11,8 @@
 .my-rank[data-tier="CHALLENGER"] { --tier-accent: #f7dea6; --tier-glow: #554022; }
 .my-rank__copy { position: relative; z-index: 1; min-width: 0; }
 .my-rank__eyebrow { color: var(--tier-accent); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; }
+.my-rank__queue { display: grid; gap: 6px; max-width: 260px; margin-bottom: 18px; color: var(--ntext-muted); font-size: .85rem; }
+.my-rank__queue select { min-height: 44px; width: 100%; padding: 8px 12px; color: var(--ntext); background: var(--n1); border: 1px solid var(--nline); border-radius: 6px; }
 .my-rank h3 { font: 600 clamp(1.5rem, 3vw, 2.3rem)/1.15 'Chakra Petch', Inter, sans-serif; margin: 0 0 14px; }
 .my-rank__title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 22px; color: var(--ntext); font: 600 clamp(1.8rem, 4vw, 3rem)/1.2 'Chakra Petch', Inter, sans-serif; margin: 0 0 15px; }
 .my-rank__title strong { color: var(--tier-accent); white-space: nowrap; }

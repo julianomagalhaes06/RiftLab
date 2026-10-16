@@ -13,7 +13,7 @@ from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, Rio
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
 from riftlab.ingestion.models import MatchModel, ParticipantModel
 from riftlab.ranked.application import ranked_me, refresh_ranked
-from riftlab.ranked.domain import SOLO_QUEUE, account_key
+from riftlab.ranked.domain import FLEX_QUEUE, SOLO_QUEUE, RankedQueue, account_key
 from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import SourceAuthError
@@ -121,6 +121,9 @@ async def test_immutable_snapshots_errors_account_change_and_season(
         ]["leaguePoints"] == 87
         account_file.write_text(json.dumps({**account, "gameName": "another-synthetic-owner"}))
         assert (await ranked_me(session_factory, settings))["status"] == "UNAVAILABLE"
+        assert (await ranked_me(session_factory, settings, queue=FLEX_QUEUE))[
+            "status"
+        ] == "UNAVAILABLE"
         account_file.write_text(json.dumps(account))
         settings.riot_api_key = "synthetic-key"
         transport, client = client_for(solo=False)
@@ -137,21 +140,27 @@ async def test_immutable_snapshots_errors_account_change_and_season(
         assert (await ranked_me(session_factory, settings, now=BASE + timedelta(days=4)))[
             "status"
         ] == "UNRANKED"
+        flex = await ranked_me(
+            session_factory, settings, queue=FLEX_QUEUE, now=BASE + timedelta(days=4)
+        )
+        assert flex["status"] == "READY" and flex["position"]["queue"] == FLEX_QUEUE
+        assert flex["position"]["season"] == "2027" and flex["change"] is None
         async with unit_of_work(session_factory) as session:
             rows = (
                 await session.scalars(select(Observation).where(Observation.account_key == key))
             ).all()
-            assert len(rows) == 9
-            assert sum(r.queue == "RANKED_FLEX_SR" for r in rows) == 4
-            assert [r.state for r in rows].count("FAILED") == 1
+            assert len(rows) == 10
+            assert sum(r.queue == "RANKED_FLEX_SR" for r in rows) == 5
+            assert [r.state for r in rows].count("FAILED") == 2
     finally:
         async with unit_of_work(session_factory) as session:
             await session.execute(delete(Observation).where(Observation.account_key == key))
 
 
 @pytest.mark.asyncio
-async def test_match_association_requires_exactly_one_own_completed_solo_match(
-    session_factory, tmp_path: Path
+@pytest.mark.parametrize("queue", [SOLO_QUEUE, FLEX_QUEUE])
+async def test_match_association_requires_exactly_one_own_completed_same_queue_match(
+    session_factory, tmp_path: Path, queue: RankedQueue
 ) -> None:
     settings = settings_for(tmp_path / "account.json")
     from riftlab.ingestion.infrastructure.riot_account import load_riot_account
@@ -164,7 +173,7 @@ async def test_match_association_requires_exactly_one_own_completed_solo_match(
     match_ids = ["BR1_310990001", "BR1_310990002"]
     try:
         for day, lp in [(0, 10), (1, 20)]:
-            transport, client = client_for(lp=lp)
+            transport, client = client_for(lp=lp, solo=queue == SOLO_QUEUE)
             try:
                 await refresh_ranked(
                     session_factory,
@@ -177,7 +186,9 @@ async def test_match_association_requires_exactly_one_own_completed_solo_match(
                 await client.aclose()
 
         async def association() -> str:
-            data = await ranked_me(session_factory, settings, now=BASE + timedelta(days=1))
+            data = await ranked_me(
+                session_factory, settings, queue=queue, now=BASE + timedelta(days=1)
+            )
             return data["change"]["ownMatchAssociation"]
 
         assert await association() == "NONE"
@@ -186,7 +197,7 @@ async def test_match_association_requires_exactly_one_own_completed_solo_match(
                 session.add(
                     MatchModel(
                         match_id=match_id,
-                        queue=420,
+                        queue=420 if queue == SOLO_QUEUE else 440,
                         map_id=11,
                         patch="26.1",
                         start_at=BASE + timedelta(hours=12 + index),
@@ -205,6 +216,11 @@ async def test_match_association_requires_exactly_one_own_completed_solo_match(
                     )
                 )
             assert await association() == ("ONE" if index == 0 else "MULTIPLE")
+        other_queue = FLEX_QUEUE if queue == SOLO_QUEUE else SOLO_QUEUE
+        other = await ranked_me(
+            session_factory, settings, queue=other_queue, now=BASE + timedelta(days=1)
+        )
+        assert other["change"]["ownMatchAssociation"] == "NONE"
     finally:
         async with unit_of_work(session_factory) as session:
             await session.execute(
@@ -244,6 +260,12 @@ async def test_get_route_is_account_scoped_and_contains_no_identifiers(
                 assert PUUID not in response.text
                 assert "synthetic-owner" not in response.text
                 assert "subject_hash" not in response.text
+                flex = await client.get("/api/v1/ranked/me", params={"queue": FLEX_QUEUE})
+                assert flex.status_code == 200
+                assert flex.json()["position"]["queue"] == FLEX_QUEUE
+                assert flex.json()["status"] == "UNRANKED"
+                invalid = await client.get("/api/v1/ranked/me", params={"queue": "NORMAL"})
+                assert invalid.status_code == 422
                 settings.ranked_account_file = str(tmp_path / "absent.json")
                 absent = await client.get("/api/v1/ranked/me")
                 assert absent.json()["status"] == "UNAVAILABLE"
@@ -324,6 +346,8 @@ async def test_demo_ranked_is_fictitious_marked_and_never_used_with_a_riot_key(
     assert shown["status"] == "READY" and shown["reason"] is None
     assert shown["position"]["origin"] == DEMO_ORIGIN and shown["position"]["tier"] == "SILVER"
     assert shown["change"]["leaguePointsDelta"] == 12
+    flex = await ranked_me(session_factory, demo, queue=FLEX_QUEUE)
+    assert flex["status"] == "UNAVAILABLE" and flex["reason"] == "NO_OBSERVATION"
 
     # com chave da Riot a opção é ignorada: a conta fictícia nunca aparece
     real = Settings(
@@ -332,3 +356,74 @@ async def test_demo_ranked_is_fictitious_marked_and_never_used_with_a_riot_key(
         ranked_account_file=str(tmp_path / "sem-conta.json"),
     )
     assert (await ranked_me(session_factory, real))["reason"] == "ACCOUNT_OR_SECRET_MISSING"
+
+
+@pytest.mark.asyncio
+async def test_queue_history_deltas_failures_and_accounts_are_isolated(
+    session_factory, tmp_path: Path
+) -> None:
+    from riftlab.ingestion.infrastructure.riot_account import load_riot_account
+
+    settings = settings_for(tmp_path / "account.json")
+    key = account_key(
+        load_riot_account(Path(settings.ranked_account_file)), settings.subject_hash_secret
+    )
+    assert key
+    try:
+        async with unit_of_work(session_factory) as session:
+            for queue, season, tier, points in (
+                (SOLO_QUEUE, "2026", "GOLD", (10, 30)),
+                (FLEX_QUEUE, "2026-flex", "PLATINUM", (50, 65)),
+            ):
+                for hour, value in enumerate(points):
+                    session.add(
+                        Observation(
+                            account_key=key,
+                            queue=queue,
+                            season=season,
+                            captured_at=BASE + timedelta(hours=hour),
+                            state="READY",
+                            tier=tier,
+                            division="III",
+                            league_points=value,
+                            wins=20 + hour,
+                            losses=10,
+                            origin="RIOT_LEAGUE_V4",
+                        )
+                    )
+        solo = await ranked_me(session_factory, settings, now=BASE + timedelta(hours=2))
+        flex = await ranked_me(
+            session_factory, settings, queue=FLEX_QUEUE, now=BASE + timedelta(hours=2)
+        )
+        assert solo["position"]["leaguePoints"] == 30
+        assert solo["change"]["leaguePointsDelta"] == 20
+        assert flex["position"]["leaguePoints"] == 65
+        assert flex["change"]["leaguePointsDelta"] == 15
+        assert flex["position"]["tier"] == "PLATINUM"
+        async with unit_of_work(session_factory) as session:
+            session.add(
+                Observation(
+                    account_key=key,
+                    queue=FLEX_QUEUE,
+                    season="2026-flex",
+                    captured_at=BASE + timedelta(hours=3),
+                    state="FAILED",
+                    error_code="RIOT_AUTH_FAILED",
+                    origin="RIOT_LEAGUE_V4",
+                )
+            )
+        flex = await ranked_me(
+            session_factory, settings, queue=FLEX_QUEUE, now=BASE + timedelta(hours=3)
+        )
+        assert flex["status"] == "STALE" and flex["reason"] == "RIOT_AUTH_FAILED"
+        assert flex["position"]["leaguePoints"] == 65
+        assert (await ranked_me(session_factory, settings, now=BASE + timedelta(hours=3)))[
+            "status"
+        ] == "READY"
+        settings.ranked_account_file = str(tmp_path / "another.json")
+        assert (await ranked_me(session_factory, settings, queue=FLEX_QUEUE))[
+            "status"
+        ] == "UNAVAILABLE"
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(delete(Observation).where(Observation.account_key == key))

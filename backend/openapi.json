@@ -2622,6 +2622,10 @@
             "type": "string"
           },
           "queue": {
+            "enum": [
+              "RANKED_SOLO_5x5",
+              "RANKED_FLEX_SR"
+            ],
             "title": "Queue",
             "type": "string"
           },
@@ -4594,6 +4598,22 @@
       "get": {
         "description": "Somente banco e conta local configurada; nenhuma chamada à Riot.",
         "operationId": "get_ranked_me_api_v1_ranked_me_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "queue",
+            "required": false,
+            "schema": {
+              "default": "RANKED_SOLO_5x5",
+              "enum": [
+                "RANKED_SOLO_5x5",
+                "RANKED_FLEX_SR"
+              ],
+              "title": "Queue",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -4604,9 +4624,19 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
-        "summary": "Posição Solo/Duo da conta local",
+        "summary": "Posição Solo/Duo ou Flex da conta local",
         "tags": [
           "ranked"
         ]

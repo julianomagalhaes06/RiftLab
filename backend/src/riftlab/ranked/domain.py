@@ -4,13 +4,14 @@ import hashlib
 import hmac
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfig
 from riftlab.shared.errors import SourceSchemaError
 
-SOLO_QUEUE = "RANKED_SOLO_5x5"
-FLEX_QUEUE = "RANKED_FLEX_SR"
+RankedQueue = Literal["RANKED_SOLO_5x5", "RANKED_FLEX_SR"]
+SOLO_QUEUE: RankedQueue = "RANKED_SOLO_5x5"
+FLEX_QUEUE: RankedQueue = "RANKED_FLEX_SR"
 QUEUES = (SOLO_QUEUE, FLEX_QUEUE)
 DIVISIONS = ("IV", "III", "II", "I")
 DIVIDED_TIERS = ("IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND")

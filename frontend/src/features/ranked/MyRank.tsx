@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type RankedMe } from "../../shared/api/client";
+import { api, type RankedMe, type RankedQueue } from "../../shared/api/client";
 import "./ranked.css";
 
 const tierNames: Record<string, string> = {
@@ -9,7 +9,7 @@ const tierNames: Record<string, string> = {
 };
 const reasonNames: Record<string, string> = {
   ACCOUNT_OR_SECRET_MISSING: "Configure a conta local e o segredo de vínculo para consultar sua posição.",
-  NO_OBSERVATION: "Ainda não há observação desta conta. Atualize pelo comando administrativo.",
+  NO_OBSERVATION: "Ainda não há observação desta fila. Atualize pelo comando administrativo.",
   RIOT_KEY_MISSING: "A chave da Riot está ausente. A última posição observada continua visível.",
   OBSERVATION_OLD: "Esta observação tem mais de 24 horas.",
   RIOT_AUTH_FAILED: "A atualização falhou por autenticação na Riot. A posição anterior foi preservada.",
@@ -46,15 +46,24 @@ function ChangeLine({ data }: { data: RankedMe["change"] }) {
 }
 
 export function MyRank({ compact = false }: { compact?: boolean }) {
-  const [data, setData] = useState<RankedMe | null>(null);
-  const [error, setError] = useState(false);
+  const [queue, setQueue] = useState<RankedQueue>("RANKED_SOLO_5x5");
+  const [result, setResult] = useState<{ queue: RankedQueue; data: RankedMe } | null>(null);
+  const [failedQueue, setFailedQueue] = useState<RankedQueue | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    api.getRankedMe(controller.signal).then(setData).catch((cause: unknown) => {
-      if (!(cause instanceof DOMException && cause.name === "AbortError")) setError(true);
+    api.getRankedMe(controller.signal, queue).then((data) => {
+      if (!controller.signal.aborted) {
+        setResult({ queue, data });
+        setFailedQueue(null);
+      }
+    }).catch((cause: unknown) => {
+      if (!controller.signal.aborted && !(cause instanceof DOMException && cause.name === "AbortError")) setFailedQueue(queue);
     });
     return () => controller.abort();
-  }, []);
+  }, [queue]);
+  const data = result?.queue === queue ? result.data : null;
+  const error = failedQueue === queue;
+  const queueLabel = queue === "RANKED_SOLO_5x5" ? "Solo/Duo" : "Flex";
   const position = data?.position;
   const tier = position?.tier && tierNames[position.tier] ? position.tier : null;
   const apex = tier ? ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(tier) : false;
@@ -62,12 +71,19 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
   return (
     <section className={`my-rank ${compact ? "my-rank--compact" : ""}`} aria-labelledby={`my-rank-heading-${compact ? "panel" : "page"}`} data-tier={tier ?? "NONE"}>
       <div className="my-rank__copy">
-        <p className="my-rank__eyebrow">Fila Solo/Duo · BR1</p>
+        <p className="my-rank__eyebrow">Fila {queueLabel} · BR1</p>
         <h3 id={`my-rank-heading-${compact ? "panel" : "page"}`}>Minha posição</h3>
+        <label className="my-rank__queue">
+          Fila ranqueada
+          <select value={queue} onChange={(event) => setQueue(event.target.value as RankedQueue)}>
+            <option value="RANKED_SOLO_5x5">Solo/Duo</option>
+            <option value="RANKED_FLEX_SR">Flex</option>
+          </select>
+        </label>
         {!data && !error && <p role="status">Carregando posição observada…</p>}
         {error && <p role="alert">Não foi possível consultar a posição armazenada.</p>}
         {data?.status === "UNAVAILABLE" && <p role="status">{reasonNames[data.reason ?? ""] ?? "Posição indisponível para esta conta."}</p>}
-        {position?.state === "UNRANKED" && <p role="status">Não classificado na Solo/Duo nesta observação válida.</p>}
+        {position?.state === "UNRANKED" && <p role="status">Não classificado na {queueLabel} nesta observação válida.</p>}
         {position?.state === "READY" && <>
           <p className="sr-only">Elo {title}, {position.leaguePoints}{apex ? "" : " de 100"} PDL</p>
           <p className="my-rank__title" aria-hidden="true">{title} <strong>{position.leaguePoints} <span>PDL</span></strong></p>

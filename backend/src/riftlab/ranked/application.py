@@ -17,6 +17,7 @@ from riftlab.ranked.domain import (
     FLEX_QUEUE,
     SEASON_PATTERN,
     SOLO_QUEUE,
+    RankedQueue,
     account_key,
     parse_league_entries,
 )
@@ -66,17 +67,18 @@ async def refresh_ranked(
     except SourceError as exc:
         stamp = captured_at or datetime.now(UTC)
         async with unit_of_work(factory) as session:
-            session.add(
-                Observation(
-                    account_key=key,
-                    queue=SOLO_QUEUE,
-                    season=season,
-                    captured_at=stamp,
-                    state="FAILED",
-                    error_code=exc.code,
-                    origin="RIOT_LEAGUE_V4",
+            for queue in (SOLO_QUEUE, FLEX_QUEUE):
+                session.add(
+                    Observation(
+                        account_key=key,
+                        queue=queue,
+                        season=season,
+                        captured_at=stamp,
+                        state="FAILED",
+                        error_code=exc.code,
+                        origin="RIOT_LEAGUE_V4",
+                    )
                 )
-            )
         raise
     finally:
         if own_transport:
@@ -154,7 +156,11 @@ async def seed_demo_ranked(
 
 
 async def ranked_me(
-    factory: async_sessionmaker[AsyncSession], settings: Settings, *, now: datetime | None = None
+    factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    *,
+    queue: RankedQueue = SOLO_QUEUE,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     demo = demo_ranked_active(settings)
     key = DEMO_ACCOUNT_KEY if demo else _identity(settings)
@@ -170,7 +176,7 @@ async def ranked_me(
             select(Observation)
             .where(
                 Observation.account_key == key,
-                Observation.queue == SOLO_QUEUE,
+                Observation.queue == queue,
             )
             .order_by(Observation.captured_at.desc(), Observation.id.desc())
             .limit(1)
@@ -187,7 +193,7 @@ async def ranked_me(
                 select(Observation)
                 .where(
                     Observation.account_key == key,
-                    Observation.queue == SOLO_QUEUE,
+                    Observation.queue == queue,
                     Observation.season == latest.season,
                     Observation.state != "FAILED",
                 )
@@ -261,7 +267,7 @@ async def _change(
                 previous.league_points or 0
             )
     # A Riot não fornece no League-V4 o PDL por partida. A associação é só do intervalo.
-    # Nunca usar hora apenas: exigir subject_hash próprio, fila Solo e partida concluída.
+    # Nunca usar hora apenas: exigir subject_hash próprio, mesma fila e partida concluída.
     # GET é estritamente banco: não resolve PUUID. O hash só pode vir de um
     # vínculo observado na coleta; guardado como HMAC no próprio snapshot.
     if (
@@ -276,7 +282,7 @@ async def _change(
         .join(ParticipantModel, ParticipantModel.match_id == MatchModel.match_id)
         .where(
             ParticipantModel.subject_hash == current.subject_hash,
-            MatchModel.queue == 420,
+            MatchModel.queue == (420 if current.queue == SOLO_QUEUE else 440),
             MatchModel.start_at + (MatchModel.duration_seconds * text("INTERVAL '1 second'"))
             > previous.captured_at,
             MatchModel.start_at + (MatchModel.duration_seconds * text("INTERVAL '1 second'"))

@@ -11,6 +11,53 @@ const rank = {
     kind: "SAME_DIVISION", leaguePointsDelta: 12, ownMatchAssociation: "MULTIPLE" },
 };
 
+for (const width of [360, 1280]) {
+  test(`seletor Solo/Duo e Flex em ${width}px preserva dados, teclado e fila no Painel`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockApi(page, { "GET /api/v1/ranked/me": ({ url }) => ok(url.searchParams.get("queue") === "RANKED_FLEX_SR"
+      ? { ...rank, position: { ...rank.position, queue: "RANKED_FLEX_SR", tier: "DIAMOND", division: "IV", leaguePoints: 29, wins: 55, losses: 22 },
+        change: { ...rank.change, leaguePointsDelta: -8 } }
+      : rank) });
+    await page.goto("/minha-posicao");
+    await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
+    const selector = page.getByLabel("Fila ranqueada");
+    await selector.focus();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await expect(selector).toHaveValue("RANKED_FLEX_SR");
+    await expect(selector).toBeFocused();
+    await expect(page.getByText("Elo Diamante IV, 29 de 100 PDL")).toBeVisible();
+    await expect(page.getByText("55 vitórias · 22 derrotas na fila")).toBeVisible();
+    await expect(page.getByText("-8 PDL desde a observação anterior, na mesma divisão.")).toBeVisible();
+    await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toHaveCount(0);
+    expect(await selector.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: `../.private/validation/ranked-flex/flex-${width}.png`, fullPage: true });
+    await selector.selectOption("RANKED_SOLO_5x5");
+    await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
+    await page.goto("/painel");
+    await page.getByLabel("Fila ranqueada").selectOption("RANKED_FLEX_SR");
+    await expect(page.locator(".my-rank--compact").getByText("Elo Diamante IV, 29 de 100 PDL")).toBeVisible();
+  });
+}
+
+test("Flex sem observação e não classificado não herda a posição Solo/Duo", async ({ page }) => {
+  let unranked = false;
+  await mockApi(page, { "GET /api/v1/ranked/me": ({ url }) => ok(url.searchParams.get("queue") !== "RANKED_FLEX_SR" ? rank
+    : unranked ? { ...rank, status: "UNRANKED", change: null, position: { ...rank.position,
+      queue: "RANKED_FLEX_SR", state: "UNRANKED", tier: null, division: null, leaguePoints: null, wins: null, losses: null } }
+      : { status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }) });
+  await page.goto("/minha-posicao");
+  await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
+  await page.getByLabel("Fila ranqueada").selectOption("RANKED_FLEX_SR");
+  await expect(page.getByText(/Ainda não há observação/)).toBeVisible();
+  await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toHaveCount(0);
+  unranked = true;
+  await page.getByLabel("Fila ranqueada").selectOption("RANKED_SOLO_5x5");
+  await page.getByLabel("Fila ranqueada").selectOption("RANKED_FLEX_SR");
+  await expect(page.getByText("Não classificado na Flex nesta observação válida.")).toBeVisible();
+});
+
 for (const width of [360, 390, 1280, 1440]) {
   test(`Minha posição e card no Painel em ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: width < 700 ? 780 : 900 });

@@ -426,7 +426,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Posição Solo/Duo da conta local
+         * Posição Solo/Duo ou Flex da conta local
          * @description Somente banco e conta local configurada; nenhuma chamada à Riot.
          */
         get: operations["get_ranked_me_api_v1_ranked_me_get"];
@@ -1515,8 +1515,11 @@ export interface components {
             observedAt: string;
             /** Origin */
             origin: string;
-            /** Queue */
-            queue: string;
+            /**
+             * Queue
+             * @enum {string}
+             */
+            queue: "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
             /** Season */
             season: string;
             /**
@@ -2740,7 +2743,9 @@ export interface operations {
     };
     get_ranked_me_api_v1_ranked_me_get: {
         parameters: {
-            query?: never;
+            query?: {
+                queue?: "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2754,6 +2759,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RankedMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
