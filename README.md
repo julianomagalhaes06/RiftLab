@@ -10,6 +10,12 @@ O público prioritário são iniciantes e jogadores de elos mais baixos. O objet
 
 ## Experiência
 
+Documentação de engenharia: [estado técnico](docs/estado-projeto.md),
+[requisitos](docs/requirements.md), [arquitetura](docs/architecture.md),
+[contratos](docs/contracts.md) e [versionamento/portabilidade](docs/versionamento.md).
+Documentação, modelos, fontes Colab e retornos experimentais auditados acompanham o Git;
+credenciais, dados identificáveis de jogadores e volumes do banco continuam locais.
+
 1. Importar uma partida concluída ou abrir uma demonstração.
 2. Selecionar um participante dentro do recorte suportado.
 3. Percorrer a linha do tempo das decisões de compra.

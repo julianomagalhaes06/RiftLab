@@ -1,0 +1,134 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{geometry}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\geometry{left=2.3cm,right=2.3cm,top=2.45cm,bottom=2.4cm}
+\hypersetup{hidelinks}
+\renewcommand{\arraystretch}{1.25}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small RIFTLAB / APS}
+\fancyhead[R]{\small REQUISITOS NÃO FUNCIONAIS}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{15pt}
+\addtolength{\parskip}{4pt}
+
+\begin{document}
+\begin{titlepage}
+  \setlength{\parindent}{0pt}\raggedright
+  {\normalsize\bfseries INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E\\ TECNOLOGIA DO CEARÁ\par}
+  \vspace*{2.0cm}
+  {\Large\bfseries ANÁLISE E PROJETO DE SISTEMAS\par}
+  \vspace{1.7cm}
+  {\Huge\bfseries RiftLab\par}
+  \vspace{0.4cm}
+  {\rule{9cm}{1pt}\par}
+  \vspace{0.7cm}
+  {\LARGE Especificação de requisitos não funcionais\par}
+  \vspace{0.5cm}
+  {\large Qualidade esperada na visão final do produto\par}
+  \vspace{1.6cm}
+  {\large Aluno: Juliano Magalhães Jurity\par}
+  \vspace{0.3cm}
+  {\large Professor: Thiago Queiroz de Oliveira\par}
+  \vfill
+  {\large RNF01--RNF12 \quad | \quad Metas verificáveis\par}
+  \vspace{0.3cm}
+  {28 de setembro de 2026\par}
+\end{titlepage}
+
+\section*{Quadro de leitura}
+\begin{center}
+\begin{tabular}{@{}p{3.4cm}p{10.3cm}@{}}
+\toprule
+\bfseries Campo & \bfseries Definição \\
+\midrule
+Escopo & Aplicação local em português para análise pós-partida e aprendizagem, com as áreas Painel, Campeões, Minha posição e Histórico. \\
+Qualidade & Desempenho, recuperação, rastreabilidade, acessibilidade, privacidade, conformidade com a Riot, consistência visual e transparência de métricas. \\
+Medição & Cada meta exige ambiente e resultado observados; este texto não informa conformidade já alcançada. \\
+Recorte & CPU, estação individual, larguras de 360 a 1440 px; multiusuário fora do escopo. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\clearpage
+
+\section{Objetivo}
+Este documento especifica qualidades e restrições da aplicação local RiftLab. As metas
+quantitativas abaixo são \emph{critérios a verificar}, não resultados de desempenho já
+medidos. Sua avaliação deve registrar ambiente, comandos e saída observada.
+
+\small
+\begin{longtable}{@{}p{1.25cm}p{3.6cm}p{5.6cm}p{4.3cm}@{}}
+\caption{Requisitos não funcionais e forma de verificação}\label{tab:rnf}\\
+\toprule
+\bfseries ID & \bfseries Atributo & \bfseries Requisito & \bfseries Verificação prevista \\
+\midrule
+\endfirsthead
+\toprule
+\bfseries ID & \bfseries Atributo & \bfseries Requisito & \bfseries Verificação prevista \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+RNF01 & Portabilidade e custo & Execução e testes fundamentais devem funcionar em CPU; a integração contínua não deve depender de chamada paga. & Executar suíte fundamental sem GPU e sem credencial de serviço pago. \\
+RNF02 & Desempenho & O ranking aquecido deve atingir percentil 95 de até 1 segundo em 100 consultas locais com até 100 candidatos; não incluir tempo de importação nem de interpretação por LLM nessa medida. As consultas do Painel e do Histórico devem responder em até 1 segundo com 500 partidas locais. & Medir 100 consultas, registrar CPU/RAM, configuração, distribuição de duração e percentil 95; repetir para Painel e Histórico com base de 500 partidas. \\
+RNF03 & Disponibilidade de entrada & A interpretação de objetivo em texto deve ter timeout configurável de 15 segundos e oferecer imediatamente formulário estruturado quando indisponível. & Simular lentidão e falha do interpretador; verificar prazo, mensagem e formulário utilizável. \\
+RNF04 & Confiabilidade & Importação, instantâneos de elo e persistência devem ser idempotentes e transacionais, com recuperação após interrupção do worker. & Repetir solicitações concorrentes, interromper worker e confirmar retomada sem duplicação nem estado parcial publicado. \\
+RNF05 & Rastreabilidade & Cada análise deve registrar patch, versão do catálogo, esquema, modelo, conjunto de candidatos e origem do orçamento. & Consultar análise persistida e verificar os identificadores e a proveniência, inclusive em casos de dados ausentes. \\
+RNF06 & Acessibilidade & A interface deve permitir uso por teclado, manter foco visível, expressar estados em texto (inclusive área ativa, resultado e elo) e atingir contraste WCAG AA. & Percorrer as quatro áreas sem mouse; inspecionar foco e mensagens; medir contraste com ferramenta apropriada. \\
+RNF07 & Privacidade e segurança & Logs, relatórios e fixtures públicas não devem expor segredos nem identificadores brutos de jogadores. O sistema não consulta nem exibe elo, perfil ou estatística de outras contas. & Inspecionar artefatos e executar verificações com valores sintéticos de teste; confirmar que nenhuma rota aceita conta diferente da configurada. \\
+RNF08 & Reprodutibilidade & Dependências devem ter lockfiles; testes devem usar ambiente isolado; migrações devem ser verificadas em PostgreSQL vazio. & Recriar ambiente a partir dos lockfiles, executar testes isolados e aplicar migrações num banco novo. \\
+RNF09 & Usabilidade responsiva & A interface deve estar em português e se adaptar de 360 a 1440 px, com menu superior no desktop e barra inferior no mobile. & Inspecionar as quatro áreas em 360, 390, 1280 e 1440 px, procurando corte, sobreposição e rolagem horizontal indevida. \\
+RNF10 & Conformidade com a Riot & Usar apenas as fontes permitidas: Match-V5 para partidas concluídas, League-V4 somente para a conta própria, Data Dragon e Ranked Emblems para ativos. Respeitar limites de requisição com limitador global e Retry-After, exibir crédito dos ativos e aviso de que o RiftLab não é endossado pela Riot Games. & Revisar a lista de hosts e rotas do cliente; simular respostas 429 e verificar espera; conferir crédito e aviso na interface. \\
+RNF11 & Consistência visual & A interface deve usar um único conjunto de tokens: roxo apenas para ação e seleção, verde e vermelho apenas para resultado de partida e a cor do elo apenas em classificação; sem gradientes ou brilhos decorativos; fonte de interface legível para dados. & Auditar tokens e componentes; medir contraste de cada elo (Ferro a Desafiante); revisar telas desktop e mobile. \\
+RNF12 & Transparência de métricas & Toda métrica exibida deve mostrar o tamanho da amostra e a origem (real ou demonstração); ausência de dado nunca aparece como zero; nenhuma métrica é apresentada como causa de vitória. & Usar fixtures com recorte vazio, menos de 20 partidas e zero mortes; verificar rótulos, denominadores e textos. \\
+\end{longtable}
+\normalsize
+
+\section{Cenários de aceitação da visão final}
+\begin{description}
+  \item[Consulta local:] com modelo aquecido e até 100 candidatos, executar 100 consultas
+  locais e calcular o percentil 95 sem misturar latência de importação ou interpretação
+  de texto (RNF01--RNF02). O limite de 1 segundo é meta, não medição atual.
+  \item[Falha do interpretador:] ao ultrapassar 15 segundos ou ocorrer erro, permitir
+  continuar pelo formulário estruturado, com objetivo confirmado antes da análise
+  (RNF03).
+  \item[Interrupção de trabalho:] ao reiniciar o worker durante importação, preservar
+  consistência e continuar ou falhar de modo recuperável sem partida duplicada
+  (RNF04).
+  \item[Auditoria de uma análise:] localizar patch, catálogo fixado, esquema, modelo,
+  candidatos e origem do orçamento, inclusive quando houver abstenção (RNF05).
+  \item[Uso acessível e privado:] executar a navegação principal e a jornada de estudo por
+  teclado nas larguras alvo e verificar foco, contraste e estados textuais; examinar logs e
+  exportações com sentinelas sintéticas para detectar vazamento (RNF06--RNF07, RNF09).
+  \item[Limites da Riot:] simular 429 e indisponibilidade do League-V4 e do Data Dragon;
+  Minha posição e Campeões mostram estado claro e o resto da aplicação continua
+  utilizável (RNF10).
+  \item[Painel honesto:] com menos de 20 partidas, o Painel mostra o número real da amostra;
+  com recorte vazio, orienta a importar ou abrir a demonstração (RNF12).
+  \item[Reprodução:] reconstruir ambiente a partir dos lockfiles, testar em banco
+  isolado e aplicar migrações a PostgreSQL vazio (RNF08).
+\end{description}
+
+\section{Relação com as telas finais}
+O Painel ilustra RNF06, RNF09, RNF11 e RNF12: duas métricas principais com amostra visível,
+lista de partidas com separadores e card de elo com contraste medido. O Histórico e as telas
+de Contexto, Estudo e Comparação exibem limites de qualidade e proveniência (RNF05). Minha
+posição concentra RNF07 e RNF10 (só a conta própria, crédito dos emblemas). A operação local
+apresenta recuperação, manifesto e remoção (RNF04, RNF07--RNF08). O protótipo demonstra
+organização da interface; não substitui ensaio de tempo, contraste medido em produção ou
+auditoria de segurança.
+
+\section{Limites e premissas}
+O MVP é local, vinculado à interface de rede de loopback e sem cadastro ou autenticação de
+usuários. Publicação multiusuário exigiria novo escopo de autenticação, autorização, TLS e
+isolamento de dados. A existência de uma meta de acessibilidade ou desempenho não substitui
+sua medição. O modo de demonstração emprega dados sintéticos identificados.
+
+\end{document}

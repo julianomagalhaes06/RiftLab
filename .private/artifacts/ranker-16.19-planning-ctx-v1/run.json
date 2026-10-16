@@ -1,0 +1,999 @@
+{
+ "card": "CC-402",
+ "environment": {
+  "catboost": "1.2.10",
+  "machine": "x86_64",
+  "numpy": "2.5.3",
+  "python": "3.12.3",
+  "threads": 1
+ },
+ "grid": [
+  {
+   "depth": 4,
+   "l2_leaf_reg": 3.0,
+   "learning_rate": 0.05
+  },
+  {
+   "depth": 4,
+   "l2_leaf_reg": 10.0,
+   "learning_rate": 0.05
+  },
+  {
+   "depth": 4,
+   "l2_leaf_reg": 3.0,
+   "learning_rate": 0.15
+  },
+  {
+   "depth": 4,
+   "l2_leaf_reg": 10.0,
+   "learning_rate": 0.15
+  },
+  {
+   "depth": 6,
+   "l2_leaf_reg": 3.0,
+   "learning_rate": 0.05
+  },
+  {
+   "depth": 6,
+   "l2_leaf_reg": 10.0,
+   "learning_rate": 0.05
+  },
+  {
+   "depth": 6,
+   "l2_leaf_reg": 3.0,
+   "learning_rate": 0.15
+  },
+  {
+   "depth": 6,
+   "l2_leaf_reg": 10.0,
+   "learning_rate": 0.15
+  }
+ ],
+ "inputs": {
+  "championCatalogSha256": "b70e5edb8d2f4c25d21cf68a8366bbf0f352082e840b0bbc2efcf004f10022db",
+  "datasetSha256": "ea3f62b054230b83a43b0ad0b33992f4bdf9c9349a7dea2f83e3a5def1607d0d",
+  "itemCatalogSha256": "72c996d05a316ca194c0f5c02b25016a553bd204a974db09b4312c40cee3d477"
+ },
+ "models": {
+  "M1-full": {
+   "config": {
+    "depth": 6,
+    "l2_leaf_reg": 3.0,
+    "learning_rate": 0.05
+   },
+   "dropped": [],
+   "features": [
+    "self_champion_id",
+    "candidate_item_id",
+    "lane_opponent_champion_id",
+    "main_item_ordinal",
+    "game_time_min",
+    "level",
+    "inventory_units",
+    "candidate_price",
+    "owned_component_compatible",
+    "gold_estimate",
+    "gold_stale",
+    "remaining_cost",
+    "affordable_margin",
+    "item_armor",
+    "item_armorpenetration",
+    "item_attackspeed",
+    "item_cooldownreduction",
+    "item_criticalstrike",
+    "item_damage",
+    "item_health",
+    "item_lifesteal",
+    "item_magicpenetration",
+    "item_mana",
+    "item_onhit",
+    "item_spellblock",
+    "item_spelldamage",
+    "ally_assassin",
+    "ally_fighter",
+    "ally_mage",
+    "ally_marksman",
+    "ally_support",
+    "ally_tank",
+    "enemy_assassin",
+    "enemy_fighter",
+    "enemy_mage",
+    "enemy_marksman",
+    "enemy_support",
+    "enemy_tank",
+    "team_gold_diff",
+    "kill_diff",
+    "enemy_main_items",
+    "enemy_items_armor",
+    "enemy_items_spellblock",
+    "enemy_items_health",
+    "enemy_items_criticalstrike",
+    "enemy_items_attackspeed",
+    "enemy_items_spelldamage",
+    "enemy_items_damage",
+    "enemy_items_lifesteal",
+    "ally_main_items"
+   ],
+   "file": "m1-full.cbm",
+   "grid": [
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 47.9,
+     "trees": 310,
+     "validationMrr": 0.8006533582482366
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 56.8,
+     "trees": 385,
+     "validationMrr": 0.7937146892655367
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 22.02,
+     "trees": 116,
+     "validationMrr": 0.7810569836264554
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 21.39,
+     "trees": 112,
+     "validationMrr": 0.7795887140166801
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 50.32,
+     "trees": 299,
+     "validationMrr": 0.8055387409200969
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 54.24,
+     "trees": 326,
+     "validationMrr": 0.8013225475089882
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 22.18,
+     "trees": 101,
+     "validationMrr": 0.7972398401479579
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 24.92,
+     "trees": 119,
+     "validationMrr": 0.7793792365826264
+    }
+   ],
+   "maxRssMb": 297.7,
+   "sha256": "2b78d16e042bc4c8c0be762d35e53d7357085fab34b7392aa101940427a06c47",
+   "trainSeconds": 299.78
+  },
+  "M1-no_composition": {
+   "config": {
+    "depth": 6,
+    "l2_leaf_reg": 3.0,
+    "learning_rate": 0.05
+   },
+   "dropped": [
+    "ally_assassin",
+    "ally_fighter",
+    "ally_mage",
+    "ally_marksman",
+    "ally_support",
+    "ally_tank",
+    "enemy_assassin",
+    "enemy_fighter",
+    "enemy_mage",
+    "enemy_marksman",
+    "enemy_support",
+    "enemy_tank"
+   ],
+   "features": [
+    "self_champion_id",
+    "candidate_item_id",
+    "lane_opponent_champion_id",
+    "main_item_ordinal",
+    "game_time_min",
+    "level",
+    "inventory_units",
+    "candidate_price",
+    "owned_component_compatible",
+    "gold_estimate",
+    "gold_stale",
+    "remaining_cost",
+    "affordable_margin",
+    "item_armor",
+    "item_armorpenetration",
+    "item_attackspeed",
+    "item_cooldownreduction",
+    "item_criticalstrike",
+    "item_damage",
+    "item_health",
+    "item_lifesteal",
+    "item_magicpenetration",
+    "item_mana",
+    "item_onhit",
+    "item_spellblock",
+    "item_spelldamage",
+    "team_gold_diff",
+    "kill_diff",
+    "enemy_main_items",
+    "enemy_items_armor",
+    "enemy_items_spellblock",
+    "enemy_items_health",
+    "enemy_items_criticalstrike",
+    "enemy_items_attackspeed",
+    "enemy_items_spelldamage",
+    "enemy_items_damage",
+    "enemy_items_lifesteal",
+    "ally_main_items"
+   ],
+   "file": "m1-no_composition.cbm",
+   "grid": [
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 43.0,
+     "trees": 280,
+     "validationMrr": 0.7909821455643293
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 65.07,
+     "trees": 469,
+     "validationMrr": 0.8027798111755542
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 18.38,
+     "trees": 90,
+     "validationMrr": 0.7713226392251815
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 26.71,
+     "trees": 159,
+     "validationMrr": 0.7759991529059326
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 56.35,
+     "trees": 359,
+     "validationMrr": 0.8070028703180877
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 56.42,
+     "trees": 359,
+     "validationMrr": 0.7824706186949245
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 23.01,
+     "trees": 111,
+     "validationMrr": 0.8055946172471596
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 24.2,
+     "trees": 121,
+     "validationMrr": 0.7993629561052292
+    }
+   ],
+   "maxRssMb": 337.6,
+   "sha256": "97b391484cdd64da875883ac2b05ccd7da3155c92929c35b1e88b345a248897d",
+   "trainSeconds": 313.14
+  },
+  "M1-no_economy": {
+   "config": {
+    "depth": 4,
+    "l2_leaf_reg": 10.0,
+    "learning_rate": 0.05
+   },
+   "dropped": [
+    "affordable_margin",
+    "gold_estimate",
+    "gold_stale",
+    "remaining_cost"
+   ],
+   "features": [
+    "self_champion_id",
+    "candidate_item_id",
+    "lane_opponent_champion_id",
+    "main_item_ordinal",
+    "game_time_min",
+    "level",
+    "inventory_units",
+    "candidate_price",
+    "owned_component_compatible",
+    "item_armor",
+    "item_armorpenetration",
+    "item_attackspeed",
+    "item_cooldownreduction",
+    "item_criticalstrike",
+    "item_damage",
+    "item_health",
+    "item_lifesteal",
+    "item_magicpenetration",
+    "item_mana",
+    "item_onhit",
+    "item_spellblock",
+    "item_spelldamage",
+    "ally_assassin",
+    "ally_fighter",
+    "ally_mage",
+    "ally_marksman",
+    "ally_support",
+    "ally_tank",
+    "enemy_assassin",
+    "enemy_fighter",
+    "enemy_mage",
+    "enemy_marksman",
+    "enemy_support",
+    "enemy_tank",
+    "team_gold_diff",
+    "kill_diff",
+    "enemy_main_items",
+    "enemy_items_armor",
+    "enemy_items_spellblock",
+    "enemy_items_health",
+    "enemy_items_criticalstrike",
+    "enemy_items_attackspeed",
+    "enemy_items_spelldamage",
+    "enemy_items_damage",
+    "enemy_items_lifesteal",
+    "ally_main_items"
+   ],
+   "file": "m1-no_economy.cbm",
+   "grid": [
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 49.47,
+     "trees": 326,
+     "validationMrr": 0.8061547278334479
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 52.9,
+     "trees": 357,
+     "validationMrr": 0.8073429684447603
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 26.04,
+     "trees": 146,
+     "validationMrr": 0.7950817461036803
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 23.57,
+     "trees": 128,
+     "validationMrr": 0.7787622252290747
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 47.28,
+     "trees": 277,
+     "validationMrr": 0.7783715087418108
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 50.63,
+     "trees": 300,
+     "validationMrr": 0.8002152273338714
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 25.03,
+     "trees": 123,
+     "validationMrr": 0.7782874805535086
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 37.32,
+     "trees": 209,
+     "validationMrr": 0.7859773431360395
+    }
+   ],
+   "maxRssMb": 341.1,
+   "sha256": "d07c8f0f76e33ea27f39554bf2a93ebd7cbce3e50fe0f062e87f64b4d099d14b",
+   "trainSeconds": 312.26
+  },
+  "M1-no_rich_context": {
+   "config": {
+    "depth": 6,
+    "l2_leaf_reg": 3.0,
+    "learning_rate": 0.05
+   },
+   "dropped": [
+    "ally_main_items",
+    "enemy_items_armor",
+    "enemy_items_attackspeed",
+    "enemy_items_criticalstrike",
+    "enemy_items_damage",
+    "enemy_items_health",
+    "enemy_items_lifesteal",
+    "enemy_items_spellblock",
+    "enemy_items_spelldamage",
+    "enemy_main_items",
+    "kill_diff",
+    "lane_opponent_champion_id",
+    "team_gold_diff"
+   ],
+   "features": [
+    "self_champion_id",
+    "candidate_item_id",
+    "main_item_ordinal",
+    "game_time_min",
+    "level",
+    "inventory_units",
+    "candidate_price",
+    "owned_component_compatible",
+    "gold_estimate",
+    "gold_stale",
+    "remaining_cost",
+    "affordable_margin",
+    "item_armor",
+    "item_armorpenetration",
+    "item_attackspeed",
+    "item_cooldownreduction",
+    "item_criticalstrike",
+    "item_damage",
+    "item_health",
+    "item_lifesteal",
+    "item_magicpenetration",
+    "item_mana",
+    "item_onhit",
+    "item_spellblock",
+    "item_spelldamage",
+    "ally_assassin",
+    "ally_fighter",
+    "ally_mage",
+    "ally_marksman",
+    "ally_support",
+    "ally_tank",
+    "enemy_assassin",
+    "enemy_fighter",
+    "enemy_mage",
+    "enemy_marksman",
+    "enemy_support",
+    "enemy_tank"
+   ],
+   "file": "m1-no_rich_context.cbm",
+   "grid": [
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 47.49,
+     "trees": 329,
+     "validationMrr": 0.8013590815053363
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 43.88,
+     "trees": 302,
+     "validationMrr": 0.7810149907420595
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 22.08,
+     "trees": 128,
+     "validationMrr": 0.7864753482932483
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 19.31,
+     "trees": 104,
+     "validationMrr": 0.7757074708023493
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 41.39,
+     "trees": 266,
+     "validationMrr": 0.8056467181467182
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 38.12,
+     "trees": 236,
+     "validationMrr": 0.7917219433109264
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 19.36,
+     "trees": 94,
+     "validationMrr": 0.7907373871356922
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 18.54,
+     "trees": 87,
+     "validationMrr": 0.7842590621646311
+    }
+   ],
+   "maxRssMb": 361.8,
+   "sha256": "dd614341b7fdd692548f0d6a01e121275eda34b8edae05c86f826419845833f6",
+   "trainSeconds": 250.19
+  }
+ },
+ "schemaVersion": 1,
+ "validation": {
+  "B0": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.6102941176470589,
+      0.7719298245614035
+     ],
+     "hitAt3": [
+      0.8173076923076923,
+      0.9391304347826087
+     ],
+     "hitAt5": [
+      0.896551724137931,
+      0.9758064516129032
+     ],
+     "mrr": [
+      0.7338301043219077,
+      0.8519334787893842
+     ],
+     "ndcgAt3": [
+      0.7365565850806485,
+      0.8669746677950343
+     ]
+    },
+    "decisions": 118,
+    "matches": 69,
+    "point": {
+     "hitAt1": 0.6949152542372882,
+     "hitAt3": 0.8813559322033898,
+     "hitAt5": 0.940677966101695,
+     "mrr": 0.7954049432437527,
+     "ndcgAt3": 0.8047792059624734
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.5777777777777777,
+      0.8444444444444444
+     ],
+     "hitAt3": [
+      0.75,
+      0.9591836734693877
+     ],
+     "hitAt5": [
+      0.8604651162790697,
+      1.0
+     ],
+     "mrr": [
+      0.6982029598308668,
+      0.8999999999999999
+     ],
+     "ndcgAt3": [
+      0.6816115705980134,
+      0.9061079059299213
+     ]
+    },
+    "decisions": 46,
+    "matches": 27,
+    "point": {
+     "hitAt1": 0.717391304347826,
+     "hitAt3": 0.8695652173913043,
+     "hitAt5": 0.9347826086956522,
+     "mrr": 0.8059617918313571,
+     "ndcgAt3": 0.8077097558229845
+    }
+   },
+   "skipped": 0
+  },
+  "B1": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.0,
+      0.0
+     ],
+     "hitAt3": [
+      0.05343511450381679,
+      0.15517241379310345
+     ],
+     "hitAt5": [
+      0.05343511450381679,
+      0.15517241379310345
+     ],
+     "mrr": [
+      0.03370010944533738,
+      0.06551203479494563
+     ],
+     "ndcgAt3": [
+      0.026717557251908396,
+      0.07758620689655173
+     ]
+    },
+    "decisions": 118,
+    "matches": 69,
+    "point": {
+     "hitAt1": 0.0,
+     "hitAt3": 0.1016949152542373,
+     "hitAt5": 0.1016949152542373,
+     "mrr": 0.04874386301034988,
+     "ndcgAt3": 0.05084745762711865
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.0,
+      0.0
+     ],
+     "hitAt3": [
+      0.02127659574468085,
+      0.16326530612244897
+     ],
+     "hitAt5": [
+      0.02127659574468085,
+      0.16326530612244897
+     ],
+     "mrr": [
+      0.024521414171547802,
+      0.0689689673718207
+     ],
+     "ndcgAt3": [
+      0.010638297872340425,
+      0.08163265306122448
+     ]
+    },
+    "decisions": 46,
+    "matches": 27,
+    "point": {
+     "hitAt1": 0.0,
+     "hitAt3": 0.08695652173913043,
+     "hitAt5": 0.08695652173913043,
+     "mrr": 0.04511175263370175,
+     "ndcgAt3": 0.043478260869565216
+    }
+   },
+   "skipped": 0
+  },
+  "M1-full": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.6065573770491803,
+      0.7745098039215687
+     ],
+     "hitAt3": [
+      0.8217054263565892,
+      0.9448818897637795
+     ],
+     "hitAt5": [
+      0.9206349206349206,
+      0.9908256880733946
+     ],
+     "mrr": [
+      0.7455880230880231,
+      0.8612052730696799
+     ],
+     "ndcgAt3": [
+      0.7436556732977336,
+      0.8713623566687775
+     ]
+    },
+    "decisions": 118,
+    "matches": 69,
+    "point": {
+     "hitAt1": 0.6949152542372882,
+     "hitAt3": 0.8898305084745762,
+     "hitAt5": 0.9576271186440678,
+     "mrr": 0.8055387409200969,
+     "ndcgAt3": 0.8123452166464935
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.5581395348837209,
+      0.8367346938775511
+     ],
+     "hitAt3": [
+      0.75,
+      0.9607843137254902
+     ],
+     "hitAt5": [
+      0.8604651162790697,
+      1.0
+     ],
+     "mrr": [
+      0.6973379629629629,
+      0.8976964769647697
+     ],
+     "ndcgAt3": [
+      0.6812144170634953,
+      0.9045105890625043
+     ]
+    },
+    "decisions": 46,
+    "matches": 27,
+    "point": {
+     "hitAt1": 0.6956521739130435,
+     "hitAt3": 0.8695652173913043,
+     "hitAt5": 0.9347826086956522,
+     "mrr": 0.8025362318840579,
+     "ndcgAt3": 0.802532788586961
+    }
+   },
+   "skipped": 0
+  },
+  "M1-no_composition": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.6194690265486725,
+      0.7804878048780488
+     ],
+     "hitAt3": [
+      0.8272727272727273,
+      0.9444444444444444
+     ],
+     "hitAt5": [
+      0.8943089430894309,
+      0.9809523809523809
+     ],
+     "mrr": [
+      0.7445452522555327,
+      0.8602654326938527
+     ],
+     "ndcgAt3": [
+      0.7463740569565253,
+      0.8745318003726739
+     ]
+    },
+    "decisions": 118,
+    "matches": 69,
+    "point": {
+     "hitAt1": 0.7033898305084746,
+     "hitAt3": 0.8898305084745762,
+     "hitAt5": 0.940677966101695,
+     "mrr": 0.8070028703180877,
+     "ndcgAt3": 0.8143633564164688
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.6046511627906976,
+      0.8666666666666667
+     ],
+     "hitAt3": [
+      0.75,
+      0.9591836734693877
+     ],
+     "hitAt5": [
+      0.8936170212765957,
+      1.0
+     ],
+     "mrr": [
+      0.7208333333333333,
+      0.9113475177304965
+     ],
+     "ndcgAt3": [
+      0.6919940215805496,
+      0.9155418681940722
+     ]
+    },
+    "decisions": 46,
+    "matches": 27,
+    "point": {
+     "hitAt1": 0.7391304347826086,
+     "hitAt3": 0.8695652173913043,
+     "hitAt5": 0.9565217391304348,
+     "mrr": 0.8227355072463768,
+     "ndcgAt3": 0.815733022049692
+    }
+   },
+   "skipped": 0
+  },
+  "M1-no_economy": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.6146788990825688,
+      0.7851239669421488
+     ],
+     "hitAt3": [
+      0.8151260504201681,
+      0.9385964912280702
+     ],
+     "hitAt5": [
+      0.8429752066115702,
+      0.957983193277311
+     ],
+     "mrr": [
+      0.7420751325285679,
+      0.8649951593029396
+     ],
+     "ndcgAt3": [
+      0.7417021747365384,
+      0.8737248359890152
+     ]
+    },
+    "decisions": 118,
+    "matches": 69,
+    "point": {
+     "hitAt1": 0.7033898305084746,
+     "hitAt3": 0.8813559322033898,
+     "hitAt5": 0.9067796610169492,
+     "mrr": 0.8073429684447603,
+     "ndcgAt3": 0.8134547908293025
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.5777777777777777,
+      0.8444444444444444
+     ],
+     "hitAt3": [
+      0.75,
+      0.9607843137254902
+     ],
+     "hitAt5": [
+      0.75,
+      0.9607843137254902
+     ],
+     "mrr": [
+      0.697420634920635,
+      0.9019097222222222
+     ],
+     "ndcgAt3": [
+      0.6883086027597443,
+      0.9121995525297656
+     ]
+    },
+    "decisions": 46,
+    "matches": 27,
+    "point": {
+     "hitAt1": 0.717391304347826,
+     "hitAt3": 0.8695652173913043,
+     "hitAt5": 0.8695652173913043,
+     "mrr": 0.8073035850495804,
+     "ndcgAt3": 0.8105560548136684
+    }
+   },
+   "skipped": 0
+  },
+  "M1-no_rich_context": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.6050420168067226,
+      0.7786885245901639
+     ],
+     "hitAt3": [
+      0.8151260504201681,
+      0.9385964912280702
+     ],
+     "hitAt5": [
+      0.8695652173913043,
+      0.9682539682539683
+     ],
+     "mrr": [
+      0.7417412405730163,
+      0.8621228687600369
+     ],
+     "ndcgAt3": [
+      0.7403487463670007,
+      0.8701683805680592
+     ]
+    },
+    "decisions": 118,
+    "matches": 69,
+    "point": {
+     "hitAt1": 0.6949152542372882,
+     "hitAt3": 0.8813559322033898,
+     "hitAt5": 0.923728813559322,
+     "mrr": 0.8056467181467182,
+     "ndcgAt3": 0.8103270768765183
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.5714285714285714,
+      0.8541666666666666
+     ],
+     "hitAt3": [
+      0.75,
+      0.9607843137254902
+     ],
+     "hitAt5": [
+      0.775,
+      0.9782608695652174
+     ],
+     "mrr": [
+      0.699156746031746,
+      0.9057971014492753
+     ],
+     "ndcgAt3": [
+      0.6907020822115424,
+      0.9103314579027393
+     ]
+    },
+    "decisions": 46,
+    "matches": 27,
+    "point": {
+     "hitAt1": 0.717391304347826,
+     "hitAt3": 0.8695652173913043,
+     "hitAt5": 0.8913043478260869,
+     "mrr": 0.8093426501035197,
+     "ndcgAt3": 0.8105560548136684
+    }
+   },
+   "skipped": 0
+  }
+ }
+}

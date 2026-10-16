@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1440" height="900" viewBox="0 0 1440 900">
+<rect x="0" y="0" width="1440" height="900" rx="0" fill="#F2F5F4"/>
+<rect x="0" y="0" width="1440" height="86" rx="0" fill="#FFFFFF"/>
+<line x1="0" y1="86" x2="1440" y2="86" stroke="#CDD9D6" stroke-width="1"/>
+<rect x="75" y="23" width="40" height="40" rx="7" fill="#183F48"/>
+<text x="95" y="51" font-family="Inter,Arial,sans-serif" font-size="23" font-weight="800" fill="#FFFFFF" text-anchor="middle">R</text>
+<text x="129" y="51" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="800" fill="#182B33">RiftLab</text>
+<text x="302" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="650" fill="#183F48">Partidas</text>
+<text x="407" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="500" fill="#52666D">Estudo</text>
+<text x="500" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="500" fill="#52666D">Avaliação</text>
+<text x="1287" y="51" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="600" fill="#52666D">Após a partida</text>
+<text x="76" y="133" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="650" fill="#126E66">Operação / controle</text>
+<text x="76" y="198" font-family="Inter,Arial,sans-serif" font-size="44" font-weight="760" fill="#182B33">Dado privado tem prazo e destino.</text>
+<text x="77" y="230" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="400" fill="#52666D">A operação distingue dados brutos, análises derivadas e registros de estudo.</text>
+<line x1="76" y1="856" x2="1364" y2="856" stroke="#CDD9D6" stroke-width="1"/>
+<text x="76" y="880" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#52666D">Conceito de interface • dados ilustrativos</text>
+<text x="1364" y="880" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#52666D" text-anchor="end">Ativos: Riot Data Dragon 16.17.1</text>
+<rect x="76" y="281" width="1288" height="135" rx="10" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<text x="108" y="325" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#182B33">01  Coleta permitida</text>
+<text x="108" y="359" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="400" fill="#52666D">Lista de contas autorizadas</text>
+<text x="1302" y="356" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="650" fill="#183F48" text-anchor="end">Limites de requisição e parada segura</text>
+<line x1="108" y1="385" x2="1332" y2="385" stroke="#CDD9D6" stroke-width="1"/>
+<rect x="76" y="442" width="1288" height="135" rx="10" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<text x="108" y="486" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#182B33">02  Processamento</text>
+<text x="108" y="520" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="400" fill="#52666D">Jobs retomáveis e catálogo fixado</text>
+<text x="1302" y="517" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="650" fill="#183F48" text-anchor="end">Sem partida ao vivo ou URL arbitrária</text>
+<line x1="108" y1="546" x2="1332" y2="546" stroke="#CDD9D6" stroke-width="1"/>
+<rect x="76" y="603" width="1288" height="135" rx="10" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<text x="108" y="647" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#182B33">03  Retenção</text>
+<text x="108" y="681" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="400" fill="#52666D">Expurgo com conferência</text>
+<text x="1302" y="678" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="650" fill="#183F48" text-anchor="end">Evidência do que foi removido</text>
+<line x1="108" y1="707" x2="1332" y2="707" stroke="#CDD9D6" stroke-width="1"/>
+<rect x="76" y="799" width="151" height="31" rx="4" fill="#E7EEEB"/><text x="88" y="820" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="650" fill="#183F48">Ambiente local</text>
+<rect x="242" y="799" width="164" height="31" rx="4" fill="#E7EEEB"/><text x="254" y="820" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="650" fill="#183F48">Acesso restrito</text>
+</svg>

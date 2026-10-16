@@ -1,0 +1,71 @@
+{
+  "n": 161,
+  "macroF1": 0.7626,
+  "accuracy": 0.7391,
+  "jsonValidRate": 1.0,
+  "perClass": {
+    "BALANCED": {
+      "precision": 1.0,
+      "recall": 0.8421,
+      "f1": 0.9143,
+      "support": 19
+    },
+    "SURVIVAL": {
+      "precision": 0.6552,
+      "recall": 0.6552,
+      "f1": 0.6552,
+      "support": 29
+    },
+    "DAMAGE": {
+      "precision": 0.7838,
+      "recall": 0.6444,
+      "f1": 0.7073,
+      "support": 45
+    },
+    "UTILITY": {
+      "precision": 0.931,
+      "recall": 0.8438,
+      "f1": 0.8852,
+      "support": 32
+    },
+    "NEEDS_INPUT": {
+      "precision": 0.56,
+      "recall": 0.7778,
+      "f1": 0.6512,
+      "support": 36
+    }
+  },
+  "perCategoryAccuracy": {
+    "ambiguous": 0.6667,
+    "balanced": 0.8462,
+    "direct": 0.7188,
+    "exclusion_only": 0.6667,
+    "injection": 1.0,
+    "negation": 0.8148,
+    "out_of_domain": 0.8,
+    "precedence": 0.7619,
+    "situation": 0.5938,
+    "vague": 1.0
+  },
+  "negationAccuracy": 0.7692,
+  "latencyP50S": 3.0955,
+  "latencyP95S": 3.4278,
+  "config": {
+    "model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "license": "apache-2.0",
+    "adapter": "artifacts/objectives/lora-0.5b/epoch-3",
+    "adapterSha256": "a867eedf0434cbefaf24ab46f02207e19544769a2707a051d60479da8e0aa625",
+    "parserVersion": "qwen2.5-0.5b-lora-v1",
+    "seed": 0,
+    "threads": 4,
+    "maxNewTokens": 12,
+    "device": "cpu"
+  },
+  "split": "val",
+  "corpusSha256": "b79f3157bba7bc4228009d98547d15a32e1fb0b0a3996e5198c0ceb1824d2b70",
+  "loadS": 2.37,
+  "peakRssMb": 3132,
+  "torch": "2.5.1+cpu",
+  "cpu": "x86_64"
+}

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100">
+<rect width="1600" height="1100" fill="#F2F6F7"/>
+<rect x="42" y="38" width="1516" height="1024" rx="25" fill="white" stroke="#D8E4E8"/>
+<rect x="42" y="38" width="1516" height="112" rx="25" fill="#102B3A"/>
+<rect x="42" y="120" width="1516" height="30" fill="#102B3A"/>
+<text x="85" y="90" text-anchor="start" font-family="Arial, sans-serif" font-size="29" font-weight="800" fill="white">RiftLab · casos de uso</text>
+<text x="85" y="123" text-anchor="start" font-family="Arial, sans-serif" font-size="14" font-weight="400" fill="#BDD5D9">Visão final do produto · Painel, Campeões, Minha posição e Histórico · estudo de compras em partidas concluídas</text>
+<rect x="285" y="177" width="1030" height="808" rx="20" fill="#FCFDFD" stroke="#AEC9CE" stroke-width="2"/>
+<text x="800" y="208" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="800" fill="#617885">LIMITE DO SISTEMA · RIFTLAB</text>
+<path d="M144 398 L370.0 270" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M144 398 L370.0 520" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M144 748 L384.0 548" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M144 748 L915.0 690" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M144 748 L915.0 800" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1456 520 L1265.0 250" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1456 520 L1265.0 360" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1456 520 L1265.0 470" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1456 520 L1265.0 580" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1456 520 L1265.0 690" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1456 520 L1265.0 800" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1456 912 L1265.0 915" fill="none" stroke="#8CAAB2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="116" cy="364" r="15" fill="none" stroke="#087F76" stroke-width="3"/>
+<path d="M116 379 V425 M88 396 H144 M116 425 L89 455 M116 425 L143 455" fill="none" stroke="#087F76" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="116" y="483" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#193342">Operador local</text>
+<text x="116" y="503" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">configuração e dados</text>
+<circle cx="116" cy="714" r="15" fill="none" stroke="#087F76" stroke-width="3"/>
+<path d="M116 729 V775 M88 746 H144 M116 775 L89 805 M116 775 L143 805" fill="none" stroke="#087F76" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="116" y="833" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#193342">Serviço de dados da Riot</text>
+<text x="116" y="853" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">Match-V5 · League-V4 · Data Dragon</text>
+<circle cx="1484" cy="486" r="15" fill="none" stroke="#087F76" stroke-width="3"/>
+<path d="M1484 501 V547 M1456 518 H1512 M1484 547 L1457 577 M1484 547 L1511 577" fill="none" stroke="#087F76" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1484" y="605" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#193342">Jogador</text>
+<text x="1484" y="625" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">painel, histórico e estudo</text>
+<circle cx="1484" cy="878" r="15" fill="none" stroke="#087F76" stroke-width="3"/>
+<path d="M1484 893 V939 M1456 910 H1512 M1484 939 L1457 969 M1484 939 L1511 969" fill="none" stroke="#087F76" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1484" y="997" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#193342">Revisor</text>
+<text x="1484" y="1017" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">avaliação cega</text>
+<ellipse cx="520" cy="520" rx="150.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="520" y="501" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC01 · RF01–03, RF17</text>
+<text x="520" y="524" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Importar partida ou demo</text>
+<text x="520" y="546" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">concluída; acompanhar processamento</text>
+<ellipse cx="520" cy="270" rx="150.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="520" y="251" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC05 · RF11–12</text>
+<text x="520" y="274" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Operar e remover dados</text>
+<text x="520" y="296" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">experimentos, manifesto, expurgo</text>
+<ellipse cx="1090" cy="250" rx="175.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="1090" y="231" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC07 · RF18–20</text>
+<text x="1090" y="254" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Consultar painel e histórico</text>
+<text x="1090" y="276" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">métricas, partidas, busca e filtros</text>
+<ellipse cx="1090" cy="360" rx="175.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="1090" y="341" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC02 · RF04–08</text>
+<text x="1090" y="364" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Revisar compra</text>
+<text x="1090" y="386" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">aberta pelo Histórico; contexto e alternativas</text>
+<ellipse cx="1090" cy="470" rx="175.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="1090" y="451" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC03 · RF09</text>
+<text x="1090" y="474" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Informar objetivo</text>
+<text x="1090" y="496" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">formulário ou texto confirmado</text>
+<ellipse cx="1090" cy="580" rx="175.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="1090" y="561" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC06 · RF13–16</text>
+<text x="1090" y="584" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Estudar decisão</text>
+<text x="1090" y="606" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">escolher, revelar e transferir</text>
+<ellipse cx="1090" cy="690" rx="175.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="1090" y="671" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC09 · RF22</text>
+<text x="1090" y="694" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Consultar minha posição</text>
+<text x="1090" y="716" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">elo oficial só da conta própria</text>
+<ellipse cx="1090" cy="800" rx="175.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="1090" y="781" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC08 · RF21</text>
+<text x="1090" y="804" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Estudar campeão</text>
+<text x="1090" y="826" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">retrato, habilidades, itens observados</text>
+<ellipse cx="1090" cy="915" rx="175.0" ry="47" fill="#EAF7F4" stroke="#087F76" stroke-width="2"/>
+<text x="1090" y="896" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="800" fill="#087F76">UC04 · RF10</text>
+<text x="1090" y="919" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#193342">Avaliar e exportar</text>
+<text x="1090" y="941" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#617885">julgamento cego ou abstenção</text>
+<text x="800" y="1020" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="400" fill="#617885">Escopo: análise pós-partida · demonstração sintética offline · sem recomendação ao vivo · sem ranking entre jogadores</text>
+</svg>

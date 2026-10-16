@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RiftLab · visão final para APS</title>
+  <style>
+    :root{font-family:Arial,sans-serif;color:#193342;background:#e9f0f2}
+    *{box-sizing:border-box}body{margin:0}header{background:#102b3a;color:white;padding:24px max(24px,calc((100vw - 1320px)/2));display:flex;align-items:center;justify-content:space-between;gap:24px}
+    h1{font-size:24px;margin:0 0 5px}header p{margin:0;color:#a9c8cd;font-size:13px}main{max-width:1320px;margin:28px auto;padding:0 20px 40px}.intro{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px}.intro h2{font-size:21px;margin:0 0 6px}.intro p{margin:0;color:#617885;font-size:14px}.controls{display:flex;gap:10px}button{border:1px solid #bed4d8;border-radius:9px;background:white;padding:11px 17px;font:700 14px Arial;color:#193342;cursor:pointer}button:hover,button:focus-visible{outline:2px solid #087f76}.stage{background:white;border:1px solid #d7e3e7;border-radius:17px;overflow:hidden;box-shadow:0 15px 45px #102b3a14}.stage img{display:block;width:100%;height:auto}.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}.tabs button[aria-current=true]{background:#087f76;color:white;border-color:#087f76}.note{font-size:13px;line-height:1.6;color:#617885}a{color:#087f76}@media(max-width:740px){header{display:block}.controls{margin-top:14px}.intro{display:block}.intro .controls{margin-top:15px}.stage{overflow:auto}.stage img{min-width:760px}.stage.mobile img{min-width:0;max-width:390px;margin:auto}}
+  </style>
+</head>
+<body>
+  <header><div><h1>RiftLab · visão final</h1><p>Protótipo conceitual vetorial para Análise e Projeto de Sistemas</p></div><div>Dados ilustrativos · sem integração nesta apresentação</div></header>
+  <main>
+    <div class="intro"><div><h2 id="screen-title">Início</h2><p id="screen-desc">Percorra a jornada de análise e estudo pós-partida.</p></div><div class="controls"><button id="prev" type="button">← Anterior</button><button id="next" type="button">Próxima →</button></div></div>
+    <div class="stage" id="stage"><img id="screen" src="telas/01-inicio.svg" alt="Tela conceitual de início do RiftLab"></div>
+    <nav class="tabs" id="tabs" aria-label="Telas do protótipo"></nav>
+    <p class="note">Use as setas do teclado para navegar. Os arquivos SVG em <code>telas/</code> têm texto e formas vetoriais editáveis. As telas representam o produto planejado ao final do projeto; números, partidas e resultados exibidos são exemplos ilustrativos.</p>
+  </main>
+  <script>
+    const screens=[
+      ['01-inicio.svg','Início','Acesso à demonstração, importação e percurso.'],
+      ['02-partida.svg','Partida','Seleção de participante e momento de compra.'],
+      ['03-contexto.svg','Contexto','Estado anterior, proveniência e objetivo confirmado.'],
+      ['04-estudo.svg','Estudo','Escolha cega, pistas graduais e revelação explícita.'],
+      ['05-comparacao.svg','Comparação','Alternativas, custos e limites do modelo.'],
+      ['06-transferencia.svg','Transferência','Segundo cenário sem pistas e reflexão.'],
+      ['07-avaliacao.svg','Avaliação','Revisão cega, abstenção e exportação.'],
+      ['08-operacao.svg','Operação','Manifesto, importação e remoção local.'],
+      ['09-mobile-inicio.svg','Móvel · início','Reorganização da entrada em largura estreita.'],
+      ['10-mobile-estudo.svg','Móvel · estudo','Escolha sem ranking em largura estreita.']
+    ];
+    let current=0;
+    function show(i){current=(i+screens.length)%screens.length;const s=screens[current];document.getElementById('screen').src='telas/'+s[0];document.getElementById('screen').alt='Tela conceitual: '+s[1];document.getElementById('screen-title').textContent=s[1];document.getElementById('screen-desc').textContent=s[2];document.getElementById('stage').classList.toggle('mobile',current>=8);document.querySelectorAll('#tabs button').forEach((b,n)=>b.setAttribute('aria-current',n===current));}
+    const tabs=document.getElementById('tabs');screens.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.textContent=s[1];b.onclick=()=>show(i);tabs.appendChild(b)});
+    document.getElementById('prev').onclick=()=>show(current-1);document.getElementById('next').onclick=()=>show(current+1);document.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')show(current-1);if(e.key==='ArrowRight')show(current+1)});show(0);
+  </script>
+</body>
+</html>

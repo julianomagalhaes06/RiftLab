@@ -1,0 +1,65 @@
+{
+  "n": 20,
+  "macroF1": 0.0667,
+  "accuracy": 0.2,
+  "jsonValidRate": 0.9,
+  "perClass": {
+    "BALANCED": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 2
+    },
+    "SURVIVAL": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 4
+    },
+    "DAMAGE": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 6
+    },
+    "UTILITY": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "support": 4
+    },
+    "NEEDS_INPUT": {
+      "precision": 0.2,
+      "recall": 1.0,
+      "f1": 0.3333,
+      "support": 4
+    }
+  },
+  "perCategoryAccuracy": {
+    "ambiguous": 1.0,
+    "balanced": 0.0,
+    "direct": 0.0,
+    "exclusion_only": 1.0,
+    "negation": 0.0,
+    "out_of_domain": 1.0,
+    "precedence": 0.0,
+    "situation": 0.0
+  },
+  "negationAccuracy": 0.4,
+  "latencyP50S": 5.6928,
+  "latencyP95S": 15.6344,
+  "config": {
+    "model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "license": "apache-2.0",
+    "seed": 0,
+    "threads": 4,
+    "maxNewTokens": 12
+  },
+  "split": "smoke",
+  "corpusSha256": "b79f3157bba7bc4228009d98547d15a32e1fb0b0a3996e5198c0ceb1824d2b70",
+  "loadS": 4.4,
+  "peakRssMb": 3135,
+  "torch": "2.5.1+cpu",
+  "cpu": "x86_64"
+}

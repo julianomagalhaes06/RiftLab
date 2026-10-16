@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1440" height="900" viewBox="0 0 1440 900">
+<rect x="0" y="0" width="1440" height="900" rx="0" fill="#F2F5F4"/>
+<rect x="0" y="0" width="1440" height="86" rx="0" fill="#FFFFFF"/>
+<line x1="0" y1="86" x2="1440" y2="86" stroke="#CDD9D6" stroke-width="1"/>
+<rect x="75" y="23" width="40" height="40" rx="7" fill="#183F48"/>
+<text x="95" y="51" font-family="Inter,Arial,sans-serif" font-size="23" font-weight="800" fill="#FFFFFF" text-anchor="middle">R</text>
+<text x="129" y="51" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="800" fill="#182B33">RiftLab</text>
+<text x="302" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="650" fill="#183F48">Partidas</text>
+<text x="407" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="500" fill="#52666D">Estudo</text>
+<text x="500" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="500" fill="#52666D">Avaliação</text>
+<text x="1287" y="51" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="600" fill="#52666D">Após a partida</text>
+<text x="76" y="133" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="650" fill="#126E66">Transferência / prática</text>
+<text x="76" y="198" font-family="Inter,Arial,sans-serif" font-size="44" font-weight="760" fill="#182B33">Teste o raciocínio em outro caso.</text>
+<text x="77" y="230" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="400" fill="#52666D">Um novo contexto mostra se a explicação continua útil, sem transformar o estudo em gabarito.</text>
+<line x1="76" y1="856" x2="1364" y2="856" stroke="#CDD9D6" stroke-width="1"/>
+<text x="76" y="880" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#52666D">Conceito de interface • dados ilustrativos</text>
+<text x="1364" y="880" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#52666D" text-anchor="end">Ativos: Riot Data Dragon 16.17.1</text>
+<rect x="76" y="275" width="813" height="512" rx="10" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<text x="108" y="321" font-family="Inter,Arial,sans-serif" font-size="21" font-weight="700" fill="#182B33">Novo cenário ilustrativo</text>
+<line x1="108" y1="341" x2="857" y2="341" stroke="#CDD9D6" stroke-width="1"/>
+<text x="108" y="387" font-family="Inter,Arial,sans-serif" font-size="18" font-weight="650" fill="#182B33">Você tem pouco tempo antes da próxima luta.</text>
+<text x="108" y="420" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="400" fill="#52666D">O inventário e o adversário mudaram.</text>
+<text x="108" y="484" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="700" fill="#182B33">O que você priorizaria agora?</text>
+<rect x="108" y="513" width="749" height="54" rx="5" fill="#E7EEEB" stroke="#126E66" stroke-width="1"/>
+<text x="128" y="547" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="400" fill="#182B33">Resistência a dano mágico</text>
+<rect x="108" y="581" width="749" height="54" rx="5" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<text x="128" y="615" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="400" fill="#182B33">Mais dano imediato</text>
+<rect x="108" y="649" width="749" height="54" rx="5" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<text x="128" y="683" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="400" fill="#182B33">Guardar ouro para o próximo retorno</text>
+<rect x="911" y="275" width="453" height="512" rx="10" fill="#E7EEEB" stroke="#E7EEEB" stroke-width="1"/>
+<text x="941" y="321" font-family="Inter,Arial,sans-serif" font-size="21" font-weight="700" fill="#182B33">O que mudou</text>
+<text x="941" y="380" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#52666D">Adversários</text>
+<text x="941" y="407" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="650" fill="#182B33">Mais ameaça mágica</text>
+<line x1="941" y1="431" x2="1334" y2="431" stroke="#CDD9D6" stroke-width="1"/>
+<text x="941" y="470" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#52666D">Inventário</text>
+<text x="941" y="497" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="650" fill="#182B33">Uma vaga disponível</text>
+<line x1="941" y1="521" x2="1334" y2="521" stroke="#CDD9D6" stroke-width="1"/>
+<text x="941" y="560" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#52666D">Qualidade</text>
+<text x="941" y="587" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="650" fill="#182B33">Ouro aproximado</text>
+<rect x="941" y="716" width="214" height="46" rx="6" fill="#126E66"/><text x="1048.0" y="745" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">Registrar raciocínio</text>
+</svg>

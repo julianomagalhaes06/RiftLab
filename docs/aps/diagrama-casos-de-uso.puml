@@ -1,0 +1,60 @@
+@startuml
+title RiftLab — casos de uso da visão final
+left to right direction
+skinparam backgroundColor #F2F6F7
+skinparam shadowing false
+skinparam roundCorner 18
+skinparam ArrowColor #8CAAB2
+skinparam ActorBorderColor #087F76
+skinparam ActorFontColor #193342
+skinparam UsecaseBackgroundColor #EAF7F4
+skinparam UsecaseBorderColor #087F76
+skinparam UsecaseFontColor #193342
+skinparam RectangleBackgroundColor #FCFDFD
+skinparam RectangleBorderColor #AEC9CE
+
+actor "Operador local" as Operador
+actor "Serviço de dados da Riot\n(Match-V5 · League-V4 · Data Dragon)" as Riot
+actor "Jogador" as Jogador
+actor "Revisor" as Revisor
+
+rectangle "RiftLab — análise pós-partida" {
+  usecase "UC01\nImportar partida\nou abrir demo" as UC01
+  usecase "UC05\nOperar e remover dados" as UC05
+  usecase "UC07\nConsultar painel\ne histórico" as UC07
+  usecase "UC02\nRevisar compra" as UC02
+  usecase "UC03\nInformar objetivo" as UC03
+  usecase "UC06\nEstudar decisão" as UC06
+  usecase "UC09\nConsultar minha posição" as UC09
+  usecase "UC08\nEstudar campeão" as UC08
+  usecase "UC04\nAvaliar e exportar" as UC04
+}
+
+Operador -- UC01
+Operador -- UC05
+Riot -- UC01
+Riot -- UC09
+Riot -- UC08
+UC07 -- Jogador
+UC02 -- Jogador
+UC03 -- Jogador
+UC06 -- Jogador
+UC09 -- Jogador
+UC08 -- Jogador
+UC04 -- Revisor
+
+note bottom of UC01
+  Partidas em andamento são recusadas.
+  O modo demo funciona sem a fonte externa.
+end note
+
+note bottom of UC06
+  Histórico e ranking só aparecem
+  após revelação explícita.
+end note
+
+note bottom of UC09
+  Somente o elo oficial da conta própria.
+  Sem ranking entre jogadores.
+end note
+@enduml

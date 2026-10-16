@@ -1,0 +1,39 @@
+{
+ "activeRanking": "B0_popularity_champion_ordinal",
+ "card": "CC-404",
+ "cellCounts": {
+  "145|1": 113,
+  "145|2": 53,
+  "18|1": 61,
+  "18|2": 33,
+  "202|1": 86,
+  "202|2": 37,
+  "21|1": 42,
+  "21|2": 28,
+  "222|1": 92,
+  "222|2": 59,
+  "22|1": 56,
+  "22|2": 26,
+  "29|1": 49,
+  "29|2": 33,
+  "51|1": 128,
+  "51|2": 57,
+  "804|1": 65,
+  "804|2": 40,
+  "81|1": 73,
+  "81|2": 44
+ },
+ "datasetSha256": "c6093efa31519b376a91b6bc1ce12440c11863b46c8325a7ad89fb74fe15b5a8",
+ "maxRisk": 0.15,
+ "patch": "16.19",
+ "riskMetric": "1 - hit@3 entre decis\u00f5es cobertas",
+ "schemaVersion": 1,
+ "supportThreshold": 0,
+ "thresholdGrid": [
+  0,
+  5,
+  10,
+  20,
+  40
+ ]
+}

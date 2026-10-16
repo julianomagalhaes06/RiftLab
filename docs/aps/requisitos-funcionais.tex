@@ -1,0 +1,222 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{geometry}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\geometry{left=2.3cm,right=2.3cm,top=2.45cm,bottom=2.4cm}
+\hypersetup{hidelinks}
+\renewcommand{\arraystretch}{1.25}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small RIFTLAB / APS}
+\fancyhead[R]{\small REQUISITOS FUNCIONAIS}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{15pt}
+\addtolength{\parskip}{4pt}
+
+\begin{document}
+\begin{titlepage}
+  \setlength{\parindent}{0pt}\raggedright
+  {\normalsize\bfseries INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E\\ TECNOLOGIA DO CEARÁ\par}
+  \vspace*{2.0cm}
+  {\Large\bfseries ANÁLISE E PROJETO DE SISTEMAS\par}
+  \vspace{1.7cm}
+  {\Huge\bfseries RiftLab\par}
+  \vspace{0.4cm}
+  {\rule{9cm}{1pt}\par}
+  \vspace{0.7cm}
+  {\LARGE Especificação de requisitos funcionais\par}
+  \vspace{0.5cm}
+  {\large Visão final planejada do produto\par}
+  \vspace{1.6cm}
+  {\large Aluno: Juliano Magalhães Jurity\par}
+  \vspace{0.3cm}
+  {\large Professor: Thiago Queiroz de Oliveira\par}
+  \vfill
+  {\large RF01--RF22 \quad | \quad UC01--UC09\par}
+  \vspace{0.3cm}
+  {28 de setembro de 2026\par}
+\end{titlepage}
+
+\section*{Resumo da especificação}
+\begin{center}
+\begin{tabular}{@{}p{3.4cm}p{10.3cm}@{}}
+\toprule
+\bfseries Campo & \bfseries Definição \\
+\midrule
+Produto & Ferramenta local de análise e estudo de decisões de compra de itens após partidas concluídas de League of Legends. \\
+Público & Jogadores iniciantes e de elos mais baixos; operador local e revisor. \\
+Interface & Quatro áreas: Painel, Campeões, Minha posição e Histórico. A jornada de estudo começa no Histórico. \\
+Fonte de verdade & Contexto anterior à compra, catálogo do patch, qualidade observada e versões persistidas. \\
+Limite & Sem recomendação durante partida em andamento; sem ranking entre jogadores; demonstração sintética identificada. \\
+Natureza & Requisitos da entrega final prevista, não declaração de implementação atual. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\clearpage
+
+\section{Objetivo e escopo}
+O RiftLab é uma aplicação local de estudo de decisões de compra de itens em partidas
+\emph{concluídas} de League of Legends. A pessoa acompanha o próprio desempenho no Painel,
+abre uma partida pelo Histórico, consulta o contexto anterior à compra, considera
+alternativas e, no modo Estudo, escolhe antes de ver a comparação. A área Campeões reúne
+guias de estudo por campeão, e Minha posição mostra o elo oficial da própria conta. O
+sistema também prevê importação, avaliação e experimentos reproduzíveis. Este documento
+descreve o \emph{escopo pretendido do produto}; um requisito listado aqui não significa que
+sua implementação já esteja concluída.
+
+O produto não oferece aconselhamento durante partidas em andamento, não compara o usuário
+com outros jogadores e não promete subida de elo. O modo de demonstração usa dados
+sintéticos e deve ser identificado como tal.
+
+\section{Atores}
+\begin{description}
+  \item[Jogador:] usa o Painel, o Histórico, os guias de Campeões e Minha posição; estuda
+  decisões, define objetivo e realiza cenário de transferência.
+  \item[Operador local:] configura a aplicação e a conta própria, importa partidas,
+  acompanha processamento, executa experimentos e remove dados locais.
+  \item[Revisor:] julga comparações de forma cega, pode se abster e exporta avaliação.
+  \item[Serviço de dados da Riot:] fornece partidas concluídas (Match-V5), o elo oficial
+  somente da conta própria (League-V4) e ativos estáticos versionados (Data Dragon). Não
+  participa do modo de demonstração.
+\end{description}
+
+\section{Interface final}
+A interface segue o protótipo conceitual do RiftLab (Painel desktop e mobile), com
+navegação fixa entre quatro áreas.
+
+\begin{center}
+\begin{tabular}{@{}p{2.9cm}p{8.4cm}p{2.4cm}@{}}
+\toprule
+\bfseries Área & \bfseries Conteúdo & \bfseries Requisitos \\
+\midrule
+Painel & Taxa de vitória e KDA médio do recorte, decisões revistas, campeões no recorte e em foco, cinco partidas mais recentes e card de elo. & RF18--RF20, RF22 \\
+Histórico & Lista completa de partidas com busca, filtros e resumo; cada partida abre o contexto e a jornada de estudo. & RF02--RF08, RF13--RF16, RF20 \\
+Campeões & Guia de estudo por campeão com retrato oficial, habilidades, trajeto de itens observado e perguntas de matchup. & RF21 \\
+Minha posição & Elo, divisão, PDL e próximo degrau da conta própria. & RF22 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Requisitos funcionais}
+Os critérios abaixo descrevem resultados observáveis. Casos sem dados suficientes devem
+exibir a limitação, sem produzir uma recomendação como se fosse confiável. Prioridade:
+\textbf{E} = essencial; \textbf{I} = importante; \textbf{D} = desejável. Em RF09, o formulário é essencial e o texto interpretado é desejável.
+
+\small
+\begin{longtable}{@{}p{1.1cm}p{5.8cm}p{6.4cm}p{1.1cm}@{}}
+\caption{Requisitos funcionais do RiftLab}\label{tab:rf}\\
+\toprule
+\bfseries ID & \bfseries Requisito & \bfseries Critério de verificação & \bfseries Prior. \\
+\midrule
+\endfirsthead
+\toprule
+\bfseries ID & \bfseries Requisito & \bfseries Critério de verificação & \bfseries Prior. \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\multicolumn{4}{@{}l}{\bfseries Importação e revisão de compras} \\
+RF01 & O sistema deve permitir abrir uma demonstração sem chave de API nem conexão externa. & A jornada demonstrativa abre com dados sintéticos identificados e não faz coleta de partidas reais. & E \\
+RF02 & O operador deve poder solicitar a importação de uma partida concluída por identificador BR1 válido, sem duplicar a mesma partida ou um trabalho ativo. & Identificador inválido é recusado; requisições repetidas reaproveitam o trabalho ou a partida correspondente. & E \\
+RF03 & O sistema deve apresentar andamento, sucesso, falha e opção de tentar novamente quando aplicável. & A interface distingue os estados e informa falhas recuperáveis sem mostrar credenciais ou detalhes internos. & E \\
+RF04 & O jogador deve poder selecionar um participante e um ponto de compra dentro do recorte suportado. & A lista associa cada decisão a participante e momento; cenários fora do recorte mostram motivo. & E \\
+RF05 & O sistema deve mostrar o estado anterior à compra, a origem dos dados e as ausências ou incertezas relevantes. & Inventário, orçamento aproximado e qualidade são apresentados com indicação da fonte; dado ausente não vira valor inventado. & E \\
+RF06 & O sistema deve gerar alternativas de itens permitidas pelo catálogo versionado do patch da partida. & Itens incompatíveis ou sem catálogo válido não são apresentados como candidatos legais. & E \\
+RF07 & O jogador deve poder comparar até três alternativas, inclusive custo restante, sem exigir exatamente três. & A comparação funciona com uma, duas ou três alternativas e sinaliza orçamento desconhecido. & E \\
+RF08 & O sistema deve ordenar alternativas com um modelo versionado e sinalizar suporte insuficiente. & A resposta identifica a versão do modelo e se abstém de ranking quando as condições de qualidade ou suporte falham. & E \\
+RF09 & O jogador deve poder definir o objetivo por formulário e, opcionalmente, por texto interpretado e validado. & O formulário está sempre disponível; a interpretação do texto requer confirmação e, se ambígua ou indisponível, devolve o usuário ao formulário. & E/D \\
+RF10 & O revisor deve poder registrar julgamento e exportar relatório JSON ou HTML. & A avaliação admite abstenção; o relatório inclui contexto e versões, sem credenciais ou identificadores pessoais brutos. & E \\
+RF11 & O operador deve poder executar experimentos reproduzíveis e consultar o manifesto do modelo. & O experimento registra versões, dados e parâmetros necessários à repetição; o modelo ativo pode ser identificado. & E \\
+RF12 & O operador deve poder expurgar uma partida local e os derivados associados. & A operação pede confirmação e informa dados, instantâneos e modelos afetados; não afirma apagar efeitos de treinamento passado. & E \\
+\multicolumn{4}{@{}l}{\bfseries Modo Estudo} \\
+RF13 & No modo Estudo, o sistema deve ocultar ranking e compra histórica até a ação explícita de revelar, inclusive após escolha ou resposta ``não sei''. & Antes da revelação a resposta histórica não aparece; a revelação depende de ação inequívoca. & E \\
+RF14 & O modo Estudo deve oferecer pistas graduais e glossário curado. & A pessoa pode abrir as pistas separadamente; os termos apresentados têm explicação acessível. & E \\
+RF15 & O sistema deve persistir tentativa, objetivo, escolha e pistas utilizadas, distinguindo comparação de gabarito absoluto. & O registro permite reconstruir a tentativa sem afirmar que existe uma única decisão correta. & E \\
+RF16 & O sistema deve oferecer cenário de transferência independente, sem pistas, e exportação da reflexão. & Após a comparação, a pessoa resolve outro cenário sem ajuda e pode registrar reflexão. & I \\
+RF17 & O sistema deve recusar fontes de partidas em andamento e não integrar dados do cliente ao vivo. & Solicitações de cenário ao vivo são rejeitadas; a análise usa apenas partida concluída ou demonstração sintética. & E \\
+\multicolumn{4}{@{}l}{\bfseries Navegação, Painel, Histórico, Campeões e Minha posição} \\
+RF18 & O sistema deve oferecer navegação entre Painel, Campeões, Minha posição e Histórico em desktop e mobile, com aviso visível quando os dados forem de demonstração. & As quatro áreas são acessíveis por menu superior (desktop) e barra inferior (mobile), por teclado, e indicam a área ativa em texto; dados sintéticos aparecem marcados. & E \\
+RF19 & O Painel deve mostrar taxa de vitória e KDA médio das últimas partidas concluídas da conta própria, decisões revistas, campeões no recorte e campeões em foco. & Cada métrica mostra o tamanho da amostra (até 20 partidas, ou menos quando não houver 20); recorte vazio exibe orientação em vez de zeros. & E \\
+RF20 & O Painel deve listar as cinco partidas mais recentes com acesso ao Histórico completo, e o Histórico deve permitir buscar, filtrar por resultado e abrir o contexto de cada partida. & A lista mostra resultado, campeão, data, duração, K/D/A e tropas; ``Contexto'' leva à partida e às decisões de compra (RF04). & E \\
+RF21 & A área Campeões deve apresentar um guia de estudo por campeão, com nome e retrato oficiais do patch, habilidades, trajeto de itens observado e perguntas de matchup. & Nome e retrato vêm da versão fixada do patch, com texto de reserva; o trajeto mostra frequência com denominador e cobertura e se abstém quando a amostra é insuficiente; nada é apresentado como ``build ideal''. & I \\
+RF22 & Minha posição deve exibir o elo oficial apenas da conta do próprio usuário: elo, divisão, PDL de 0 a 100 e próximo degrau. & A variação de PDL compara instantâneos locais e só é associada a uma partida quando não houver ambiguidade; conta não classificada ou serviço indisponível mostram estado claro; nenhuma outra conta é consultada ou exibida. & I \\
+\end{longtable}
+\normalsize
+
+\section{Fluxo principal da experiência final}
+\begin{enumerate}
+  \item O operador abre a demonstração ou importa partidas concluídas; o sistema mostra
+  progresso e permite recuperação de falhas aplicáveis (RF01--RF03, RF17).
+  \item No Painel, o jogador vê o desempenho do recorte com o tamanho da amostra, as cinco
+  partidas mais recentes, os campeões em foco e o card de elo (RF18--RF20, RF22).
+  \item No Histórico, busca ou filtra uma partida e abre o contexto. Escolhe participante e
+  compra; o sistema congela o catálogo do patch e mostra o estado anterior, sua origem e
+  suas incertezas (RF04--RF06, RF20).
+  \item O jogador confirma o objetivo. No modo Estudo, escolhe entre alternativas em ordem
+  neutra, com pistas opcionais, sem ver compra histórica ou ranking antes da revelação
+  explícita (RF09, RF13--RF14).
+  \item Após a revelação, o sistema compara até três alternativas, custo restante, suporte
+  e versão do modelo. Quando a evidência não permite ordenar, apresenta abstenção e motivo
+  (RF07--RF08).
+  \item A tentativa, a reflexão em outro cenário, a avaliação cega e as versões ficam
+  disponíveis para revisão e exportação; o operador pode consultar experimentos e remover
+  dados locais com confirmação (RF10--RF12, RF15--RF16).
+  \item Em Campeões, o jogador estuda padrões observados de um campeão, com amostra e
+  cobertura explícitas (RF21).
+\end{enumerate}
+
+\section{Regras que atravessam os requisitos}
+\begin{itemize}
+  \item \textbf{Tempo da decisão:} inventário, ouro e qualidade para elegibilidade são
+  calculados antes do item comprado; informação posterior não pode influenciar essa
+  fotografia da decisão.
+  \item \textbf{Ausência e incerteza:} orçamento desconhecido, catálogo indisponível ou
+  reconciliação não validada devem aparecer como limites, inclusive quando impedem
+  recomendação. Valor ausente nunca deve ser apresentado como zero observado.
+  \item \textbf{Aprendizagem:} ranking e compra histórica continuam ocultos após a escolha
+  ou ``não sei'' até o comando explícito de revelar. A comparação não é um gabarito
+  universal; o cenário de transferência deve ser independente e sem pistas.
+  \item \textbf{Métricas descritivas:} taxa de vitória, KDA e frequências descrevem o recorte
+  e sempre mostram o denominador; não são usadas para afirmar causa, avaliar o aluno ou
+  prometer subida de elo.
+  \item \textbf{Sem comparação entre jogadores:} o elo exibido é só o da conta própria; não
+  existe escada, pódio ou perfil público.
+  \item \textbf{Proveniência:} análise e relatório referenciam patch, catálogo, esquema,
+  modelo e origem dos dados. A exclusão local não desfaz automaticamente um modelo já
+  treinado; a interface deve informar essa limitação.
+\end{itemize}
+
+\section{Rastreabilidade dos casos de uso}
+\begin{center}
+\begin{tabular}{@{}p{1.6cm}p{5.2cm}p{3.4cm}p{3.6cm}@{}}
+\toprule
+Caso & Nome & Requisitos & Área da interface \\
+\midrule
+UC01 & Importar partida ou abrir demonstração & RF01--RF03, RF17 & Histórico \\
+UC02 & Revisar compra & RF04--RF08 & Histórico \\
+UC03 & Informar objetivo & RF09 & Histórico \\
+UC04 & Avaliar e exportar & RF10 & Histórico \\
+UC05 & Operar e remover dados & RF11--RF12 & Operação local \\
+UC06 & Estudar decisão & RF13--RF16 & Histórico \\
+UC07 & Consultar painel e histórico & RF18--RF20 & Painel, Histórico \\
+UC08 & Estudar campeão & RF21 & Campeões \\
+UC09 & Consultar minha posição & RF22 & Minha posição, Painel \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Restrições da especificação}
+A análise é pós-partida, local e de estação individual. As telas da visão final são
+protótipos conceituais e usam valores ilustrativos; não constituem evidência de
+integração com API externa, treinamento de modelo ou medição dos requisitos não
+funcionais. Retratos (Data Dragon) e emblemas de elo (Ranked Emblems) são ativos da Riot
+Games usados com crédito; o RiftLab não é endossado pela Riot Games.
+
+\end{document}

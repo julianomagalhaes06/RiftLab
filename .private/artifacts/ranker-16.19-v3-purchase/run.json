@@ -1,0 +1,3379 @@
+{
+ "card": "CC-402",
+ "environment": {
+  "catboost": "1.2.10",
+  "machine": "x86_64",
+  "numpy": "2.5.3",
+  "python": "3.12.3",
+  "threads": 1
+ },
+ "grid": [
+  {
+   "depth": 4,
+   "l2_leaf_reg": 3.0,
+   "learning_rate": 0.05
+  },
+  {
+   "depth": 4,
+   "l2_leaf_reg": 10.0,
+   "learning_rate": 0.05
+  },
+  {
+   "depth": 4,
+   "l2_leaf_reg": 3.0,
+   "learning_rate": 0.15
+  },
+  {
+   "depth": 4,
+   "l2_leaf_reg": 10.0,
+   "learning_rate": 0.15
+  },
+  {
+   "depth": 6,
+   "l2_leaf_reg": 3.0,
+   "learning_rate": 0.05
+  },
+  {
+   "depth": 6,
+   "l2_leaf_reg": 10.0,
+   "learning_rate": 0.05
+  },
+  {
+   "depth": 6,
+   "l2_leaf_reg": 3.0,
+   "learning_rate": 0.15
+  },
+  {
+   "depth": 6,
+   "l2_leaf_reg": 10.0,
+   "learning_rate": 0.15
+  }
+ ],
+ "inputs": {
+  "championCatalogSha256": "b70e5edb8d2f4c25d21cf68a8366bbf0f352082e840b0bbc2efcf004f10022db",
+  "datasetSha256": "bd1dcde323472665d06db8d711618db54ce0d6c4a3ae833d5de4dd0d06dc7b16",
+  "itemCatalogSha256": "72c996d05a316ca194c0f5c02b25016a553bd204a974db09b4312c40cee3d477"
+ },
+ "models": {
+  "M1-full": {
+   "config": {
+    "depth": 4,
+    "l2_leaf_reg": 10.0,
+    "learning_rate": 0.15
+   },
+   "dropped": [],
+   "features": [
+    "self_champion_id",
+    "candidate_item_id",
+    "lane_opponent_champion_id",
+    "decision_cluster",
+    "main_item_ordinal",
+    "game_time_min",
+    "level",
+    "inventory_units",
+    "candidate_price",
+    "owned_component_compatible",
+    "gold_estimate",
+    "gold_stale",
+    "remaining_cost",
+    "affordable_margin",
+    "item_armor",
+    "item_armorpenetration",
+    "item_attackspeed",
+    "item_cooldownreduction",
+    "item_criticalstrike",
+    "item_damage",
+    "item_health",
+    "item_lifesteal",
+    "item_magicpenetration",
+    "item_mana",
+    "item_onhit",
+    "item_spellblock",
+    "item_spelldamage",
+    "ally_assassin",
+    "ally_fighter",
+    "ally_mage",
+    "ally_marksman",
+    "ally_support",
+    "ally_tank",
+    "enemy_assassin",
+    "enemy_fighter",
+    "enemy_mage",
+    "enemy_marksman",
+    "enemy_support",
+    "enemy_tank",
+    "team_gold_diff",
+    "kill_diff",
+    "enemy_main_items",
+    "enemy_items_armor",
+    "enemy_items_spellblock",
+    "enemy_items_health",
+    "enemy_items_criticalstrike",
+    "enemy_items_attackspeed",
+    "enemy_items_spelldamage",
+    "enemy_items_damage",
+    "enemy_items_lifesteal",
+    "ally_main_items"
+   ],
+   "file": "m1-full.cbm",
+   "grid": [
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 229.01,
+     "trees": 786,
+     "validationMrr": 0.9586309523809524
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 266.58,
+     "trees": 911,
+     "validationMrr": 0.955952380952381
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 115.92,
+     "trees": 353,
+     "validationMrr": 0.9607142857142857
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 104.67,
+     "trees": 315,
+     "validationMrr": 0.962797619047619
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 137.68,
+     "trees": 403,
+     "validationMrr": 0.9592261904761904
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 110.77,
+     "trees": 314,
+     "validationMrr": 0.9568452380952381
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 65.22,
+     "trees": 163,
+     "validationMrr": 0.9565178571428571
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 66.33,
+     "trees": 165,
+     "validationMrr": 0.9521173469387756
+    }
+   ],
+   "maxRssMb": 422.0,
+   "sha256": "9da97e39d3d8bfe66d5c3ea6f029ddec01a466572884926328d0fa5b03aea012",
+   "trainSeconds": 1096.21
+  },
+  "M1-no_composition": {
+   "config": {
+    "depth": 4,
+    "l2_leaf_reg": 3.0,
+    "learning_rate": 0.05
+   },
+   "dropped": [
+    "ally_assassin",
+    "ally_fighter",
+    "ally_mage",
+    "ally_marksman",
+    "ally_support",
+    "ally_tank",
+    "enemy_assassin",
+    "enemy_fighter",
+    "enemy_mage",
+    "enemy_marksman",
+    "enemy_support",
+    "enemy_tank"
+   ],
+   "features": [
+    "self_champion_id",
+    "candidate_item_id",
+    "lane_opponent_champion_id",
+    "decision_cluster",
+    "main_item_ordinal",
+    "game_time_min",
+    "level",
+    "inventory_units",
+    "candidate_price",
+    "owned_component_compatible",
+    "gold_estimate",
+    "gold_stale",
+    "remaining_cost",
+    "affordable_margin",
+    "item_armor",
+    "item_armorpenetration",
+    "item_attackspeed",
+    "item_cooldownreduction",
+    "item_criticalstrike",
+    "item_damage",
+    "item_health",
+    "item_lifesteal",
+    "item_magicpenetration",
+    "item_mana",
+    "item_onhit",
+    "item_spellblock",
+    "item_spelldamage",
+    "team_gold_diff",
+    "kill_diff",
+    "enemy_main_items",
+    "enemy_items_armor",
+    "enemy_items_spellblock",
+    "enemy_items_health",
+    "enemy_items_criticalstrike",
+    "enemy_items_attackspeed",
+    "enemy_items_spelldamage",
+    "enemy_items_damage",
+    "enemy_items_lifesteal",
+    "ally_main_items"
+   ],
+   "file": "m1-no_composition.cbm",
+   "grid": [
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 227.97,
+     "trees": 768,
+     "validationMrr": 0.9607142857142857
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 253.04,
+     "trees": 873,
+     "validationMrr": 0.9556547619047618
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 39.23,
+     "trees": 102,
+     "validationMrr": 0.9553571428571429
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 125.15,
+     "trees": 444,
+     "validationMrr": 0.9601190476190475
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 107.63,
+     "trees": 361,
+     "validationMrr": 0.9526190476190477
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 110.19,
+     "trees": 367,
+     "validationMrr": 0.9554761904761906
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 50.71,
+     "trees": 136,
+     "validationMrr": 0.9582482993197279
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 54.06,
+     "trees": 150,
+     "validationMrr": 0.9562840136054421
+    }
+   ],
+   "maxRssMb": 507.4,
+   "sha256": "e5383c99d60d7b8a12725769e9e27c93ae88c27c90156410f3ccbcd4636b9be9",
+   "trainSeconds": 967.99
+  },
+  "M1-no_economy": {
+   "config": {
+    "depth": 6,
+    "l2_leaf_reg": 10.0,
+    "learning_rate": 0.05
+   },
+   "dropped": [
+    "affordable_margin",
+    "gold_estimate",
+    "gold_stale",
+    "remaining_cost"
+   ],
+   "features": [
+    "self_champion_id",
+    "candidate_item_id",
+    "lane_opponent_champion_id",
+    "decision_cluster",
+    "main_item_ordinal",
+    "game_time_min",
+    "level",
+    "inventory_units",
+    "candidate_price",
+    "owned_component_compatible",
+    "item_armor",
+    "item_armorpenetration",
+    "item_attackspeed",
+    "item_cooldownreduction",
+    "item_criticalstrike",
+    "item_damage",
+    "item_health",
+    "item_lifesteal",
+    "item_magicpenetration",
+    "item_mana",
+    "item_onhit",
+    "item_spellblock",
+    "item_spelldamage",
+    "ally_assassin",
+    "ally_fighter",
+    "ally_mage",
+    "ally_marksman",
+    "ally_support",
+    "ally_tank",
+    "enemy_assassin",
+    "enemy_fighter",
+    "enemy_mage",
+    "enemy_marksman",
+    "enemy_support",
+    "enemy_tank",
+    "team_gold_diff",
+    "kill_diff",
+    "enemy_main_items",
+    "enemy_items_armor",
+    "enemy_items_spellblock",
+    "enemy_items_health",
+    "enemy_items_criticalstrike",
+    "enemy_items_attackspeed",
+    "enemy_items_spelldamage",
+    "enemy_items_damage",
+    "enemy_items_lifesteal",
+    "ally_main_items"
+   ],
+   "file": "m1-no_economy.cbm",
+   "grid": [
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 152.97,
+     "trees": 533,
+     "validationMrr": 0.8098681080823938
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 262.37,
+     "trees": 961,
+     "validationMrr": 0.815093537414966
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 64.43,
+     "trees": 194,
+     "validationMrr": 0.8079224644403216
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 90.53,
+     "trees": 295,
+     "validationMrr": 0.8035102694924123
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 131.56,
+     "trees": 431,
+     "validationMrr": 0.8191224251938538
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 151.99,
+     "trees": 473,
+     "validationMrr": 0.8206264172335601
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 80.26,
+     "trees": 219,
+     "validationMrr": 0.8144883786848073
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 69.93,
+     "trees": 199,
+     "validationMrr": 0.8163110698824985
+    }
+   ],
+   "maxRssMb": 599.3,
+   "sha256": "0f9c979ab1cb0015218be8f1d1c8e65d7b718d53a0b49e907ea61d1be189f62e",
+   "trainSeconds": 1004.06
+  },
+  "M1-no_rich_context": {
+   "config": {
+    "depth": 4,
+    "l2_leaf_reg": 3.0,
+    "learning_rate": 0.05
+   },
+   "dropped": [
+    "ally_main_items",
+    "enemy_items_armor",
+    "enemy_items_attackspeed",
+    "enemy_items_criticalstrike",
+    "enemy_items_damage",
+    "enemy_items_health",
+    "enemy_items_lifesteal",
+    "enemy_items_spellblock",
+    "enemy_items_spelldamage",
+    "enemy_main_items",
+    "kill_diff",
+    "lane_opponent_champion_id",
+    "team_gold_diff"
+   ],
+   "features": [
+    "self_champion_id",
+    "candidate_item_id",
+    "decision_cluster",
+    "main_item_ordinal",
+    "game_time_min",
+    "level",
+    "inventory_units",
+    "candidate_price",
+    "owned_component_compatible",
+    "gold_estimate",
+    "gold_stale",
+    "remaining_cost",
+    "affordable_margin",
+    "item_armor",
+    "item_armorpenetration",
+    "item_attackspeed",
+    "item_cooldownreduction",
+    "item_criticalstrike",
+    "item_damage",
+    "item_health",
+    "item_lifesteal",
+    "item_magicpenetration",
+    "item_mana",
+    "item_onhit",
+    "item_spellblock",
+    "item_spelldamage",
+    "ally_assassin",
+    "ally_fighter",
+    "ally_mage",
+    "ally_marksman",
+    "ally_support",
+    "ally_tank",
+    "enemy_assassin",
+    "enemy_fighter",
+    "enemy_mage",
+    "enemy_marksman",
+    "enemy_support",
+    "enemy_tank"
+   ],
+   "file": "m1-no_rich_context.cbm",
+   "grid": [
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 274.37,
+     "trees": 953,
+     "validationMrr": 0.9619047619047618
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 176.99,
+     "trees": 532,
+     "validationMrr": 0.9557738095238095
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 90.62,
+     "trees": 271,
+     "validationMrr": 0.955952380952381
+    },
+    {
+     "depth": 4,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 79.22,
+     "trees": 240,
+     "validationMrr": 0.9506292517006802
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.05,
+     "seconds": 125.33,
+     "trees": 399,
+     "validationMrr": 0.9574404761904761
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.05,
+     "seconds": 160.21,
+     "trees": 524,
+     "validationMrr": 0.9539880952380952
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 3.0,
+     "learning_rate": 0.15,
+     "seconds": 80.55,
+     "trees": 237,
+     "validationMrr": 0.9607142857142857
+    },
+    {
+     "depth": 6,
+     "l2_leaf_reg": 10.0,
+     "learning_rate": 0.15,
+     "seconds": 103.71,
+     "trees": 322,
+     "validationMrr": 0.9613095238095238
+    }
+   ],
+   "maxRssMb": 599.3,
+   "sha256": "40972350e8f840ed61ef3be89754e69d792b78ad2a8b478043a2ceafec45c97f",
+   "trainSeconds": 1091.03
+  }
+ },
+ "schemaVersion": 1,
+ "validation": {
+  "B0": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.5672727272727273,
+      0.6879432624113475
+     ],
+     "hitAt3": [
+      0.8694029850746269,
+      0.9386281588447654
+     ],
+     "hitAt5": [
+      0.9312977099236641,
+      0.9798657718120806
+     ],
+     "mrr": [
+      0.7316077787324325,
+      0.8085416261968482
+     ],
+     "ndcgAt3": [
+      0.754102404049303,
+      0.8316512288590658
+     ]
+    },
+    "decisions": 280,
+    "matches": 137,
+    "point": {
+     "hitAt1": 0.6285714285714286,
+     "hitAt3": 0.9035714285714286,
+     "hitAt5": 0.9571428571428572,
+     "mrr": 0.7697881835504017,
+     "ndcgAt3": 0.7922573792857202
+    }
+   },
+   "champion:145": {
+    "ci95": {
+     "hitAt1": [
+      0.5416666666666666,
+      0.88
+     ],
+     "hitAt3": [
+      0.6153846153846154,
+      0.9310344827586207
+     ],
+     "hitAt5": [
+      0.875,
+      1.0
+     ],
+     "mrr": [
+      0.6602212051868802,
+      0.9173164392462638
+     ],
+     "ndcgAt3": [
+      0.5926491197204982,
+      0.9090909090909091
+     ]
+    },
+    "decisions": 25,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.72,
+     "hitAt3": 0.8,
+     "hitAt5": 0.96,
+     "mrr": 0.7987017543859649,
+     "ndcgAt3": 0.7704743802857166
+    }
+   },
+   "champion:18": {
+    "ci95": {
+     "hitAt1": [
+      0.42105263157894735,
+      0.9285714285714286
+     ],
+     "hitAt3": [
+      0.6666666666666666,
+      1.0
+     ],
+     "hitAt5": [
+      0.6666666666666666,
+      1.0
+     ],
+     "mrr": [
+      0.5924185463659148,
+      0.9642857142857143
+     ],
+     "ndcgAt3": [
+      0.592729447744364,
+      0.9736378395408184
+     ]
+    },
+    "decisions": 18,
+    "matches": 13,
+    "point": {
+     "hitAt1": 0.6666666666666666,
+     "hitAt3": 0.8888888888888888,
+     "hitAt5": 0.8888888888888888,
+     "mrr": 0.779431216931217,
+     "ndcgAt3": 0.7995994033730207
+    }
+   },
+   "champion:202": {
+    "ci95": {
+     "hitAt1": [
+      0.35294117647058826,
+      0.7419354838709677
+     ],
+     "hitAt3": [
+      0.8125,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.6015625,
+      0.8463541666666666
+     ],
+     "ndcgAt3": [
+      0.6494307311090294,
+      0.8675093309907862
+     ]
+    },
+    "decisions": 33,
+    "matches": 22,
+    "point": {
+     "hitAt1": 0.5454545454545454,
+     "hitAt3": 0.9090909090909091,
+     "hitAt5": 1.0,
+     "mrr": 0.7247474747474748,
+     "ndcgAt3": 0.7550457053030365
+    }
+   },
+   "champion:21": {
+    "ci95": {
+     "hitAt1": [
+      0.35714285714285715,
+      0.6470588235294118
+     ],
+     "hitAt3": [
+      0.71875,
+      0.9375
+     ],
+     "hitAt5": [
+      0.896551724137931,
+      1.0
+     ],
+     "mrr": [
+      0.5751373626373626,
+      0.7946428571428571
+     ],
+     "ndcgAt3": [
+      0.581627804336741,
+      0.8164289527649863
+     ]
+    },
+    "decisions": 30,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.5,
+     "hitAt3": 0.8333333333333334,
+     "hitAt5": 0.9666666666666667,
+     "mrr": 0.6897863247863248,
+     "ndcgAt3": 0.7015812676190554
+    }
+   },
+   "champion:22": {
+    "ci95": {
+     "hitAt1": [
+      0.2222222222222222,
+      0.7391304347826086
+     ],
+     "hitAt3": [
+      0.8421052631578947,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.5714285714285714,
+      0.8650793650793651
+     ],
+     "ndcgAt3": [
+      0.6284330152255807,
+      0.8959852112782016
+     ]
+    },
+    "decisions": 19,
+    "matches": 15,
+    "point": {
+     "hitAt1": 0.47368421052631576,
+     "hitAt3": 0.9473684210526315,
+     "hitAt5": 1.0,
+     "mrr": 0.7149122807017544,
+     "ndcgAt3": 0.765654633082719
+    }
+   },
+   "champion:222": {
+    "ci95": {
+     "hitAt1": [
+      0.5714285714285714,
+      0.896551724137931
+     ],
+     "hitAt3": [
+      0.875,
+      1.0
+     ],
+     "hitAt5": [
+      0.875,
+      1.0
+     ],
+     "mrr": [
+      0.744047619047619,
+      0.9464285714285714
+     ],
+     "ndcgAt3": [
+      0.7786562597883641,
+      0.9604567593112276
+     ]
+    },
+    "decisions": 28,
+    "matches": 18,
+    "point": {
+     "hitAt1": 0.75,
+     "hitAt3": 0.9642857142857143,
+     "hitAt5": 0.9642857142857143,
+     "mrr": 0.8547619047619047,
+     "ndcgAt3": 0.8805231702806174
+    }
+   },
+   "champion:29": {
+    "ci95": {
+     "hitAt1": [
+      0.18181818181818182,
+      0.8571428571428571
+     ],
+     "hitAt3": [
+      0.5714285714285714,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.5,
+      0.9285714285714286
+     ],
+     "ndcgAt3": [
+      0.46597992959184503,
+      0.9472756790816368
+     ]
+    },
+    "decisions": 8,
+    "matches": 7,
+    "point": {
+     "hitAt1": 0.5,
+     "hitAt3": 0.875,
+     "hitAt5": 1.0,
+     "mrr": 0.71875,
+     "ndcgAt3": 0.7365986575892965
+    }
+   },
+   "champion:51": {
+    "ci95": {
+     "hitAt1": [
+      0.48148148148148145,
+      0.7457627118644068
+     ],
+     "hitAt3": [
+      0.7868852459016393,
+      0.9649122807017544
+     ],
+     "hitAt5": [
+      0.8461538461538461,
+      0.9818181818181818
+     ],
+     "mrr": [
+      0.6587578735197782,
+      0.8440601503759398
+     ],
+     "ndcgAt3": [
+      0.6766869656641665,
+      0.8651442721059158
+     ]
+    },
+    "decisions": 60,
+    "matches": 39,
+    "point": {
+     "hitAt1": 0.6166666666666667,
+     "hitAt3": 0.8833333333333333,
+     "hitAt5": 0.9166666666666666,
+     "mrr": 0.7572275132275131,
+     "ndcgAt3": 0.7783681132738158
+    }
+   },
+   "champion:804": {
+    "ci95": {
+     "hitAt1": [
+      0.3793103448275862,
+      0.782608695652174
+     ],
+     "hitAt3": [
+      0.8928571428571429,
+      1.0
+     ],
+     "hitAt5": [
+      0.8928571428571429,
+      1.0
+     ],
+     "mrr": [
+      0.6258445945945946,
+      0.8763440860215054
+     ],
+     "ndcgAt3": [
+      0.6980075763095344,
+      0.9061859507142915
+     ]
+    },
+    "decisions": 29,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.5862068965517241,
+     "hitAt3": 0.9655172413793104,
+     "hitAt5": 0.9655172413793104,
+     "mrr": 0.7533395464429947,
+     "ndcgAt3": 0.8074658025862139
+    }
+   },
+   "champion:81": {
+    "ci95": {
+     "hitAt1": [
+      0.6551724137931034,
+      0.96875
+     ],
+     "hitAt3": [
+      0.8928571428571429,
+      1.0
+     ],
+     "hitAt5": [
+      0.8928571428571429,
+      1.0
+     ],
+     "mrr": [
+      0.7418546365914788,
+      0.9791666666666666
+     ],
+     "ndcgAt3": [
+      0.78,
+      0.984375
+     ]
+    },
+    "decisions": 30,
+    "matches": 18,
+    "point": {
+     "hitAt1": 0.8333333333333334,
+     "hitAt3": 0.9666666666666667,
+     "hitAt5": 0.9666666666666667,
+     "mrr": 0.87953216374269,
+     "ndcgAt3": 0.9
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.524390243902439,
+      0.6770186335403726
+     ],
+     "hitAt3": [
+      0.8604651162790697,
+      0.9536423841059603
+     ],
+     "hitAt5": [
+      0.9186046511627907,
+      0.9878048780487805
+     ],
+     "mrr": [
+      0.6994680010717746,
+      0.8053161448741559
+     ],
+     "ndcgAt3": [
+      0.727962729800564,
+      0.8337103997481743
+     ]
+    },
+    "decisions": 166,
+    "matches": 93,
+    "point": {
+     "hitAt1": 0.6024096385542169,
+     "hitAt3": 0.9096385542168675,
+     "hitAt5": 0.9578313253012049,
+     "mrr": 0.7546464434115037,
+     "ndcgAt3": 0.7836297673192831
+    }
+   },
+   "scopeNew": {
+    "ci95": {
+     "hitAt1": [
+      0.49714285714285716,
+      0.6666666666666666
+     ],
+     "hitAt3": [
+      0.86875,
+      0.9580838323353293
+     ],
+     "hitAt5": [
+      0.935672514619883,
+      0.9940119760479041
+     ],
+     "mrr": [
+      0.6976448202496107,
+      0.8034623550547118
+     ],
+     "ndcgAt3": [
+      0.727618241996566,
+      0.8318221051085045
+     ]
+    },
+    "decisions": 165,
+    "matches": 99,
+    "point": {
+     "hitAt1": 0.5818181818181818,
+     "hitAt3": 0.9151515151515152,
+     "hitAt5": 0.9696969696969697,
+     "mrr": 0.750021405021405,
+     "ndcgAt3": 0.7810189084632106
+    }
+   },
+   "scopeOriginal": {
+    "ci95": {
+     "hitAt1": [
+      0.6153846153846154,
+      0.7747747747747747
+     ],
+     "hitAt3": [
+      0.8260869565217391,
+      0.944954128440367
+     ],
+     "hitAt5": [
+      0.896551724137931,
+      0.9752066115702479
+     ],
+     "mrr": [
+      0.7385709926991392,
+      0.8534860859044161
+     ],
+     "ndcgAt3": [
+      0.744295437334937,
+      0.868368272648086
+     ]
+    },
+    "decisions": 115,
+    "matches": 68,
+    "point": {
+     "hitAt1": 0.6956521739130435,
+     "hitAt3": 0.8869565217391304,
+     "hitAt5": 0.9391304347826087,
+     "mrr": 0.7981492136137446,
+     "ndcgAt3": 0.8083821417701901
+    }
+   },
+   "skipped": 4
+  },
+  "B1": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.5878136200716846,
+      0.6917293233082706
+     ],
+     "hitAt3": [
+      0.9161073825503355,
+      0.9671532846715328
+     ],
+     "hitAt5": [
+      0.9458483754512635,
+      0.9858657243816255
+     ],
+     "mrr": [
+      0.748288137122698,
+      0.8130592590525945
+     ],
+     "ndcgAt3": [
+      0.7852337343246809,
+      0.8453649887473796
+     ]
+    },
+    "decisions": 280,
+    "matches": 137,
+    "point": {
+     "hitAt1": 0.6392857142857142,
+     "hitAt3": 0.9428571428571428,
+     "hitAt5": 0.9678571428571429,
+     "mrr": 0.7807152451721755,
+     "ndcgAt3": 0.8163221667602096
+    }
+   },
+   "champion:145": {
+    "ci95": {
+     "hitAt1": [
+      0.6,
+      0.896551724137931
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.7777777777777777,
+      0.9464285714285714
+     ],
+     "ndcgAt3": [
+      0.8353099178571526,
+      0.96
+     ]
+    },
+    "decisions": 25,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.76,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.8666666666666667,
+     "ndcgAt3": 0.9009487605714332
+    }
+   },
+   "champion:18": {
+    "ci95": {
+     "hitAt1": [
+      0.5555555555555556,
+      1.0
+     ],
+     "hitAt3": [
+      0.75,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.6842105263157895,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.6709936139610416,
+      1.0
+     ]
+    },
+    "decisions": 18,
+    "matches": 13,
+    "point": {
+     "hitAt1": 0.7777777777777778,
+     "hitAt3": 0.8888888888888888,
+     "hitAt5": 1.0,
+     "mrr": 0.8462962962962962,
+     "ndcgAt3": 0.8406072085317476
+    }
+   },
+   "champion:202": {
+    "ci95": {
+     "hitAt1": [
+      0.18181818181818182,
+      0.41935483870967744
+     ],
+     "hitAt3": [
+      0.7575757575757576,
+      0.9714285714285714
+     ],
+     "hitAt5": [
+      0.8,
+      1.0
+     ],
+     "mrr": [
+      0.5016001183081928,
+      0.667156862745098
+     ],
+     "ndcgAt3": [
+      0.5541778290640513,
+      0.7341153275974175
+     ]
+    },
+    "decisions": 33,
+    "matches": 22,
+    "point": {
+     "hitAt1": 0.30303030303030304,
+     "hitAt3": 0.8787878787878788,
+     "hitAt5": 0.9090909090909091,
+     "mrr": 0.5869596586987892,
+     "ndcgAt3": 0.6504226152597534
+    }
+   },
+   "champion:21": {
+    "ci95": {
+     "hitAt1": [
+      0.25,
+      0.6071428571428571
+     ],
+     "hitAt3": [
+      0.7333333333333333,
+      0.967741935483871
+     ],
+     "hitAt5": [
+      0.8333333333333334,
+      1.0
+     ],
+     "mrr": [
+      0.5057471264367815,
+      0.7528735632183907
+     ],
+     "ndcgAt3": [
+      0.5525420349753735,
+      0.7894065262315301
+     ]
+    },
+    "decisions": 30,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.43333333333333335,
+     "hitAt3": 0.8666666666666667,
+     "hitAt5": 0.9333333333333333,
+     "mrr": 0.6330555555555556,
+     "ndcgAt3": 0.6761859507142916
+    }
+   },
+   "champion:22": {
+    "ci95": {
+     "hitAt1": [
+      0.5238095238095238,
+      0.9411764705882353
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.7619047619047619,
+      0.9705882352941176
+     ],
+     "ndcgAt3": [
+      0.8242522636054559,
+      0.9782899855042034
+     ]
+    },
+    "decisions": 19,
+    "matches": 15,
+    "point": {
+     "hitAt1": 0.7368421052631579,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.868421052631579,
+     "ndcgAt3": 0.9028762509398573
+    }
+   },
+   "champion:222": {
+    "ci95": {
+     "hitAt1": [
+      0.41935483870967744,
+      0.7307692307692307
+     ],
+     "hitAt3": [
+      0.8888888888888888,
+      1.0
+     ],
+     "hitAt5": [
+      0.8888888888888888,
+      1.0
+     ],
+     "mrr": [
+      0.6349062310949789,
+      0.8452380952380952
+     ],
+     "ndcgAt3": [
+      0.7054606677248764,
+      0.8809504133540398
+     ]
+    },
+    "decisions": 28,
+    "matches": 18,
+    "point": {
+     "hitAt1": 0.5714285714285714,
+     "hitAt3": 0.9642857142857143,
+     "hitAt5": 0.9642857142857143,
+     "mrr": 0.7390350877192982,
+     "ndcgAt3": 0.7959135186224552
+    }
+   },
+   "champion:29": {
+    "ci95": {
+     "hitAt1": [
+      0.7,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.85,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8892789260714373,
+      1.0
+     ]
+    },
+    "decisions": 8,
+    "matches": 7,
+    "point": {
+     "hitAt1": 0.875,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9375,
+     "ndcgAt3": 0.9538662191964322
+    }
+   },
+   "champion:51": {
+    "ci95": {
+     "hitAt1": [
+      0.5409836065573771,
+      0.7833333333333333
+     ],
+     "hitAt3": [
+      0.847457627118644,
+      0.9827586206896551
+     ],
+     "hitAt5": [
+      0.8870967741935484,
+      1.0
+     ],
+     "mrr": [
+      0.686484137331595,
+      0.8564876215738285
+     ],
+     "ndcgAt3": [
+      0.7171067378934675,
+      0.8797192933497557
+     ]
+    },
+    "decisions": 60,
+    "matches": 39,
+    "point": {
+     "hitAt1": 0.6666666666666666,
+     "hitAt3": 0.9166666666666666,
+     "hitAt5": 0.95,
+     "mrr": 0.7774325131390348,
+     "ndcgAt3": 0.8047596420238124
+    }
+   },
+   "champion:804": {
+    "ci95": {
+     "hitAt1": [
+      0.41935483870967744,
+      0.6923076923076923
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.6888888888888889,
+      0.8333333333333334
+     ],
+     "ndcgAt3": [
+      0.7698292019047773,
+      0.8764313198275933
+     ]
+    },
+    "decisions": 29,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.5517241379310345,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.7586206896551724,
+     "ndcgAt3": 0.8210102598522266
+    }
+   },
+   "champion:81": {
+    "ci95": {
+     "hitAt1": [
+      1.0,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      1.0,
+      1.0
+     ],
+     "ndcgAt3": [
+      1.0,
+      1.0
+     ]
+    },
+    "decisions": 30,
+    "matches": 18,
+    "point": {
+     "hitAt1": 1.0,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 1.0,
+     "ndcgAt3": 1.0
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.5389221556886228,
+      0.6867469879518072
+     ],
+     "hitAt3": [
+      0.8950617283950617,
+      0.9653179190751445
+     ],
+     "hitAt5": [
+      0.9161676646706587,
+      0.9776536312849162
+     ],
+     "mrr": [
+      0.7166765050260655,
+      0.8093879908416718
+     ],
+     "ndcgAt3": [
+      0.7578130292383871,
+      0.8421309795238154
+     ]
+    },
+    "decisions": 166,
+    "matches": 93,
+    "point": {
+     "hitAt1": 0.6144578313253012,
+     "hitAt3": 0.9337349397590361,
+     "hitAt5": 0.9518072289156626,
+     "mrr": 0.7642007224714483,
+     "ndcgAt3": 0.8017020564759096
+    }
+   },
+   "scopeNew": {
+    "ci95": {
+     "hitAt1": [
+      0.4782608695652174,
+      0.6134969325153374
+     ],
+     "hitAt3": [
+      0.8950617283950617,
+      0.9668874172185431
+     ],
+     "hitAt5": [
+      0.9318181818181818,
+      0.9880239520958084
+     ],
+     "mrr": [
+      0.6866324465008675,
+      0.7724472883766044
+     ],
+     "ndcgAt3": [
+      0.7352832008005015,
+      0.813135004023515
+     ]
+    },
+    "decisions": 165,
+    "matches": 99,
+    "point": {
+     "hitAt1": 0.5454545454545454,
+     "hitAt3": 0.9333333333333333,
+     "hitAt5": 0.9636363636363636,
+     "mrr": 0.7290160678375781,
+     "ndcgAt3": 0.774308540346328
+    }
+   },
+   "scopeOriginal": {
+    "ci95": {
+     "hitAt1": [
+      0.6974789915966386,
+      0.8454545454545455
+     ],
+     "hitAt3": [
+      0.9152542372881356,
+      0.9911504424778761
+     ],
+     "hitAt5": [
+      0.9385964912280702,
+      1.0
+     ],
+     "mrr": [
+      0.8030029864966378,
+      0.9018082701768382
+     ],
+     "ndcgAt3": [
+      0.8279203948937447,
+      0.9212523694954147
+     ]
+    },
+    "decisions": 115,
+    "matches": 68,
+    "point": {
+     "hitAt1": 0.7739130434782608,
+     "hitAt3": 0.9565217391304348,
+     "hitAt5": 0.9739130434782609,
+     "mrr": 0.8548923256957284,
+     "ndcgAt3": 0.8766025872670833
+    }
+   },
+   "skipped": 4
+  },
+  "M1-full": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.9081272084805654,
+      0.9607142857142857
+     ],
+     "hitAt3": [
+      0.9711191335740073,
+      0.9966101694915255
+     ],
+     "hitAt5": [
+      0.9887218045112782,
+      1.0
+     ],
+     "mrr": [
+      0.946551724137931,
+      0.9774114774114774
+     ],
+     "ndcgAt3": [
+      0.9490729741319459,
+      0.9808410350102411
+     ]
+    },
+    "decisions": 280,
+    "matches": 137,
+    "point": {
+     "hitAt1": 0.9357142857142857,
+     "hitAt3": 0.9857142857142858,
+     "hitAt5": 0.9964285714285714,
+     "mrr": 0.962797619047619,
+     "ndcgAt3": 0.9663255608673481
+    }
+   },
+   "champion:145": {
+    "ci95": {
+     "hitAt1": [
+      1.0,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      1.0,
+      1.0
+     ],
+     "ndcgAt3": [
+      1.0,
+      1.0
+     ]
+    },
+    "decisions": 25,
+    "matches": 17,
+    "point": {
+     "hitAt1": 1.0,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 1.0,
+     "ndcgAt3": 1.0
+    }
+   },
+   "champion:18": {
+    "ci95": {
+     "hitAt1": [
+      0.6842105263157895,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.825,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8696394630357187,
+      1.0
+     ]
+    },
+    "decisions": 18,
+    "matches": 13,
+    "point": {
+     "hitAt1": 0.8333333333333334,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9074074074074073,
+     "ndcgAt3": 0.9312144170634953
+    }
+   },
+   "champion:202": {
+    "ci95": {
+     "hitAt1": [
+      0.7647058823529411,
+      0.9705882352941176
+     ],
+     "hitAt3": [
+      0.9032258064516129,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8636363636363636,
+      0.9852941176470589
+     ],
+     "ndcgAt3": [
+      0.8643551216450251,
+      0.9891449927521017
+     ]
+    },
+    "decisions": 33,
+    "matches": 22,
+    "point": {
+     "hitAt1": 0.8787878787878788,
+     "hitAt3": 0.9696969696969697,
+     "hitAt5": 1.0,
+     "mrr": 0.9318181818181818,
+     "ndcgAt3": 0.9361451291125568
+    }
+   },
+   "champion:21": {
+    "ci95": {
+     "hitAt1": [
+      0.7857142857142857,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8928571428571429,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9209135186224552,
+      1.0
+     ]
+    },
+    "decisions": 30,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.9,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.95,
+     "ndcgAt3": 0.9630929753571458
+    }
+   },
+   "champion:22": {
+    "ci95": {
+     "hitAt1": [
+      0.8421052631578947,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9210526315789473,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9417257505639144,
+      1.0
+     ]
+    },
+    "decisions": 19,
+    "matches": 15,
+    "point": {
+     "hitAt1": 0.9473684210526315,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9736842105263158,
+     "ndcgAt3": 0.9805752501879714
+    }
+   },
+   "champion:222": {
+    "ci95": {
+     "hitAt1": [
+      0.8888888888888888,
+      1.0
+     ],
+     "hitAt3": [
+      0.8888888888888888,
+      1.0
+     ],
+     "hitAt5": [
+      0.8888888888888888,
+      1.0
+     ],
+     "mrr": [
+      0.9074074074074074,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8888888888888888,
+      1.0
+     ]
+    },
+    "decisions": 28,
+    "matches": 18,
+    "point": {
+     "hitAt1": 0.9642857142857143,
+     "hitAt3": 0.9642857142857143,
+     "hitAt5": 0.9642857142857143,
+     "mrr": 0.9702380952380952,
+     "ndcgAt3": 0.9642857142857143
+    }
+   },
+   "champion:29": {
+    "ci95": {
+     "hitAt1": [
+      0.7,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.85,
+      1.0
+     ]
+    },
+    "decisions": 8,
+    "matches": 7,
+    "point": {
+     "hitAt1": 0.875,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9166666666666666,
+     "ndcgAt3": 0.9375
+    }
+   },
+   "champion:51": {
+    "ci95": {
+     "hitAt1": [
+      0.9180327868852459,
+      1.0
+     ],
+     "hitAt3": [
+      0.9473684210526315,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9485294117647058,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.937978205933182,
+      1.0
+     ]
+    },
+    "decisions": 60,
+    "matches": 39,
+    "point": {
+     "hitAt1": 0.9666666666666667,
+     "hitAt3": 0.9833333333333333,
+     "hitAt5": 1.0,
+     "mrr": 0.9791666666666666,
+     "ndcgAt3": 0.9771821625595243
+    }
+   },
+   "champion:804": {
+    "ci95": {
+     "hitAt1": [
+      0.7931034482758621,
+      1.0
+     ],
+     "hitAt3": [
+      0.8928571428571429,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.875,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8664949823979613,
+      1.0
+     ]
+    },
+    "decisions": 29,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.896551724137931,
+     "hitAt3": 0.9655172413793104,
+     "hitAt5": 1.0,
+     "mrr": 0.9396551724137931,
+     "ndcgAt3": 0.9400641209359626
+    }
+   },
+   "champion:81": {
+    "ci95": {
+     "hitAt1": [
+      1.0,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      1.0,
+      1.0
+     ],
+     "ndcgAt3": [
+      1.0,
+      1.0
+     ]
+    },
+    "decisions": 30,
+    "matches": 18,
+    "point": {
+     "hitAt1": 1.0,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 1.0,
+     "ndcgAt3": 1.0
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.8728323699421965,
+      0.9542857142857143
+     ],
+     "hitAt3": [
+      0.96,
+      1.0
+     ],
+     "hitAt5": [
+      0.98125,
+      1.0
+     ],
+     "mrr": [
+      0.9251497005988024,
+      0.9737373737373737
+     ],
+     "ndcgAt3": [
+      0.9307281767187513,
+      0.9777332670414468
+     ]
+    },
+    "decisions": 166,
+    "matches": 93,
+    "point": {
+     "hitAt1": 0.9156626506024096,
+     "hitAt3": 0.9819277108433735,
+     "hitAt5": 0.9939759036144579,
+     "mrr": 0.9508032128514057,
+     "ndcgAt3": 0.9558937818201393
+    }
+   },
+   "scopeNew": {
+    "ci95": {
+     "hitAt1": [
+      0.8597560975609756,
+      0.9426751592356688
+     ],
+     "hitAt3": [
+      0.9597701149425287,
+      1.0
+     ],
+     "hitAt5": [
+      0.9810126582278481,
+      1.0
+     ],
+     "mrr": [
+      0.9194444444444444,
+      0.9677083333333334
+     ],
+     "ndcgAt3": [
+      0.9263651669312191,
+      0.9734942045372876
+     ]
+    },
+    "decisions": 165,
+    "matches": 99,
+    "point": {
+     "hitAt1": 0.9030303030303031,
+     "hitAt3": 0.9818181818181818,
+     "hitAt5": 0.9939393939393939,
+     "mrr": 0.9444444444444445,
+     "ndcgAt3": 0.9511528926623396
+    }
+   },
+   "scopeOriginal": {
+    "ci95": {
+     "hitAt1": [
+      0.954954954954955,
+      1.0
+     ],
+     "hitAt3": [
+      0.9722222222222222,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9717741935483871,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9672131147540983,
+      1.0
+     ]
+    },
+    "decisions": 115,
+    "matches": 68,
+    "point": {
+     "hitAt1": 0.9826086956521739,
+     "hitAt3": 0.991304347826087,
+     "hitAt5": 1.0,
+     "mrr": 0.9891304347826086,
+     "ndcgAt3": 0.9880950413354039
+    }
+   },
+   "skipped": 4
+  },
+  "M1-no_composition": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.903448275862069,
+      0.958041958041958
+     ],
+     "hitAt3": [
+      0.9708029197080292,
+      0.9965635738831615
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9438657407407407,
+      0.9755799755799756
+     ],
+     "ndcgAt3": [
+      0.9469401368913872,
+      0.9790680531920467
+     ]
+    },
+    "decisions": 280,
+    "matches": 137,
+    "point": {
+     "hitAt1": 0.9321428571428572,
+     "hitAt3": 0.9857142857142858,
+     "hitAt5": 1.0,
+     "mrr": 0.9607142857142857,
+     "ndcgAt3": 0.9645398465816338
+    }
+   },
+   "champion:145": {
+    "ci95": {
+     "hitAt1": [
+      1.0,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      1.0,
+      1.0
+     ],
+     "ndcgAt3": [
+      1.0,
+      1.0
+     ]
+    },
+    "decisions": 25,
+    "matches": 17,
+    "point": {
+     "hitAt1": 1.0,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 1.0,
+     "ndcgAt3": 1.0
+    }
+   },
+   "champion:18": {
+    "ci95": {
+     "hitAt1": [
+      0.6842105263157895,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.825,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8696394630357187,
+      1.0
+     ]
+    },
+    "decisions": 18,
+    "matches": 13,
+    "point": {
+     "hitAt1": 0.8333333333333334,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9074074074074073,
+     "ndcgAt3": 0.9312144170634953
+    }
+   },
+   "champion:202": {
+    "ci95": {
+     "hitAt1": [
+      0.7647058823529411,
+      0.9705882352941176
+     ],
+     "hitAt3": [
+      0.9032258064516129,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8636363636363636,
+      0.9852941176470589
+     ],
+     "ndcgAt3": [
+      0.8643551216450251,
+      0.9891449927521017
+     ]
+    },
+    "decisions": 33,
+    "matches": 22,
+    "point": {
+     "hitAt1": 0.8787878787878788,
+     "hitAt3": 0.9696969696969697,
+     "hitAt5": 1.0,
+     "mrr": 0.9318181818181818,
+     "ndcgAt3": 0.9361451291125568
+    }
+   },
+   "champion:21": {
+    "ci95": {
+     "hitAt1": [
+      0.8275862068965517,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9137931034482759,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9363671988916307,
+      1.0
+     ]
+    },
+    "decisions": 30,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.9333333333333333,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9666666666666667,
+     "ndcgAt3": 0.9753953169047639
+    }
+   },
+   "champion:22": {
+    "ci95": {
+     "hitAt1": [
+      0.8421052631578947,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9210526315789473,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9417257505639144,
+      1.0
+     ]
+    },
+    "decisions": 19,
+    "matches": 15,
+    "point": {
+     "hitAt1": 0.9473684210526315,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9736842105263158,
+     "ndcgAt3": 0.9805752501879714
+    }
+   },
+   "champion:222": {
+    "ci95": {
+     "hitAt1": [
+      0.8888888888888888,
+      1.0
+     ],
+     "hitAt3": [
+      0.8888888888888888,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9166666666666666,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8888888888888888,
+      1.0
+     ]
+    },
+    "decisions": 28,
+    "matches": 18,
+    "point": {
+     "hitAt1": 0.9642857142857143,
+     "hitAt3": 0.9642857142857143,
+     "hitAt5": 1.0,
+     "mrr": 0.9732142857142857,
+     "ndcgAt3": 0.9642857142857143
+    }
+   },
+   "champion:29": {
+    "ci95": {
+     "hitAt1": [
+      0.7,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.85,
+      1.0
+     ]
+    },
+    "decisions": 8,
+    "matches": 7,
+    "point": {
+     "hitAt1": 0.875,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9166666666666666,
+     "ndcgAt3": 0.9375
+    }
+   },
+   "champion:51": {
+    "ci95": {
+     "hitAt1": [
+      0.8688524590163934,
+      0.9841269841269841
+     ],
+     "hitAt3": [
+      0.9180327868852459,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9137931034482759,
+      0.9915254237288136
+     ],
+     "ndcgAt3": [
+      0.9032258064516129,
+      0.9937445720944315
+     ]
+    },
+    "decisions": 60,
+    "matches": 39,
+    "point": {
+     "hitAt1": 0.9333333333333333,
+     "hitAt3": 0.9666666666666667,
+     "hitAt5": 1.0,
+     "mrr": 0.9555555555555556,
+     "ndcgAt3": 0.9521821625595243
+    }
+   },
+   "champion:804": {
+    "ci95": {
+     "hitAt1": [
+      0.7931034482758621,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.896551724137931,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9236406386699568,
+      1.0
+     ]
+    },
+    "decisions": 29,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.896551724137931,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9482758620689655,
+     "ndcgAt3": 0.9618203193349784
+    }
+   },
+   "champion:81": {
+    "ci95": {
+     "hitAt1": [
+      1.0,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      1.0,
+      1.0
+     ],
+     "ndcgAt3": [
+      1.0,
+      1.0
+     ]
+    },
+    "decisions": 30,
+    "matches": 18,
+    "point": {
+     "hitAt1": 1.0,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 1.0,
+     "ndcgAt3": 1.0
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.8823529411764706,
+      0.9580838323353293
+     ],
+     "hitAt3": [
+      0.9691358024691358,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9318181818181818,
+      0.976482617586912
+     ],
+     "ndcgAt3": [
+      0.9382908700760798,
+      0.9808196867945332
+     ]
+    },
+    "decisions": 166,
+    "matches": 93,
+    "point": {
+     "hitAt1": 0.9216867469879518,
+     "hitAt3": 0.9879518072289156,
+     "hitAt5": 1.0,
+     "mrr": 0.9548192771084337,
+     "ndcgAt3": 0.9611291447504317
+    }
+   },
+   "scopeNew": {
+    "ci95": {
+     "hitAt1": [
+      0.8651685393258427,
+      0.9479768786127167
+     ],
+     "hitAt3": [
+      0.9691358024691358,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.925,
+      0.9717078189300411
+     ],
+     "ndcgAt3": [
+      0.9340144376959946,
+      0.9771752119426765
+     ]
+    },
+    "decisions": 165,
+    "matches": 99,
+    "point": {
+     "hitAt1": 0.9090909090909091,
+     "hitAt3": 0.9878787878787879,
+     "hitAt5": 1.0,
+     "mrr": 0.9494949494949494,
+     "ndcgAt3": 0.9572134987229457
+    }
+   },
+   "scopeOriginal": {
+    "ci95": {
+     "hitAt1": [
+      0.9279279279279279,
+      0.9917355371900827
+     ],
+     "hitAt3": [
+      0.954954954954955,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9514563106796117,
+      0.9956521739130435
+     ],
+     "ndcgAt3": [
+      0.9451488762016024,
+      0.9967906935093169
+     ]
+    },
+    "decisions": 115,
+    "matches": 68,
+    "point": {
+     "hitAt1": 0.9652173913043478,
+     "hitAt3": 0.9826086956521739,
+     "hitAt5": 1.0,
+     "mrr": 0.9768115942028985,
+     "ndcgAt3": 0.9750515630745343
+    }
+   },
+   "skipped": 4
+  },
+  "M1-no_economy": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.6548042704626335,
+      0.7591240875912408
+     ],
+     "hitAt3": [
+      0.89198606271777,
+      0.9571428571428572
+     ],
+     "hitAt5": [
+      0.9653979238754326,
+      0.9963768115942029
+     ],
+     "mrr": [
+      0.786294589520396,
+      0.8545472518782127
+     ],
+     "ndcgAt3": [
+      0.8004190056801606,
+      0.8709575710586778
+     ]
+    },
+    "decisions": 280,
+    "matches": 137,
+    "point": {
+     "hitAt1": 0.7071428571428572,
+     "hitAt3": 0.925,
+     "hitAt5": 0.9821428571428571,
+     "mrr": 0.8206264172335601,
+     "ndcgAt3": 0.8361784978699024
+    }
+   },
+   "champion:145": {
+    "ci95": {
+     "hitAt1": [
+      0.5357142857142857,
+      0.8181818181818182
+     ],
+     "hitAt3": [
+      0.8636363636363636,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.7243589743589743,
+      0.9
+     ],
+     "ndcgAt3": [
+      0.7505156307453441,
+      0.9239891928571473
+     ]
+    },
+    "decisions": 25,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.68,
+     "hitAt3": 0.96,
+     "hitAt5": 1.0,
+     "mrr": 0.8166666666666668,
+     "ndcgAt3": 0.8461859507142916
+    }
+   },
+   "champion:18": {
+    "ci95": {
+     "hitAt1": [
+      0.55,
+      1.0
+     ],
+     "hitAt3": [
+      0.55,
+      1.0
+     ],
+     "hitAt5": [
+      0.8333333333333334,
+      1.0
+     ],
+     "mrr": [
+      0.6389285714285714,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.55,
+      1.0
+     ]
+    },
+    "decisions": 18,
+    "matches": 13,
+    "point": {
+     "hitAt1": 0.7777777777777778,
+     "hitAt3": 0.7777777777777778,
+     "hitAt5": 0.9444444444444444,
+     "mrr": 0.8246031746031747,
+     "ndcgAt3": 0.7777777777777778
+    }
+   },
+   "champion:202": {
+    "ci95": {
+     "hitAt1": [
+      0.28125,
+      0.625
+     ],
+     "hitAt3": [
+      0.7647058823529411,
+      0.9705882352941176
+     ],
+     "hitAt5": [
+      0.90625,
+      1.0
+     ],
+     "mrr": [
+      0.5474074074074073,
+      0.7806451612903226
+     ],
+     "ndcgAt3": [
+      0.5762571027901885,
+      0.8221655479910804
+     ]
+    },
+    "decisions": 33,
+    "matches": 22,
+    "point": {
+     "hitAt1": 0.45454545454545453,
+     "hitAt3": 0.8787878787878788,
+     "hitAt5": 0.9696969696969697,
+     "mrr": 0.665993265993266,
+     "ndcgAt3": 0.7023747812770641
+    }
+   },
+   "champion:21": {
+    "ci95": {
+     "hitAt1": [
+      0.41935483870967744,
+      0.7666666666666667
+     ],
+     "hitAt3": [
+      0.8387096774193549,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.6598958333333333,
+      0.8787878787878788
+     ],
+     "ndcgAt3": [
+      0.687594044458139,
+      0.906885330739799
+     ]
+    },
+    "decisions": 30,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.6,
+     "hitAt3": 0.9333333333333333,
+     "hitAt5": 1.0,
+     "mrr": 0.7761111111111112,
+     "ndcgAt3": 0.8059455927381038
+    }
+   },
+   "champion:22": {
+    "ci95": {
+     "hitAt1": [
+      0.65,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8055555555555556,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8551549589285763,
+      1.0
+     ]
+    },
+    "decisions": 19,
+    "matches": 15,
+    "point": {
+     "hitAt1": 0.8421052631578947,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9122807017543859,
+     "ndcgAt3": 0.9348347109022587
+    }
+   },
+   "champion:222": {
+    "ci95": {
+     "hitAt1": [
+      0.7741935483870968,
+      1.0
+     ],
+     "hitAt3": [
+      0.875,
+      1.0
+     ],
+     "hitAt5": [
+      0.875,
+      1.0
+     ],
+     "mrr": [
+      0.8518518518518519,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8442441461309548,
+      1.0
+     ]
+    },
+    "decisions": 28,
+    "matches": 18,
+    "point": {
+     "hitAt1": 0.8928571428571429,
+     "hitAt3": 0.9642857142857143,
+     "hitAt5": 0.9642857142857143,
+     "mrr": 0.9345238095238095,
+     "ndcgAt3": 0.9379235538265327
+    }
+   },
+   "champion:29": {
+    "ci95": {
+     "hitAt1": [
+      0.375,
+      1.0
+     ],
+     "hitAt3": [
+      0.5714285714285714,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.59375,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.5187042505102083,
+      1.0
+     ]
+    },
+    "decisions": 8,
+    "matches": 7,
+    "point": {
+     "hitAt1": 0.75,
+     "hitAt3": 0.875,
+     "hitAt5": 1.0,
+     "mrr": 0.84375,
+     "ndcgAt3": 0.8288662191964322
+    }
+   },
+   "champion:51": {
+    "ci95": {
+     "hitAt1": [
+      0.532258064516129,
+      0.7903225806451613
+     ],
+     "hitAt3": [
+      0.8064516129032258,
+      0.9821428571428571
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.7132768361581922,
+      0.8761538461538462
+     ],
+     "ndcgAt3": [
+      0.7140951061942024,
+      0.8934119965959862
+     ]
+    },
+    "decisions": 60,
+    "matches": 39,
+    "point": {
+     "hitAt1": 0.6666666666666666,
+     "hitAt3": 0.9,
+     "hitAt5": 1.0,
+     "mrr": 0.8002777777777778,
+     "ndcgAt3": 0.8095192840476249
+    }
+   },
+   "champion:804": {
+    "ci95": {
+     "hitAt1": [
+      0.5862068965517241,
+      0.9
+     ],
+     "hitAt3": [
+      0.8928571428571429,
+      1.0
+     ],
+     "hitAt5": [
+      0.8928571428571429,
+      1.0
+     ],
+     "mrr": [
+      0.7419354838709677,
+      0.9423076923076923
+     ],
+     "ndcgAt3": [
+      0.7860827739955403,
+      0.9543643251190486
+     ]
+    },
+    "decisions": 29,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.7586206896551724,
+     "hitAt3": 0.9655172413793104,
+     "hitAt5": 0.9655172413793104,
+     "mrr": 0.8477011494252873,
+     "ndcgAt3": 0.8756134227832543
+    }
+   },
+   "champion:81": {
+    "ci95": {
+     "hitAt1": [
+      0.6551724137931034,
+      0.96875
+     ],
+     "hitAt3": [
+      0.8928571428571429,
+      1.0
+     ],
+     "hitAt5": [
+      0.8928571428571429,
+      1.0
+     ],
+     "mrr": [
+      0.7431972789115646,
+      0.9791666666666666
+     ],
+     "ndcgAt3": [
+      0.78,
+      0.984375
+     ]
+    },
+    "decisions": 30,
+    "matches": 18,
+    "point": {
+     "hitAt1": 0.8333333333333334,
+     "hitAt3": 0.9666666666666667,
+     "hitAt5": 0.9666666666666667,
+     "mrr": 0.8801587301587301,
+     "ndcgAt3": 0.9
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.6470588235294118,
+      0.7935483870967742
+     ],
+     "hitAt3": [
+      0.8707865168539326,
+      0.9647058823529412
+     ],
+     "hitAt5": [
+      0.9693251533742331,
+      1.0
+     ],
+     "mrr": [
+      0.7757601835915088,
+      0.8757383966244726
+     ],
+     "ndcgAt3": [
+      0.7833028336734722,
+      0.8892904144677016
+     ]
+    },
+    "decisions": 166,
+    "matches": 93,
+    "point": {
+     "hitAt1": 0.7228915662650602,
+     "hitAt3": 0.9216867469879518,
+     "hitAt5": 0.9879518072289156,
+     "mrr": 0.8279690189328744,
+     "ndcgAt3": 0.8396412926420004
+    }
+   },
+   "scopeNew": {
+    "ci95": {
+     "hitAt1": [
+      0.6294117647058823,
+      0.7757575757575758
+     ],
+     "hitAt3": [
+      0.875,
+      0.9607843137254902
+     ],
+     "hitAt5": [
+      0.9505494505494505,
+      0.9940828402366864
+     ],
+     "mrr": [
+      0.7701236731911578,
+      0.8655982905982906
+     ],
+     "ndcgAt3": [
+      0.7829577739955402,
+      0.8807186085944744
+     ]
+    },
+    "decisions": 165,
+    "matches": 99,
+    "point": {
+     "hitAt1": 0.703030303030303,
+     "hitAt3": 0.9212121212121213,
+     "hitAt5": 0.9757575757575757,
+     "mrr": 0.8178018278018279,
+     "ndcgAt3": 0.8327525672294417
+    }
+   },
+   "scopeOriginal": {
+    "ci95": {
+     "hitAt1": [
+      0.639344262295082,
+      0.7857142857142857
+     ],
+     "hitAt3": [
+      0.875,
+      0.9745762711864406
+     ],
+     "hitAt5": [
+      0.9736842105263158,
+      1.0
+     ],
+     "mrr": [
+      0.7761904761904762,
+      0.8710210210210211
+     ],
+     "ndcgAt3": [
+      0.7857111284053196,
+      0.8921293570186376
+     ]
+    },
+    "decisions": 115,
+    "matches": 68,
+    "point": {
+     "hitAt1": 0.7130434782608696,
+     "hitAt3": 0.9304347826086956,
+     "hitAt5": 0.991304347826087,
+     "mrr": 0.8246790890269151,
+     "ndcgAt3": 0.8410939635714328
+    }
+   },
+   "skipped": 4
+  },
+  "M1-no_rich_context": {
+   "all": {
+    "ci95": {
+     "hitAt1": [
+      0.903448275862069,
+      0.9578947368421052
+     ],
+     "hitAt3": [
+      0.9755244755244755,
+      1.0
+     ],
+     "hitAt5": [
+      0.9887218045112782,
+      1.0
+     ],
+     "mrr": [
+      0.9458955223880597,
+      0.9765100671140939
+     ],
+     "ndcgAt3": [
+      0.9521524668075262,
+      0.9805223779280476
+     ]
+    },
+    "decisions": 280,
+    "matches": 137,
+    "point": {
+     "hitAt1": 0.9321428571428572,
+     "hitAt3": 0.9892857142857143,
+     "hitAt5": 0.9964285714285714,
+     "mrr": 0.9619047619047618,
+     "ndcgAt3": 0.9672607733928587
+    }
+   },
+   "champion:145": {
+    "ci95": {
+     "hitAt1": [
+      1.0,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      1.0,
+      1.0
+     ],
+     "ndcgAt3": [
+      1.0,
+      1.0
+     ]
+    },
+    "decisions": 25,
+    "matches": 17,
+    "point": {
+     "hitAt1": 1.0,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 1.0,
+     "ndcgAt3": 1.0
+    }
+   },
+   "champion:18": {
+    "ci95": {
+     "hitAt1": [
+      0.6842105263157895,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.825,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8696394630357187,
+      1.0
+     ]
+    },
+    "decisions": 18,
+    "matches": 13,
+    "point": {
+     "hitAt1": 0.8333333333333334,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9074074074074073,
+     "ndcgAt3": 0.9312144170634953
+    }
+   },
+   "champion:202": {
+    "ci95": {
+     "hitAt1": [
+      0.7647058823529411,
+      0.9705882352941176
+     ],
+     "hitAt3": [
+      0.9032258064516129,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8636363636363636,
+      0.9852941176470589
+     ],
+     "ndcgAt3": [
+      0.8643551216450251,
+      0.9891449927521017
+     ]
+    },
+    "decisions": 33,
+    "matches": 22,
+    "point": {
+     "hitAt1": 0.8787878787878788,
+     "hitAt3": 0.9696969696969697,
+     "hitAt5": 1.0,
+     "mrr": 0.9318181818181818,
+     "ndcgAt3": 0.9361451291125568
+    }
+   },
+   "champion:21": {
+    "ci95": {
+     "hitAt1": [
+      0.7857142857142857,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8928571428571429,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9209135186224552,
+      1.0
+     ]
+    },
+    "decisions": 30,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.9,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.95,
+     "ndcgAt3": 0.9630929753571458
+    }
+   },
+   "champion:22": {
+    "ci95": {
+     "hitAt1": [
+      0.8421052631578947,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9210526315789473,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9417257505639144,
+      1.0
+     ]
+    },
+    "decisions": 19,
+    "matches": 15,
+    "point": {
+     "hitAt1": 0.9473684210526315,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9736842105263158,
+     "ndcgAt3": 0.9805752501879714
+    }
+   },
+   "champion:222": {
+    "ci95": {
+     "hitAt1": [
+      0.8888888888888888,
+      1.0
+     ],
+     "hitAt3": [
+      0.8888888888888888,
+      1.0
+     ],
+     "hitAt5": [
+      0.8888888888888888,
+      1.0
+     ],
+     "mrr": [
+      0.9074074074074074,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.8888888888888888,
+      1.0
+     ]
+    },
+    "decisions": 28,
+    "matches": 18,
+    "point": {
+     "hitAt1": 0.9642857142857143,
+     "hitAt3": 0.9642857142857143,
+     "hitAt5": 0.9642857142857143,
+     "mrr": 0.9702380952380952,
+     "ndcgAt3": 0.9642857142857143
+    }
+   },
+   "champion:29": {
+    "ci95": {
+     "hitAt1": [
+      0.7,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.8,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.85,
+      1.0
+     ]
+    },
+    "decisions": 8,
+    "matches": 7,
+    "point": {
+     "hitAt1": 0.875,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9166666666666666,
+     "ndcgAt3": 0.9375
+    }
+   },
+   "champion:51": {
+    "ci95": {
+     "hitAt1": [
+      0.8923076923076924,
+      1.0
+     ],
+     "hitAt3": [
+      0.9473684210526315,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9354838709677419,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9309111233021106,
+      1.0
+     ]
+    },
+    "decisions": 60,
+    "matches": 39,
+    "point": {
+     "hitAt1": 0.95,
+     "hitAt3": 0.9833333333333333,
+     "hitAt5": 1.0,
+     "mrr": 0.9708333333333333,
+     "ndcgAt3": 0.9710309917857153
+    }
+   },
+   "champion:804": {
+    "ci95": {
+     "hitAt1": [
+      0.7931034482758621,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.896551724137931,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9236406386699568,
+      1.0
+     ]
+    },
+    "decisions": 29,
+    "matches": 17,
+    "point": {
+     "hitAt1": 0.896551724137931,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 0.9482758620689655,
+     "ndcgAt3": 0.9618203193349784
+    }
+   },
+   "champion:81": {
+    "ci95": {
+     "hitAt1": [
+      1.0,
+      1.0
+     ],
+     "hitAt3": [
+      1.0,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      1.0,
+      1.0
+     ],
+     "ndcgAt3": [
+      1.0,
+      1.0
+     ]
+    },
+    "decisions": 30,
+    "matches": 18,
+    "point": {
+     "hitAt1": 1.0,
+     "hitAt3": 1.0,
+     "hitAt5": 1.0,
+     "mrr": 1.0,
+     "ndcgAt3": 1.0
+    }
+   },
+   "playerDisjoint": {
+    "ci95": {
+     "hitAt1": [
+      0.8728323699421965,
+      0.9542857142857143
+     ],
+     "hitAt3": [
+      0.9691358024691358,
+      1.0
+     ],
+     "hitAt5": [
+      0.98125,
+      1.0
+     ],
+     "mrr": [
+      0.9274509803921568,
+      0.9742857142857143
+     ],
+     "ndcgAt3": [
+      0.9364326345458577,
+      0.9794763728089404
+     ]
+    },
+    "decisions": 166,
+    "matches": 93,
+    "point": {
+     "hitAt1": 0.9156626506024096,
+     "hitAt3": 0.9879518072289156,
+     "hitAt5": 0.9939759036144579,
+     "mrr": 0.9523092369477912,
+     "ndcgAt3": 0.9596945634681601
+    }
+   },
+   "scopeNew": {
+    "ci95": {
+     "hitAt1": [
+      0.8597560975609756,
+      0.9426751592356688
+     ],
+     "hitAt3": [
+      0.9691358024691358,
+      1.0
+     ],
+     "hitAt5": [
+      0.9810126582278481,
+      1.0
+     ],
+     "mrr": [
+      0.921239837398374,
+      0.9684418145956607
+     ],
+     "ndcgAt3": [
+      0.9324650640259772,
+      0.9747272969715971
+     ]
+    },
+    "decisions": 165,
+    "matches": 99,
+    "point": {
+     "hitAt1": 0.9030303030303031,
+     "hitAt3": 0.9878787878787879,
+     "hitAt5": 0.9939393939393939,
+     "mrr": 0.945959595959596,
+     "ndcgAt3": 0.9549767093506515
+    }
+   },
+   "scopeOriginal": {
+    "ci95": {
+     "hitAt1": [
+      0.9423076923076923,
+      1.0
+     ],
+     "hitAt3": [
+      0.9722222222222222,
+      1.0
+     ],
+     "hitAt5": [
+      1.0,
+      1.0
+     ],
+     "mrr": [
+      0.9662162162162162,
+      1.0
+     ],
+     "ndcgAt3": [
+      0.9633284755420926,
+      1.0
+     ]
+    },
+    "decisions": 115,
+    "matches": 68,
+    "point": {
+     "hitAt1": 0.9739130434782609,
+     "hitAt3": 0.991304347826087,
+     "hitAt5": 1.0,
+     "mrr": 0.9847826086956522,
+     "ndcgAt3": 0.984885734844721
+    }
+   },
+   "skipped": 4
+  }
+ }
+}

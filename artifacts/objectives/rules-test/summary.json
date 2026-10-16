@@ -1,0 +1,59 @@
+{
+  "n": 100,
+  "macroF1": 0.9177,
+  "accuracy": 0.91,
+  "jsonValidRate": 1.0,
+  "perClass": {
+    "BALANCED": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "support": 15
+    },
+    "SURVIVAL": {
+      "precision": 0.9444,
+      "recall": 0.85,
+      "f1": 0.8947,
+      "support": 20
+    },
+    "DAMAGE": {
+      "precision": 1.0,
+      "recall": 0.75,
+      "f1": 0.8571,
+      "support": 20
+    },
+    "UTILITY": {
+      "precision": 1.0,
+      "recall": 0.95,
+      "f1": 0.9744,
+      "support": 20
+    },
+    "NEEDS_INPUT": {
+      "precision": 0.7576,
+      "recall": 1.0,
+      "f1": 0.8621,
+      "support": 25
+    }
+  },
+  "perCategoryAccuracy": {
+    "ambiguous": 1.0,
+    "balanced": 1.0,
+    "direct": 0.9118,
+    "exclusion_only": 1.0,
+    "injection": 1.0,
+    "negation": 1.0,
+    "out_of_domain": 1.0,
+    "precedence": 0.2,
+    "situation": 0.8667,
+    "vague": 1.0
+  },
+  "negationAccuracy": 0.8947,
+  "latencyP50S": 0.0001,
+  "latencyP95S": 0.0003,
+  "config": {
+    "provider": "RULES",
+    "version": "rules_v1"
+  },
+  "split": "test",
+  "corpusSha256": "c567152c9ded35f7bde7baceff2f7a9662b418d36d5ab93b70f93b3b66090a94"
+}

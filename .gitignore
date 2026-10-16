@@ -1,14 +1,22 @@
 # Local workspace files
-.private/
+# Private runtime, raw data and execution history stay local.
+/.private/*
+!/.private/artifacts/
+!/.private/colab/
+/.private/colab/*/bundle-map*.json
+/.private/colab/*/riftlab-*-colab/
+/.private/colab/*/riftlab-*-colab.zip
 /backup_riftlab_ignored.sh
-/docs/
+# Downloaded third-party pages can contain browser/session data.
+/docs/*.html
+/docs/*_files/
 /AGENTS.md
 /CLAUDE.md
 /RTK.md
 /.agents/
 /.codex/
 /.claude/
-/.aws
+**/.aws
 /skills-lock.json
 /*.gpg
 .env
@@ -18,7 +26,8 @@
 *.key
 # Data and model artifacts
 /data/
-/artifacts/
+/artifacts/**/logs/
+*.log
 /mlruns/
 /wandb/
 *.parquet
@@ -26,6 +35,19 @@
 *.safetensors
 *.gguf
 *.pt
+# Audited models and aggregate experimental returns are portable project assets.
+!/.private/artifacts/**/*.cbm
+!/artifacts/**/*.safetensors
+# Credentials remain excluded even inside otherwise versioned directories.
+**/riot-account*
+**/bundle-map*
+**/credentials
+**/credentials.*
+**/id_rsa
+**/id_ed25519
+**/id_ecdsa
+*.p12
+*.pfx
 # Build, caches and editors
 __pycache__/
 *.py[cod]

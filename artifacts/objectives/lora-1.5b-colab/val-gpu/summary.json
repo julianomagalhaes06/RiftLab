@@ -1,0 +1,67 @@
+{
+  "n": 161,
+  "macroF1": 0.8966,
+  "accuracy": 0.8882,
+  "jsonValidRate": 1.0,
+  "perClass": {
+    "BALANCED": {
+      "precision": 0.95,
+      "recall": 1.0,
+      "f1": 0.9744,
+      "support": 19
+    },
+    "SURVIVAL": {
+      "precision": 0.7714,
+      "recall": 0.931,
+      "f1": 0.8438,
+      "support": 29
+    },
+    "DAMAGE": {
+      "precision": 0.8667,
+      "recall": 0.8667,
+      "f1": 0.8667,
+      "support": 45
+    },
+    "UTILITY": {
+      "precision": 0.9032,
+      "recall": 0.875,
+      "f1": 0.8889,
+      "support": 32
+    },
+    "NEEDS_INPUT": {
+      "precision": 1.0,
+      "recall": 0.8333,
+      "f1": 0.9091,
+      "support": 36
+    }
+  },
+  "perCategoryAccuracy": {
+    "ambiguous": 0.8889,
+    "balanced": 1.0,
+    "direct": 0.9688,
+    "exclusion_only": 0.6667,
+    "injection": 0.8,
+    "negation": 0.9259,
+    "out_of_domain": 1.0,
+    "precedence": 0.9048,
+    "situation": 0.7812,
+    "vague": 1.0
+  },
+  "negationAccuracy": 0.8462,
+  "latencyP50S": 0.4929,
+  "latencyP95S": 0.5491,
+  "config": {
+    "model": "Qwen/Qwen2.5-1.5B-Instruct",
+    "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+    "adapter": "artifacts/objectives/lora-1.5b-colab/epoch-3",
+    "seed": 0,
+    "device": "auto",
+    "maxNewTokens": 12
+  },
+  "split": "val",
+  "corpusSha256": "b79f3157bba7bc4228009d98547d15a32e1fb0b0a3996e5198c0ceb1824d2b70",
+  "loadS": 24.11,
+  "peakRssMb": 9877,
+  "torch": "2.11.0+cu130",
+  "cpu": "x86_64"
+}

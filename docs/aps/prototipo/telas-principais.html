@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RiftLab — protótipo de telas para APS</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #183743; background: #edf4f7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #123443; color: white; padding: 22px max(24px, calc((100vw - 1360px)/2)); }
+    header h1 { margin: 0 0 5px; font-size: 1.65rem; }
+    header p { margin: 0; color: #d5e8ee; }
+    main { max-width: 1408px; padding: 24px; margin: auto; }
+    .intro { padding: 16px 20px; background: #dceef6; border-left: 5px solid #2f7897; border-radius: 8px; line-height: 1.5; }
+    .layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 22px; margin-top: 22px; }
+    nav { display: flex; flex-direction: column; gap: 7px; }
+    button { font: inherit; cursor: pointer; }
+    nav button { text-align: left; padding: 10px 12px; background: white; border: 1px solid #b4cdd7; border-radius: 8px; color: #183743; }
+    nav button[aria-current="step"] { background: #1f607b; color: white; border-color: #1f607b; font-weight: 700; }
+    .panel { min-width: 0; padding: 18px; background: white; border-radius: 12px; box-shadow: 0 3px 15px #12344315; }
+    .meta { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 12px; }
+    h2 { margin: 0 0 6px; }
+    #description { margin: 0 0 16px; color: #405763; line-height: 1.45; }
+    .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 15px; }
+    .tags span { font-size: .85rem; border-radius: 99px; padding: 4px 9px; background: #e0eef4; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+    .controls button { border: 1px solid #2c6d89; background: white; color: #164b63; padding: 7px 10px; border-radius: 7px; }
+    .controls button[aria-pressed="true"] { background: #1f607b; color: white; }
+    .shot { overflow: auto; background: #e8f0f4; border: 1px solid #bed0d8; border-radius: 8px; padding: 14px; text-align: center; }
+    .shot img { display: block; margin: auto; max-width: 100%; height: auto; box-shadow: 0 2px 10px #20384130; }
+    .shot img.mobile { max-width: 360px; }
+    .footer { display: flex; justify-content: space-between; gap: 10px; margin-top: 16px; }
+    .footer button { border: 0; background: #1f607b; color: white; padding: 10px 15px; border-radius: 7px; }
+    .footer button:disabled { opacity: .45; cursor: default; }
+    @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); } }
+  </style>
+</head>
+<body>
+  <header><h1>RiftLab — telas principais</h1><p>Protótipo acadêmico de baixa/média fidelidade • dados ilustrativos</p></header>
+  <main>
+    <div class="intro">Use a lista ou as setas para percorrer a jornada. Estas capturas são do protótipo navegável do projeto, com dados sintéticos. Importação, ranking e avaliação aqui não devem ser confundidos com integração real; os estados de erro foram incluídos para mostrar o comportamento esperado.</div>
+    <div class="layout">
+      <nav id="steps" aria-label="Telas da jornada"></nav>
+      <section class="panel" aria-live="polite">
+        <div class="meta"><div><h2 id="title"></h2><p id="description"></p></div><div class="controls"><button id="desktop" type="button" aria-pressed="true">Desktop 1280 px</button><button id="mobile" type="button" aria-pressed="false">Celular 360 px</button></div></div>
+        <div class="tags" id="tags"></div>
+        <div class="shot"><img id="screen" alt=""></div>
+        <div class="footer"><button id="previous" type="button">← Anterior</button><button id="next" type="button">Próxima →</button></div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const screens = [
+      {file:'01-entrada.png', title:'1. Entrada e importação', desc:'O operador abre uma demonstração ou informa um identificador válido de partida concluída.', tags:['UC01','RF01–RF03','RF17','simulado']},
+      {file:'03-progresso-loading.png', title:'2. Acompanhamento', desc:'A pessoa acompanha o processamento e sabe que ainda não existe partida pronta para análise.', tags:['UC01','RF03','estado: carregando']},
+      {file:'04-progresso-falha.png', title:'3. Falha recuperável', desc:'Um erro de importação é apresentado em linguagem legível, com opção de tentar novamente.', tags:['UC01','RF03','estado alternativo']},
+      {file:'08-decisoes-normal.png', title:'4. Lista de decisões', desc:'Após escolher uma partida, o jogador seleciona o participante e o momento de compra a estudar.', tags:['UC02','RF04']},
+      {file:'12-contexto-disponivel.png', title:'5. Contexto pré-decisão', desc:'O contexto mostra inventário, orçamento estimado, origem dos dados e escolha de objetivo antes do alvo.', tags:['UC02','UC03','RF05','RF09']},
+      {file:'14-escolha-inicial.png', title:'6. Escolha no modo Estudo', desc:'A pessoa escolhe entre alternativas sem ver a compra histórica nem o ranking; pistas são opcionais.', tags:['UC06','RF13','RF14']},
+      {file:'18-comparacao-disponivel.png', title:'7. Comparação revelada', desc:'A comparação aparece somente após ação de revelar e explicita os compromissos entre alternativas.', tags:['UC02','UC06','RF07','RF13']},
+      {file:'19-transferencia-inicial.png', title:'8. Transferência', desc:'Um segundo cenário independente permite aplicar o raciocínio sem pistas.', tags:['UC06','RF16','simulado']},
+      {file:'24-comparacao-sem-recomendacao.png', title:'9. Sem recomendação disponível', desc:'A interface informa que a qualidade dos dados não permite uma recomendação confiável.', tags:['UC02','RF05','RF08','estado alternativo']}
+    ];
+    let current = 0, width = '1280';
+    const nav = document.getElementById('steps');
+    const img = document.getElementById('screen');
+    function render() {
+      nav.replaceChildren(...screens.map((s, i) => { const b = document.createElement('button'); b.type='button'; b.textContent=s.title; b.setAttribute('aria-current', i===current?'step':'false'); b.onclick=()=>{current=i;render()}; return b; }));
+      const s = screens[current];
+      document.getElementById('title').textContent=s.title;
+      document.getElementById('description').textContent=s.desc;
+      const tags=document.getElementById('tags');
+      tags.replaceChildren(...s.tags.map(t=>{const x=document.createElement('span');x.textContent=t;return x}));
+      img.src=`telas/${width}-${s.file}`; img.alt=`Captura ilustrativa da tela ${s.title}`;
+      img.className=width==='360'?'mobile':'';
+      document.getElementById('previous').disabled=current===0;
+      document.getElementById('next').disabled=current===screens.length-1;
+      document.getElementById('desktop').setAttribute('aria-pressed',String(width==='1280'));
+      document.getElementById('mobile').setAttribute('aria-pressed',String(width==='360'));
+    }
+    document.getElementById('previous').onclick=()=>{if(current>0){current--;render()}};
+    document.getElementById('next').onclick=()=>{if(current<screens.length-1){current++;render()}};
+    document.getElementById('desktop').onclick=()=>{width='1280';render()};
+    document.getElementById('mobile').onclick=()=>{width='360';render()};
+    render();
+  </script>
+</body>
+</html>

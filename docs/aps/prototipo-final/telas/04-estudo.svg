@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1440" height="900" viewBox="0 0 1440 900">
+<rect x="0" y="0" width="1440" height="900" rx="0" fill="#F2F5F4"/>
+<rect x="0" y="0" width="1440" height="86" rx="0" fill="#FFFFFF"/>
+<line x1="0" y1="86" x2="1440" y2="86" stroke="#CDD9D6" stroke-width="1"/>
+<rect x="75" y="23" width="40" height="40" rx="7" fill="#183F48"/>
+<text x="95" y="51" font-family="Inter,Arial,sans-serif" font-size="23" font-weight="800" fill="#FFFFFF" text-anchor="middle">R</text>
+<text x="129" y="51" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="800" fill="#182B33">RiftLab</text>
+<text x="302" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="650" fill="#183F48">Partidas</text>
+<text x="407" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="500" fill="#52666D">Estudo</text>
+<text x="500" y="51" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="500" fill="#52666D">Avaliação</text>
+<text x="1287" y="51" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="600" fill="#52666D">Após a partida</text>
+<text x="76" y="133" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="650" fill="#126E66">Estudo / escolha</text>
+<text x="76" y="198" font-family="Inter,Arial,sans-serif" font-size="44" font-weight="760" fill="#182B33">Escolha antes de revelar.</text>
+<text x="77" y="230" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="400" fill="#52666D">As alternativas são apresentadas em ordem neutra; a resposta do modelo fica escondida.</text>
+<line x1="76" y1="856" x2="1364" y2="856" stroke="#CDD9D6" stroke-width="1"/>
+<text x="76" y="880" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#52666D">Conceito de interface • dados ilustrativos</text>
+<text x="1364" y="880" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#52666D" text-anchor="end">Ativos: Riot Data Dragon 16.17.1</text>
+<rect x="76" y="270" width="852" height="540" rx="10" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<text x="110" y="320" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="700" fill="#182B33">Qual item atende ao objetivo definido?</text>
+<text x="110" y="351" font-family="Inter,Arial,sans-serif" font-size="15" font-weight="400" fill="#52666D">Sobreviver à próxima luta • orçamento aproximado, não garantido</text>
+<rect x="110" y="386" width="784" height="89" rx="6" fill="#E7EEEB" stroke="#126E66" stroke-width="1"/>
+<rect x="126" y="408" width="43" height="43" rx="5" fill="#183F48"/>
+<text x="147" y="436" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="700" fill="#FFFFFF" text-anchor="middle">A</text>
+<text x="191" y="421" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#182B33">Alternativa A</text>
+<text x="191" y="448" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#52666D">Defesa física e vida</text>
+<rect x="110" y="491" width="784" height="89" rx="6" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<rect x="126" y="513" width="43" height="43" rx="5" fill="#F2F5F4"/>
+<text x="147" y="541" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="700" fill="#183F48" text-anchor="middle">B</text>
+<text x="191" y="526" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#182B33">Alternativa B</text>
+<text x="191" y="553" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#52666D">Resistência mágica e utilidade</text>
+<rect x="110" y="596" width="784" height="89" rx="6" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<rect x="126" y="618" width="43" height="43" rx="5" fill="#F2F5F4"/>
+<text x="147" y="646" font-family="Inter,Arial,sans-serif" font-size="19" font-weight="700" fill="#183F48" text-anchor="middle">C</text>
+<text x="191" y="631" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#182B33">Alternativa C</text>
+<text x="191" y="658" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#52666D">Mobilidade e proteção</text>
+<rect x="110" y="724" width="203" height="46" rx="6" fill="#126E66"/><text x="211.5" y="753" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">Registrar escolha</text>
+<rect x="952" y="270" width="412" height="540" rx="10" fill="#E7EEEB" stroke="#E7EEEB" stroke-width="1"/>
+<text x="982" y="317" font-family="Inter,Arial,sans-serif" font-size="22" font-weight="700" fill="#182B33">Seu raciocínio</text>
+<text x="982" y="352" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="400" fill="#52666D">Por que esta alternativa parece melhor?</text>
+<rect x="982" y="375" width="352" height="109" rx="6" fill="#FFFFFF" stroke="#CDD9D6" stroke-width="1"/>
+<text x="998" y="403" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#52666D">Escreva sua justificativa...</text>
+<line x1="982" y1="531" x2="1334" y2="531" stroke="#CDD9D6" stroke-width="1"/>
+<text x="982" y="569" font-family="Inter,Arial,sans-serif" font-size="17" font-weight="700" fill="#182B33">Precisa de uma pista?</text>
+<text x="982" y="598" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="400" fill="#52666D">Abra um nível de cada vez.</text>
+<rect x="982" y="628" width="167" height="46" rx="6" fill="#FFFFFF" stroke="#126E66" stroke-width="1"/><text x="1065.5" y="657" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="700" fill="#126E66" text-anchor="middle">Pista 1</text>
+<text x="982" y="774" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="400" fill="#52666D">Também é possível responder “não sei”.</text>
+</svg>
