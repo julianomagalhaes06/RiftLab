@@ -178,6 +178,8 @@ O OpenAPI servido descreve:
 
 Os nomes dos itens no inventário, nas alternativas de estudo e nos padrões por campeão são exibidos em português brasileiro com o catálogo oficial do Data Dragon da versão fixada para a decisão ou padrão. A tradução altera apenas a apresentação: IDs, receitas, preços, regras e resultados permanecem os mesmos. Se o catálogo traduzido estiver indisponível ou não contiver o item, o nome original é preservado; sem nome, aparece o ID. A consulta ao catálogo oficial ocorre no navegador, sem credenciais, e não é necessária para analisar a decisão.
 
+Na tela de decisão, o inventário, o amuleto e as opções de compra também mostram ícones oficiais da mesma versão, mantendo os nomes visíveis e as escolhas acessíveis por teclado. Falhas nas imagens não bloqueiam o estudo nem alteram o espaço reservado para o ícone.
+
 ### Glossário no modo Estudo
 
 O modo Estudo oferece um glossário curado e acessível por teclado, disponível antes da escolha e durante a comparação. Ele explica composição, componentes, custo restante, orçamento, elegibilidade, popularidade e abstenção, sem depender de um modelo ou revelar a compra histórica. Consultar o glossário não abre pistas nem modifica a tentativa. Na prática de transferência sem ajuda, o glossário fica oculto.

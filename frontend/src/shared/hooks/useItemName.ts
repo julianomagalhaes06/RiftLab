@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 
 export type ItemNamesMap = Readonly<Record<string, string>>;
 export const ItemNamesContext = createContext<ItemNamesMap>({});
+export const ItemVersionContext = createContext<string | null>(null);
 
 export function useItemName() {
   const names = useContext(ItemNamesContext);

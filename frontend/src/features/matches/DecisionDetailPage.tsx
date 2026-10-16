@@ -15,6 +15,7 @@ import { useDecision } from "./useDecision";
 import { StudyPanel } from "../study/StudyPanel";
 import { ItemNames } from "../../shared/ui/ItemNames";
 import { useItemName } from "../../shared/hooks/useItemName";
+import { ItemIcon } from "../../shared/ui/ItemIcon";
 
 const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
   NO_PRIOR_FRAME: "não há quadro anterior à decisão",
@@ -40,13 +41,15 @@ function Inventory({ decision }: { decision: DecisionState }) {
         <ul className="list list--compact">
           {items.map((item) => (
             <li key={item.itemId} className="list__item">
-              <span className="list__title">{itemName(item)}</span>
+              <span className="list__title item-with-icon"><ItemIcon itemId={item.itemId} /><span>{itemName(item)}</span></span>
               {item.quantity > 1 ? <span className="tag">×{item.quantity}</span> : null}
             </li>
           ))}
         </ul>
       )}
-      <p className="muted">Amuleto: {decision.inventory.trinketItemId != null ? itemName({ itemId: decision.inventory.trinketItemId }) : "Vazio"}</p>
+      <p className="muted">Amuleto: {decision.inventory.trinketItemId != null
+        ? <span className="item-with-icon"><ItemIcon itemId={decision.inventory.trinketItemId} /><span>{itemName({ itemId: decision.inventory.trinketItemId })}</span></span>
+        : "Vazio"}</p>
     </section>
   );
 }

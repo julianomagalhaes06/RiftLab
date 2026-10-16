@@ -1,0 +1,30 @@
+.item-icon {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+  vertical-align: middle;
+}
+
+.item-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.item-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.item-with-icon > span:last-child {
+  overflow-wrap: anywhere;
+}

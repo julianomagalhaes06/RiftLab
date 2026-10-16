@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ItemNamesContext, type ItemNamesMap as Names } from "../hooks/useItemName";
+import { ItemNamesContext, ItemVersionContext, type ItemNamesMap as Names } from "../hooks/useItemName";
 
 const catalogs = new Map<string, Promise<Names>>();
 
@@ -43,8 +43,8 @@ export function ItemNames({ version, children }: { version?: string | null; chil
     });
     return () => { active = false; };
   }, [version]);
-  return <ItemNamesContext value={result && result.version === version ? result.names : {}}>
+  return <ItemVersionContext value={version ?? null}><ItemNamesContext value={result && result.version === version ? result.names : {}}>
     {result?.version === version && result?.failed ? <span className="muted" role="note">Tradução dos itens indisponível; exibindo os nomes originais do catálogo. </span> : null}
     {children}
-  </ItemNamesContext>;
+  </ItemNamesContext></ItemVersionContext>;
 }

@@ -13,6 +13,7 @@ import { ExportLinks, Reflection, ReviewerFeedback } from "../reports/AfterCompa
 import { objectiveLabel, objectiveOrigin } from "../objectives/objectiveText";
 import { GlossaryDisclosure } from "../review/components/GlossaryDisclosure";
 import { useItemName } from "../../shared/hooks/useItemName";
+import { ItemIcon } from "../../shared/ui/ItemIcon";
 import "../review/review.css";
 
 /**
@@ -87,7 +88,7 @@ function Comparison({ attempt, headingRef }: { attempt: LearningAttempt; heading
               return (
                 <li key={candidate.itemId} className={chosen ? "comparison-list__item--chosen" : undefined}>
                   <strong>
-                    {candidate.rank}. {name(candidate)}
+                    <span className="item-with-icon"><ItemIcon itemId={candidate.itemId} /><span>{candidate.rank}. {name(candidate)}</span></span>
                   </strong>
                   {chosen ? <span className="tag-chosen"> — sua escolha</span> : null}
                   {historical ? <span className="tag"> compra feita na partida (histórico)</span> : null}
@@ -189,7 +190,7 @@ function Scenario({ attempt }: { attempt: LearningAttempt }) {
         <ul className="comparison-list">
           {(result.candidates ?? []).map((candidate) => (
             <li key={candidate.itemId}>
-              Cenário com {value} de ouro — {name(candidate)}: faltam {candidate.remainingCost};{" "}
+              Cenário com {value} de ouro — <span className="item-with-icon"><ItemIcon itemId={candidate.itemId} /><span>{name(candidate)}</span></span>: faltam {candidate.remainingCost};{" "}
               {AFFORDABILITY_TEXT[candidate.affordability] ?? candidate.affordability}
             </li>
           ))}
@@ -251,7 +252,7 @@ function Reanalysis({ attempt }: { attempt: LearningAttempt }) {
           <ol className="comparison-list">
             {(result.candidates ?? []).map((candidate) => (
               <li key={candidate.itemId}>
-                {candidate.rank}. {name(candidate)}
+                <span className="item-with-icon"><ItemIcon itemId={candidate.itemId} /><span>{candidate.rank}. {name(candidate)}</span></span>
               </li>
             ))}
           </ol>
@@ -397,7 +398,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
                 checked={answered ? attempt.selectedItemId === option.itemId : choice === option.itemId}
                 onChange={() => setChoice(option.itemId)}
               />
-              {name(option)}
+              <span className="item-with-icon"><ItemIcon itemId={option.itemId} /><span>{name(option)}</span></span>
             </label>
           ))}
           <label className="radio-option">
