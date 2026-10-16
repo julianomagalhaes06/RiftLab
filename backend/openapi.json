@@ -1262,6 +1262,17 @@
             ],
             "title": "Curationrulesversion"
           },
+          "dataDragonVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datadragonversion"
+          },
           "featureSchemaVersion": {
             "title": "Featureschemaversion",
             "type": "string"

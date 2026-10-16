@@ -6,15 +6,15 @@ import {
   describeBudget,
   formatAge,
   formatGameTime,
-  itemLabel,
   ordinalLabel,
   reasonText,
   subReasonText,
-  trinketLabel,
 } from "./format";
 import { ChampionBadge } from "./ChampionBadge";
 import { useDecision } from "./useDecision";
 import { StudyPanel } from "../study/StudyPanel";
+import { ItemNames } from "../../shared/ui/ItemNames";
+import { useItemName } from "../../shared/hooks/useItemName";
 
 const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
   NO_PRIOR_FRAME: "não há quadro anterior à decisão",
@@ -23,6 +23,7 @@ const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
 };
 
 function Inventory({ decision }: { decision: DecisionState }) {
+  const itemName = useItemName();
   const items = decision.inventory.items ?? [];
   const uncertain = (decision.reasons ?? []).some((reason) => reason.code === "INVENTORY_UNCERTAIN");
   return (
@@ -39,13 +40,13 @@ function Inventory({ decision }: { decision: DecisionState }) {
         <ul className="list list--compact">
           {items.map((item) => (
             <li key={item.itemId} className="list__item">
-              <span className="list__title">{itemLabel(item)}</span>
+              <span className="list__title">{itemName(item)}</span>
               {item.quantity > 1 ? <span className="tag">×{item.quantity}</span> : null}
             </li>
           ))}
         </ul>
       )}
-      <p className="muted">Trinket: {trinketLabel(decision.inventory.trinketItemId)}</p>
+      <p className="muted">Amuleto: {decision.inventory.trinketItemId != null ? itemName({ itemId: decision.inventory.trinketItemId }) : "Vazio"}</p>
     </section>
   );
 }
@@ -206,10 +207,12 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         </ul>
       ) : null}
 
-      <Inventory decision={decision} />
-      <Level decision={decision} />
-      <Budget decision={decision} />
-      {decision.eligible ? <StudyPanel decisionId={decision.decisionId} /> : null}
+      <ItemNames version={decision.versions.dataDragonVersion}>
+        <Inventory decision={decision} />
+        <Level decision={decision} />
+        <Budget decision={decision} />
+        {decision.eligible ? <StudyPanel decisionId={decision.decisionId} /> : null}
+      </ItemNames>
       <TechnicalDetails decision={decision} />
     </section>
   );

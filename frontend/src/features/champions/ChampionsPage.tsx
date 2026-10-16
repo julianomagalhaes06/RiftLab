@@ -4,16 +4,23 @@ import { isAbortError } from "../../shared/api/errors";
 import { useRouter } from "../../shared/router/context";
 import { Link } from "../../shared/router/Link";
 import { ChampionBadge } from "../matches/ChampionBadge";
+import { ItemNames } from "../../shared/ui/ItemNames";
+import { useItemName } from "../../shared/hooks/useItemName";
 import "./champions.css";
 
 const PHASES = { sequence: "1º → 2º item", first: "Primeiro item", second: "Segundo item" } as const;
 
 function ItemPortrait({ item }: { item: NonNullable<ChampionPatterns["patterns"]>[number]["items"][number] }) {
+  return <ItemNames version={item.dataDragonVersion}><LocalizedItemPortrait item={item} /></ItemNames>;
+}
+
+function LocalizedItemPortrait({ item }: { item: NonNullable<ChampionPatterns["patterns"]>[number]["items"][number] }) {
+  const name = useItemName();
   const [failed, setFailed] = useState(false);
   return <span className="pattern-item">
     {!failed && <img src={`https://ddragon.leagueoflegends.com/cdn/${item.dataDragonVersion}/img/item/${item.itemId}.png`}
       alt="" width={40} height={40} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />}
-    <span>{item.name || `Item ${item.itemId}`}</span>
+    <span>{name(item)}</span>
   </span>;
 }
 

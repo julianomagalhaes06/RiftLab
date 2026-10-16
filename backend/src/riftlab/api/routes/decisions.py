@@ -163,6 +163,7 @@ def _to_detail(detail: DecisionDetail) -> DecisionState:
             absent_reason=detail.level.get("absentReason"),
         ),
         versions=DecisionVersionInfo(
+            data_dragon_version=detail.data_dragon_version,
             reconstruction_version=versions.reconstruction_version,
             selection_version=versions.selection_version,
             feature_schema_version=versions.feature_schema_version,

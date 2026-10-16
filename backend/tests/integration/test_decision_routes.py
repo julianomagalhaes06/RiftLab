@@ -162,6 +162,7 @@ async def test_demo_0002_list_and_detail_through_the_api(
     assert body["versions"]["selectionVersion"] == "decision_selection_v1"
     assert body["versions"]["reconstructionVersion"] == RECONSTRUCTION_ALGORITHM_VERSION
     assert body["versions"]["scopeVersion"] == "demo_scope_v1"
+    assert body["versions"]["dataDragonVersion"] == "demo-datadragon-1"
     assert body["versions"]["curationRulesVersion"] == "curated_demo_v1"
     assert "100010" not in detail.text and "100010" not in listing.text  # o alvo nunca aparece
 

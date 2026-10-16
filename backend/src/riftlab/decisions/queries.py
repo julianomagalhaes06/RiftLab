@@ -166,6 +166,7 @@ class DecisionDetail:
     # ponto (linha imutável), nunca do canônico atual; None = sem catálogo ou
     # item ausente dele
     item_names: dict[int, str | None]
+    data_dragon_version: str | None = None
 
 
 _read_only = read_only_unit_of_work  # transação READ ONLY compartilhada (shared/db.py)
@@ -242,9 +243,12 @@ async def get_decision_detail(
         item_names: dict[int, str | None] = {}
         catalog_id = point.versions.catalog_id
         catalog_repo = SqlAlchemyCatalogRepository(session)
+        catalog = await catalog_repo.get_catalog_version(catalog_id) if catalog_id else None
         for raw_item_id in inventory.get("items", {}):
             item_id = int(raw_item_id)
             item = await catalog_repo.get_item(catalog_id, item_id) if catalog_id else None
             name = item.attributes.get("name") if item is not None else None
             item_names[item_id] = name if isinstance(name, str) and name else None
-    return DecisionDetail(point, inventory, level, item_names)
+    return DecisionDetail(
+        point, inventory, level, item_names, catalog.data_dragon_version if catalog else None
+    )

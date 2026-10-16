@@ -168,7 +168,7 @@ describe("fluxo principal: demonstração → importação → partida → decis
     expect(await screen.findByText("Componente Sintético A")).toBeInTheDocument();
     expect(screen.getByText("×2")).toBeInTheDocument();
     expect(screen.getByText("Item #100002, nome indisponível")).toBeInTheDocument();
-    expect(screen.getByText("Trinket: Vazio")).toBeInTheDocument();
+    expect(screen.getByText("Amuleto: Vazio")).toBeInTheDocument();
     expect(screen.getByText("Nível 4 (quadro há 20 s)")).toBeInTheDocument();
     expect(screen.getByText(/Aproximadamente 640 de ouro/)).toBeInTheDocument();
 

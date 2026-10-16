@@ -966,6 +966,8 @@ export interface components {
             classificationVersion?: string | null;
             /** Curationrulesversion */
             curationRulesVersion?: string | null;
+            /** Datadragonversion */
+            dataDragonVersion?: string | null;
             /** Featureschemaversion */
             featureSchemaVersion: string;
             /** Reconstructionversion */

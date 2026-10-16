@@ -181,6 +181,7 @@ class DecisionVersionInfo(CamelModel):
     """Todas as versões que produziram o ponto (linhas imutáveis: uma extração
     antiga continua consultável com as suas versões)."""
 
+    data_dragon_version: str | None = None
     reconstruction_version: int = Field(ge=1)
     selection_version: str
     feature_schema_version: str

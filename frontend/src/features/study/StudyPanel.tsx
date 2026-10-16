@@ -12,6 +12,7 @@ import { ObjectivePicker } from "../objectives/ObjectivePicker";
 import { ExportLinks, Reflection, ReviewerFeedback } from "../reports/AfterComparison";
 import { objectiveLabel, objectiveOrigin } from "../objectives/objectiveText";
 import { GlossaryDisclosure } from "../review/components/GlossaryDisclosure";
+import { useItemName } from "../../shared/hooks/useItemName";
 import "../review/review.css";
 
 /**
@@ -39,11 +40,8 @@ function reasonText(code: string): string {
   return REASON_TEXT[code] ?? `Motivo: ${code}`;
 }
 
-function name(option: { itemId: number; name?: string | null }): string {
-  return option.name ?? `Item ${option.itemId}`;
-}
-
 function Comparison({ attempt, headingRef }: { attempt: LearningAttempt; headingRef: RefObject<HTMLHeadingElement | null> }) {
+  const name = useItemName();
   const comparison = attempt.comparison;
   if (!comparison) {
     return null;
@@ -147,6 +145,7 @@ const AFFORDABILITY_TEXT: Readonly<Record<string, string>> = {
 };
 
 function Scenario({ attempt }: { attempt: LearningAttempt }) {
+  const name = useItemName();
   const [gold, setGold] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -205,6 +204,7 @@ function Scenario({ attempt }: { attempt: LearningAttempt }) {
  * anterior continua na tela; falha ou timeout da interpretação não a apagam.
  */
 function Reanalysis({ attempt }: { attempt: LearningAttempt }) {
+  const name = useItemName();
   const comparison = attempt.comparison;
   const [objective, setObjective] = useState<ObjectiveForm>(
     comparison?.objective ?? { priority: "BALANCED" },
@@ -285,6 +285,7 @@ function Progress() {
 }
 
 export function StudyPanel({ decisionId }: { decisionId: string }) {
+  const name = useItemName();
   const [objective, setObjective] = useState<ObjectiveForm>({ priority: "BALANCED" });
   const [transfer, setTransfer] = useState(false);
   const [attempt, setAttempt] = useState<LearningAttempt | null>(null);
