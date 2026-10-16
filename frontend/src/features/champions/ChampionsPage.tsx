@@ -127,7 +127,7 @@ export function ChampionsPage() {
               {(data.situations ?? []).map((situation) => <li key={situation.decisionId}>
                 <div><strong>{situation.matchId}</strong><span>Participante {situation.participantId} · {Math.floor(situation.timestampMs / 60000)} min</span></div>
                 <div className="champion-situation-actions">
-                  <Link to={`/decisions/${situation.decisionId}`}>Estudar decisão</Link>
+                  <Link to={`/decisions/${situation.decisionId}`}>Analisar decisão</Link>
                   <Link to={`/historico/${situation.matchId}?participant=${situation.participantId}`}>Abrir contexto</Link>
                 </div>
               </li>)}

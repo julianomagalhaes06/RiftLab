@@ -14,11 +14,13 @@ O público prioritário são iniciantes e jogadores de elos mais baixos. O objet
 2. Selecionar um participante dentro do recorte suportado.
 3. Percorrer a linha do tempo das decisões de compra.
 4. Consultar inventário, composição, momento e qualidade dos dados disponíveis.
-5. Escolher uma alternativa e justificar o raciocínio antes de revelar a comparação.
-6. Consultar pistas graduais, comparar consequências e tentar um novo cenário sem ajuda.
+5. Ver diretamente a comparação disponível, suas justificativas e limitações, com objetivo inicial equilibrado.
+6. Opcionalmente abrir **Praticar decisão** para escolher antes de revelar, consultar pistas e registrar uma reflexão.
 7. Exportar um relatório com versões, evidências e limitações.
 
 A interface distingue recomendação disponível, suporte limitado, estado incompatível e evidência insuficiente. Ouro estimado e ouro informado manualmente têm identificação própria.
+
+**Analisar partida** é o modo padrão da tela de decisão: não exige adivinhar um item nem cria tentativa de aprendizagem. **Praticar decisão** é uma experiência separada e opcional, também acessível por `?mode=practice`, que preserva a escolha antes da revelação. Depois de ver uma comparação, use outra decisão para praticar sem influência. A análise direta começa com objetivo equilibrado e permite reanalisar com outra prioridade; popularidade e compra histórica não são apresentadas como garantia do melhor item.
 
 ## Escopo inicial
 

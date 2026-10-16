@@ -18,7 +18,7 @@ import {
  * real-stack.spec.ts.
  */
 const evidence = "../.private/validation/sprint-5/CC-506";
-const decisionUrl = `/decisions/${DECISION_1}`;
+const decisionUrl = `/decisions/${DECISION_1}?mode=practice`;
 
 /** Registra e bloqueia qualquer requisição para fora da máquina (demo sem rede externa). */
 async function blockExternal(page: Page): Promise<string[]> {
@@ -282,6 +282,7 @@ for (const width of [1280, 360]) {
     await expect(page.getByRole("heading", { name: "Partida DEMO-0008" })).toBeVisible();
     await page.getByRole("link", { name: /^Participante 1 —/ }).click();
     await page.getByRole("link", { name: "Decisão em 7:52" }).click();
+    await page.getByRole("button", { name: "Praticar decisão", exact: true }).click();
 
     // Estudo só pelo formulário: o interpretador de texto nunca é chamado
     await page.getByLabel(/Sobrevivência/).check();
@@ -295,7 +296,9 @@ for (const width of [1280, 360]) {
 
     // Transferência numa decisão diferente: sem pistas
     await page.goBack();
+    await page.goBack();
     await page.getByRole("link", { name: "Decisão em 15:00" }).click();
+    await page.getByRole("button", { name: "Praticar decisão", exact: true }).click();
     await page.getByLabel(/Praticar sem pistas/).check();
     await page.getByRole("button", { name: "Confirmar objetivo e começar" }).click();
     await expect(page.getByText("Modo sem pistas (transferência).")).toBeVisible();

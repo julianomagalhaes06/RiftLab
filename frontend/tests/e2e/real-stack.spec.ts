@@ -68,6 +68,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
       page.getByText(/^(Aproximadamente .* de ouro|Snapshot antigo; orçamento não confirmável|Orçamento desconhecido)$/),
     ).toBeVisible();
     await expect(page.getByText("Elegível para análise")).toBeVisible();
+    await page.getByRole("button", { name: "Praticar decisão", exact: true }).click();
     await expect(page.locator("body")).not.toContainText(/item comprado|nome indisponível/);
 
     // Objetivo por texto (CC-504): interpretado pelo provedor de regras e só vale confirmado.

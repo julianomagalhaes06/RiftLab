@@ -44,7 +44,7 @@ for (const locale of ["pt-BR", "en-US"]) {
         }),
         "GET /api/v1/champions/patterns": () => ok(championPatterns()),
       });
-      await page.goto(`/decisions/${DECISION_1}`);
+      await page.goto(`/decisions/${DECISION_1}?mode=practice`);
       await expect(page.getByText("Gume do Infinito", { exact: true })).toBeVisible();
       await expect(page.getByText("×2")).toBeVisible();
       await expect(page.getByText("Amuleto: Sentinela Invisível")).toBeVisible();

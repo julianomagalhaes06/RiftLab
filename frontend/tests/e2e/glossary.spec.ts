@@ -5,7 +5,7 @@ for (const width of [1280, 360]) {
   test(`glossário em ${width}px: teclado, estudo e prática sem ajuda`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     const api = await mockApi(page);
-    await page.goto(`/decisions/${DECISION_1}`);
+    await page.goto(`/decisions/${DECISION_1}?mode=practice`);
     const glossary = page.locator("details.glossary");
     const summary = glossary.locator("summary");
     await expect(summary).toBeVisible();

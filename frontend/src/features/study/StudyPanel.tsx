@@ -41,9 +41,14 @@ function reasonText(code: string): string {
   return REASON_TEXT[code] ?? `Motivo: ${code}`;
 }
 
-function Comparison({ attempt, headingRef }: { attempt: LearningAttempt; headingRef: RefObject<HTMLHeadingElement | null> }) {
+export function Comparison({ comparison, selectedItemId, historicalItemId, headingRef, objectiveSource }: {
+  comparison: AnalysisResult | null;
+  selectedItemId?: number | null;
+  historicalItemId?: number | null;
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  objectiveSource?: string;
+}) {
   const name = useItemName();
-  const comparison = attempt.comparison;
   if (!comparison) {
     return null;
   }
@@ -55,7 +60,7 @@ function Comparison({ attempt, headingRef }: { attempt: LearningAttempt; heading
         Comparação
       </h3>
       <p className="muted">
-        Objetivo: {objectiveLabel(comparison.objective.priority)} ({objectiveOrigin(comparison.objective)}) ·
+        Objetivo: {objectiveLabel(comparison.objective.priority)} ({objectiveSource ?? objectiveOrigin(comparison.objective)}) ·
         Critério: {ENGINE_TEXT[comparison.engine] ?? comparison.engine}
       </p>
       {candidates.length === 0 ? (
@@ -77,8 +82,8 @@ function Comparison({ attempt, headingRef }: { attempt: LearningAttempt; heading
           ) : null}
           <ol className="comparison-list">
             {candidates.map((candidate) => {
-              const chosen = attempt.selectedItemId === candidate.itemId;
-              const historical = attempt.historicalItemId === candidate.itemId;
+              const chosen = selectedItemId === candidate.itemId;
+              const historical = historicalItemId === candidate.itemId;
               const moved =
                 candidate.baseRank != null && candidate.baseRank !== candidate.rank
                   ? candidate.baseRank > candidate.rank
@@ -111,8 +116,8 @@ function Comparison({ attempt, headingRef }: { attempt: LearningAttempt; heading
           ))}
         </>
       )}
-      {attempt.historicalItemId != null &&
-      !candidates.some((candidate) => candidate.itemId === attempt.historicalItemId) ? (
+      {historicalItemId != null &&
+      !candidates.some((candidate) => candidate.itemId === historicalItemId) ? (
         <p className="muted">A compra feita na partida não está entre as alternativas mostradas.</p>
       ) : null}
       <p className="muted">
@@ -145,12 +150,11 @@ const AFFORDABILITY_TEXT: Readonly<Record<string, string>> = {
   UNKNOWN: "sem orçamento conhecido",
 };
 
-function Scenario({ attempt }: { attempt: LearningAttempt }) {
+export function Scenario({ decisionId, comparison }: { decisionId: string; comparison: AnalysisResult | null }) {
   const name = useItemName();
   const [gold, setGold] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<unknown>(null);
-  const comparison = attempt.comparison;
   if (!comparison || (comparison.candidates ?? []).length === 0) {
     return null;
   }
@@ -177,7 +181,7 @@ function Scenario({ attempt }: { attempt: LearningAttempt }) {
           disabled={!valid}
           onClick={() =>
             api
-              .createScenarioAnalysis(attempt.decisionId ?? "", comparison.objective, value, crypto.randomUUID())
+              .createScenarioAnalysis(decisionId, comparison.objective, value, crypto.randomUUID())
               .then(setResult)
               .catch(setError)
           }
@@ -204,9 +208,8 @@ function Scenario({ attempt }: { attempt: LearningAttempt }) {
  * Reanalisar com outro objetivo (UC03): a nova análise aparece separada e a comparação
  * anterior continua na tela; falha ou timeout da interpretação não a apagam.
  */
-function Reanalysis({ attempt }: { attempt: LearningAttempt }) {
+export function Reanalysis({ decisionId, comparison }: { decisionId: string; comparison: AnalysisResult | null }) {
   const name = useItemName();
-  const comparison = attempt.comparison;
   const [objective, setObjective] = useState<ObjectiveForm>(
     comparison?.objective ?? { priority: "BALANCED" },
   );
@@ -233,7 +236,7 @@ function Reanalysis({ attempt }: { attempt: LearningAttempt }) {
             setBusy(true);
             setError(null);
             api
-              .createObjectiveAnalysis(attempt.decisionId ?? "", objective, crypto.randomUUID())
+              .createObjectiveAnalysis(decisionId, objective, crypto.randomUUID())
               .then(setResult)
               .catch(setError)
               .finally(() => setBusy(false));
@@ -480,9 +483,9 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
         ) : null}
       </div>
       {error ? <ErrorNotice error={error} /> : null}
-      {revealed ? <Comparison attempt={attempt} headingRef={comparisonHeading} /> : null}
-      {revealed ? <Scenario attempt={attempt} /> : null}
-      {revealed ? <Reanalysis attempt={attempt} /> : null}
+      {revealed ? <Comparison comparison={attempt.comparison ?? null} selectedItemId={attempt.selectedItemId} historicalItemId={attempt.historicalItemId} headingRef={comparisonHeading} /> : null}
+      {revealed ? <Scenario decisionId={decisionId} comparison={attempt.comparison ?? null} /> : null}
+      {revealed ? <Reanalysis decisionId={decisionId} comparison={attempt.comparison ?? null} /> : null}
       {revealed ? <Reflection attempt={attempt} onSaved={setAttempt} /> : null}
       {revealed ? <ExportLinks attempt={attempt} /> : null}
       {revealed ? <ReviewerFeedback attempt={attempt} /> : null}

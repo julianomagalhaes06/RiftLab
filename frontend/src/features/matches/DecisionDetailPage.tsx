@@ -12,7 +12,7 @@ import {
 } from "./format";
 import { ChampionBadge } from "./ChampionBadge";
 import { useDecision } from "./useDecision";
-import { StudyPanel } from "../study/StudyPanel";
+import { DecisionExperience } from "../study/DecisionExperience";
 import { ItemNames } from "../../shared/ui/ItemNames";
 import { useItemName } from "../../shared/hooks/useItemName";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
@@ -214,7 +214,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         <Inventory decision={decision} />
         <Level decision={decision} />
         <Budget decision={decision} />
-        {decision.eligible ? <StudyPanel decisionId={decision.decisionId} /> : null}
+        {decision.eligible ? <DecisionExperience decisionId={decision.decisionId} /> : null}
       </ItemNames>
       <TechnicalDetails decision={decision} />
     </section>

@@ -24,7 +24,7 @@ describe("Campeões com padrões observados", () => {
     expect(await screen.findByText("Infinity Edge")).toBeInTheDocument();
     expect(screen.getByText("3 de 5")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Abrir contexto" })).toHaveAttribute("href", "/historico/BR1_123?participant=4");
-    expect(screen.getByRole("link", { name: "Estudar decisão" })).toHaveAttribute("href", "/decisions/11111111-1111-4111-8111-111111111111");
+    expect(screen.getByRole("link", { name: "Analisar decisão" })).toHaveAttribute("href", "/decisions/11111111-1111-4111-8111-111111111111");
     expect(screen.getByText(/Sem ranking de itens validado/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Jinx/ }));
     expect(await screen.findByText("Ainda não há trajetos elegíveis neste filtro")).toBeInTheDocument();

@@ -107,6 +107,10 @@ fieldset legend {
   padding: 0.35rem 0;
 }
 
+.decision-mode { display: flex; flex-wrap: wrap; gap: 12px; margin: 24px 0 16px; }
+.decision-mode button { min-height: 44px; }
+.decision-mode button[aria-pressed="true"] { background: var(--color-focus); color: var(--color-surface); border-color: var(--color-focus); }
+
 .scenario-fieldset button {
   margin: 0.25rem 0.5rem 0.25rem 0;
 }

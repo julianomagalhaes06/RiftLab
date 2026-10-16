@@ -19,6 +19,7 @@ async function openDecision(page: Page, matchId: string) {
 }
 
 async function revealByForm(page: Page): Promise<string[]> {
+  await page.getByRole("button", { name: "Praticar decisão", exact: true }).click();
   await page.getByRole("button", { name: "Confirmar objetivo e começar" }).click();
   await page.getByText("Não sei", { exact: true }).click();
   await page.getByRole("button", { name: "Responder" }).click();
