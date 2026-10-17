@@ -139,6 +139,41 @@ class SqlAlchemyIngestionRepository:
             for row in result.scalars()
         ]
 
+    async def list_participant_facts_for_matches(
+        self, match_ids: list[str], local_subject: str | None
+    ) -> dict[str, list[tuple[Participant, bool]]]:
+        """Participantes em lote com a marca "é a conta local", calculada no banco. O
+        `subject_hash` devolvido é sempre vazio: o hash nunca sai desta consulta."""
+        if not match_ids:
+            return {}
+        is_local = (
+            (ParticipantModel.subject_hash == local_subject)
+            if local_subject is not None
+            else literal(False)
+        )
+        rows = await self._session.execute(
+            select(ParticipantModel, is_local.label("is_local"))
+            .where(ParticipantModel.match_id.in_(match_ids))
+            .order_by(ParticipantModel.match_id, ParticipantModel.participant_id)
+        )
+        facts: dict[str, list[tuple[Participant, bool]]] = {match_id: [] for match_id in match_ids}
+        for row, local in rows.tuples():
+            facts[row.match_id].append(
+                (
+                    Participant(
+                        match_id=row.match_id,
+                        participant_id=row.participant_id,
+                        champion_id=row.champion_id,
+                        team=row.team,
+                        role=row.role,
+                        subject_hash="",
+                        score=_score_from_row(row),
+                    ),
+                    bool(local),
+                )
+            )
+        return facts
+
     async def list_champion_ids_for_matches(self, match_ids: list[str]) -> dict[str, list[int]]:
         """Projeção pública em lote; nunca seleciona subject_hash."""
         if not match_ids:

@@ -41,7 +41,7 @@ test("Minha posição: sem observação e API fora do ar não inventam elo", asy
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/Elo (Ferro|Bronze|Prata|Ouro)/);
   await page.reload();
-  await expect(page.getByText(/Ainda não há observação desta conta/)).toBeVisible();
+  await expect(page.getByText(/Ainda não há observação desta (conta|fila)/)).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/Elo (Ferro|Bronze|Prata|Ouro)/);
 });
 
@@ -78,7 +78,7 @@ for (const width of [1280, 360]) {
         }),
     });
     await page.goto("/historico");
-    const search = page.getByLabel("Buscar por identificador ou campeão presente");
+    const search = page.getByLabel("Buscar campeão ou partida");
     await search.fill("Teemo");
     await expect(page.getByRole("heading", { name: "Nenhuma partida neste filtro" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Contexto da partida/ })).toHaveCount(0);

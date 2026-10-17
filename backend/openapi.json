@@ -2057,6 +2057,20 @@
             "title": "Durationseconds",
             "type": "integer"
           },
+          "localParticipantId": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Participante da conta local configurada (DEMO: 1); null se desconhecido.",
+            "title": "Localparticipantid"
+          },
           "map": {
             "minimum": 0.0,
             "title": "Map",
@@ -2305,7 +2319,7 @@
       },
       "MatchSummary": {
         "additionalProperties": false,
-        "description": "Item de GET /matches: sem identificador de conta própria ou PUUID.\n`champions_present` abrange qualquer participante, nunca o jogador local.",
+        "description": "Item de GET /matches: sem PUUID, Riot ID ou hash de jogador.\n`champions_present` abrange qualquer participante. `local_participant_id` só\naponta a posição da conta local configurada (mesma regra do Painel) e é null\nquando ela não é conhecida ou não está na partida.",
         "properties": {
           "championsPresent": {
             "items": {
@@ -2319,6 +2333,20 @@
             "title": "Durationseconds",
             "type": "integer"
           },
+          "localParticipantId": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Participante da conta local configurada (DEMO: 1); null se desconhecido.",
+            "title": "Localparticipantid"
+          },
           "map": {
             "minimum": 0.0,
             "title": "Map",
@@ -2327,6 +2355,14 @@
           "matchId": {
             "title": "Matchid",
             "type": "string"
+          },
+          "participants": {
+            "description": "Fatos pós-partida dos participantes, por participantId; sem identidade.",
+            "items": {
+              "$ref": "#/components/schemas/MatchParticipant"
+            },
+            "title": "Participants",
+            "type": "array"
           },
           "patch": {
             "maxLength": 20,

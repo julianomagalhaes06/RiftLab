@@ -38,7 +38,7 @@ for (const width of [360, 390, 1280, 1440]) {
     await expect(page.getByRole("heading", { name: "Partidas importadas recentes" })).toBeVisible();
     await expect(page.locator(".recent-row")).toHaveCount(5);
     await expect(page.getByText(/Mostrando 5 partidas importadas recentes/)).toBeVisible();
-    await expect(page.getByText(/Ainda não há observação desta conta/)).toBeVisible();
+    await expect(page.getByText(/Ainda não há observação desta (conta|fila)/)).toBeVisible();
     await expect(page.getByText(/vitória|derrota|KDA|tropas/i)).toHaveCount(0);
     expect(calls.count("GET /api/v1/matches")).toBe(1);
     await layoutIsClear(page, width);
@@ -49,24 +49,20 @@ for (const width of [360, 390, 1280, 1440]) {
     expect(await navHistory.evaluate((node) => node.matches(":focus-visible"))).toBe(true);
     await page.keyboard.press("Enter");
     await expect(page.getByRole("heading", { name: "Partidas para estudar" })).toBeVisible();
-    await expect(page.getByRole("list", { name: "Partidas carregadas" }).locator(".history-row")).toHaveCount(5);
+    await expect(page.locator(".match-card")).toHaveCount(5);
     expect(calls.count("GET /api/v1/matches")).toBe(2);
-    const select = page.getByRole("button", { name: "Selecionar detalhes da partida DEMO-0008" });
-    await select.focus();
-    await page.keyboard.press("Enter");
-    await expect(select).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator("#history-selection")).toContainText("DEMO-0008");
-    if (width < 700) {
-      await expect(page.locator("#history-selection")).toBeFocused();
-    }
+    const open = page.getByRole("link", { name: "Contexto da partida DEMO-0008" });
+    await open.focus();
+    expect(await open.evaluate((node) => node.matches(":focus-visible"))).toBe(true);
+    await expect(page.getByText(/Sua conta não foi identificada nesta partida/).first()).toBeVisible();
     expect(calls.count("GET /api/v1/matches")).toBe(2);
     await layoutIsClear(page, width);
     await page.screenshot({ path: `${evidence}/historico-dados-${width}.png`, fullPage: true });
-    await page.getByLabel("Buscar por identificador ou campeão presente").fill("caitlyn");
-    await expect(page.getByRole("list", { name: "Partidas carregadas" }).locator(".history-row")).toHaveCount(1);
-    await page.getByLabel("Buscar por identificador ou campeão presente").clear();
+    await page.getByLabel("Buscar campeão ou partida").fill("caitlyn");
+    await expect(page.locator(".match-card")).toHaveCount(1);
+    await page.getByLabel("Buscar campeão ou partida").clear();
     await page.getByRole("button", { name: "DEMO", exact: true }).click();
-    await expect(page.getByRole("list", { name: "Partidas carregadas" }).locator(".history-row")).toHaveCount(1);
+    await expect(page.locator(".match-card")).toHaveCount(1);
     await page.getByRole("link", { name: "Contexto da partida DEMO-0008" }).click();
     await expect(page).toHaveURL(/\/historico\/DEMO-0008$/);
     await page.getByRole("link", { name: /^Participante 1 —/ }).click();
@@ -82,7 +78,7 @@ for (const width of [360, 390, 1280, 1440]) {
     });
     await page.goto("/painel");
     await expect(page.getByText("Nenhuma partida importada")).toBeVisible();
-    await expect(page.getByText(/Ainda não há observação desta conta/)).toBeVisible();
+    await expect(page.getByText(/Ainda não há observação desta (conta|fila)/)).toBeVisible();
     await layoutIsClear(page, width);
     await page.screenshot({ path: `${evidence}/painel-vazio-${width}.png`, fullPage: true });
     await page.getByRole("navigation", { name: "Áreas principais" }).getByRole("link", { name: /Histórico/ }).click();

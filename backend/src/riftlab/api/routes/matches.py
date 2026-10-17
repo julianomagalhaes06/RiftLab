@@ -3,7 +3,8 @@ POST /api/v1/matches/{matchId}/preparation (CC-205, fronteira D3).
 
 As duas leituras só consultam o banco (transação READ ONLY): nunca importam,
 preparam, reconstroem, acessam rede nem gravam, e nenhum identificador pessoal
-(subject_hash, Riot ID) sai daqui. O POST é o único caminho de escrita: pede
+(subject_hash, Riot ID) sai daqui. A lista marca a posição da conta local
+(`localParticipantId`) comparando o hash dentro do banco. O POST é o único caminho de escrita: pede
 uma NOVA tentativa de preparação local (catálogo -> reconstrução -> extração)
 para uma partida já importada; nunca coleta a partida de novo."""
 
@@ -28,6 +29,7 @@ from riftlab.preparation.application import (
     preparation_info,
     request_preparation,
 )
+from riftlab.ranked.local import local_subject_hash
 from riftlab.shared.api.common import (
     MATCH_ID_DEMO_PATTERN,
     PAGINATION_DEFAULT_LIMIT,
@@ -79,18 +81,26 @@ async def list_imported_matches(
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=PAGINATION_MAX_LIMIT)] = PAGINATION_DEFAULT_LIMIT,
 ) -> CursorPage[MatchSummary]:
+    settings = request.app.state.settings
     page = await list_matches(
         request.app.state.session_factory,
         limit=limit,
         cursor=cursor,
         mapping=await _catalog_mapping_or_none(
             request.app.state.session_factory,
-            Path(request.app.state.settings.catalog_mappings_path),
+            Path(settings.catalog_mappings_path),
         ),
+        local_subject=lambda session: local_subject_hash(session, settings),
     )
     return CursorPage[MatchSummary](
         items=[
-            _to_summary(item.match, item.preparation, item.champions_present) for item in page.items
+            _to_summary(item.match, item.preparation, item.champions_present).model_copy(
+                update={
+                    "participants": [_to_participant(p, item.champions) for p in item.participants],
+                    "local_participant_id": item.local_participant_id,
+                }
+            )
+            for item in page.items
         ],
         next_cursor=page.next_cursor,
     )
@@ -123,7 +133,7 @@ async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail
         ),
     )
     return MatchDetail(
-        **summary.model_dump(),
+        **summary.model_dump(exclude={"participants"}),
         participants=[_to_participant(p, detail.champions) for p in detail.participants],
         preparation=_to_preparation(detail.preparation),
     )

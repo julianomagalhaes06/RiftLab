@@ -40,9 +40,8 @@ for (const width of [1280, 1440, 360, 390]) {
 
     await expect(page.getByText("2 partidas carregadas")).toBeVisible();
     await expect(page.getByText("1 RIOT · 1 DEMO")).toBeVisible();
-    const rows = page.getByRole("list", { name: "Partidas carregadas" });
-    await expect(rows.getByText("RIOT · importada")).toBeVisible();
-    await expect(rows.getByText("DEMO · sintética")).toBeVisible();
+    await expect(page.locator(".match-card")).toHaveCount(2);
+    await expect(page.locator(".match-card").getByText("DEMO", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Vitórias" })).toHaveCount(0);
     await expect(page.getByText(/Filtro de resultado indisponível/)).toBeVisible();
     await page.screenshot({ path: `${evidence}/historico-${width}.png`, fullPage: true });
@@ -67,10 +66,10 @@ for (const width of [1280, 1440, 360, 390]) {
       expect(clearOfNav).toBe(true);
     }
 
-    await page.getByLabel("Buscar por identificador ou campeão presente").fill("Caitlyn");
+    await page.getByLabel("Buscar campeão ou partida").fill("Caitlyn");
     await expect(page.getByRole("link", { name: "Contexto da partida BR1_123" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toHaveCount(0);
-    await page.getByLabel("Buscar por identificador ou campeão presente").clear();
+    await page.getByLabel("Buscar campeão ou partida").clear();
     await page.getByRole("button", { name: "DEMO", exact: true }).click();
     await expect(page.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Contexto da partida BR1_123" })).toHaveCount(0);

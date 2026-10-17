@@ -199,6 +199,8 @@ async def test_list_items_have_no_personal_field_and_report_not_requested_withou
             "championsPresent": [],
             "supportLevel": "LIMITED",
             "supportReason": "PATCH_NOT_VALIDATED",
+            "participants": [],
+            "localParticipantId": None,
         }
     finally:
         await _delete_matches(session_factory, [match_id])
@@ -489,3 +491,91 @@ async def _inventory_names(settings: Settings, match_id: str) -> dict[int, str |
                 detail = (await client.get(f"/api/v1/decisions/{point['decisionId']}")).json()
                 names.update({i["itemId"]: i["name"] for i in detail["inventory"]["items"]})
             return names
+
+
+async def test_list_marks_the_local_account_participant_without_exposing_its_hash(
+    session_factory, tmp_path
+) -> None:
+    from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfig
+    from riftlab.ranked.domain import account_key
+    from riftlab.ranked.models import RankedObservationModel
+
+    account_file = tmp_path / "account.json"
+    account_file.write_text(
+        json.dumps(
+            {
+                "gameName": "dono-sintetico",
+                "tagLine": "BR1",
+                "platform": "BR1",
+                "regionalRouting": "AMERICAS",
+            }
+        )
+    )
+    settings = Settings(ranked_account_file=str(account_file), subject_hash_secret="segredo-x")
+    key = account_key(RiotAccountConfig("dono-sintetico", "BR1", "BR1", "AMERICAS"), "segredo-x")
+    own_hash, other_hash = "a" * 64, "b" * 64
+    match_id = f"BR1_7{uuid.uuid4().int % 10**9:09d}"
+    try:
+        await _insert_match(session_factory, match_id, _LATE + timedelta(days=400))
+        async with unit_of_work(session_factory) as session:
+            for pid in range(1, 11):
+                session.add(
+                    ParticipantModel(
+                        match_id=match_id,
+                        participant_id=pid,
+                        champion_id=100 + pid,
+                        team=100 if pid <= 5 else 200,
+                        role="BOTTOM" if pid in (4, 9) else None,
+                        subject_hash=own_hash if pid == 4 else f"{other_hash[:-2]}{pid:02d}",
+                        win=pid <= 5,
+                        kills=pid,
+                        deaths=1,
+                        assists=2,
+                        total_minions_killed=150,
+                        neutral_minions_killed=10,
+                    )
+                )
+            session.add(
+                RankedObservationModel(
+                    account_key=key,
+                    subject_hash=own_hash,
+                    queue="RANKED_FLEX_SR",
+                    season="2026-3",
+                    captured_at=datetime.now(UTC),
+                    state="READY",
+                    origin="RIOT_LEAGUE_V4",
+                )
+            )
+        app = create_app(settings)
+        async with app.router.lifespan_context(app):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get("/api/v1/matches", params={"limit": 100})
+        assert response.status_code == 200
+        item = next(i for i in response.json()["items"] if i["matchId"] == match_id)
+        assert item["localParticipantId"] == 4
+        assert [p["participantId"] for p in item["participants"]] == list(range(1, 11))
+        own = item["participants"][3]
+        assert (own["win"], own["kills"], own["team"], own["role"]) == (True, 4, 100, "BOTTOM")
+        assert own_hash not in response.text and other_hash[:-2] not in response.text
+        assert not any(word in k.lower() for k in _keys(response.json()) for word in _PERSONAL)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=create_app(Settings())), base_url="http://test"
+        ) as anonymous:
+            app2 = anonymous._transport.app  # type: ignore[attr-defined]
+            async with app2.router.lifespan_context(app2):
+                plain = await anonymous.get("/api/v1/matches", params={"limit": 100})
+        listed = next(i for i in plain.json()["items"] if i["matchId"] == match_id)
+        assert listed["localParticipantId"] is None  # sem conta configurada: ninguém é marcado
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(
+                RankedObservationModel.__table__.delete().where(
+                    RankedObservationModel.account_key == key
+                )
+            )
+            await session.execute(
+                ParticipantModel.__table__.delete().where(ParticipantModel.match_id == match_id)
+            )
+        await _delete_matches(session_factory, [match_id])

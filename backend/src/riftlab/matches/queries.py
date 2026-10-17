@@ -11,7 +11,8 @@ from __future__ import annotations
 import base64
 import binascii
 import json
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -27,6 +28,7 @@ from riftlab.shared.db import read_only_unit_of_work
 from riftlab.shared.errors import InvalidCursorError, NotFoundError
 
 SessionFactory = async_sessionmaker[AsyncSession]
+LocalSubject = Callable[[AsyncSession], Awaitable[str | None]]
 
 CURSOR_VERSION = 1
 MAX_CURSOR_CHARS = 256
@@ -37,6 +39,9 @@ class MatchListItem:
     match: Match
     preparation: PreparationInfo
     champions_present: tuple[tuple[int, str | None], ...]
+    participants: tuple[MatchParticipantFactsView, ...] = ()
+    champions: Mapping[int, ChampionAsset] = field(default_factory=dict)
+    local_participant_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,14 +123,22 @@ async def list_matches(
     limit: int,
     cursor: str | None,
     mapping: CatalogMapping | None = None,
+    local_subject: LocalSubject | None = None,
 ) -> MatchPage:
+    """`local_subject` resolve, na mesma transação, o hash da conta local; ele só é
+    comparado no banco e vira `local_participant_id` (DEMO: participante 1)."""
     after = decode_match_cursor(cursor) if cursor else None
     async with read_only_unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         rows = await repo.list_matches_page(after, limit + 1)
         page = rows[:limit]
         jobs = await repo.list_latest_preparation_jobs([m.match_id for m in page])
-        champion_ids = await repo.list_champion_ids_for_matches([m.match_id for m in page])
+        subject = await local_subject(session) if local_subject is not None else None
+        facts = await repo.list_participant_facts_for_matches([m.match_id for m in page], subject)
+        champion_ids = {
+            match_id: [p.champion_id for p, _ in match_facts]
+            for match_id, match_facts in facts.items()
+        }
         assets_by_patch: dict[str, dict[int, ChampionAsset]] = {}
         for patch in sorted(
             {m.patch for m in page if not MATCH_ID_DEMO_PATTERN.fullmatch(m.match_id)}
@@ -147,11 +160,21 @@ async def list_matches(
             for champion_id in champion_ids[m.match_id]
         )
 
+    def local_id(m: Match) -> int | None:
+        if MATCH_ID_DEMO_PATTERN.fullmatch(m.match_id):
+            ids = [p.participant_id for p, _ in facts[m.match_id] if p.participant_id == 1]
+        else:
+            ids = [p.participant_id for p, local in facts[m.match_id] if local]
+        return ids[0] if len(ids) == 1 else None  # ambíguo ou ausente: nenhum
+
     items = [
         MatchListItem(
             m,
             preparation_info(jobs.get(m.match_id)),
             present(m),
+            tuple(MatchParticipantFactsView.from_participant(p) for p, _ in facts[m.match_id]),
+            assets_by_patch.get(m.patch, {}),
+            local_id(m),
         )
         for m in page
     ]

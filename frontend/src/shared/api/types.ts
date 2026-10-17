@@ -1307,6 +1307,11 @@ export interface components {
             championsPresent?: components["schemas"]["MatchChampion"][];
             /** Durationseconds */
             durationSeconds: number;
+            /**
+             * Localparticipantid
+             * @description Participante da conta local configurada (DEMO: 1); null se desconhecido.
+             */
+            localParticipantId?: number | null;
             /** Map */
             map: number;
             /** Matchid */
@@ -1391,18 +1396,30 @@ export interface components {
         };
         /**
          * MatchSummary
-         * @description Item de GET /matches: sem identificador de conta própria ou PUUID.
-         *     `champions_present` abrange qualquer participante, nunca o jogador local.
+         * @description Item de GET /matches: sem PUUID, Riot ID ou hash de jogador.
+         *     `champions_present` abrange qualquer participante. `local_participant_id` só
+         *     aponta a posição da conta local configurada (mesma regra do Painel) e é null
+         *     quando ela não é conhecida ou não está na partida.
          */
         MatchSummary: {
             /** Championspresent */
             championsPresent?: components["schemas"]["MatchChampion"][];
             /** Durationseconds */
             durationSeconds: number;
+            /**
+             * Localparticipantid
+             * @description Participante da conta local configurada (DEMO: 1); null se desconhecido.
+             */
+            localParticipantId?: number | null;
             /** Map */
             map: number;
             /** Matchid */
             matchId: string;
+            /**
+             * Participants
+             * @description Fatos pós-partida dos participantes, por participantId; sem identidade.
+             */
+            participants?: components["schemas"]["MatchParticipant"][];
             /** Patch */
             patch: string;
             preparationStatus: components["schemas"]["PreparationStatus"];

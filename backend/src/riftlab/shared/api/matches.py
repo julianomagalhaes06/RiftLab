@@ -23,24 +23,6 @@ class MatchChampion(CamelModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
 
 
-class MatchSummary(CamelModel):
-    """Item de GET /matches: sem identificador de conta própria ou PUUID.
-    `champions_present` abrange qualquer participante, nunca o jogador local."""
-
-    match_id: MatchId
-    queue: int = Field(ge=0)
-    map: int = Field(ge=0)
-    patch: str = Field(min_length=1, max_length=20)
-    start_at: datetime
-    duration_seconds: int = Field(ge=0)
-    preparation_status: PreparationStatus
-    champions_present: list[MatchChampion] = Field(default_factory=list)
-    support_level: Literal["LIMITED", "DEMO"] = Field(
-        description="Sem avaliação de ranking neste patch: suporte limitado; DEMO é ilustrativo."
-    )
-    support_reason: Literal["PATCH_NOT_VALIDATED", "DEMO_DATA"]
-
-
 class ChampionAsset(CamelModel):
     """Nome e retrato oficiais (CC-208), resolvidos pelo `key` numérico no catálogo do
     Data Dragon da versão FIXADA para o patch. O retrato é
@@ -74,6 +56,36 @@ class MatchParticipant(CamelModel):
         default=None,
         description="null em partida DEMO, patch sem mapping, catálogo ainda não "
         "sincronizado ou campeão ausente do catálogo: a interface mostra o id numérico.",
+    )
+
+
+class MatchSummary(CamelModel):
+    """Item de GET /matches: sem PUUID, Riot ID ou hash de jogador.
+    `champions_present` abrange qualquer participante. `local_participant_id` só
+    aponta a posição da conta local configurada (mesma regra do Painel) e é null
+    quando ela não é conhecida ou não está na partida."""
+
+    match_id: MatchId
+    queue: int = Field(ge=0)
+    map: int = Field(ge=0)
+    patch: str = Field(min_length=1, max_length=20)
+    start_at: datetime
+    duration_seconds: int = Field(ge=0)
+    preparation_status: PreparationStatus
+    champions_present: list[MatchChampion] = Field(default_factory=list)
+    support_level: Literal["LIMITED", "DEMO"] = Field(
+        description="Sem avaliação de ranking neste patch: suporte limitado; DEMO é ilustrativo."
+    )
+    support_reason: Literal["PATCH_NOT_VALIDATED", "DEMO_DATA"]
+    participants: list[MatchParticipant] = Field(
+        default_factory=list,
+        description="Fatos pós-partida dos participantes, por participantId; sem identidade.",
+    )
+    local_participant_id: int | None = Field(
+        default=None,
+        ge=1,
+        le=10,
+        description="Participante da conta local configurada (DEMO: 1); null se desconhecido.",
     )
 
 

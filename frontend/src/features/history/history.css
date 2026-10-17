@@ -1,0 +1,91 @@
+/* Histórico: cartões por partida agrupados por dia, no espírito dos rastreadores de
+   partida (faixa de resultado, campeão em destaque, KDA, times lado a lado). */
+
+.history-overview { display: grid; grid-template-columns: minmax(180px, .9fr) minmax(140px, .6fr) minmax(0, 1.6fr); gap: 18px 28px; align-items: center; padding: 18px 22px; border: 1px solid var(--nline); border-top: 3px solid var(--accent); background: var(--n1); }
+.history-overview__label { display: block; color: var(--ntext-muted); font-size: .78rem; margin-bottom: 4px; }
+.history-overview__record strong, .history-overview__kda strong { font: 600 1.45rem/1.1 'Chakra Petch', Inter, sans-serif; }
+.history-overview__wins { color: var(--win); }
+.history-overview__losses { color: var(--loss); }
+.history-overview__rate { color: var(--ntext); }
+.history-overview__bar { display: block; height: 6px; margin-top: 10px; background: var(--loss); border-radius: 3px; overflow: hidden; }
+.history-overview__bar span { display: block; height: 100%; background: var(--win); }
+.history-overview__kda small { display: block; color: var(--ntext-muted); font-size: .8rem; margin-top: 4px; }
+.history-overview__champions { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.history-overview__champions li { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.history-overview__champions strong { display: block; font-size: .9rem; }
+.history-overview__champions small { color: var(--ntext-muted); font-size: .78rem; }
+.history-overview__champions .champion-avatar { border-radius: 50%; }
+.history-overview__scope { grid-column: 1 / -1; margin: 0; color: var(--ntext-muted); font-size: .78rem; }
+
+.history-filters { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px 16px; }
+
+.history-day { margin: 0 0 22px; }
+.history-day__heading { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--nline); font: 600 .82rem Inter, sans-serif; text-transform: uppercase; letter-spacing: .04em; }
+.history-day__heading small { color: var(--ntext-muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+.history-more { margin-top: 4px; }
+
+.champion-avatar { position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; overflow: hidden; border-radius: 6px; background: var(--n2); border: 1px solid var(--nline); }
+.champion-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.champion-avatar__initials { color: var(--ntext-muted); font: 600 .62rem Inter, sans-serif; }
+
+.match-card { --tone: var(--nline); --tone-bg: transparent; list-style: none; }
+.match-card--win { --tone: var(--win); --tone-bg: rgba(105, 223, 177, .10); }
+.match-card--loss { --tone: var(--loss); --tone-bg: rgba(255, 120, 139, .10); }
+.match-card > article { display: grid; grid-template-columns: 132px minmax(0, 1fr) minmax(0, 300px) auto; grid-template-areas: "meta hero teams actions"; align-items: center; gap: 14px 20px; padding: 14px 18px; border: 1px solid var(--nline); border-left: 4px solid var(--tone); background: linear-gradient(90deg, var(--tone-bg), var(--n1) 65%); min-width: 0; }
+.match-card:hover > article { border-color: color-mix(in srgb, var(--tone) 55%, var(--nline)); border-left-color: var(--tone); }
+
+.match-card__meta { grid-area: meta; display: grid; gap: 3px; font-size: .8rem; color: var(--ntext-muted); min-width: 0; }
+.match-card__queue { color: var(--ntext); font-size: .84rem; }
+.match-card--win .match-card__queue, .match-card--win .match-card__result { color: var(--win); }
+.match-card--loss .match-card__queue, .match-card--loss .match-card__result { color: var(--loss); }
+.match-card__divider { height: 1px; width: 44px; background: var(--nline); margin: 4px 0; }
+.match-card__result { font-weight: 700; color: var(--ntext); }
+
+.match-card__hero { grid-area: hero; display: flex; align-items: center; gap: 16px 22px; min-width: 0; flex-wrap: wrap; }
+.match-card__hero--unknown p { margin: 0; color: var(--ntext-muted); font-size: .86rem; }
+.match-card__hero--unknown small { display: block; margin-top: 2px; }
+.match-card__portrait { position: relative; flex: none; padding-bottom: 6px; }
+.match-card__portrait .champion-avatar { border-radius: 50%; border: 2px solid var(--tone); }
+.match-card__role { position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); padding: 1px 6px; border-radius: 8px; background: var(--n0); border: 1px solid var(--nline); font: 600 .6rem Inter, sans-serif; color: var(--ntext-muted); white-space: nowrap; }
+.match-card__score { display: grid; gap: 2px; min-width: 112px; }
+.match-card__champion { font-weight: 700; font-size: .92rem; }
+.match-card__kda-line { font: 600 1.15rem/1.2 'Chakra Petch', Inter, sans-serif; white-space: nowrap; }
+.match-card__kda-line [aria-hidden] { color: var(--ntext-muted); }
+.match-card__deaths { color: var(--loss); }
+.match-card__kda { color: var(--ntext-muted); font-size: .8rem; }
+.match-card__stats { display: flex; gap: 6px 18px; margin: 0; flex-wrap: wrap; }
+.match-card__stats div { min-width: 0; }
+.match-card__stats dt { color: var(--ntext-muted); font-size: .72rem; }
+.match-card__stats dd { margin: 2px 0 0; font-weight: 600; font-size: .9rem; white-space: nowrap; }
+.match-card__stats small { color: var(--ntext-muted); font-weight: 500; }
+
+.match-card__teams { grid-area: teams; display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; min-width: 0; }
+.match-card__team { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; min-width: 0; }
+.match-card__mate { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: .74rem; color: var(--ntext-muted); }
+.match-card__mate span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-card__mate--local { color: var(--ntext); font-weight: 700; }
+.match-card__mate .champion-avatar { border-radius: 4px; }
+
+.match-card__actions { grid-area: actions; display: grid; justify-items: end; gap: 6px; }
+.app .match-card__open { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--nline); background: var(--n0); color: var(--ntext); font-weight: 700; white-space: nowrap; text-decoration: none; }
+.app .match-card__open:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 1100px) {
+  .history-page .history-controls { grid-template-columns: 1fr; }
+  .history-filters { justify-content: flex-start; }
+  .match-card > article { grid-template-columns: 120px minmax(0, 1fr) auto; grid-template-areas: "meta hero actions" "teams teams teams"; }
+  .match-card__teams { grid-template-columns: repeat(2, minmax(0, 260px)); }
+  .history-overview { grid-template-columns: 1fr 1fr; }
+  .history-overview__champions { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .history-overview { grid-template-columns: 1fr; padding: 16px; }
+  .history-filters { justify-content: flex-start; }
+  .match-card > article { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "meta meta" "hero actions" "teams teams"; padding: 12px; gap: 12px; }
+  .match-card__meta { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .match-card__divider { display: none; }
+  .match-card__hero { gap: 10px 14px; }
+  .match-card__actions { align-self: start; }
+  .app .match-card__open { padding: 0 10px; }
+  .match-card__teams { grid-template-columns: 1fr 1fr; }
+}
