@@ -15,7 +15,7 @@ from riftlab.candidates.domain import (
     UserBudget,
     enumerate_candidates,
 )
-from riftlab.candidates.rules import load_item_rules
+from riftlab.candidates.rules import load_item_rules, resolve_item_rules
 from riftlab.catalog.classification import classify_catalog
 from riftlab.catalog.domain import CatalogVersion, Item
 from riftlab.catalog.infrastructure.curation import curate_data_dragon_items
@@ -349,3 +349,76 @@ def test_future_fields_and_historical_target_cannot_change_candidates() -> None:
     a = run(items, ctx=replace(context(), view=build_pre_decision_view(state)))
     b = run(items, ctx=replace(context(), view=build_pre_decision_view(changed)))
     assert a == b
+
+
+def _manifest(
+    directory: Path, patch: str, *, covered: list[int] | None, coverage: bool = True
+) -> None:
+    payload: dict[str, object] = {
+        "version": f"fixture_{patch}",
+        "gamePatch": patch,
+        "curationRulesVersion": "data_dragon_v5",
+        "excludedIds": [],
+        "exclusiveGroups": [[100, 101]],
+        "exclusiveCoverage": coverage,
+        "uniqueItemIds": coverage,
+        "highIdNamespaceExcluded": True,
+        "evidence": "fixture",
+    }
+    if covered is not None:
+        payload["coveredItemIds"] = covered
+    (directory / f"{patch}.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_a_patch_without_its_own_rules_inherits_the_latest_earlier_covered_manifest(
+    tmp_path: Path,
+) -> None:
+    _manifest(tmp_path, "16.9", covered=[100, 101])
+    _manifest(tmp_path, "16.10", covered=[100, 101])
+    _manifest(tmp_path, "16.11", covered=None, coverage=False)  # fail-closed: não serve de origem
+    rules = resolve_item_rules(tmp_path, "16.12", [100, 101, 102])
+    assert rules is not None
+    assert (rules.game_patch, rules.inherited_from) == ("16.12", "16.10")
+    assert rules.version == "fixture_16.10+inherited_16.12"
+    assert rules.exclusive_groups == (frozenset({100, 101}),)
+    assert rules.uncovered_item_ids == {102}
+    own = resolve_item_rules(tmp_path, "16.11", [100])
+    assert own is not None and own.inherited_from is None and not own.exclusive_coverage
+
+
+@pytest.mark.parametrize("patch", ["16.8", "DEMO-1", "16"])
+def test_earlier_or_non_numeric_patches_never_inherit_item_rules(
+    tmp_path: Path, patch: str
+) -> None:
+    _manifest(tmp_path, "16.9", covered=[100])
+    assert resolve_item_rules(tmp_path, patch, [100]) is None
+
+
+def test_inherited_rules_keep_groups_and_fail_closed_on_items_the_source_never_covered() -> None:
+    items = (item(1, 100), item(100, 500, (1,)), item(101, 500, (1,)), item(102, 500, (1,)))
+    inherited = replace(RULES, inherited_from="16.16", uncovered_item_ids=frozenset({102}))
+    grouped = replace(inherited, exclusive_groups=(frozenset({100, 101}),))
+    result = run(items, ((100, 1),), rules=grouped)
+    reasons = {entry.item_id: entry.reason_codes for entry in result.exclusions}
+    assert "EXCLUSIVE_GROUP_OWNED" in reasons[101]
+    assert "EXCLUSIVE_GROUP_UNKNOWN" in reasons[102]
+    assert {c.item_id for c in run(items, rules=inherited).candidates} == {100, 101}
+    # possuir um item sem cobertura impede afirmar que qualquer outro é compatível
+    assert run(items, ((102, 1),), rules=inherited).candidates == ()
+
+
+def test_patch_16_19_rules_list_the_covered_main_items() -> None:
+    rules = load_item_rules(ROOT / "configs" / "item-rules" / "16.19.json")
+    assert rules.covered_item_ids is not None and len(rules.covered_item_ids) == 106
+    assert {3031, 3036, 6672} <= rules.covered_item_ids
+
+
+@pytest.mark.parametrize("covered", [[], [1, 1], [True], "x"])
+def test_malformed_covered_lists_are_rejected(tmp_path: Path, covered: object) -> None:
+    _manifest(tmp_path, "16.9", covered=[100])
+    path = tmp_path / "16.9.json"
+    payload = json.loads(path.read_text())
+    payload["coveredItemIds"] = covered
+    path.write_text(json.dumps(payload))
+    with pytest.raises(CandidateInputError):
+        load_item_rules(path)

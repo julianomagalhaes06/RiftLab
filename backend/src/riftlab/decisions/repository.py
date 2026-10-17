@@ -152,6 +152,13 @@ class SqlAlchemyDecisionRepository:
         inventory, level = result.one()
         return inventory, level
 
+    async def get_rules_provenance(self, decision_state_id: uuid.UUID) -> list[dict[str, Any]]:
+        stmt = select(DecisionStateModel.quality["empiricalRules"]).where(
+            DecisionStateModel.id == decision_state_id
+        )
+        value = (await self._session.execute(stmt)).scalar_one()
+        return [rule for rule in value or [] if isinstance(rule, dict)]
+
     async def list_extractions(self, match_id: str) -> list[DecisionExtractionMarker]:
         stmt = (
             select(DecisionExtractionModel)

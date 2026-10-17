@@ -16,7 +16,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -157,6 +157,9 @@ class DecisionPage:
     next_cursor: str | None
 
 
+RulesApplication = Literal["VALIDATED", "INHERITED", "NONE"]
+
+
 @dataclass(frozen=True, slots=True)
 class DecisionDetail:
     point: StoredDecisionPoint
@@ -167,6 +170,22 @@ class DecisionDetail:
     # item ausente dele
     item_names: dict[int, str | None]
     data_dragon_version: str | None = None
+    # De onde vieram as regras empíricas da reconstrução: VALIDATED (confirmadas no
+    # próprio patch), INHERITED (de `rules_patch`) ou NONE.
+    rules_application: RulesApplication = "NONE"
+    rules_patch: str | None = None
+
+
+def rules_origin(provenance: list[dict[str, Any]]) -> tuple[RulesApplication, str | None]:
+    """Estados v9 não gravavam `application`: regra ligada ali era sempre validada."""
+    if not provenance:
+        return "NONE", None
+    first = provenance[0]
+    patch = first.get("appliedFromPatch")
+    application: RulesApplication = (
+        "INHERITED" if first.get("application") == "INHERITED" else "VALIDATED"
+    )
+    return application, patch if isinstance(patch, str) else None
 
 
 _read_only = read_only_unit_of_work  # transação READ ONLY compartilhada (shared/db.py)
@@ -240,6 +259,9 @@ async def get_decision_detail(
         if point is None:
             raise NotFoundError(f"decisão {decision_id} não encontrada")
         inventory, level = await decisions.get_pre_decision_context(point.decision_state_id)
+        application, rules_patch = rules_origin(
+            await decisions.get_rules_provenance(point.decision_state_id)
+        )
         item_names: dict[int, str | None] = {}
         catalog_id = point.versions.catalog_id
         catalog_repo = SqlAlchemyCatalogRepository(session)
@@ -250,5 +272,11 @@ async def get_decision_detail(
             name = item.attributes.get("name") if item is not None else None
             item_names[item_id] = name if isinstance(name, str) and name else None
     return DecisionDetail(
-        point, inventory, level, item_names, catalog.data_dragon_version if catalog else None
+        point,
+        inventory,
+        level,
+        item_names,
+        catalog.data_dragon_version if catalog else None,
+        application,
+        rules_patch,
     )

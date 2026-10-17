@@ -579,7 +579,17 @@ def _registry_yaml(supported: dict[str, list[str]]) -> str:
                 activatedInVersion=RECONSTRUCTION_ALGORITHM_VERSION,
             )
         rules[rule_id] = entry
-    return yaml.safe_dump({"schemaVersion": "v1", "systemItemIds": [1202], "rules": rules})
+    return yaml.safe_dump(
+        {
+            "schemaVersion": "v2",
+            "inheritance": {
+                "mode": "LATEST_VALIDATED_EARLIER",
+                "activatedInVersion": RECONSTRUCTION_ALGORITHM_VERSION,
+            },
+            "systemItemIds": [1202],
+            "rules": rules,
+        }
+    )
 
 
 @pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)

@@ -87,6 +87,26 @@ function Level({ decision }: { decision: DecisionState }) {
   );
 }
 
+function rulesLabel(application: DecisionState["versions"]["reconstructionRules"], patch?: string | null): string {
+  if (application === "INHERITED") return `herdadas do patch ${patch ?? "anterior"} (sem confirmação própria)`;
+  if (application === "VALIDATED") return "confirmadas neste patch";
+  return "nenhuma (reconstrução conservadora)";
+}
+
+/** Regras de reconstrução herdadas: a análise é possível, mas com regras confirmadas em
+ * outro patch. Mostrado sempre que a reconstrução usou herança, elegível ou não. */
+function InheritedRules({ decision, patch }: { decision: DecisionState; patch: string | null }) {
+  if (decision.versions.reconstructionRules !== "INHERITED") return null;
+  const source = decision.versions.reconstructionRulesPatch ?? "anterior";
+  return (
+    <p className="decision-inherited" role="note">
+      O inventário foi reconstruído com as regras confirmadas no patch {source}, aplicadas por herança
+      {patch ? ` ao patch ${patch}` : ""}, que ainda não tem confirmação própria. Mudanças de itens ou de
+      mecânica neste patch podem não estar refletidas.
+    </p>
+  );
+}
+
 function TechnicalDetails({ decision }: { decision: DecisionState }) {
   const versions = decision.versions;
   const subReasons = (decision.reasons ?? []).flatMap((reason) =>
@@ -100,6 +120,7 @@ function TechnicalDetails({ decision }: { decision: DecisionState }) {
     ["Catálogo", versions.catalogId ?? "sem catálogo"],
     ["Regras de curadoria", versions.curationRulesVersion ?? "—"],
     ["Classificação de itens", versions.classificationVersion ?? "—"],
+    ["Regras de reconstrução", rulesLabel(versions.reconstructionRules, versions.reconstructionRulesPatch)],
   ];
   return (
     <details className="details">
@@ -279,6 +300,8 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
           </ul>
         </div>
       ) : null}
+
+      <InheritedRules decision={decision} patch={match?.patch ?? null} />
 
       <ItemNames version={decision.versions.dataDragonVersion}>
         <div className="decision-grid">

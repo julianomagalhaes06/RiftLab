@@ -12,11 +12,19 @@ versionado `configs/empirical-rules.yaml` declara, por regra, o estado (`PENDING
 `EMPIRICALLY_SUPPORTED`), a versão da regra, os patches validados, a taxa e a contagem
 de contra-exemplos e a referência da evidência.
 
+Herança (schema v2, reconstrução v10): um patch SEM confirmação própria herda as regras
+do patch validado mais recente ANTERIOR a ele (`inheritance.mode:
+LATEST_VALIDATED_EARLIER`). Assim o patch atual e cada patch novo são reconstruídos com
+as mesmas regras do último patch confirmado, mas a proveniência grava
+`application: INHERITED` e o patch de origem: herdar não é validar, e a interface diz
+isso. Um patch com qualquer regra própria usa só as suas (nunca mistura), patches
+anteriores ao primeiro validado e patches não numéricos (DEMO) nunca herdam.
+
 Invariante de identidade (sem migração): ativar uma regra muda o RESULTADO computado,
 então exige uma nova versão de reconstrução. O carregador recusa uma regra
-`EMPIRICALLY_SUPPORTED` cuja `activatedInVersion` não seja a versão de reconstrução
-corrente, de modo que estados de uma versão nunca sejam reaproveitados com outro
-conjunto de regras."""
+`EMPIRICALLY_SUPPORTED` (ou uma herança ligada) cuja `activatedInVersion` não seja a
+versão de reconstrução corrente, de modo que estados de uma versão nunca sejam
+reaproveitados com outro conjunto de regras."""
 
 from __future__ import annotations
 
@@ -29,6 +37,7 @@ from typing import Any
 import yaml
 
 from riftlab.shared.errors import DomainError
+from riftlab.shared.numeric import patch_order_key
 from riftlab.timeline.domain import TimelineEvent
 
 logger = logging.getLogger(__name__)
@@ -71,7 +80,12 @@ MID_LANE_QUEST_ITEM_ID = 1201
 
 STATUS_PENDING = "PENDING"
 STATUS_SUPPORTED = "EMPIRICALLY_SUPPORTED"
-SCHEMA_VERSION = "v1"
+SCHEMA_VERSION = "v2"
+
+INHERITANCE_NONE = "NONE"
+INHERITANCE_LATEST_EARLIER = "LATEST_VALIDATED_EARLIER"
+APPLICATION_VALIDATED = "VALIDATED"
+APPLICATION_INHERITED = "INHERITED"
 
 DEFAULT_TRINKET_ITEM_ID = 3340
 WORLD_ATLAS_ITEM_ID = 3865
@@ -129,22 +143,63 @@ class RuleEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class RuleResolution:
+    """Regras ligadas num patch e de onde vêm: VALIDATED (confirmação do próprio patch),
+    INHERITED (do `source_patch`, o validado mais recente anterior) ou nada."""
+
+    rule_ids: frozenset[str]
+    application: str | None = None
+    source_patch: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class EmpiricalRules:
     entries: Mapping[str, RuleEntry] = field(default_factory=dict)
     system_item_ids: frozenset[int] = frozenset()
+    inheritance: str = INHERITANCE_NONE
 
     @classmethod
     def disabled(cls) -> EmpiricalRules:
         """Nenhuma regra ligada em nenhum patch: o reducer se comporta exatamente como a v6."""
         return cls()
 
-    def enabled_for(self, patch: str) -> frozenset[str]:
+    def validated_for(self, patch: str) -> frozenset[str]:
         return frozenset(
             rule_id for rule_id, entry in self.entries.items() if entry.enabled_for(patch)
         )
 
+    def resolve(self, patch: str) -> RuleResolution:
+        own = self.validated_for(patch)
+        if own:
+            return RuleResolution(own, APPLICATION_VALIDATED, patch)
+        key = patch_order_key(patch)
+        if self.inheritance != INHERITANCE_LATEST_EARLIER or key is None:
+            return RuleResolution(frozenset())
+        earlier = [
+            (candidate_key, candidate)
+            for entry in self.entries.values()
+            if entry.status == STATUS_SUPPORTED
+            for candidate in entry.patches_validated
+            if (candidate_key := patch_order_key(candidate)) is not None and candidate_key < key
+        ]
+        if not earlier:
+            return RuleResolution(frozenset())
+        source = max(earlier)[1]
+        return RuleResolution(self.validated_for(source), APPLICATION_INHERITED, source)
+
+    def enabled_for(self, patch: str) -> frozenset[str]:
+        return self.resolve(patch).rule_ids
+
     def provenance_for(self, patch: str) -> list[dict[str, Any]]:
-        return [self.entries[rule_id].provenance() for rule_id in sorted(self.enabled_for(patch))]
+        resolution = self.resolve(patch)
+        return [
+            {
+                **self.entries[rule_id].provenance(),
+                "application": resolution.application,
+                "appliedFromPatch": resolution.source_patch,
+            }
+            for rule_id in sorted(resolution.rule_ids)
+        ]
 
 
 def _fail(detail: str) -> EmpiricalRulesConfigError:
@@ -223,15 +278,38 @@ def _parse_entry(rule_id: str, raw: Any, reconstruction_version: int) -> RuleEnt
     )
 
 
+def _parse_inheritance(raw: Any, reconstruction_version: int) -> str:
+    if not isinstance(raw, dict) or set(raw) != {"mode", "activatedInVersion"}:
+        raise _fail("inheritance deve ter exatamente mode e activatedInVersion")
+    mode = raw["mode"]
+    if mode not in (INHERITANCE_NONE, INHERITANCE_LATEST_EARLIER):
+        raise _fail(f"inheritance.mode deve ser {INHERITANCE_NONE} ou {INHERITANCE_LATEST_EARLIER}")
+    if mode == INHERITANCE_NONE:
+        if raw["activatedInVersion"] is not None:
+            raise _fail("inheritance NONE não pode carregar activatedInVersion")
+        return mode
+    activated = _int(raw["activatedInVersion"], "inheritance.activatedInVersion")
+    if activated != reconstruction_version:
+        raise _fail(
+            f"inheritance.activatedInVersion={activated} difere da versão de reconstrução "
+            f"corrente ({reconstruction_version}); ligar a herança exige nova versão"
+        )
+    return mode
+
+
 def parse_empirical_rules(document: Any, *, reconstruction_version: int) -> EmpiricalRules:
     if not isinstance(document, dict) or set(document) != {
         "schemaVersion",
+        "inheritance",
         "systemItemIds",
         "rules",
     }:
-        raise _fail("documento deve ter exatamente schemaVersion, systemItemIds e rules")
+        raise _fail(
+            "documento deve ter exatamente schemaVersion, inheritance, systemItemIds e rules"
+        )
     if document["schemaVersion"] != SCHEMA_VERSION:
         raise _fail(f"schemaVersion deve ser {SCHEMA_VERSION}")
+    inheritance = _parse_inheritance(document["inheritance"], reconstruction_version)
     system = document["systemItemIds"]
     if not isinstance(system, list):
         raise _fail("systemItemIds deve ser uma lista")
@@ -247,7 +325,7 @@ def parse_empirical_rules(document: Any, *, reconstruction_version: int) -> Empi
     }
     if entries[RULE_R4S].status == STATUS_SUPPORTED and not ids:
         raise _fail("R4s EMPIRICALLY_SUPPORTED exige systemItemIds não vazio")
-    return EmpiricalRules(entries=entries, system_item_ids=frozenset(ids))
+    return EmpiricalRules(entries=entries, system_item_ids=frozenset(ids), inheritance=inheritance)
 
 
 def load_empirical_rules(path: Path, *, reconstruction_version: int) -> EmpiricalRules:

@@ -108,7 +108,17 @@ STALE_FRAME_THRESHOLD_MS = 90_000
 #       partida). Ativar uma regra exige nova versão (o registro recusa
 #       `activatedInVersion` diferente da corrente), então estados de uma
 #       versão nunca são reaproveitados com outro conjunto de regras.
-RECONSTRUCTION_ALGORITHM_VERSION = 9
+#   10 — HERANÇA de regras por patch (`inheritance` no registro): patch sem
+#       confirmação própria herda as regras do validado mais recente anterior,
+#       com `application: INHERITED` na proveniência. O reducer não muda: só a
+#       resolução das regras por patch. Por isso uma partida cujo conjunto de
+#       regras é o mesmo da v9 tem resultado idêntico ao da v9, e a v10 copia
+#       esses estados sem reabrir a fonte (`_carry_forward`), o que preserva as
+#       partidas cujo bruto não está nesta máquina.
+RECONSTRUCTION_ALGORITHM_VERSION = 10
+# Versão anterior cujo reducer é idêntico ao da corrente (só a resolução das regras
+# mudou): base da cópia sem fonte.
+CARRY_FORWARD_FROM_VERSION = 9
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens
@@ -1288,6 +1298,64 @@ class MatchReconstruction:
     decision_states: list[DecisionState] = field(default_factory=list)
 
 
+def _rule_set(provenance: Sequence[dict[str, Any]]) -> frozenset[tuple[Any, Any]]:
+    return frozenset((rule.get("ruleId"), rule.get("ruleVersion")) for rule in provenance)
+
+
+async def _carry_forward(
+    session_factory: SessionFactory,
+    match_id: str,
+    catalog_id: uuid.UUID | None,
+    provenance: Sequence[dict[str, Any]],
+    timeline_repo_factory: Any,
+) -> MatchReconstruction | None:
+    """Copia os estados da v9 para a v10 quando o resultado é o mesmo por construção:
+    marca v9 com o MESMO catálogo, estados existentes e o MESMO conjunto de regras
+    (id + versão) que a v10 ligaria para o patch. Linhas novas (ids novos, v10, só a
+    proveniência atualizada); as da v9 ficam intactas. Qualquer diferença (ex.: patch
+    que agora herda regras) ⇒ None, e a reconstrução segue fresca a partir da fonte."""
+    async with unit_of_work(session_factory) as session:
+        repo = timeline_repo_factory(session)
+        previous = await repo.get_match_reconstruction(match_id, CARRY_FORWARD_FROM_VERSION)
+        if previous is None or previous.catalog_id != catalog_id:
+            return None
+        participants = await SqlAlchemyIngestionRepository(session).list_participants(match_id)
+        old_states = [
+            state
+            for participant in participants
+            for state in await repo.list_decision_states(match_id, participant.participant_id)
+            if state.state_version == CARRY_FORWARD_FROM_VERSION
+        ]
+    if not old_states or any(
+        _rule_set(state.quality.get("empiricalRules") or []) != _rule_set(provenance)
+        for state in old_states
+    ):
+        return None
+    new_states = [
+        replace(
+            state,
+            id=uuid.uuid4(),
+            state_version=RECONSTRUCTION_ALGORITHM_VERSION,
+            quality={**state.quality, "empiricalRules": [dict(rule) for rule in provenance]},
+            created_at=None,
+        )
+        for state in old_states
+    ]
+    try:
+        async with unit_of_work(session_factory) as session:
+            repo = timeline_repo_factory(session)
+            for state in new_states:
+                await repo.add_decision_state(state)
+            await repo.add_match_reconstruction(
+                match_id, RECONSTRUCTION_ALGORITHM_VERSION, catalog_id
+            )
+    except IntegrityError as exc:
+        raise ConflictError(
+            f"reconstrução concorrente de {match_id!r} já em andamento/concluída"
+        ) from exc
+    return MatchReconstruction(match_id=match_id, catalog_id=catalog_id, decision_states=new_states)
+
+
 async def reconstruct_match(
     session_factory: SessionFactory,
     mapping: CatalogMapping,
@@ -1352,6 +1420,23 @@ async def reconstruct_match(
             match_id=match_id, catalog_id=marker.catalog_id, decision_states=all_existing
         )
 
+    catalog_id: uuid.UUID | None = None
+    entry = mapping.resolve(match.patch)
+    if entry is not None:
+        async with unit_of_work(session_factory) as session:
+            catalog_version = await catalog_repo_factory(session).find_canonical_catalog_version(
+                match.patch, entry.data_dragon_version, mapping.mapping_version
+            )
+        catalog_id = catalog_version.id if catalog_version is not None else None
+
+    enabled_rules = rules.enabled_for(match.patch)
+    provenance = rules.provenance_for(match.patch)
+    carried = await _carry_forward(
+        session_factory, match_id, catalog_id, provenance, timeline_repo_factory
+    )
+    if carried is not None:
+        return carried
+
     # Reconstrução FRESCA (marca ausente para esta versão): agora sim
     # precisa da fonte local (fixture demo ou raw imutável real já
     # persistido pelo CC-201) — nunca coleta nova, só re-leitura;
@@ -1372,15 +1457,6 @@ async def reconstruct_match(
         )
     participant_ids = [p.participant_id for p in source_result.participants]
 
-    catalog_id: uuid.UUID | None = None
-    entry = mapping.resolve(match.patch)
-    if entry is not None:
-        async with unit_of_work(session_factory) as session:
-            catalog_version = await catalog_repo_factory(session).find_canonical_catalog_version(
-                match.patch, entry.data_dragon_version, mapping.mapping_version
-            )
-        catalog_id = catalog_version.id if catalog_version is not None else None
-
     async with unit_of_work(session_factory) as session:
         events = await timeline_repo_factory(session).list_events(match_id)
 
@@ -1395,8 +1471,6 @@ async def reconstruct_match(
                 excluded.item_id for excluded in await catalog_repo.list_excluded_items(catalog_id)
             )
 
-    enabled_rules = rules.enabled_for(match.patch)
-    provenance = rules.provenance_for(match.patch)
     if RULE_R4W in enabled_rules:
         # R4w: pré-passo puro (reatribui as compras do World Atlas do
         # participante 0 aos Apoios; falha segura).

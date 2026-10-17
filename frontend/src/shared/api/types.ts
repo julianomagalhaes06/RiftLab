@@ -990,6 +990,15 @@ export interface components {
             dataDragonVersion?: string | null;
             /** Featureschemaversion */
             featureSchemaVersion: string;
+            /**
+             * Reconstructionrules
+             * @description Regras empíricas da reconstrução: confirmadas no próprio patch, herdadas do último patch validado anterior (reconstructionRulesPatch) ou nenhuma.
+             * @default NONE
+             * @enum {string}
+             */
+            reconstructionRules: "VALIDATED" | "INHERITED" | "NONE";
+            /** Reconstructionrulespatch */
+            reconstructionRulesPatch?: string | null;
             /** Reconstructionversion */
             reconstructionVersion: number;
             /** Scopeversion */

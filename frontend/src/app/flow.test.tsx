@@ -324,3 +324,40 @@ describe("entrada: partidas importadas (retomar)", () => {
     expect(api.callsTo("GET", /matches$/)[1].search.get("cursor")).toBe("P2");
   });
 });
+
+describe("decisão reconstruída com regras herdadas", () => {
+  it("avisa de onde vieram as regras e mostra a origem nos detalhes técnicos", async () => {
+    setup(`/decisions/${DECISION_1}`, (mock) => {
+      mock.on("GET", /^\/api\/v1\/decisions\/.+$/, () =>
+        json(
+          200,
+          decisionState({
+            versions: {
+              ...decisionState().versions,
+              reconstructionVersion: 10,
+              reconstructionRules: "INHERITED",
+              reconstructionRulesPatch: "16.19",
+            },
+          }),
+        ),
+      );
+      mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008$/, () => json(200, matchDetail({ patch: "16.20" })));
+      mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008\/decisions$/, () => json(200, { items: [], nextCursor: null }));
+    });
+
+    const note = await screen.findByText(/regras confirmadas no patch 16\.19, aplicadas por herança/);
+    await waitFor(() => expect(note).toHaveTextContent("ao patch 16.20"));
+    fireEvent.click(screen.getByText("Detalhes técnicos"));
+    expect(screen.getByText("herdadas do patch 16.19 (sem confirmação própria)")).toBeInTheDocument();
+  });
+
+  it("não mostra o aviso quando as regras são do próprio patch", async () => {
+    setup(`/decisions/${DECISION_1}`, (mock) => {
+      mock.on("GET", /^\/api\/v1\/decisions\/.+$/, () =>
+        json(200, decisionState({ versions: { ...decisionState().versions, reconstructionRules: "VALIDATED" } })),
+      );
+    });
+    await screen.findByRole("heading", { name: /^Decisão em 7:52/ });
+    expect(screen.queryByText(/aplicadas por herança/)).not.toBeInTheDocument();
+  });
+});

@@ -35,6 +35,10 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
   INVENTORY_UNCERTAIN: "O inventário antes desta compra é incerto.",
   OUT_OF_SCOPE: "Esta decisão está fora do recorte analisado.",
   NO_POPULARITY_FOR_CELL: "Não há decisões de referência deste campeão nesta etapa; a ordem vem das regras explícitas.",
+  RECONSTRUCTION_RULES_INHERITED:
+    "O inventário usa regras de reconstrução confirmadas num patch anterior, herdadas porque este patch ainda não tem confirmação própria.",
+  ITEM_RULES_INHERITED:
+    "Os limites de itens (exclusividade) vêm do último patch revisado; itens que ele não cobre ficam fora das alternativas.",
 };
 
 function reasonText(code: string): string {

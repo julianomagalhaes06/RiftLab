@@ -1277,6 +1277,29 @@
             "title": "Featureschemaversion",
             "type": "string"
           },
+          "reconstructionRules": {
+            "default": "NONE",
+            "description": "Regras empíricas da reconstrução: confirmadas no próprio patch, herdadas do último patch validado anterior (reconstructionRulesPatch) ou nenhuma.",
+            "enum": [
+              "VALIDATED",
+              "INHERITED",
+              "NONE"
+            ],
+            "title": "Reconstructionrules",
+            "type": "string"
+          },
+          "reconstructionRulesPatch": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructionrulespatch"
+          },
           "reconstructionVersion": {
             "minimum": 1.0,
             "title": "Reconstructionversion",

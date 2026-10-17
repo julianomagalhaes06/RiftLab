@@ -175,6 +175,7 @@
 .decision-reasons { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--nline); border-left: 3px solid var(--color-warning); background: var(--n1); font-size: .86rem; }
 .decision-reasons p { margin: 0 0 4px; font-weight: 600; }
 .decision-reasons .reasons { margin: 0; }
+.decision-inherited { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--nline); border-left: 3px solid var(--accent); background: var(--n1); font-size: .86rem; color: var(--ntext-muted); }
 .decision-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .9fr); gap: 16px; align-items: start; margin-bottom: 18px; }
 .decision-grid__main { display: grid; gap: 16px; min-width: 0; }
 .decision-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }

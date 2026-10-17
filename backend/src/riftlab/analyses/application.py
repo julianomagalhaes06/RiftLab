@@ -26,7 +26,7 @@ from riftlab.candidates.domain import (
     UserBudget,
     enumerate_candidates,
 )
-from riftlab.candidates.rules import load_item_rules
+from riftlab.candidates.rules import resolve_item_rules
 from riftlab.dataset.rows import _catalog
 from riftlab.decisions.features import build_pre_decision_view
 from riftlab.decisions.models import DecisionPointModel
@@ -86,8 +86,16 @@ async def _compute(
     bundle = await _catalog(session, point.catalog_id)
     patch = bundle.catalog.game_patch
     catalog_label = f"{patch}/{bundle.catalog.data_dragon_version}"
-    rules_path = configs / "item-rules" / f"{patch}.json"
-    if not rules_path.exists():
+    item_rules = resolve_item_rules(
+        configs / "item-rules",
+        patch,
+        (
+            item.item_id
+            for item in bundle.items
+            if bundle.classification.classify(item.item_id).item_class.value == "MAIN"
+        ),
+    )
+    if item_rules is None:
         return _empty(decision_id, objective, "UNSUPPORTED", ["PATCH_UNSUPPORTED"], catalog_label)
     state = await SqlAlchemyTimelineRepository(session).get_decision_state(point.decision_state_id)
     values = (point.features or {}).get("values", {})
@@ -103,7 +111,7 @@ async def _compute(
             bundle.catalog,
             bundle.items,
             bundle.classification,
-            load_item_rules(rules_path),
+            item_rules,
             user_budget=UserBudget(gold=int(budget["gold"])) if budget else None,
         )
     except CandidateInputError as exc:
@@ -148,6 +156,14 @@ async def _compute(
         objective=objective_cfg,
     )
     reason_codes = [] if supported else ["NO_POPULARITY_FOR_CELL"]
+    # Herança (reconstrução v10 e legalidade): análise possível, mas com regras
+    # confirmadas em outro patch; o motivo vai junto do resultado.
+    if any(
+        rule.get("application") == "INHERITED" for rule in state.quality.get("empiricalRules") or []
+    ):
+        reason_codes.append("RECONSTRUCTION_RULES_INHERITED")
+    if item_rules.inherited_from is not None:
+        reason_codes.append("ITEM_RULES_INHERITED")
     gold = (point.budget or {}).get("value") if isinstance(point.budget, dict) else None
     return {
         "decisionId": str(decision_id),
@@ -161,7 +177,9 @@ async def _compute(
             "candidates": ALGORITHM_VERSION,
             "ranking": popularity.version if supported and popularity else rules.version,
             "objective": objective_cfg.version,
-            "itemRules": rules_path.name,
+            "itemRules": f"{item_rules.inherited_from}.json (herdado)"
+            if item_rules.inherited_from
+            else f"{patch}.json",
         },
         "quality": {
             "budgetSource": "USER_PROVIDED"
@@ -172,7 +190,7 @@ async def _compute(
             "userGold": int(budget["gold"]) if budget else None,
         },
         "support": {
-            "level": "SUPPORTED" if supported else "LIMITED",
+            "level": "SUPPORTED" if supported and not reason_codes else "LIMITED",
             "reasonCodes": reason_codes,
             "legalCandidates": len(facts),
             "referenceDecisions": popularity.support(decision) if popularity else 0,

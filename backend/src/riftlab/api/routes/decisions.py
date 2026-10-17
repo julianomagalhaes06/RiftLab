@@ -171,5 +171,7 @@ def _to_detail(detail: DecisionDetail) -> DecisionState:
             catalog_id=versions.catalog_id,
             curation_rules_version=versions.curation_rules_version,
             classification_version=versions.classification_version,
+            reconstruction_rules=detail.rules_application,
+            reconstruction_rules_patch=detail.rules_patch,
         ),
     )

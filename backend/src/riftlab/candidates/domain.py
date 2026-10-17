@@ -49,6 +49,13 @@ class ItemRules:
     exclusive_coverage: bool
     unique_item_ids: bool
     high_id_namespace_excluded: bool
+    # Itens cujos limites o manifesto declara cobertos (None = não declarado).
+    covered_item_ids: frozenset[int] | None = None
+    # Herança: patch do manifesto de origem e itens principais do patch atual que a
+    # origem não cobre (exclusividade desconhecida: o item nunca vira candidato e,
+    # se possuído, nenhum candidato pode ser afirmado compatível com ele).
+    inherited_from: str | None = None
+    uncovered_item_ids: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,7 +281,11 @@ def enumerate_candidates(
             reasons.append("DUPLICATE_RULE_UNKNOWN")
         elif owned[item_id]:
             reasons.append("ALREADY_OWNED")
-        if not rules.exclusive_coverage:
+        if (
+            not rules.exclusive_coverage
+            or item_id in rules.uncovered_item_ids
+            or any(owned[other] for other in rules.uncovered_item_ids)
+        ):
             reasons.append("EXCLUSIVE_GROUP_UNKNOWN")
         elif any(
             item_id in group and any(owned[other] for other in group if other != item_id)

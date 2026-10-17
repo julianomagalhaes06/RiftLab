@@ -201,6 +201,14 @@ class DecisionVersionInfo(CamelModel):
     catalog_id: UUID | None = None
     curation_rules_version: str | None = None
     classification_version: str | None = None
+    reconstruction_rules: Literal["VALIDATED", "INHERITED", "NONE"] = Field(
+        default="NONE",
+        description=(
+            "Regras empíricas da reconstrução: confirmadas no próprio patch, herdadas do "
+            "último patch validado anterior (reconstructionRulesPatch) ou nenhuma."
+        ),
+    )
+    reconstruction_rules_patch: str | None = Field(default=None, max_length=20)
 
 
 class DecisionState(CamelModel):

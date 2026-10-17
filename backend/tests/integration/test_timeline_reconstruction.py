@@ -459,3 +459,79 @@ async def test_reconstruct_match_without_a_registry_records_no_rules(
 
     assert result.decision_states
     assert all(state.quality["empiricalRules"] == [] for state in result.decision_states)
+
+
+async def _reconstruct_as_v9(session_factory, match_id: str, monkeypatch, **kwargs):
+    """Reconstrução gravada como v9 (o reducer é o mesmo; só a versão gravada muda)."""
+    with monkeypatch.context() as patched:
+        patched.setattr("riftlab.timeline.application.RECONSTRUCTION_ALGORITHM_VERSION", 9)
+        return await reconstruct_match(
+            session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id, **kwargs
+        )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_v10_carries_v9_states_forward_without_reopening_the_source(
+    session_factory, tmp_path, _demo_match, monkeypatch
+) -> None:
+    """Mesmo catálogo e mesmo conjunto de regras: a v10 copia os estados da v9 sem a fonte
+    (partidas cujo bruto não está na máquina continuam preparáveis). Linhas novas; a v9
+    fica intacta."""
+    match_id = "DEMO-0002"
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, match_id)
+    old = await _reconstruct_as_v9(session_factory, match_id, monkeypatch)
+    assert old.decision_states and all(s.state_version == 9 for s in old.decision_states)
+
+    carried = await reconstruct_match(
+        session_factory, _DEMO_1_MAPPING, _SourceForbiddenIfCalled(), match_id
+    )
+
+    assert carried.catalog_id == old.catalog_id
+    assert len(carried.decision_states) == len(old.decision_states)
+    by_event = {(s.participant_id, s.event_source_index): s for s in old.decision_states}
+    for state in carried.decision_states:
+        source = by_event[(state.participant_id, state.event_source_index)]
+        assert state.state_version == RECONSTRUCTION_ALGORITHM_VERSION and state.id != source.id
+        assert state.snapshot == source.snapshot and state.quality == source.quality
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyTimelineRepository(session)
+        assert await repo.get_match_reconstruction(match_id, 9) is not None
+        persisted = await repo.list_decision_states(match_id, 1)
+    assert {s.id for s in persisted if s.state_version == 9} == {
+        s.id for s in old.decision_states if s.participant_id == 1
+    }
+    again = await reconstruct_match(
+        session_factory, _DEMO_1_MAPPING, _SourceForbiddenIfCalled(), match_id
+    )
+    assert {s.id for s in again.decision_states} == {s.id for s in carried.decision_states}
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_v10_reconstructs_fresh_when_the_patch_now_has_other_rules(
+    session_factory, tmp_path, _demo_match, monkeypatch
+) -> None:
+    """Patch que agora herda (ou ganhou) regras: o resultado pode mudar, então nunca copia;
+    sem a fonte, a reconstrução precisa dela e falha em vez de reaproveitar a v9."""
+    match_id = "DEMO-0002"
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, match_id)
+    await _reconstruct_as_v9(session_factory, match_id, monkeypatch)
+    rules = EmpiricalRules(entries={"R5": _supported("R5", frozenset({"DEMO-1"}))})
+
+    with pytest.raises(AssertionError, match="load_match"):
+        await reconstruct_match(
+            session_factory,
+            _DEMO_1_MAPPING,
+            _SourceForbiddenIfCalled(),
+            match_id,
+            empirical_rules=rules,
+        )
+    fresh = await reconstruct_match(
+        session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id, empirical_rules=rules
+    )
+    assert fresh.decision_states
+    assert all(
+        [rule["ruleId"] for rule in s.quality["empiricalRules"]] == ["R5"]
+        for s in fresh.decision_states
+    )

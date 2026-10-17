@@ -89,8 +89,13 @@ def test_repository_registry_releases_only_the_rules_confirmed_for_16_19() -> No
     assert rules.enabled_for("16.19") == frozenset(
         {"R1", "R2", "R2i", "R4s", "R4w", "R5", "R7b", "R7m", "R7x", "R8", "R8t"}
     )
-    for patch in ("16.16", "16.17", "16.18", "16.20"):
+    for patch in ("16.16", "16.17", "16.18"):
         assert rules.enabled_for(patch) == frozenset()
+    # patch atual e seguintes: herdam o conjunto do 16.19, marcado como herdado
+    for patch in ("16.20", "16.24", "17.1"):
+        resolution = rules.resolve(patch)
+        assert resolution.rule_ids == rules.enabled_for("16.19")
+        assert (resolution.application, resolution.source_patch) == ("INHERITED", "16.19")
     assert rules.entries["R6"].status == "PENDING"
     for rule_id in ("R1", "R2", "R2i", "R4s", "R4w", "R5"):
         entry = rules.entries[rule_id]
@@ -131,8 +136,62 @@ def test_provenance_lists_only_enabled_rules_with_evidence() -> None:
     assert {"ruleVersion", "status", "contraRate", "counterExamples", "evidence"} <= set(
         provenance[0]
     )
-    assert rules.provenance_for("16.16") == [provenance[0]]
+    assert provenance[0]["application"] == "VALIDATED"
+    assert provenance[0]["appliedFromPatch"] == "16.17"
+    assert [item["ruleId"] for item in rules.provenance_for("16.16")] == ["R1"]
     assert rules.provenance_for("15.1") == []
+
+
+def _inheriting(document: dict) -> dict:
+    document["inheritance"] = {"mode": "LATEST_VALIDATED_EARLIER", "activatedInVersion": VERSION}
+    for rule_id in KNOWN_RULE_IDS:
+        _pending(document, rule_id)
+    return document
+
+
+def test_a_patch_without_its_own_validation_inherits_the_latest_earlier_validated_patch() -> None:
+    document = _supported(_inheriting(_document()), "R1", ("16.17",))
+    document = _supported(document, "R5", ("16.19",))
+    rules = parse_empirical_rules(document, reconstruction_version=VERSION)
+    resolution = rules.resolve("16.21")
+    assert (resolution.rule_ids, resolution.source_patch) == ({"R5"}, "16.19")
+    assert rules.resolve("16.18").rule_ids == {"R1"}  # o anterior mais recente é o 16.17
+    assert rules.resolve("16.18").source_patch == "16.17"
+    [item] = rules.provenance_for("16.21")
+    assert (item["ruleId"], item["application"], item["appliedFromPatch"]) == (
+        "R5",
+        "INHERITED",
+        "16.19",
+    )
+
+
+def test_a_patch_with_its_own_rules_never_mixes_in_inherited_ones() -> None:
+    document = _supported(_supported(_inheriting(_document()), "R1", ("16.19",)), "R5", ("16.20",))
+    rules = parse_empirical_rules(document, reconstruction_version=VERSION)
+    resolution = rules.resolve("16.20")
+    assert (resolution.rule_ids, resolution.application) == ({"R5"}, "VALIDATED")
+
+
+@pytest.mark.parametrize("patch", ["16.16", "16.19x", "DEMO-1", "16", "16.٣"])
+def test_earlier_and_non_numeric_patches_never_inherit(patch: str) -> None:
+    document = _supported(_inheriting(_document()), "R5", ("16.17",))
+    rules = parse_empirical_rules(document, reconstruction_version=VERSION)
+    assert rules.resolve(patch).rule_ids == frozenset()
+    assert rules.provenance_for(patch) == []
+
+
+def test_patch_order_is_numeric_not_textual() -> None:
+    document = _supported(_supported(_inheriting(_document()), "R1", ("16.9",)), "R5", ("16.10",))
+    rules = parse_empirical_rules(document, reconstruction_version=VERSION)
+    assert rules.resolve("16.11").source_patch == "16.10"
+    assert rules.resolve("17.1").source_patch == "16.10"
+
+
+def test_inheritance_none_keeps_the_v9_behaviour() -> None:
+    document = _supported(_inheriting(_document()), "R5", ("16.19",))
+    document["inheritance"] = {"mode": "NONE", "activatedInVersion": None}
+    rules = parse_empirical_rules(document, reconstruction_version=VERSION)
+    assert rules.enabled_for("16.20") == frozenset()
 
 
 def test_disabled_registry_enables_nothing() -> None:
@@ -199,7 +258,19 @@ def _mutations() -> list[tuple[str, callable]]:
         d["systemItemIds"] = [True]
 
     def wrong_schema(d: dict) -> None:
-        d["schemaVersion"] = "v2"
+        d["schemaVersion"] = "v1"
+
+    def missing_inheritance(d: dict) -> None:
+        del d["inheritance"]
+
+    def bad_inheritance_mode(d: dict) -> None:
+        d["inheritance"]["mode"] = "ANY_PATCH"
+
+    def inheritance_wrong_version(d: dict) -> None:
+        d["inheritance"] = {"mode": "LATEST_VALIDATED_EARLIER", "activatedInVersion": VERSION - 1}
+
+    def inheritance_none_with_version(d: dict) -> None:
+        d["inheritance"] = {"mode": "NONE", "activatedInVersion": VERSION}
 
     def extra_top_key(d: dict) -> None:
         d["surprise"] = 1
@@ -229,6 +300,10 @@ def _mutations() -> list[tuple[str, callable]]:
         duplicate_item,
         bool_item,
         wrong_schema,
+        missing_inheritance,
+        bad_inheritance_mode,
+        inheritance_wrong_version,
+        inheritance_none_with_version,
         extra_top_key,
         bad_rule_version,
         empty_description,
