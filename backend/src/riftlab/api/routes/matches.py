@@ -10,6 +10,7 @@ para uma partida já importada; nunca coleta a partida de novo."""
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated
@@ -24,6 +25,7 @@ from riftlab.errors import ProblemDetail
 from riftlab.ingestion.domain import Match
 from riftlab.ingestion.purge import purge_preview, request_purge
 from riftlab.matches.queries import MatchParticipantFactsView, get_match_detail, list_matches
+from riftlab.matches.timeline import get_match_timeline
 from riftlab.preparation.application import (
     PreparationInfo,
     preparation_info,
@@ -46,11 +48,19 @@ from riftlab.shared.api.matches import (
     MatchParticipant,
     MatchPreparation,
     MatchSummary,
+    MatchTimeline,
+    ParticipantTimeline,
+    TimelineGoldFrame,
+    TimelineItemEvent,
+    TimelineKill,
+    TimelineObjective,
+    TimelineSkillUp,
 )
 from riftlab.shared.api.purge import PurgePreview
 from riftlab.shared.errors import SourceSchemaError
 
 router = APIRouter(tags=["matches"])
+_DD_VERSION = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}")
 
 _NOT_FOUND = {
     "model": ProblemDetail,
@@ -113,13 +123,15 @@ async def list_imported_matches(
     responses={404: _NOT_FOUND, 422: _INVALID},
 )
 async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail:
+    settings = request.app.state.settings
     detail = await get_match_detail(
         request.app.state.session_factory,
         match_id,
         await _catalog_mapping_or_none(
             request.app.state.session_factory,
-            Path(request.app.state.settings.catalog_mappings_path),
+            Path(settings.catalog_mappings_path),
         ),
+        local_subject=lambda session: local_subject_hash(session, settings),
     )
     summary = _to_summary(
         detail.match,
@@ -133,9 +145,87 @@ async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail
         ),
     )
     return MatchDetail(
-        **summary.model_dump(exclude={"participants"}),
+        **summary.model_dump(exclude={"participants", "local_participant_id"}),
+        local_participant_id=detail.local_participant_id,
         participants=[_to_participant(p, detail.champions) for p in detail.participants],
         preparation=_to_preparation(detail.preparation),
+    )
+
+
+@router.get(
+    "/api/v1/matches/{match_id}/timeline",
+    response_model=MatchTimeline,
+    summary="Linha do tempo de uma partida importada",
+    description=(
+        "Compras e vendas por participante (desfazer aplicado), subidas de habilidade, "
+        "abates, objetivos e ouro por quadro. Só banco; `goldFrames` é null até a "
+        "preparação gravar os quadros."
+    ),
+    responses={404: _NOT_FOUND, 422: _INVALID},
+)
+async def get_imported_match_timeline(match_id: MatchId, request: Request) -> MatchTimeline:
+    data = await get_match_timeline(request.app.state.session_factory, match_id)
+    participant_ids = [p.participant_id for p in data.participants]
+    return MatchTimeline(
+        match_id=data.match_id,
+        # catálogo DEMO usa versão sintética: sem versão do CDN, a interface não monta ícone
+        data_dragon_version=(
+            data.data_dragon_version
+            if data.data_dragon_version and _DD_VERSION.fullmatch(data.data_dragon_version)
+            else None
+        ),
+        participants=[
+            ParticipantTimeline(
+                participant_id=p.participant_id,
+                items=[
+                    TimelineItemEvent(
+                        timestamp_ms=i.timestamp_ms,
+                        item_id=i.item_id,
+                        kind=i.kind,  # type: ignore[arg-type]
+                        item_class=i.item_class,
+                    )
+                    for i in p.items
+                ],
+                skills=[
+                    TimelineSkillUp(
+                        timestamp_ms=s.timestamp_ms,
+                        skill_slot=s.skill_slot,
+                        level_up_type=s.level_up_type,
+                    )
+                    for s in p.skills
+                ],
+            )
+            for p in data.participants
+        ],
+        kills=[
+            TimelineKill(
+                timestamp_ms=k.timestamp_ms,
+                killer_id=k.killer_id if 0 <= k.killer_id <= 10 else 0,
+                victim_id=k.victim_id,
+                assisting_ids=[a for a in k.assisting_ids if 1 <= a <= 10],
+            )
+            for k in data.kills
+        ],
+        objectives=[
+            TimelineObjective(
+                timestamp_ms=o.timestamp_ms,
+                kind=o.kind,  # type: ignore[arg-type]
+                team=o.team,
+                sub_type=o.sub_type,
+            )
+            for o in data.objectives
+        ],
+        gold_frames=(
+            [
+                TimelineGoldFrame(
+                    timestamp_ms=f.timestamp_ms,
+                    gold=[f.gold.get(pid) for pid in range(1, max(participant_ids, default=0) + 1)],
+                )
+                for f in data.gold_frames
+            ]
+            if data.gold_frames is not None
+            else None
+        ),
     )
 
 

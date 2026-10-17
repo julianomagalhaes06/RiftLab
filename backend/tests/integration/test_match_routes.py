@@ -42,6 +42,7 @@ from riftlab.ingestion.models import MatchModel, ParticipantModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.preparation.application import process_next_preparation
 from riftlab.shared.db import unit_of_work
+from riftlab.timeline.models import MatchFramesModel
 
 _PROBLEM_KEYS = {"type", "title", "status", "code", "detail", "requestId"}
 _PERSONAL = ("subject", "hash", "puuid", "riotid", "gamename", "tagline")
@@ -107,6 +108,9 @@ async def _insert_match(session_factory, match_id: str, start_at: datetime) -> N
 async def _delete_matches(session_factory, match_ids: list[str]) -> None:
     async with unit_of_work(session_factory) as session:
         for match_id in match_ids:
+            await session.execute(
+                MatchFramesModel.__table__.delete().where(MatchFramesModel.match_id == match_id)
+            )
             row = await session.get(MatchModel, match_id)
             if row is not None:
                 await session.delete(row)
@@ -327,6 +331,38 @@ async def test_detail_shows_match_participants_and_preparation_without_personal_
         if item["matchId"] == "DEMO-0002"
     )
     assert row["preparationStatus"] == "READY"
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_timeline_lists_purchases_and_gets_gold_frames_after_preparation(
+    app_client, session_factory, tmp_path, _demo_match
+) -> None:
+    await import_demo_match(session_factory, tmp_path, "DEMO-0002")
+    before = await app_client.get("/api/v1/matches/DEMO-0002/timeline")
+    assert before.status_code == 200
+    body = before.json()
+    assert body["goldFrames"] is None  # a preparação ainda não gravou os quadros
+    assert [p["participantId"] for p in body["participants"]] == sorted(
+        p["participantId"] for p in body["participants"]
+    )
+    purchases = [i for p in body["participants"] for i in p["items"] if i["kind"] == "PURCHASE"]
+    assert purchases, "a partida demo tem compras"
+    assert all(i["itemClass"] is None for i in purchases)  # sem catálogo fixado ainda
+
+    raw_store = DurableRawMatchStore(tmp_path / "raw")
+    assert await process_next_preparation(session_factory, raw_store, _settings()) is True
+    after = (await app_client.get("/api/v1/matches/DEMO-0002/timeline")).json()
+    assert after["goldFrames"] is not None and after["goldFrames"]
+    highest = max(p["participantId"] for p in after["participants"])
+    assert all(len(f["gold"]) == highest for f in after["goldFrames"])  # índice 0 = participante 1
+    assert any(i["itemClass"] for p in after["participants"] for i in p["items"])
+    assert not any(word in key.lower() for key in _keys(after) for word in _PERSONAL)
+
+
+async def test_timeline_of_unknown_match_is_404(app_client) -> None:
+    _assert_problem(
+        await app_client.get("/api/v1/matches/BR1_1/timeline"), 404, "RESOURCE_NOT_FOUND"
+    )
 
 
 async def test_detail_unknown_match_is_404_and_invalid_id_is_422(app_client) -> None:
@@ -551,6 +587,9 @@ async def test_list_marks_the_local_account_participant_without_exposing_its_has
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.get("/api/v1/matches", params={"limit": 100})
+                detail = await client.get(f"/api/v1/matches/{match_id}")
+        assert detail.status_code == 200 and detail.json()["localParticipantId"] == 4
+        assert own_hash not in detail.text
         assert response.status_code == 200
         item = next(i for i in response.json()["items"] if i["matchId"] == match_id)
         assert item["localParticipantId"] == 4

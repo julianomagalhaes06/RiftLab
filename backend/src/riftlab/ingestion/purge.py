@@ -67,6 +67,7 @@ from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import ConflictError, InvalidRequestError, NotFoundError
 from riftlab.timeline.models import (
     DecisionStateModel,
+    MatchFramesModel,
     MatchReconstructionModel,
     TimelineEventModel,
 )
@@ -273,6 +274,7 @@ async def _delete_rows(session: AsyncSession, match_id: str) -> dict[str, int]:
     await run(
         "timelineEvents", delete(TimelineEventModel).where(TimelineEventModel.match_id == match_id)
     )
+    await run("frames", delete(MatchFramesModel).where(MatchFramesModel.match_id == match_id))
     own_jobs = select(ImportJobModel.id).where(
         ImportJobModel.requested_match_id == match_id,
         ImportJobModel.kind.in_([JobKind.IMPORT.value, JobKind.PREPARE.value]),

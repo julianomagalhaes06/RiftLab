@@ -77,6 +77,7 @@ class MatchDetailData:
     participants: list[MatchParticipantFactsView]
     preparation: PreparationInfo
     champions: dict[int, ChampionAsset]
+    local_participant_id: int | None = None
 
 
 def encode_match_cursor(start_at: datetime, match_id: str) -> str:
@@ -185,20 +186,32 @@ async def list_matches(
 
 
 async def get_match_detail(
-    session_factory: SessionFactory, match_id: str, mapping: CatalogMapping | None = None
+    session_factory: SessionFactory,
+    match_id: str,
+    mapping: CatalogMapping | None = None,
+    local_subject: LocalSubject | None = None,
 ) -> MatchDetailData:
     async with read_only_unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         match = await repo.get_match(match_id)
         if match is None:
             raise NotFoundError(f"match {match_id!r} não encontrado")
-        participants = [
-            MatchParticipantFactsView.from_participant(p)
-            for p in await repo.list_participants(match_id)
-        ]
+        rows = await repo.list_participants(match_id)
+        participants = [MatchParticipantFactsView.from_participant(p) for p in rows]
+        subject = await local_subject(session) if local_subject is not None else None
+        if MATCH_ID_DEMO_PATTERN.fullmatch(match_id):
+            local_ids = [p.participant_id for p in rows if p.participant_id == 1]
+        else:
+            local_ids = [p.participant_id for p in rows if subject and p.subject_hash == subject]
         job = await repo.get_latest_preparation_job(match_id)
         # CC-208: só banco (catálogo de campeões já sincronizado); nunca busca o CDN.
         champions = await champion_assets(
             session, mapping, match_id, match.patch, (p.champion_id for p in participants)
         )
-    return MatchDetailData(match, participants, preparation_info(job), champions)
+    return MatchDetailData(
+        match,
+        participants,
+        preparation_info(job),
+        champions,
+        local_ids[0] if len(local_ids) == 1 else None,
+    )

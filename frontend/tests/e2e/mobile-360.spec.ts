@@ -140,7 +140,7 @@ test("partida (preparando, falha, pronta) e decisões cabem em 360 px", async ({
       }),
   });
   await page.goto(`/matches/${LONG_MATCH_ID}?participant=10`);
-  await expect(page.getByText("Decisão em 7:52")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Decisão em 7:52" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Participante 10/ })).toBeVisible();
   await expectNoHorizontalOverflow(page, "partida pronta com decisões");
   await expectInsideViewport(page, "Carregar mais decisões");

@@ -45,7 +45,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
 
     // Importação e preparação automática (o worker faz tudo sozinho)
     await page.getByRole("button", { name: "Explorar demonstração" }).click();
-    await expect(page.getByRole("heading", { name: "Partida DEMO-0008" })).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible({ timeout: 90_000 });
     await expect(page.getByRole("status")).toContainText("Partida pronta", { timeout: 90_000 });
     await expect(page).toHaveURL(/\/matches\/DEMO-0008$/);
     const matchUrl = "/matches/DEMO-0008";
@@ -56,7 +56,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(page.getByRole("heading", { name: "Decisões do participante 1" })).toBeVisible();
     const decisionLink = page.getByRole("link", { name: /^Decisão em / }).first();
     await expect(decisionLink).toBeVisible();
-    await expect(page.getByText("Elegível", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Analisar", { exact: true }).first()).toBeVisible();
 
     // Detalhe: inventário com nomes do catálogo fixado, orçamento e elegibilidade
     await decisionLink.click();
@@ -158,9 +158,10 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(row).toBeVisible();
     await expect(page.getByText("Pronta", { exact: true }).first()).toBeVisible();
     await row.click();
-    await expect(page.getByRole("heading", { name: "Partida DEMO-0008" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible();
 
     // Remoção (CC-603): prévia, confirmação digitada e job PURGE processado pelo worker real
+    await page.getByText("Mais ações").click();
     await page.getByRole("button", { name: "Ver o que será removido" }).click();
     await expect(page.getByText(/eventos da linha do tempo/)).toBeVisible();
     await page.getByLabel(/Digite o id da partida/).fill("DEMO-0008");

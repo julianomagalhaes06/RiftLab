@@ -224,3 +224,58 @@ class DecisionState(CamelModel):
 def _check_stale_consistent(frame_age_ms: int | None, stale_frame: bool) -> None:
     if frame_age_ms is not None and frame_age_ms > STALE_FRAME_THRESHOLD_MS and not stale_frame:
         raise ValueError("frameAgeMs > 90000ms deve marcar staleFrame=true (docs/domain-model.md)")
+
+
+class TimelineItemEvent(CamelModel):
+    """Compra ou venda de item; desfazer já aplicado. `item_class` vem da
+    classificação do catálogo fixado pela reconstrução (null sem catálogo)."""
+
+    timestamp_ms: int = Field(ge=0)
+    item_id: int = Field(ge=1)
+    kind: Literal["PURCHASE", "SOLD"]
+    item_class: str | None = Field(default=None, max_length=32)
+
+
+class TimelineSkillUp(CamelModel):
+    timestamp_ms: int = Field(ge=0)
+    skill_slot: int = Field(ge=1, le=4, description="1=Q, 2=W, 3=E, 4=R.")
+    level_up_type: str = Field(max_length=32)
+
+
+class ParticipantTimeline(CamelModel):
+    participant_id: int = Field(ge=1, le=10)
+    items: list[TimelineItemEvent] = Field(default_factory=list)
+    skills: list[TimelineSkillUp] = Field(default_factory=list)
+
+
+class TimelineKill(CamelModel):
+    timestamp_ms: int = Field(ge=0)
+    killer_id: int = Field(ge=0, le=10, description="0 = executado (torre, monstro).")
+    victim_id: int = Field(ge=1, le=10)
+    assisting_ids: list[int] = Field(default_factory=list)
+
+
+class TimelineObjective(CamelModel):
+    timestamp_ms: int = Field(ge=0)
+    kind: Literal["DRAGON", "BARON", "HERALD", "VOIDGRUB", "ATAKHAN", "TOWER", "INHIBITOR", "OTHER"]
+    team: int | None = Field(default=None, description="Time que conquistou o objetivo.")
+    sub_type: str | None = Field(default=None, max_length=40)
+
+
+class TimelineGoldFrame(CamelModel):
+    timestamp_ms: int = Field(ge=0)
+    gold: list[int | None] = Field(
+        description="Ouro total por participante, índice 0 = participante 1; null ausente."
+    )
+
+
+class MatchTimeline(CamelModel):
+    """GET /matches/{id}/timeline: fatos da partida para a tela de análise. `gold_frames`
+    é null enquanto a preparação não gravou os quadros de ouro."""
+
+    match_id: MatchId
+    data_dragon_version: str | None = Field(default=None, pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}$")
+    participants: list[ParticipantTimeline]
+    kills: list[TimelineKill]
+    objectives: list[TimelineObjective]
+    gold_frames: list[TimelineGoldFrame] | None = None

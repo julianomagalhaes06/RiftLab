@@ -43,7 +43,7 @@ test.describe("Importação com falha recuperável (API simulada)", () => {
 
     await page.getByRole("button", { name: "Tentar importar novamente" }).click();
 
-    await expect(page.getByRole("heading", { name: "Partida BR1_3120345678" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Partida BR1_3120345678/ })).toBeVisible();
     await expect(page).toHaveURL(/\/matches\/BR1_3120345678$/);
   });
 
@@ -70,7 +70,7 @@ test.describe("Importação com falha recuperável (API simulada)", () => {
 
     // recuperação: explorar a demonstração, que não precisa de chave
     await page.getByRole("button", { name: "Explorar demonstração" }).click();
-    await expect(page.getByRole("heading", { name: "Partida DEMO-0008" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible();
     expect(calls).toBe(2);
   });
 
@@ -89,7 +89,7 @@ test.describe("Importação com falha recuperável (API simulada)", () => {
 
     await expect(page.getByRole("status")).toContainText("Nova tentativa agendada");
     await expect(page.getByText(/A Riot está indisponível/)).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Partida DEMO-0008" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible({
       timeout: 15_000,
     });
   });

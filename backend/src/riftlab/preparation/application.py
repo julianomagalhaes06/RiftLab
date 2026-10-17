@@ -24,11 +24,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -68,9 +69,14 @@ from riftlab.shared.errors import (
     SourceRateLimitedError,
     SourceSchemaError,
 )
-from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION, reconstruct_match
+from riftlab.timeline.application import (
+    RECONSTRUCTION_ALGORITHM_VERSION,
+    FrameLike,
+    reconstruct_match,
+)
 from riftlab.timeline.domain import TimelineReplayError
 from riftlab.timeline.empirical_rules import load_empirical_rules_or_disabled
+from riftlab.timeline.models import MatchFramesModel
 
 SessionFactory = async_sessionmaker[AsyncSession]
 CatalogSourceFactory = Callable[[CatalogMapping], AbstractAsyncContextManager[CatalogSource]]
@@ -230,6 +236,41 @@ async def _prepare(
     await reconstruct_match(session_factory, mapping, source, match_id, empirical_rules=rules)
     await extract_decisions(session_factory, match_id, scope_path=Path(settings.scope_path))
     await _ensure_champions(session_factory, job, mapping, match.patch, champion_fetch)
+    await _ensure_frames(session_factory, source, match_id)
+
+
+def frames_document(frames: Iterable[FrameLike]) -> list[dict[str, Any]]:
+    """Só o ouro total de cada participante por quadro; valor inválido fica de fora."""
+    document: list[dict[str, Any]] = []
+    for frame in frames:
+        gold: dict[str, int] = {}
+        for participant_id, data in frame.participant_frames.items():
+            value = data.get("totalGold") if isinstance(data, Mapping) else None
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                gold[str(int(participant_id))] = value
+        document.append({"t": frame.timestamp_ms, "gold": gold})
+    return document
+
+
+async def _ensure_frames(
+    session_factory: SessionFactory, source: DemoMatchSource | LocalRawMatchSource, match_id: str
+) -> None:
+    """Grava o ouro por quadro uma única vez (só a preparação lê o bruto). É acessório:
+    sem o bruto local (ex.: partida de corpus guardado fora do worker), a preparação
+    termina normalmente e só o gráfico de ouro fica indisponível."""
+    async with unit_of_work(session_factory) as session:
+        if await session.get(MatchFramesModel, match_id) is not None:
+            return
+    try:
+        result = await source.load_match(match_id)
+    except SourceError as exc:
+        logger.warning(
+            "quadros de ouro indisponíveis; seguindo sem gráfico", extra={"code": exc.code}
+        )
+        return
+    async with unit_of_work(session_factory) as session:
+        if await session.get(MatchFramesModel, match_id) is None:
+            session.add(MatchFramesModel(match_id=match_id, frames=frames_document(result.frames)))
 
 
 async def _finalize(
@@ -339,7 +380,9 @@ async def request_preparation(
         latest = await repo.get_latest_preparation_job(match_id)
         force = False
         if latest is not None and latest.state == ImportJobState.SUCCEEDED:
-            force = not await _decisions_are_current(session, match_id, scope_path)
+            force = not await _decisions_are_current(session, match_id, scope_path) or (
+                await session.get(MatchFramesModel, match_id) is None
+            )
         return await repo.enqueue_preparation(match_id, mode, force=force)
 
 

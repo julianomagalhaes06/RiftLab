@@ -34,6 +34,19 @@ class TimelineEventModel(Base):
     schema_version: Mapped[str] = mapped_column(String, nullable=False, default="v1")
 
 
+class MatchFramesModel(CreatedAtMixin, Base):
+    """Ouro total por participante em cada quadro da timeline, gravado pela preparação
+    (o bruto só existe para o worker). `frames` é [{"t": ms, "gold": {"1": int, ...}}]."""
+
+    __tablename__ = "match_frames"
+    __table_args__ = (
+        ForeignKeyConstraint(["match_id"], ["matches.match_id"], name="fk_match_frames_match"),
+    )
+
+    match_id: Mapped[str] = mapped_column(String, primary_key=True)
+    frames: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+
+
 class MatchReconstructionModel(CreatedAtMixin, Base):
     """Marca de conclusão atômica de uma reconstrução (CC-203): existe
     independente de contagem de compra de qualquer participante. Chave

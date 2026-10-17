@@ -51,7 +51,7 @@ for (const locale of ["pt-BR", "en-US"]) {
       const inventoryIcon = page.locator("section[aria-labelledby='inventory-heading'] img").first();
       await expect(inventoryIcon).toHaveAttribute("src", "https://ddragon.leagueoflegends.com/cdn/16.19.1/img/item/3031.png");
       await expect(inventoryIcon).toHaveAttribute("alt", "");
-      expect(await inventoryIcon.evaluate((image) => image.getBoundingClientRect().width)).toBe(32);
+      expect(await inventoryIcon.evaluate((image) => image.getBoundingClientRect().width)).toBe(42); // grade do inventário
       await page.getByRole("button", { name: "Confirmar objetivo e começar" }).click();
       await expect(page.getByRole("radio", { name: "Gume do Infinito" })).toBeVisible();
       await expect(page.locator("label.radio-option img")).toHaveAttribute("src", "https://ddragon.leagueoflegends.com/cdn/16.19.1/img/item/3031.png");

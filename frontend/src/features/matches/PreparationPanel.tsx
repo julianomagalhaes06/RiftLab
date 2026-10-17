@@ -33,7 +33,7 @@ export function PreparationPanel({ preparation, busy, onPrepare, requestError }:
       status = "Preparando a partida: reconstruindo o inventário e extraindo as decisões…";
       break;
     case "READY":
-      status = "Partida pronta: escolha um participante para ver as decisões.";
+      status = "Partida pronta: escolha um participante no placar para ver as decisões.";
       break;
     case "FAILED":
       status = "A preparação da partida falhou.";
@@ -43,6 +43,10 @@ export function PreparationPanel({ preparation, busy, onPrepare, requestError }:
       break;
   }
 
+  if (preparation.status === "READY" && !requestError) {
+    // Pronta: só o anúncio para leitor de tela; o placar já é a tela.
+    return <p className="sr-only" role="status" aria-live="polite">{status}</p>;
+  }
   return (
     <section className="section" aria-labelledby="preparation-heading">
       <h3 id="preparation-heading">Preparação</h3>

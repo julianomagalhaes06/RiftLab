@@ -59,7 +59,7 @@ test("partida mostra nome e retrato por key, recua sem salto de layout e só usa
   const boxes = await Promise.all([1, 2, 3].map((id) => portraitOf(page, id).boundingBox()));
   for (const box of boxes) {
     expect(box).not.toBeNull();
-    expect([Math.round(box!.width), Math.round(box!.height)]).toEqual([32, 32]);
+    expect([Math.round(box!.width), Math.round(box!.height)]).toEqual([34, 34]); // retrato do placar
   }
   await expect(portraitOf(page, 3)).toHaveAttribute("data-state", "fallback");
 
@@ -84,7 +84,7 @@ test("CDN fora do ar: navegação por teclado até a decisão continua, com rót
 
   await page.goto(`/decisions/${DECISION_1}`);
   await expect(page.getByRole("heading", { name: /participante 1/ })).toBeVisible();
-  await expect(page.getByText("Kai'Sa")).toBeVisible();
+  await expect(page.getByText("Kai'Sa").first()).toBeVisible(); // cabeçalho e composição dos times
 });
 
 test.describe("360 px", () => {

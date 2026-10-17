@@ -1,16 +1,22 @@
-import { useState } from "react";
-import { api, type MatchDetail, type MatchParticipant } from "../../shared/api/client";
+import { useEffect, useState } from "react";
+import { api, type DecisionSummary, type MatchDetail, type MatchParticipant, type MatchTimeline } from "../../shared/api/client";
 import { isAbortError, isApiError } from "../../shared/api/errors";
 import { useAbortScope } from "../../shared/hooks/useAbortScope";
 import { usePolling } from "../../shared/hooks/usePolling";
 import { Link } from "../../shared/router/Link";
-import { isDemoMatchId } from "../../shared/router/routes";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
-import { DecisionList } from "./DecisionList";
+import { usePagedList } from "../../shared/hooks/usePagedList";
+import { ItemNames } from "../../shared/ui/ItemNames";
+import { ChampionAvatar } from "../history/ChampionAvatar";
+import { BuildTimeline, DecisionChip, SkillOrder } from "./BuildTimeline";
+import { championName, reasonText } from "./format";
+import { GoldChart } from "./GoldChart";
+import { MatchHeader } from "./MatchHeader";
+import { summarizeDecisions } from "./matchView";
 import { PreparationPanel } from "./PreparationPanel";
 import { PurgePanel } from "./PurgePanel";
-import { ChampionBadge } from "./ChampionBadge";
-import { roleLabel, teamLabel } from "./format";
+import { Scoreboard } from "./Scoreboard";
+import "./match.css";
 
 /** Preparação em andamento (PENDING/RUNNING) é o único estado não terminal. */
 function preparationSettled(match: MatchDetail): boolean {
@@ -18,66 +24,99 @@ function preparationSettled(match: MatchDetail): boolean {
   return status === "READY" || status === "FAILED" || status === "NOT_REQUESTED";
 }
 
-function groupByTeam(participants: MatchParticipant[]): Array<[number, MatchParticipant[]]> {
-  const teams = new Map<number, MatchParticipant[]>();
-  for (const participant of participants) {
-    teams.set(participant.team, [...(teams.get(participant.team) ?? []), participant]);
-  }
-  return [...teams.entries()].sort(([a], [b]) => a - b);
+/** Linha do tempo da partida; recarrega quando a preparação termina (ouro por minuto). */
+function useMatchTimeline(matchId: string, readyKey: string) {
+  const [state, setState] = useState<{ key: string; timeline: MatchTimeline | null; failed: boolean } | null>(null);
+  const key = `${matchId}#${readyKey}`;
+  useEffect(() => {
+    const controller = new AbortController();
+    api
+      .getMatchTimeline(matchId, controller.signal)
+      .then((timeline) => setState({ key, timeline, failed: false }))
+      .catch((error: unknown) => {
+        if (!isAbortError(error)) setState({ key, timeline: null, failed: true });
+      });
+    return () => controller.abort();
+  }, [matchId, key]);
+  return state?.key === key ? state : null;
 }
 
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? "data desconhecida"
-    : date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-}
-
-function Participants({
-  match,
-  selected,
-  fromHistory,
-}: {
-  match: MatchDetail;
-  selected: number | null;
-  fromHistory: boolean;
-}) {
+function DecisionsSummary({ decisions }: { decisions: DecisionSummary[] }) {
+  const summary = summarizeDecisions(decisions);
+  if (!summary.total) return null;
+  const blocked = summary.total - summary.eligible;
   return (
-    <section aria-labelledby="participants-heading" className="section">
-      <h3 id="participants-heading">Participantes</h3>
-      {match.participants.length === 0 ? (
-        <p className="muted">Esta partida não tem participantes registrados.</p>
-      ) : (
-        groupByTeam(match.participants).map(([team, members]) => (
-          <div key={team} className="team">
-            <h4 className="team__title">{teamLabel(team)}</h4>
-            <ul className="list list--compact">
-              {members.map((participant) => {
-                const isSelected = participant.participantId === selected;
-                return (
-                  <li key={participant.participantId} className="list__item">
-                    <Link
-                      to={{
-                        name: fromHistory ? "historyMatch" : "match",
-                        matchId: match.matchId,
-                        participantId: participant.participantId,
-                      }}
-                      className={`list__link${isSelected ? " list__link--selected" : ""}`}
-                      aria-current={isSelected ? "true" : undefined}
-                    >
-                      <span className="list__title">
-                        Participante {participant.participantId} —{" "}
-                        <ChampionBadge participant={participant} />
-                      </span>
-                    </Link>
-                    <span className="list__meta">{roleLabel(participant.role)}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))
-      )}
+    <div className={`decisions-summary${summary.eligible ? "" : " decisions-summary--blocked"}`} role="note">
+      <p className="decisions-summary__headline">
+        {summary.eligible === 0
+          ? `Nenhuma das ${summary.total} decisões de compra desta partida pode ser analisada.`
+          : `${summary.eligible} de ${summary.total} decisões de compra podem ser analisadas.`}
+      </p>
+      {blocked > 0 && summary.reasons.length ? (
+        <ul className="decisions-summary__reasons">
+          {summary.reasons.map(([code, count]) => (
+            <li key={code}>
+              {reasonText(code)} <span className="muted">({count === blocked ? "todas as bloqueadas" : `${count} de ${blocked}`})</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function ParticipantSection({
+  matchId,
+  participant,
+  timeline,
+}: {
+  matchId: string;
+  participant: MatchParticipant;
+  timeline: MatchTimeline | null;
+}) {
+  const participantId = participant.participantId;
+  const list = usePagedList<DecisionSummary>({
+    resetKey: `${matchId}:${participantId}`,
+    fetchPage: (cursor, signal) => api.listDecisions(matchId, participantId, { cursor, limit: 20 }, signal),
+  });
+  const cursorExpired = isApiError(list.loadMoreError) && list.loadMoreError.code === "INVALID_CURSOR";
+  const ownTimeline = timeline?.participants.find((p) => p.participantId === participantId) ?? null;
+  return (
+    <section aria-labelledby="decisions-heading" className="match-panel">
+      <div className="match-panel__heading">
+        <ChampionAvatar participant={participant} size={40} />
+        <div>
+          <h3 id="decisions-heading">Decisões do participante {participantId}</h3>
+          <p className="muted">{championName(participant)} · compras na ordem do tempo, agrupadas por volta à loja</p>
+        </div>
+      </div>
+      {list.status === "loading" ? <p className="muted" aria-busy="true">Carregando decisões…</p> : null}
+      {list.status === "error" ? <ErrorNotice error={list.error} onRetry={list.reload} retryLabel="Recarregar decisões" /> : null}
+      {list.status === "ready" && list.items.length === 0 ? (
+        <p className="muted">Nenhuma decisão de compra foi encontrada para este participante nesta partida.</p>
+      ) : null}
+      <DecisionsSummary decisions={list.items} />
+      {timeline ? (
+        <BuildTimeline participant={ownTimeline} decisions={list.items} />
+      ) : list.items.length ? (
+        <div className="build-path__orphans">
+          {list.items.map((decision) => <DecisionChip key={decision.decisionId} decision={decision} />)}
+        </div>
+      ) : null}
+      {list.loadMoreError ? (
+        <ErrorNotice error={list.loadMoreError} onRetry={cursorExpired ? list.reload : list.loadMore} retryLabel={cursorExpired ? "Recarregar decisões" : "Tentar carregar mais"} />
+      ) : null}
+      {list.nextCursor !== null && !list.loadMoreError ? (
+        <button type="button" className="button button--secondary" onClick={list.loadMore} disabled={list.loadingMore}>
+          {list.loadingMore ? "Carregando…" : "Carregar mais decisões"}
+        </button>
+      ) : null}
+      {timeline ? (
+        <div className="match-panel__sub">
+          <h4>Ordem de habilidades</h4>
+          <SkillOrder participant={ownTimeline} />
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -122,15 +161,18 @@ export function MatchPage({
 
   const notFound =
     polling.phase === "failed" && isApiError(polling.error) && polling.error.status === 404;
+  const localId = match?.localParticipantId ?? null;
+  const selectedId = participantId ?? localId;
   const selectedParticipant =
-    match && participantId !== null
-      ? (match.participants.find((p) => p.participantId === participantId) ?? null)
+    match && selectedId !== null
+      ? (match.participants.find((p) => p.participantId === selectedId) ?? null)
       : null;
+  const timelineState = useMatchTimeline(matchId, match?.preparation.status ?? "loading");
 
   return (
     <section className="section" aria-labelledby="match-heading">
-      {fromHistory ? <Link to="/historico">Voltar ao Histórico</Link> : null}
-      <h2 id="match-heading">Partida {matchId}</h2>
+      {fromHistory ? <Link to="/historico" className="match-back">Voltar ao Histórico</Link> : null}
+      {match === null ? <h2 id="match-heading">Partida {matchId}</h2> : null}
 
       {match === null && polling.phase === "polling" ? (
         <p className="muted" aria-busy="true">
@@ -162,21 +204,8 @@ export function MatchPage({
       ) : null}
 
       {match !== null ? (
-        <>
-          <p className="list__meta">
-            {isDemoMatchId(match.matchId) ? <span className="tag">Demonstração</span> : null} Patch{" "}
-            {match.patch} · fila {match.queue} · mapa {match.map} · {formatDate(match.startAt)}
-          </p>
-          {isDemoMatchId(match.matchId) ? (
-            <p className="muted">
-              Partida sintética: valida o fluxo do sistema e não representa um jogo real.
-            </p>
-          ) : null}
-          {match.supportLevel === "LIMITED" ? (
-            <div className="notice notice--info" role="note">
-              <p>Suporte limitado neste patch: ainda não há avaliação de ranking própria. Nenhuma recomendação é gerada.</p>
-            </div>
-          ) : null}
+        <ItemNames version={timelineState?.timeline?.dataDragonVersion}>
+          <MatchHeader match={match} timeline={timelineState?.timeline ?? null} localId={localId} />
 
           <PreparationPanel
             preparation={match.preparation}
@@ -187,21 +216,51 @@ export function MatchPage({
 
           {match.preparation.status === "READY" ? (
             <>
-              <Participants match={match} selected={participantId} fromHistory={fromHistory} />
-              {participantId === null ? (
-                <p className="muted">Selecione um participante para listar as decisões dele.</p>
+              <section aria-labelledby="participants-heading" className="match-panel">
+                <h3 id="participants-heading">Placar</h3>
+                <Scoreboard
+                  match={match}
+                  timeline={timelineState?.timeline ?? null}
+                  selected={selectedId}
+                  localId={localId}
+                  fromHistory={fromHistory}
+                />
+              </section>
+              {selectedId === null ? (
+                <p className="muted">Selecione um participante no placar para ver as compras e decisões dele.</p>
               ) : selectedParticipant === null ? (
                 <div className="notice notice--info" role="note">
-                  <p>O participante {participantId} não existe nesta partida.</p>
+                  <p>O participante {selectedId} não existe nesta partida.</p>
                 </div>
               ) : (
-                <DecisionList matchId={match.matchId} participantId={participantId} />
+                <ParticipantSection
+                  key={selectedId}
+                  matchId={match.matchId}
+                  participant={selectedParticipant}
+                  timeline={timelineState?.timeline ?? null}
+                />
               )}
+              {timelineState?.timeline ? (
+                <section aria-labelledby="gold-heading" className="match-panel">
+                  <h3 id="gold-heading">Ouro ao longo da partida</h3>
+                  <GoldChart timeline={timelineState.timeline} participants={match.participants} />
+                  {timelineState.timeline.goldFrames == null ? (
+                    <button type="button" className="button button--secondary" onClick={() => void handlePrepare()} disabled={preparing}>
+                      {preparing ? "Enviando…" : "Preparar de novo para gerar o gráfico"}
+                    </button>
+                  ) : null}
+                </section>
+              ) : timelineState?.failed ? (
+                <p className="muted">A linha do tempo da partida não pôde ser carregada agora.</p>
+              ) : null}
             </>
           ) : null}
 
-          <PurgePanel key={match.matchId} matchId={match.matchId} />
-        </>
+          <details className="match-more">
+            <summary>Mais ações</summary>
+            <PurgePanel key={match.matchId} matchId={match.matchId} />
+          </details>
+        </ItemNames>
       ) : null}
 
       {!fromHistory ? <p><Link to="/">Voltar ao início</Link></p> : null}

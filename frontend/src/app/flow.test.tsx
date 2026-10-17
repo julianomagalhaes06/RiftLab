@@ -130,7 +130,7 @@ describe("fluxo principal: demonstração → importação → partida → decis
     await advance(2_000);
 
     // SUCCEEDED leva à página da partida (replace: sem voltar para o progresso).
-    await screen.findByRole("heading", { name: "Partida DEMO-0008" });
+    await screen.findByRole("heading", { name: /^Partida DEMO-0008/ });
     expect(window.location.pathname).toBe("/matches/DEMO-0008");
     await waitFor(() => expect(status()).toMatch(/aguardando na fila/i));
     await advance(1_000);
@@ -139,25 +139,23 @@ describe("fluxo principal: demonstração → importação → partida → decis
     await waitFor(() => expect(status()).toMatch(/Partida pronta/));
 
     // Participantes → seleção → decisões.
-    expect(screen.getByText("Time 100")).toBeInTheDocument();
-    expect(screen.getByText("Atirador (bot)")).toBeInTheDocument();
+    expect(screen.getByText("Time azul")).toBeInTheDocument();
+    expect(screen.getByText("Atirador")).toBeInTheDocument();
     expect(screen.getByText("Função não informada")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: /Participante 1 — Campeão #9001/ }));
     await screen.findByRole("heading", { name: "Decisões do participante 1" });
     expect(window.location.search).toBe("?participant=1");
     expect(api.callsTo("GET", /decisions$/)[0].search.get("participantId")).toBe("1");
 
-    expect(await screen.findByText("Decisão em 7:52")).toBeInTheDocument();
-    expect(screen.getByText("Elegível")).toBeInTheDocument();
-    expect(screen.getByText("Inelegível")).toBeInTheDocument();
-    expect(screen.getByText("Orçamento aproximado (quadro há 20 s)")).toBeInTheDocument();
-    expect(screen.getByText("Orçamento desconhecido")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Decisão em 7:52" })).toBeInTheDocument();
+    expect(screen.getByText("Analisar")).toBeInTheDocument();
+    expect(screen.getAllByText("Bloqueada").length).toBeGreaterThan(0);
     expect(screen.getByText(/O inventário anterior à decisão é incerto/)).toBeInTheDocument();
     expect(screen.getByText("2º item principal")).toBeInTheDocument();
 
     // "Carregar mais" usa o cursor devolvido pela API.
     fireEvent.click(screen.getByRole("button", { name: "Carregar mais decisões" }));
-    expect(await screen.findByText("Decisão em 15:00")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Decisão em 15:00" })).toBeInTheDocument();
     expect(api.callsTo("GET", /decisions$/)[1].search.get("cursor")).toBe("PROXIMA_PAGINA");
     expect(screen.queryByRole("button", { name: "Carregar mais decisões" })).not.toBeInTheDocument();
 

@@ -38,7 +38,12 @@ from riftlab.learning.models import LearningAttemptModel
 from riftlab.reviews.models import AnalysisFeedbackModel
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.domain import SourceOrigin
-from riftlab.timeline.models import DecisionStateModel, MatchReconstructionModel, TimelineEventModel
+from riftlab.timeline.models import (
+    DecisionStateModel,
+    MatchFramesModel,
+    MatchReconstructionModel,
+    TimelineEventModel,
+)
 
 FAKE_SUBJECT_HASH_SECRET = "segredo-local-de-teste-nao-real"  # noqa: S105
 FAKE_RIOT_API_KEY = "RGAPI-fake-test-key-not-real"  # noqa: S105
@@ -98,6 +103,7 @@ async def reset_match(session_factory, match_id: str) -> None:
         await session.execute(
             delete(MatchReconstructionModel).where(MatchReconstructionModel.match_id == match_id)
         )
+        await session.execute(delete(MatchFramesModel).where(MatchFramesModel.match_id == match_id))
         await session.execute(
             delete(DecisionStateModel).where(DecisionStateModel.match_id == match_id)
         )

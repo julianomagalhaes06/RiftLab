@@ -33,7 +33,7 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
   await page.keyboard.press("Space");
 
   // Importação → partida (redirecionamento automático); o foco vai para o conteúdo novo.
-  await expect(page.getByRole("heading", { name: "Partida DEMO-0008" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible();
   await expect.poll(() => activeId(page)).toBe("conteudo");
   await expect(page.getByRole("status")).toContainText("Partida pronta");
 
@@ -49,7 +49,7 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
   await tabTo(page, "Carregar mais decisões");
   await expectFocusVisible(page);
   await page.keyboard.press("Space");
-  await expect(page.getByText("Decisão em 15:00")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Decisão em 15:00" })).toBeVisible();
 
   // Detalhe: Enter no link da decisão.
   await page.keyboard.press("Shift+Tab"); // volta para a lista (último link da decisão nova)

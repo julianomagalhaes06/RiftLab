@@ -74,7 +74,7 @@ describe("importação: falha, nova tentativa e espera", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar importar novamente" }));
 
-    await screen.findByRole("heading", { name: "Partida BR1_3120345678" });
+    await screen.findByRole("heading", { name: /^Partida BR1_3120345678/ });
     expect(api.callsTo("POST", /retry$/)).toHaveLength(1);
     // depois do FAILED, nenhuma consulta extra ao job antigo
     expect(api.callsTo("GET", new RegExp(`imports/${JOB_ID}$`))).toHaveLength(1);
@@ -284,7 +284,7 @@ describe("decisões: erros e estados", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Carregar mais decisões" }));
 
     expect(await screen.findByText(/A página solicitada não é mais válida/)).toBeInTheDocument();
-    expect(screen.getByText("Decisão em 7:52")).toBeInTheDocument(); // o que já estava na tela fica
+    expect(screen.getByRole("link", { name: "Decisão em 7:52" })).toBeInTheDocument(); // o que já estava na tela fica
     fireEvent.click(screen.getByRole("button", { name: "Recarregar decisões" }));
     await waitFor(() => expect(api.callsTo("GET", /decisions$/).length).toBeGreaterThanOrEqual(3));
   });
@@ -370,7 +370,7 @@ describe("URL: deep link, recarregar e voltar/avançar", () => {
       mock.on("GET", /decisions$/, () => json(200, { items: [decisionSummary()], nextCursor: null }));
     });
 
-    expect(await screen.findByText("Decisão em 7:52")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Decisão em 7:52" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Participante 1/ })).toHaveAttribute("aria-current", "true");
     expect(api.callsTo("POST", /./)).toHaveLength(0); // retomar nunca dispara escrita
   });
@@ -390,19 +390,19 @@ describe("URL: deep link, recarregar e voltar/avançar", () => {
       mock.on("GET", /decisions$/, () => json(200, { items: [], nextCursor: null }));
     });
     fireEvent.click(await screen.findByRole("link", { name: /DEMO-0008/ }));
-    await screen.findByRole("heading", { name: "Partida DEMO-0008" });
+    await screen.findByRole("heading", { name: /^Partida DEMO-0008/ });
     fireEvent.click(await screen.findByRole("link", { name: /Participante 2/ }));
     await screen.findByRole("heading", { name: "Decisões do participante 2" });
 
     window.history.back();
     await waitFor(() => expect(window.location.search).toBe(""));
-    await screen.findByText("Selecione um participante para listar as decisões dele.");
+    await screen.findByText("Selecione um participante no placar para ver as compras e decisões dele.");
 
     window.history.back();
     await screen.findByRole("heading", { name: "Analisar uma partida" });
 
     window.history.forward();
-    await screen.findByRole("heading", { name: "Partida DEMO-0008" });
+    await screen.findByRole("heading", { name: /^Partida DEMO-0008/ });
   });
 
   it("o protótipo do CC-102 fica fora da jornada principal e rotulado como ilustrativo", async () => {

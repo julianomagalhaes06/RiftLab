@@ -22,6 +22,7 @@ export function ChampionAvatar({
       className={`champion-avatar ${className}`.trim()}
       style={{ width: size, height: size }}
       data-state={showImage ? "image" : "fallback"}
+      data-testid="champion-portrait"
       aria-hidden="true"
     >
       {showImage ? (

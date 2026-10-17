@@ -13,6 +13,7 @@ for (const width of [1280, 360]) {
         ok(++polls < 2 ? job({ status: "RUNNING", kind: "PURGE", attempts: 1 }) : job({ status: "SUCCEEDED", kind: "PURGE", attempts: 1 })),
     });
     await page.goto("/matches/DEMO-0008");
+    await page.getByText("Mais ações").click();
     await expect(page.getByRole("heading", { name: "Remover esta partida" })).toBeVisible();
     await page.getByRole("button", { name: "Ver o que será removido" }).click();
     await expect(page.getByText("40 eventos da linha do tempo")).toBeVisible();

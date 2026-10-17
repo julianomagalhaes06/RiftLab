@@ -19,6 +19,9 @@ export type PurgePreview = Schemas["PurgePreview"];
 export type MatchSummary = Schemas["MatchSummary"];
 export type MatchDetail = Schemas["MatchDetail"];
 export type MatchParticipant = Schemas["MatchParticipant"];
+export type MatchTimeline = Schemas["MatchTimeline"];
+export type TimelineItemEvent = Schemas["TimelineItemEvent"];
+export type TimelineObjective = Schemas["TimelineObjective"];
 export type ChampionAsset = Schemas["ChampionAsset"];
 export type ChampionPatterns = Schemas["ChampionPatterns"];
 export type MatchPreparation = Schemas["MatchPreparation"];
@@ -62,6 +65,7 @@ export interface ApiClient {
   retryImport(jobId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
   listMatches(params?: PageParams, signal?: AbortSignal): Promise<MatchPage>;
   getMatch(matchId: string, signal?: AbortSignal): Promise<MatchDetail>;
+  getMatchTimeline(matchId: string, signal?: AbortSignal): Promise<MatchTimeline>;
   prepareMatch(matchId: string, signal?: AbortSignal): Promise<MatchPreparation>;
   listDecisions(
     matchId: string,
@@ -173,6 +177,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
         signal,
       }),
     getMatch: (matchId, signal) => request("GET", `/api/v1/matches/${enc(matchId)}`, { signal }),
+    getMatchTimeline: (matchId, signal) =>
+      request("GET", `/api/v1/matches/${enc(matchId)}/timeline`, { signal }),
     getPurgePreview: (matchId, signal) =>
       request("GET", `/api/v1/matches/${enc(matchId)}/purge-preview`, { signal }),
     purgeMatch: (matchId, signal) =>

@@ -401,6 +401,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matches/{match_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Linha do tempo de uma partida importada
+         * @description Compras e vendas por participante (desfazer aplicado), subidas de habilidade, abates, objetivos e ouro por quadro. Só banco; `goldFrames` é null até a preparação gravar os quadros.
+         */
+        get: operations["get_imported_match_timeline_api_v1_matches__match_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/objectives/interpret": {
         parameters: {
             query?: never;
@@ -1443,6 +1463,25 @@ export interface components {
             supportReason: "PATCH_NOT_VALIDATED" | "DEMO_DATA";
         };
         /**
+         * MatchTimeline
+         * @description GET /matches/{id}/timeline: fatos da partida para a tela de análise. `gold_frames`
+         *     é null enquanto a preparação não gravou os quadros de ouro.
+         */
+        MatchTimeline: {
+            /** Datadragonversion */
+            dataDragonVersion?: string | null;
+            /** Goldframes */
+            goldFrames?: components["schemas"]["TimelineGoldFrame"][] | null;
+            /** Kills */
+            kills: components["schemas"]["TimelineKill"][];
+            /** Matchid */
+            matchId: string;
+            /** Objectives */
+            objectives: components["schemas"]["TimelineObjective"][];
+            /** Participants */
+            participants: components["schemas"]["ParticipantTimeline"][];
+        };
+        /**
          * ObjectiveForm
          * @description Formulario estruturado citado em docs/contracts.md e reaproveitado como
          *     o campo "objective" de POST /analyses e /learning-attempts.
@@ -1516,6 +1555,15 @@ export interface components {
             denominator: number;
             /** Items */
             items: components["schemas"]["ObservedItem"][];
+        };
+        /** ParticipantTimeline */
+        ParticipantTimeline: {
+            /** Items */
+            items?: components["schemas"]["TimelineItemEvent"][];
+            /** Participantid */
+            participantId: number;
+            /** Skills */
+            skills?: components["schemas"]["TimelineSkillUp"][];
         };
         /** Position */
         Position: {
@@ -1667,6 +1715,77 @@ export interface components {
          * @enum {string}
          */
         ReportFormat: "json" | "html";
+        /** TimelineGoldFrame */
+        TimelineGoldFrame: {
+            /**
+             * Gold
+             * @description Ouro total por participante, índice 0 = participante 1; null ausente.
+             */
+            gold: (number | null)[];
+            /** Timestampms */
+            timestampMs: number;
+        };
+        /**
+         * TimelineItemEvent
+         * @description Compra ou venda de item; desfazer já aplicado. `item_class` vem da
+         *     classificação do catálogo fixado pela reconstrução (null sem catálogo).
+         */
+        TimelineItemEvent: {
+            /** Itemclass */
+            itemClass?: string | null;
+            /** Itemid */
+            itemId: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "PURCHASE" | "SOLD";
+            /** Timestampms */
+            timestampMs: number;
+        };
+        /** TimelineKill */
+        TimelineKill: {
+            /** Assistingids */
+            assistingIds?: number[];
+            /**
+             * Killerid
+             * @description 0 = executado (torre, monstro).
+             */
+            killerId: number;
+            /** Timestampms */
+            timestampMs: number;
+            /** Victimid */
+            victimId: number;
+        };
+        /** TimelineObjective */
+        TimelineObjective: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "DRAGON" | "BARON" | "HERALD" | "VOIDGRUB" | "ATAKHAN" | "TOWER" | "INHIBITOR" | "OTHER";
+            /** Subtype */
+            subType?: string | null;
+            /**
+             * Team
+             * @description Time que conquistou o objetivo.
+             */
+            team?: number | null;
+            /** Timestampms */
+            timestampMs: number;
+        };
+        /** TimelineSkillUp */
+        TimelineSkillUp: {
+            /** Leveluptype */
+            levelUpType: string;
+            /**
+             * Skillslot
+             * @description 1=Q, 2=W, 3=E, 4=R.
+             */
+            skillSlot: number;
+            /** Timestampms */
+            timestampMs: number;
+        };
         /**
          * UserProvidedBudget
          * @description docs/contracts.md: Budget opcional {gold: inteiro 0..100000, source:
@@ -2703,6 +2822,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PurgePreview"];
+                };
+            };
+            /** @description Partida inexistente (ou sem importação concluída, no POST). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description VALIDATION_ERROR (parâmetro inválido) ou INVALID_CURSOR (cursor malformado, adulterado ou de versão desconhecida). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_imported_match_timeline_api_v1_matches__match_id__timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchTimeline"];
                 };
             };
             /** @description Partida inexistente (ou sem importação concluída, no POST). */
