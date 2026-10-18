@@ -121,10 +121,25 @@ test("partida (preparando, falha, pronta) e decisões cabem em 360 px", async ({
 
   await mockApi(page, {
     "GET /api/v1/matches/:id": () => ok(matchDetail({ matchId: LONG_MATCH_ID })),
+    "GET /api/v1/matches/:id/timeline": () =>
+      ok({
+        matchId: LONG_MATCH_ID,
+        dataDragonVersion: null,
+        participants: [
+          {
+            participantId: 10,
+            items: [{ timestampMs: 472_000, itemId: 3031, kind: "PURCHASE", itemClass: "MAIN" }],
+            skills: [],
+          },
+        ],
+        kills: [],
+        objectives: [],
+        goldFrames: [],
+      }),
     "GET /api/v1/matches/:id/decisions": () =>
       ok({
         items: [
-          decisionSummary(),
+          decisionSummary({ participantId: 10 }),
           decisionSummary({
             decisionId: DECISION_2,
             timestampMs: 3_605_000,
