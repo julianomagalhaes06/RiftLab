@@ -14,18 +14,31 @@ function ordered(members: MatchParticipant[]): MatchParticipant[] {
   return [...members].sort((a, b) => rank(a) - rank(b) || a.participantId - b.participantId);
 }
 
-function Build({ items }: { items: MatchTimeline["participants"][number]["items"] }) {
+function Build({ items, participant }: { items: MatchTimeline["participants"][number]["items"]; participant: MatchParticipant }) {
   const itemName = useItemName();
-  const build = completedBuild(items ?? []);
-  if (!build.length) return <span className="muted">—</span>;
+  const official = participant.finalItems != null;
+  const build = official
+    ? participant.finalItems!.map((itemId) => ({ itemId }))
+    : completedBuild(items ?? []);
+  const trinket = official ? participant.finalTrinketItemId : null;
+  const source = official ? "Inventário final oficial" : "Estimado pela linha do tempo";
   return (
-    <span className="scoreboard__build">
-      {build.map((item, index) => (
-        <span key={`${item.itemId}-${index}`} title={itemName({ itemId: item.itemId })}>
-          <ItemIcon itemId={item.itemId} />
-          <span className="sr-only">{itemName({ itemId: item.itemId })}</span>
+    <span className="scoreboard__build" role="group" aria-label={source} title={source}>
+      {build.length ? build.map((item, index) => (
+          <span key={`${item.itemId}-${index}`} title={itemName({ itemId: item.itemId })}>
+            <ItemIcon itemId={item.itemId} />
+            <span className="sr-only">{itemName({ itemId: item.itemId })}</span>
+          </span>
+        )) : <span className="muted" aria-label={source}>—</span>}
+      {trinket ? (
+        <span className="scoreboard__trinket" role="group" aria-label="Amuleto final oficial">
+          <span className="muted">Amuleto</span>
+          <span title={itemName({ itemId: trinket })}>
+            <ItemIcon itemId={trinket} />
+            <span className="sr-only">{itemName({ itemId: trinket })}</span>
+          </span>
         </span>
-      ))}
+      ) : null}
     </span>
   );
 }
@@ -84,7 +97,7 @@ function Row({
         <small>{cs != null && minutes > 0 ? `${decimal(cs / minutes)}/min` : ""}</small>
       </td>
       <td>{scored && teamKills ? percent(Math.min(1, (kills + assists) / teamKills)) : "—"}</td>
-      <td className="scoreboard__items"><Build items={items} /></td>
+      <td className="scoreboard__items"><Build items={items} participant={participant} /></td>
     </tr>
   );
 }
@@ -127,7 +140,7 @@ export function Scoreboard({
                 <th scope="col">K / D / A</th>
                 <th scope="col">Farm</th>
                 <th scope="col"><abbr title="Participação em abates do time">P/Abate</abbr></th>
-                <th scope="col">Itens concluídos</th>
+                <th scope="col">Itens finais</th>
               </tr>
             </thead>
             <tbody>

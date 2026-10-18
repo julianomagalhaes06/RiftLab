@@ -14,7 +14,7 @@ import base64
 import binascii
 import json
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
@@ -155,6 +155,7 @@ def public_reasons(reasons: list[dict[str, Any]]) -> list[PublicReason]:
 class DecisionPage:
     items: list[StoredDecisionPoint]
     next_cursor: str | None
+    health: dict[uuid.UUID, dict[str, Any]] = field(default_factory=dict)
 
 
 RulesApplication = Literal["VALIDATED", "INHERITED", "NONE"]
@@ -174,13 +175,17 @@ class DecisionDetail:
     # próprio patch), INHERITED (de `rules_patch`) ou NONE.
     rules_application: RulesApplication = "NONE"
     rules_patch: str | None = None
+    health: dict[str, Any] = field(default_factory=dict)
 
 
 def rules_origin(provenance: list[dict[str, Any]]) -> tuple[RulesApplication, str | None]:
     """Estados v9 não gravavam `application`: regra ligada ali era sempre validada."""
     if not provenance:
         return "NONE", None
-    first = provenance[0]
+    applied = [r for r in provenance if r.get("application") != "WITHHELD"]
+    if not applied:
+        return "NONE", None
+    first = applied[0]
     patch = first.get("appliedFromPatch")
     application: RulesApplication = (
         "INHERITED" if first.get("application") == "INHERITED" else "VALIDATED"
@@ -230,6 +235,18 @@ async def list_decision_points(
             if extraction is None:
                 raise DecisionsNotPreparedError("decisões não preparadas")
         rows = await decisions.list_points_page(extraction.id, participant_id, after, limit + 1)
+        from riftlab.timeline.health import health_for_state
+
+        match = await ingestion.get_match(match_id)
+        assert match is not None
+        health = {}
+        for point in rows[:limit]:
+            health[point.id] = await health_for_state(
+                session,
+                match.patch,
+                point.versions.reconstruction_version,
+                await decisions.get_rules_provenance(point.decision_state_id),
+            )
 
     items = rows[:limit]
     next_cursor: str | None = None
@@ -245,7 +262,7 @@ async def list_decision_points(
                 point_id=last.id,
             )
         )
-    return DecisionPage(items, next_cursor)
+    return DecisionPage(items, next_cursor, health)
 
 
 async def get_decision_detail(
@@ -261,6 +278,16 @@ async def get_decision_detail(
         inventory, level = await decisions.get_pre_decision_context(point.decision_state_id)
         application, rules_patch = rules_origin(
             await decisions.get_rules_provenance(point.decision_state_id)
+        )
+        from riftlab.timeline.health import health_for_state
+
+        match = await SqlAlchemyIngestionRepository(session).get_match(point.match_id)
+        assert match is not None
+        health = await health_for_state(
+            session,
+            match.patch,
+            point.versions.reconstruction_version,
+            await decisions.get_rules_provenance(point.decision_state_id),
         )
         item_names: dict[int, str | None] = {}
         catalog_id = point.versions.catalog_id
@@ -279,4 +306,5 @@ async def get_decision_detail(
         catalog.data_dragon_version if catalog else None,
         application,
         rules_patch,
+        health,
     )

@@ -34,6 +34,7 @@ from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore, Raw
 from riftlab.ingestion.infrastructure.riot_source import LocalRawMatchSource, RiotMatchSource
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import SubjectHashSecretMissingError
+from riftlab.ingestion.models import ParticipantFinalItemsModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import (
@@ -337,6 +338,20 @@ async def _persist_result(
                         score=participant.score,
                     )
                 )
+            await session.flush()
+            for participant in result.participants:
+                final = participant.final_items
+                if final is not None:
+                    session.add(
+                        ParticipantFinalItemsModel(
+                            match_id=result.match_id,
+                            participant_id=participant.participant_id,
+                            items=list(final.items),
+                            trinket_item_id=final.trinket_item_id,
+                            role_bound_item_id=final.role_bound_item_id,
+                            raw_hash=result.raw_hash,
+                        )
+                    )
             for event in result.events:
                 await timeline_repo.add_event(
                     TimelineEvent(

@@ -52,6 +52,7 @@ from riftlab.timeline.empirical_rules import (
     EmpiricalRules,
     attribute_system_purchases,
 )
+from riftlab.timeline.legacy_provenance import normalize_known_v10_provenance
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 SessionFactory = async_sessionmaker[AsyncSession]
@@ -115,10 +116,10 @@ STALE_FRAME_THRESHOLD_MS = 90_000
 #       regras é o mesmo da v9 tem resultado idêntico ao da v9, e a v10 copia
 #       esses estados sem reabrir a fonte (`_carry_forward`), o que preserva as
 #       partidas cujo bruto não está nesta máquina.
-RECONSTRUCTION_ALGORITHM_VERSION = 10
+RECONSTRUCTION_ALGORITHM_VERSION = 11
 # Versão anterior cujo reducer é idêntico ao da corrente (só a resolução das regras
 # mudou): base da cópia sem fonte.
-CARRY_FORWARD_FROM_VERSION = 9
+CARRY_FORWARD_FROM_VERSION = 10
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens
@@ -625,7 +626,15 @@ def _recipe_ids(item: Item | None) -> set[int]:
     }
 
 
-def reconstruct_participant_purchases(
+@dataclass(frozen=True, slots=True)
+class ParticipantReconstruction:
+    purchases: list[ReconstructedPurchase]
+    final_inventory: InventorySnapshot
+    uncertain: bool
+    reasons: tuple[UncertainReason, ...]
+
+
+def reconstruct_participant(
     *,
     participant_id: int,
     events: Sequence[TimelineEvent],
@@ -636,7 +645,7 @@ def reconstruct_participant_purchases(
     excluded_item_ids: frozenset[int] = frozenset(),
     enabled_rules: frozenset[str] = frozenset(),
     system_item_ids: frozenset[int] = frozenset(),
-) -> list[ReconstructedPurchase]:
+) -> ParticipantReconstruction:
     """Reducer puro. events deve conter os eventos de TODOS os participantes
     da partida — a filtragem por dono acontece aqui (nunca antes de chamar),
     para que dois participantes processados separadamente fiquem isolados
@@ -1127,7 +1136,7 @@ def reconstruct_participant_purchases(
                     rev_stack.pop()
                 last_reversible = rev_stack[-1] if rev_stack else None
 
-    return [
+    purchases = [
         replace(
             purchase,
             retrospective_status=retro_status[purchase.event_source_index],
@@ -1141,6 +1150,36 @@ def reconstruct_participant_purchases(
         )
         for purchase in results
     ]
+
+    return ParticipantReconstruction(
+        purchases, inventory, uncertain or not catalog_available, tuple(reasons)
+    )
+
+
+def reconstruct_participant_purchases(
+    *,
+    participant_id: int,
+    events: Sequence[TimelineEvent],
+    origin: SourceOrigin,
+    frames: Sequence[FrameLike] = (),
+    catalog_id: uuid.UUID | None,
+    catalog_items: Mapping[int, Item] | None = None,
+    excluded_item_ids: frozenset[int] = frozenset(),
+    enabled_rules: frozenset[str] = frozenset(),
+    system_item_ids: frozenset[int] = frozenset(),
+) -> list[ReconstructedPurchase]:
+    """Interface pré-compra preservada; fatos finais são retornados separadamente."""
+    return reconstruct_participant(
+        participant_id=participant_id,
+        events=events,
+        origin=origin,
+        frames=frames,
+        catalog_id=catalog_id,
+        catalog_items=catalog_items,
+        excluded_item_ids=excluded_item_ids,
+        enabled_rules=enabled_rules,
+        system_item_ids=system_item_ids,
+    ).purchases
 
 
 def _decision_state_from_purchase(
@@ -1298,20 +1337,32 @@ class MatchReconstruction:
     decision_states: list[DecisionState] = field(default_factory=list)
 
 
-def _rule_set(provenance: Sequence[dict[str, Any]]) -> frozenset[tuple[Any, Any]]:
-    return frozenset((rule.get("ruleId"), rule.get("ruleVersion")) for rule in provenance)
+def _rule_set(provenance: Sequence[dict[str, Any]]) -> frozenset[tuple[Any, ...]]:
+    return frozenset(
+        (
+            rule.get("ruleId"),
+            rule.get("ruleVersion"),
+            rule.get("application"),
+            rule.get("appliedFromPatch"),
+            tuple(rule.get("systemItemIds", ())) if rule.get("ruleId") == "R4s" else (),
+        )
+        for rule in provenance
+        if rule.get("application") != "WITHHELD"
+    )
 
 
 async def _carry_forward(
     session_factory: SessionFactory,
     match_id: str,
+    patch: str,
     catalog_id: uuid.UUID | None,
     provenance: Sequence[dict[str, Any]],
     timeline_repo_factory: Any,
 ) -> MatchReconstruction | None:
-    """Copia os estados da v9 para a v10 quando o resultado é o mesmo por construção:
-    marca v9 com o MESMO catálogo, estados existentes e o MESMO conjunto de regras
-    (id + versão) que a v10 ligaria para o patch. Linhas novas (ids novos, v10, só a
+    """Copia v10 para v11 quando o resultado é o mesmo por construção:
+    marca v10 com o MESMO catálogo, estados existentes e a MESMA proveniência
+    efetiva de regras (id/versão/aplicação/origem/parâmetros) que v11 ligaria.
+    Linhas novas (ids novos, v11, só a
     proveniência atualizada); as da v9 ficam intactas. Qualquer diferença (ex.: patch
     que agora herda regras) ⇒ None, e a reconstrução segue fresca a partir da fonte."""
     async with unit_of_work(session_factory) as session:
@@ -1326,10 +1377,24 @@ async def _carry_forward(
             for state in await repo.list_decision_states(match_id, participant.participant_id)
             if state.state_version == CARRY_FORWARD_FROM_VERSION
         ]
-    if not old_states or any(
-        _rule_set(state.quality.get("empiricalRules") or []) != _rule_set(provenance)
-        for state in old_states
-    ):
+    normalized_states: list[DecisionState] = []
+    for state in old_states:
+        old_provenance = state.quality.get("empiricalRules") or []
+        if _rule_set(old_provenance) == _rule_set(provenance):
+            normalized_states.append(state)
+            continue
+        known_legacy = normalize_known_v10_provenance(
+            old_provenance,
+            patch=patch,
+            reconstruction_version=CARRY_FORWARD_FROM_VERSION,
+            has_catalog=catalog_id is not None,
+        )
+        if known_legacy is None or _rule_set(known_legacy) != _rule_set(provenance):
+            return None
+        normalized_states.append(
+            replace(state, quality={**state.quality, "empiricalRules": known_legacy})
+        )
+    if not normalized_states:
         return None
     new_states = [
         replace(
@@ -1339,7 +1404,7 @@ async def _carry_forward(
             quality={**state.quality, "empiricalRules": [dict(rule) for rule in provenance]},
             created_at=None,
         )
-        for state in old_states
+        for state in normalized_states
     ]
     try:
         async with unit_of_work(session_factory) as session:
@@ -1347,7 +1412,7 @@ async def _carry_forward(
             for state in new_states:
                 await repo.add_decision_state(state)
             await repo.add_match_reconstruction(
-                match_id, RECONSTRUCTION_ALGORITHM_VERSION, catalog_id
+                match_id, RECONSTRUCTION_ALGORITHM_VERSION, catalog_id, list(provenance)
             )
     except IntegrityError as exc:
         raise ConflictError(
@@ -1429,10 +1494,12 @@ async def reconstruct_match(
             )
         catalog_id = catalog_version.id if catalog_version is not None else None
 
-    enabled_rules = rules.enabled_for(match.patch)
-    provenance = rules.provenance_for(match.patch)
+    from riftlab.timeline.rule_resolution import resolve_rules
+
+    async with unit_of_work(session_factory) as session:
+        enabled_rules, provenance = await resolve_rules(session, rules, match.patch, catalog_id)
     carried = await _carry_forward(
-        session_factory, match_id, catalog_id, provenance, timeline_repo_factory
+        session_factory, match_id, match.patch, catalog_id, provenance, timeline_repo_factory
     )
     if carried is not None:
         return carried
@@ -1505,7 +1572,7 @@ async def reconstruct_match(
             for state in all_decision_states:
                 await repo.add_decision_state(state)
             await repo.add_match_reconstruction(
-                match_id, RECONSTRUCTION_ALGORITHM_VERSION, catalog_id
+                match_id, RECONSTRUCTION_ALGORITHM_VERSION, catalog_id, list(provenance)
             )
     except IntegrityError as exc:
         raise ConflictError(

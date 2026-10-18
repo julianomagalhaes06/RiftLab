@@ -12,14 +12,16 @@ import base64
 import binascii
 import json
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
 from riftlab.champions.application import ChampionAsset, champion_assets
 from riftlab.ingestion.domain import Match, Participant
+from riftlab.ingestion.models import ParticipantFinalItemsModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.ingestion.score import ParticipantScore
 from riftlab.preparation.application import PreparationInfo, preparation_info
@@ -59,6 +61,8 @@ class MatchParticipantFactsView:
     team: int
     role: str | None
     score: ParticipantScore
+    final_items: list[int] | None = None
+    final_trinket_item_id: int | None = None
 
     @classmethod
     def from_participant(cls, participant: Participant) -> MatchParticipantFactsView:
@@ -135,6 +139,16 @@ async def list_matches(
         page = rows[:limit]
         jobs = await repo.list_latest_preparation_jobs([m.match_id for m in page])
         subject = await local_subject(session) if local_subject is not None else None
+        finals = {
+            (f.match_id, f.participant_id): f
+            for f in (
+                await session.scalars(
+                    select(ParticipantFinalItemsModel).where(
+                        ParticipantFinalItemsModel.match_id.in_([m.match_id for m in page])
+                    )
+                )
+            ).all()
+        }
         facts = await repo.list_participant_facts_for_matches([m.match_id for m in page], subject)
         champion_ids = {
             match_id: [p.champion_id for p, _ in match_facts]
@@ -173,7 +187,13 @@ async def list_matches(
             m,
             preparation_info(jobs.get(m.match_id)),
             present(m),
-            tuple(MatchParticipantFactsView.from_participant(p) for p, _ in facts[m.match_id]),
+            tuple(
+                _with_final(
+                    MatchParticipantFactsView.from_participant(p),
+                    finals.get((m.match_id, p.participant_id)),
+                )
+                for p, _ in facts[m.match_id]
+            ),
             assets_by_patch.get(m.patch, {}),
             local_id(m),
         )
@@ -197,7 +217,20 @@ async def get_match_detail(
         if match is None:
             raise NotFoundError(f"match {match_id!r} não encontrado")
         rows = await repo.list_participants(match_id)
-        participants = [MatchParticipantFactsView.from_participant(p) for p in rows]
+        finals = {
+            f.participant_id: f
+            for f in (
+                await session.scalars(
+                    select(ParticipantFinalItemsModel).where(
+                        ParticipantFinalItemsModel.match_id == match_id
+                    )
+                )
+            ).all()
+        }
+        participants = [
+            _with_final(MatchParticipantFactsView.from_participant(p), finals.get(p.participant_id))
+            for p in rows
+        ]
         subject = await local_subject(session) if local_subject is not None else None
         if MATCH_ID_DEMO_PATTERN.fullmatch(match_id):
             local_ids = [p.participant_id for p in rows if p.participant_id == 1]
@@ -214,4 +247,14 @@ async def get_match_detail(
         preparation_info(job),
         champions,
         local_ids[0] if len(local_ids) == 1 else None,
+    )
+
+
+def _with_final(
+    view: MatchParticipantFactsView, final: ParticipantFinalItemsModel | None
+) -> MatchParticipantFactsView:
+    return (
+        replace(view, final_items=list(final.items), final_trinket_item_id=final.trinket_item_id)
+        if final
+        else view
     )

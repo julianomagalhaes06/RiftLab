@@ -233,10 +233,36 @@ async def _prepare(
     rules = load_empirical_rules_or_disabled(
         Path(settings.empirical_rules_path), reconstruction_version=RECONSTRUCTION_ALGORITHM_VERSION
     )
+    resolution = rules.resolve(match.patch)
+    if job.mode != ImportMode.DEMO and resolution.application == "INHERITED":
+        try:
+            await _ensure_catalog(
+                session_factory,
+                settings,
+                job,
+                resolution.source_patch or "",
+                catalog_source_factory,
+            )
+        except SourceError:
+            logger.warning("catálogo de origem indisponível; herança restrita")
     await reconstruct_match(session_factory, mapping, source, match_id, empirical_rules=rules)
     await extract_decisions(session_factory, match_id, scope_path=Path(settings.scope_path))
     await _ensure_champions(session_factory, job, mapping, match.patch, champion_fetch)
     await _ensure_frames(session_factory, source, match_id)
+    if job.mode != ImportMode.DEMO:
+        from riftlab.ingestion.final_items_backfill import backfill_final_items
+        from riftlab.shared.errors import SourceSchemaError
+        from riftlab.timeline.health import compute_health
+
+        backfill = await backfill_final_items(
+            session_factory, Path(settings.raw_storage_dir), match_id
+        )
+        if backfill.status == "RAW_INVALID":
+            raise SourceSchemaError(
+                code="FINAL_ITEMS_RAW_INVALID",
+                detail="dados locais inválidos para preencher o inventário final",
+            )
+        await compute_health(session_factory, rules, match.patch)
 
 
 def frames_document(frames: Iterable[FrameLike]) -> list[dict[str, Any]]:

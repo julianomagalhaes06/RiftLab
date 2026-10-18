@@ -655,7 +655,7 @@ def test_every_output_carries_all_versions() -> None:
     }
 
 
-@pytest.mark.parametrize("old_version", [1, 2, 3, 4, 5, 6, 7, 8, 9, 11])
+@pytest.mark.parametrize("old_version", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12])
 def test_state_of_another_reconstruction_version_is_rejected_without_fallback(
     old_version: int,
 ) -> None:

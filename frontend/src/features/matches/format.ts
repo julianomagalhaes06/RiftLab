@@ -117,6 +117,8 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
     "Fora do recorte suportado pelo RiftLab (fila, mapa, patch, função, campeão ou posição do item).",
   INVENTORY_UNCERTAIN:
     "O inventário anterior à decisão é incerto: não dá para reconstruí-lo com segurança.",
+  INHERITED_RULES_SUSPENDED:
+    "Herança suspensa após divergências entre inventário reconstruído e oficial neste patch.",
   // Neutro de propósito: não diz o motivo específico do alvo (modo Estudo).
   TARGET_NOT_ELIGIBLE: "Esta decisão não é elegível para análise.",
 };

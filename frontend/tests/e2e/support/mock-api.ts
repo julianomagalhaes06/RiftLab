@@ -147,6 +147,10 @@ export function decisionState(overrides: Record<string, unknown> = {}) {
       catalogId: "11111111-1111-4111-8111-111111111111",
       curationRulesVersion: "data_dragon_v5",
       classificationVersion: "item_classification_v1",
+      reconstructionRules: "NONE",
+      reconstructionRulesHealth: "UNVERIFIED",
+      reconstructionRulesCleanParticipants: 0,
+      reconstructionRulesFailures: 0,
     },
     ...overrides,
   };
@@ -159,6 +163,7 @@ export type RouteKey =
   | "POST /api/v1/imports/:id/retry"
   | "GET /api/v1/matches"
   | "GET /api/v1/matches/:id"
+  | "GET /api/v1/matches/:id/timeline"
   | "POST /api/v1/matches/:id/preparation"
   | "GET /api/v1/matches/:id/decisions"
   | "GET /api/v1/decisions/:id"
@@ -183,6 +188,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["POST /api/v1/imports/:id/retry", "POST", /^\/api\/v1\/imports\/[^/]+\/retry$/],
   ["GET /api/v1/imports/:id", "GET", /^\/api\/v1\/imports\/[^/]+$/],
   ["GET /api/v1/matches", "GET", /^\/api\/v1\/matches$/],
+  ["GET /api/v1/matches/:id/timeline", "GET", /^\/api\/v1\/matches\/[^/]+\/timeline$/],
   ["POST /api/v1/matches/:id/preparation", "POST", /^\/api\/v1\/matches\/[^/]+\/preparation$/],
   ["GET /api/v1/matches/:id/decisions", "GET", /^\/api\/v1\/matches\/[^/]+\/decisions$/],
   ["GET /api/v1/matches/:id/purge-preview", "GET", /^\/api\/v1\/matches\/[^/]+\/purge-preview$/],
@@ -335,6 +341,14 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
     ok({ jobId: JOB_ID_2, status: "QUEUED", statusUrl: `/api/v1/imports/${JOB_ID_2}` }, 202),
   "GET /api/v1/matches": () => ok({ items: [matchSummary()], nextCursor: null }),
   "GET /api/v1/matches/:id": () => ok(matchDetail()),
+  "GET /api/v1/matches/:id/timeline": () => ok({
+    matchId: "DEMO-0008",
+    dataDragonVersion: null,
+    participants: [{ participantId: 1, items: [{ timestampMs: 472_000, itemId: 3031, kind: "PURCHASE", itemClass: "MAIN" }], skills: [] }],
+    kills: [],
+    objectives: [],
+    goldFrames: [],
+  }),
   "POST /api/v1/matches/:id/preparation": () => ok(preparation({ status: "PENDING", attempts: 0 }), 202),
   "GET /api/v1/matches/:id/decisions": ({ url }) =>
     url.searchParams.get("cursor")

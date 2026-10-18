@@ -20,6 +20,7 @@ from riftlab.ingestion.domain import (
     TimelineEventDTO,
     TimelineFrameDTO,
 )
+from riftlab.ingestion.final_items import parse_final_items
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore, RawStoreCorruptedError
 from riftlab.ingestion.infrastructure.riot_transport import RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
@@ -316,6 +317,7 @@ def _build_match_source_result(
                 subject_hash=compute_real_subject_hash(puuid, subject_hash_secret),
                 role=role or None,
                 score=parse_participant_score(raw_participant),
+                final_items=parse_final_items(raw_participant),
             )
         )
         match_puuid_by_id[participant_id] = puuid

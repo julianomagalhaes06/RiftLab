@@ -21,6 +21,7 @@ import riftlab.learning.models  # noqa: F401
 import riftlab.ml.models  # noqa: F401
 import riftlab.ranked.models  # noqa: F401
 import riftlab.reviews.models  # noqa: F401
+import riftlab.timeline.health  # noqa: F401
 import riftlab.timeline.models  # noqa: F401
 from riftlab.config import get_settings
 from riftlab.shared.db import Base

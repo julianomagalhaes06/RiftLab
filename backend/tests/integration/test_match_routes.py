@@ -38,7 +38,7 @@ from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource
 from riftlab.config import Settings
 from riftlab.ingestion.domain import Match
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
-from riftlab.ingestion.models import MatchModel, ParticipantModel
+from riftlab.ingestion.models import MatchModel, ParticipantFinalItemsModel, ParticipantModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.preparation.application import process_next_preparation
 from riftlab.shared.db import unit_of_work
@@ -302,6 +302,8 @@ async def test_detail_shows_match_participants_and_preparation_without_personal_
             "championId",
             "team",
             "role",
+            "finalItems",
+            "finalTrinketItemId",
             "champion",
             "win",
             "kills",
@@ -311,6 +313,8 @@ async def test_detail_shows_match_participants_and_preparation_without_personal_
             "neutralMinionsKilled",
         }
         assert participant["champion"] is None  # DEMO nunca recebe campeão real (CC-208)
+        assert participant["finalItems"] is None
+        assert participant["finalTrinketItemId"] is None
     assert not any(word in key.lower() for key in _keys(body) for word in _PERSONAL)
     assert not any(value in response.text for value in hashes)  # o hash nunca sai
 
@@ -612,6 +616,11 @@ async def test_list_marks_the_local_account_participant_without_exposing_its_has
             await session.execute(
                 RankedObservationModel.__table__.delete().where(
                     RankedObservationModel.account_key == key
+                )
+            )
+            await session.execute(
+                ParticipantFinalItemsModel.__table__.delete().where(
+                    ParticipantFinalItemsModel.match_id == match_id
                 )
             )
             await session.execute(

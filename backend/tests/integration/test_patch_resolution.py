@@ -59,6 +59,12 @@ async def test_resolution_is_idempotent_under_concurrency_and_first_write_wins(
 
 @pytest.mark.asyncio
 async def test_detected_patch_is_recorded_without_any_match_collection(session_factory) -> None:
+    # O teste precisa começar sem uma resolução criada por outra prova na mesma DB.
+    # Detectar a versão vigente não deve criar essa linha de catálogo.
+    async with unit_of_work(session_factory) as session:
+        await session.execute(
+            delete(PatchResolutionModel).where(PatchResolutionModel.game_patch == "16.19")
+        )
     assert (
         await record_current_patch(session_factory, b'["16.19.1","16.18.1","16.17.1"]') == "16.19"
     )

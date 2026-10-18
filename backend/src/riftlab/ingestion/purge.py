@@ -30,7 +30,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -49,6 +49,7 @@ from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.ingestion.models import (
     ImportJobModel,
     MatchModel,
+    ParticipantFinalItemsModel,
     ParticipantModel,
     PurgeTombstoneModel,
 )
@@ -292,6 +293,10 @@ async def _delete_rows(session: AsyncSession, match_id: str) -> dict[str, int]:
         .execution_options(synchronize_session=False)
     )
     await run("importJobs", delete(ImportJobModel).where(ImportJobModel.id.in_(own_jobs)))
+    await run(
+        "participantFinalItems",
+        delete(ParticipantFinalItemsModel).where(ParticipantFinalItemsModel.match_id == match_id),
+    )
     await run("participants", delete(ParticipantModel).where(ParticipantModel.match_id == match_id))
     await run("matches", delete(MatchModel).where(MatchModel.match_id == match_id))
     return removed
@@ -361,7 +366,19 @@ async def purge_match(
     ref = match_ref(match_id, secret)
     now = datetime.now(UTC)
     async with session_factory.begin() as session:
+        patch = await session.scalar(
+            select(MatchModel.patch).where(MatchModel.match_id == match_id)
+        )
+        if patch is not None:
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                {"key": "rule-health:" + patch},
+            )
         removed = await _delete_rows(session, match_id)
+        if patch is not None:
+            from riftlab.timeline.health import invalidate_patch_health
+
+            await invalidate_patch_health(session, patch)
         removed.update(await _invalidate_derived(session, match_id, now))
         removed["rawFiles"] = raw_files
         await session.execute(

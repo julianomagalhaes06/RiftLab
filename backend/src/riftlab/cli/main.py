@@ -81,6 +81,55 @@ def matches_backfill_score(
         raise typer.Exit(code=1) from exc
 
 
+@matches_app.command("backfill-final-items")
+def matches_backfill_final_items(
+    match_id: str = typer.Option(..., help="ID da partida RIOT já importada."),
+    raw_dir: Path = typer.Option(..., help="Diretório local imutável dos raw de importação."),
+) -> None:
+    """Completa inventário final oficial só a partir de raw verificado, sem rede.
+
+    Exige RIFTLAB_BACKFILL_DATABASE_URL explicitamente no ambiente. Nunca
+    carrega `.env` ou usa RIFTLAB_DATABASE_URL implícito do app.
+    """
+    import asyncio
+    import os
+    import re
+
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from riftlab.ingestion.final_items_backfill import backfill_final_items
+    from riftlab.ingestion.score_backfill import ScoreBackfillConflict
+    from riftlab.shared.db import build_session_factory
+
+    if not re.fullmatch(r"BR1_[0-9]{1,20}", match_id):
+        typer.echo("BLOCKED: match-id inválido.", err=True)
+        raise typer.Exit(code=1)
+    database_url = os.environ.get("RIFTLAB_BACKFILL_DATABASE_URL")
+    if not database_url or not database_url.startswith("postgresql+asyncpg://"):
+        typer.echo("BLOCKED: RIFTLAB_BACKFILL_DATABASE_URL explícita é obrigatória.", err=True)
+        raise typer.Exit(code=1)
+
+    async def run() -> None:
+        engine = create_async_engine(database_url)
+        try:
+            result = await backfill_final_items(build_session_factory(engine), raw_dir, match_id)
+            if result.status == "RAW_INVALID":
+                typer.echo("BLOCKED: raw local inválido; nenhuma escrita realizada.", err=True)
+                raise typer.Exit(code=1)
+            typer.echo(
+                f"{result.status}: participantes={result.participants} "
+                f"campos_preenchidos={result.fields_filled}"
+            )
+        finally:
+            await engine.dispose()
+
+    try:
+        asyncio.run(run())
+    except ScoreBackfillConflict as exc:
+        typer.echo(f"BLOCKED: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
 @openapi_app.command("export")
 def openapi_export(
     out: Path = typer.Argument(..., help="Caminho do arquivo JSON de saida."),
@@ -1388,3 +1437,9 @@ def ranked_refresh(
         typer.echo(f"BLOCKED: {getattr(exc, 'code', type(exc).__name__)}", err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"estado={result['state']} fila={result['queue']} temporada={result['season']}")
+
+
+from riftlab.cli.rule_health import catalog_diff_command, rules_app  # noqa: E402
+
+app.add_typer(rules_app, name="rules")
+report_app.command("catalog-diff")(catalog_diff_command)

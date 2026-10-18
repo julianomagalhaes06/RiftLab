@@ -46,7 +46,15 @@ describe("tela da partida", () => {
     window.history.replaceState(null, "", "/historico/BR1_1");
     const api = createMockApi();
     api.on("GET", /^\/api\/v1\/matches\/BR1_1$/, () =>
-      json(200, { ...matchDetail(), matchId: "BR1_1", queue: 440, patch: "16.20", supportLevel: "LIMITED", supportReason: "PATCH_NOT_VALIDATED", participants, localParticipantId: 2 }),
+      json(200, {
+        ...matchDetail(), matchId: "BR1_1", queue: 440, patch: "16.20", supportLevel: "LIMITED", supportReason: "PATCH_NOT_VALIDATED",
+        participants: participants.map((participant) => participant.participantId === 1
+          ? { ...participant, finalItems: [100001, 100001], finalTrinketItemId: null }
+          : participant.participantId === 2
+            ? { ...participant, finalItems: [], finalTrinketItemId: 3340 }
+            : participant),
+        localParticipantId: 2,
+      }),
     );
     api.on("GET", /^\/api\/v1\/matches\/BR1_1\/timeline$/, () => json(200, timeline));
     api.on("GET", /^\/api\/v1\/matches\/BR1_1\/decisions$/, () =>
@@ -64,9 +72,15 @@ describe("tela da partida", () => {
     expect(within(self).getByText("Você")).toBeInTheDocument();
 
     expect(await screen.findByText(/Nenhuma das 1 decisões de compra/)).toBeInTheDocument();
+    const officialBuilds = await screen.findAllByRole("group", { name: "Inventário final oficial" });
+    expect(officialBuilds).toHaveLength(2);
+    expect(within(officialBuilds[0]).getByText("—")).toBeInTheDocument();
+    expect(within(officialBuilds[1]).getAllByText("Item #100001, nome indisponível")).toHaveLength(2);
+    expect(screen.getByRole("group", { name: "Amuleto final oficial" })).toBeInTheDocument();
+    expect(await screen.findAllByRole("group", { name: "Estimado pela linha do tempo" })).not.toHaveLength(0);
     const path = await screen.findByRole("list", { name: "Compras por volta à loja" });
     expect(within(path).getAllByRole("listitem").filter((li) => li.classList.contains("build-path__visit"))).toHaveLength(3);
-    expect(within(path).getByRole("link", { name: "Decisão em 7:52" })).toHaveTextContent("Bloqueada");
+    expect(within(path).getByRole("link", { name: /^Decisão em 7:52/ })).toHaveTextContent("Bloqueada");
     expect(within(path).getByText(/Vendeu/)).toBeInTheDocument();
     expect(screen.getByText("Maximizou")).toBeInTheDocument();
 

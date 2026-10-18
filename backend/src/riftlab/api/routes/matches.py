@@ -349,6 +349,8 @@ def _to_participant(
         champion_id=view.champion_id,
         team=view.team,
         role=view.role,
+        final_items=view.final_items,
+        final_trinket_item_id=view.final_trinket_item_id,
         win=view.score.win,
         kills=view.score.kills,
         deaths=view.score.deaths,

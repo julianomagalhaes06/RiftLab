@@ -95,7 +95,11 @@ def _inheritable(rules: ItemRules) -> bool:
 
 
 def resolve_item_rules(
-    directory: Path, patch: str, main_item_ids: Iterable[int]
+    directory: Path,
+    patch: str,
+    main_item_ids: Iterable[int],
+    *,
+    changed_item_ids: Iterable[int] = (),
 ) -> ItemRules | None:
     """The patch's own manifest, else the inherited one, else None (unsupported).
     `main_item_ids` are the MAIN items of the patch's catalog: any not covered by the
@@ -124,6 +128,7 @@ def resolve_item_rules(
             version=f"{source.version}+inherited_{patch}",
             game_patch=patch,
             inherited_from=source.game_patch,
-            uncovered_item_ids=frozenset(main_item_ids) - source.covered_item_ids,
+            uncovered_item_ids=(frozenset(main_item_ids) - source.covered_item_ids)
+            | frozenset(changed_item_ids),
         )
     return None

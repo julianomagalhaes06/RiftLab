@@ -35,6 +35,8 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
   INVENTORY_UNCERTAIN: "O inventário antes desta compra é incerto.",
   OUT_OF_SCOPE: "Esta decisão está fora do recorte analisado.",
   NO_POPULARITY_FOR_CELL: "Não há decisões de referência deste campeão nesta etapa; a ordem vem das regras explícitas.",
+  INHERITED_RULES_SUSPENDED: "Herança suspensa por divergências no inventário final deste patch.",
+  INHERITED_RULES_UNVERIFIED: "Ainda sem amostra suficiente para conferir as regras herdadas neste patch.",
   RECONSTRUCTION_RULES_INHERITED:
     "O inventário usa regras de reconstrução confirmadas num patch anterior, herdadas porque este patch ainda não tem confirmação própria.",
   ITEM_RULES_INHERITED:

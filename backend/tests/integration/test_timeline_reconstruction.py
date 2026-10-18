@@ -8,6 +8,7 @@ genuinamente persistida, não de um Match construído à mão."""
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 
 import pytest
 from pipeline_helpers import (
@@ -19,20 +20,27 @@ from pipeline_helpers import (
 from pipeline_helpers import (
     sync_demo_catalog as _sync_demo_catalog,
 )
+from sqlalchemy import select
 
+from riftlab.catalog.application import sync_catalog
 from riftlab.catalog.classification import classify_catalog
-from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
+from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, MappingEntry
+from riftlab.catalog.infrastructure.demo_source import DemoCatalogSource
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.decisions.domain import MatchContext, ParticipantView
 from riftlab.decisions.scope import DEMO_SCOPE
 from riftlab.decisions.selection import evaluate_decision
 from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
+from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+from riftlab.ingestion.models import MatchModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import NotFoundError
 from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION, reconstruct_match
 from riftlab.timeline.domain import DecisionState, TimelineReplayError
 from riftlab.timeline.empirical_rules import EmpiricalRules, RuleEntry
+from riftlab.timeline.legacy_provenance import legacy_v10_context
+from riftlab.timeline.models import DecisionStateModel
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 
@@ -414,6 +422,71 @@ def _supported(rule_id: str, patches: frozenset[str]) -> RuleEntry:
     )
 
 
+def _legacy_v10_rules() -> EmpiricalRules:
+    context = legacy_v10_context()
+    entries = {
+        row["ruleId"]: RuleEntry(
+            rule_id=row["ruleId"],
+            rule_version=row["ruleVersion"],
+            description="regra histórica do manifesto v10",
+            status=row["status"],
+            patches_validated=frozenset(row["patchesValidated"]),
+            contra_rate=row["contraRate"],
+            counter_examples=row["counterExamples"],
+            evidence=row["evidence"],
+            activated_in_version=row["activatedInVersion"],
+        )
+        for row in context["legacyProvenance"]
+    }
+    return EmpiricalRules(
+        entries=entries,
+        system_item_ids=frozenset(context["systemItemIds"]),
+        inheritance=context["inheritance"]["mode"],
+    )
+
+
+async def _seed_legacy_v10_match(session_factory, tmp_path, match_id, monkeypatch):
+    await _import_demo_match(session_factory, tmp_path, match_id)
+    raw_catalog = await DemoCatalogSource().load_catalog("DEMO-1")
+
+    class _PatchCatalogSource:
+        async def load_catalog(self, game_patch: str):
+            return replace(raw_catalog, game_patch=game_patch)
+
+    await sync_catalog(session_factory, _PatchCatalogSource(), "16.19")
+    mapping = CatalogMapping(
+        schema_version="v1",
+        mapping_version=raw_catalog.mapping_version,
+        entries={"16.19": MappingEntry(raw_catalog.data_dragon_version)},
+    )
+    async with unit_of_work(session_factory) as session:
+        match = await session.get(MatchModel, match_id)
+        assert match is not None
+        match.patch = "16.19"
+    rules = _legacy_v10_rules()
+    from riftlab.timeline import rule_resolution
+
+    original_resolve = rule_resolution.resolve_rules
+
+    async def resolve_v10_without_persisted_parameter(session, empirical_rules, patch, catalog_id):
+        enabled, provenance = await original_resolve(session, empirical_rules, patch, catalog_id)
+        for rule in provenance:
+            if rule.get("ruleId") == "R4s":
+                rule.pop("systemItemIds", None)
+        return enabled, provenance
+
+    with monkeypatch.context() as patched:
+        patched.setattr("riftlab.timeline.application.RECONSTRUCTION_ALGORITHM_VERSION", 10)
+        patched.setattr(rule_resolution, "resolve_rules", resolve_v10_without_persisted_parameter)
+        old = await reconstruct_match(
+            session_factory, mapping, DemoMatchSource(), match_id, empirical_rules=rules
+        )
+    expected = legacy_v10_context()["legacyProvenance"]
+    assert old.decision_states
+    assert all(state.quality["empiricalRules"] == expected for state in old.decision_states)
+    return mapping, rules, old
+
+
 @pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
 async def test_reconstruct_match_records_provenance_only_for_rules_enabled_in_the_patch(
     session_factory, tmp_path, _demo_match
@@ -461,27 +534,25 @@ async def test_reconstruct_match_without_a_registry_records_no_rules(
     assert all(state.quality["empiricalRules"] == [] for state in result.decision_states)
 
 
-async def _reconstruct_as_v9(session_factory, match_id: str, monkeypatch, **kwargs):
-    """Reconstrução gravada como v9 (o reducer é o mesmo; só a versão gravada muda)."""
+async def _reconstruct_as_v10(session_factory, match_id: str, monkeypatch, **kwargs):
+    """Reconstrução gravada como v10 (o reducer é o mesmo; só a versão muda)."""
     with monkeypatch.context() as patched:
-        patched.setattr("riftlab.timeline.application.RECONSTRUCTION_ALGORITHM_VERSION", 9)
+        patched.setattr("riftlab.timeline.application.RECONSTRUCTION_ALGORITHM_VERSION", 10)
         return await reconstruct_match(
             session_factory, _DEMO_1_MAPPING, DemoMatchSource(), match_id, **kwargs
         )
 
 
 @pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
-async def test_v10_carries_v9_states_forward_without_reopening_the_source(
+async def test_v11_carries_v10_states_forward_without_reopening_the_source(
     session_factory, tmp_path, _demo_match, monkeypatch
 ) -> None:
-    """Mesmo catálogo e mesmo conjunto de regras: a v10 copia os estados da v9 sem a fonte
-    (partidas cujo bruto não está na máquina continuam preparáveis). Linhas novas; a v9
-    fica intacta."""
+    """Mesmo catálogo e regras: v11 copia estados v10 sem reabrir fonte. Linhas antigas intactas."""
     match_id = "DEMO-0002"
     await _sync_demo_catalog(session_factory)
     await _import_demo_match(session_factory, tmp_path, match_id)
-    old = await _reconstruct_as_v9(session_factory, match_id, monkeypatch)
-    assert old.decision_states and all(s.state_version == 9 for s in old.decision_states)
+    old = await _reconstruct_as_v10(session_factory, match_id, monkeypatch)
+    assert old.decision_states and all(s.state_version == 10 for s in old.decision_states)
 
     carried = await reconstruct_match(
         session_factory, _DEMO_1_MAPPING, _SourceForbiddenIfCalled(), match_id
@@ -496,9 +567,9 @@ async def test_v10_carries_v9_states_forward_without_reopening_the_source(
         assert state.snapshot == source.snapshot and state.quality == source.quality
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyTimelineRepository(session)
-        assert await repo.get_match_reconstruction(match_id, 9) is not None
+        assert await repo.get_match_reconstruction(match_id, 10) is not None
         persisted = await repo.list_decision_states(match_id, 1)
-    assert {s.id for s in persisted if s.state_version == 9} == {
+    assert {s.id for s in persisted if s.state_version == 10} == {
         s.id for s in old.decision_states if s.participant_id == 1
     }
     again = await reconstruct_match(
@@ -508,7 +579,137 @@ async def test_v10_carries_v9_states_forward_without_reopening_the_source(
 
 
 @pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
-async def test_v10_reconstructs_fresh_when_the_patch_now_has_other_rules(
+async def test_v11_does_not_carry_forward_when_persisted_rule_parameters_change(
+    session_factory, tmp_path, _demo_match, monkeypatch
+) -> None:
+    match_id = "DEMO-0002"
+    await _sync_demo_catalog(session_factory)
+    await _import_demo_match(session_factory, tmp_path, match_id)
+    rules_before = EmpiricalRules(
+        entries={"R4s": _supported("R4s", frozenset({"DEMO-1"}))},
+        system_item_ids=frozenset({7654321}),
+    )
+    await _reconstruct_as_v10(session_factory, match_id, monkeypatch, empirical_rules=rules_before)
+    rules_now = EmpiricalRules(
+        entries={"R4s": _supported("R4s", frozenset({"DEMO-1"}))},
+        system_item_ids=frozenset({9876543}),
+    )
+
+    with pytest.raises(AssertionError, match="load_match"):
+        await reconstruct_match(
+            session_factory,
+            _DEMO_1_MAPPING,
+            _SourceForbiddenIfCalled(),
+            match_id,
+            empirical_rules=rules_now,
+        )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_verified_v10_context_carries_without_source_and_preserves_v10_rows(
+    session_factory, tmp_path, _demo_match, monkeypatch
+) -> None:
+    match_id = "DEMO-0002"
+    mapping, rules, old = await _seed_legacy_v10_match(
+        session_factory, tmp_path, match_id, monkeypatch
+    )
+    before = {
+        (state.participant_id, state.event_source_index): state for state in old.decision_states
+    }
+    DurableRawMatchStore(tmp_path / "raw").purge(match_id)
+
+    carried = await reconstruct_match(
+        session_factory, mapping, _SourceForbiddenIfCalled(), match_id, empirical_rules=rules
+    )
+
+    assert len(carried.decision_states) == len(before)
+    after_by_key = {
+        (state.participant_id, state.event_source_index): state for state in carried.decision_states
+    }
+    assert after_by_key.keys() == before.keys()
+    for key, old_state in before.items():
+        new_state = after_by_key[key]
+        assert new_state.snapshot == old_state.snapshot
+        assert new_state.features == old_state.features
+        old_quality = dict(old_state.quality)
+        new_quality = dict(new_state.quality)
+        old_quality.pop("empiricalRules")
+        new_quality.pop("empiricalRules")
+        assert new_quality == old_quality
+        assert new_state.quality["empiricalRules"] != old_state.quality["empiricalRules"]
+        assert next(row for row in new_state.quality["empiricalRules"] if row["ruleId"] == "R4s")[
+            "systemItemIds"
+        ] == list(legacy_v10_context()["systemItemIds"])
+
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyTimelineRepository(session)
+        previous = await repo.get_match_reconstruction(match_id, 10)
+        current = await repo.get_match_reconstruction(match_id, RECONSTRUCTION_ALGORITHM_VERSION)
+        all_states = await repo.list_decision_states(match_id, 1)
+    assert previous is not None and current is not None
+    assert previous.catalog_id == current.catalog_id == old.catalog_id
+    assert current.rules_provenance is not None
+    assert next(row for row in current.rules_provenance if row["ruleId"] == "R4s")[
+        "systemItemIds"
+    ] == list(legacy_v10_context()["systemItemIds"])
+    persisted_old = [state for state in all_states if state.state_version == 10]
+    assert len(persisted_old) == sum(state.participant_id == 1 for state in old.decision_states)
+    assert all(
+        "systemItemIds"
+        not in next(row for row in state.quality["empiricalRules"] if row["ruleId"] == "R4s")
+        for state in persisted_old
+    )
+
+
+@pytest.mark.parametrize(
+    "divergence", ["unknown-evidence", "historical-parameter-differs-from-current"]
+)
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_legacy_bridge_rejects_unknown_or_divergent_v10_context(
+    session_factory, tmp_path, _demo_match, monkeypatch, divergence
+) -> None:
+    match_id = "DEMO-0002"
+    mapping, rules, _old = await _seed_legacy_v10_match(
+        session_factory, tmp_path, match_id, monkeypatch
+    )
+    if divergence == "unknown-evidence":
+        async with unit_of_work(session_factory) as session:
+            states = (
+                await session.scalars(
+                    select(DecisionStateModel).where(
+                        DecisionStateModel.match_id == match_id,
+                        DecisionStateModel.state_version == 10,
+                    )
+                )
+            ).all()
+            for state in states:
+                provenance = [dict(row) for row in state.quality["empiricalRules"]]
+                provenance[0]["evidence"] = "evidência divergente"
+                state.quality = {**state.quality, "empiricalRules": provenance}
+    else:
+        rules = EmpiricalRules(
+            entries=rules.entries,
+            system_item_ids=frozenset({999999}),
+            inheritance=rules.inheritance,
+        )
+    DurableRawMatchStore(tmp_path / "raw").purge(match_id)
+
+    with pytest.raises(AssertionError, match="load_match"):
+        await reconstruct_match(
+            session_factory, mapping, _SourceForbiddenIfCalled(), match_id, empirical_rules=rules
+        )
+
+    async with unit_of_work(session_factory) as session:
+        assert (
+            await SqlAlchemyTimelineRepository(session).get_match_reconstruction(
+                match_id, RECONSTRUCTION_ALGORITHM_VERSION
+            )
+            is None
+        )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_v11_reconstructs_fresh_when_the_patch_now_has_other_rules(
     session_factory, tmp_path, _demo_match, monkeypatch
 ) -> None:
     """Patch que agora herda (ou ganhou) regras: o resultado pode mudar, então nunca copia;
@@ -516,7 +717,7 @@ async def test_v10_reconstructs_fresh_when_the_patch_now_has_other_rules(
     match_id = "DEMO-0002"
     await _sync_demo_catalog(session_factory)
     await _import_demo_match(session_factory, tmp_path, match_id)
-    await _reconstruct_as_v9(session_factory, match_id, monkeypatch)
+    await _reconstruct_as_v10(session_factory, match_id, monkeypatch)
     rules = EmpiricalRules(entries={"R5": _supported("R5", frozenset({"DEMO-1"}))})
 
     with pytest.raises(AssertionError, match="load_match"):

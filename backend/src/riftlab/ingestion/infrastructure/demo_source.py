@@ -10,6 +10,7 @@ from riftlab.ingestion.domain import (
     TimelineEventDTO,
     TimelineFrameDTO,
 )
+from riftlab.ingestion.final_items import parse_final_items
 from riftlab.ingestion.score import parse_participant_score
 from riftlab.shared.domain import SourceOrigin
 from riftlab.shared.errors import SourceNotFoundError, SourceSchemaError
@@ -104,6 +105,7 @@ def parse_match_source_document(match_id: str, raw_bytes: bytes) -> MatchSourceR
             subject_hash=_demo_subject_hash(match_id, raw_participant["participantId"]),
             role=raw_participant.get("role"),
             score=parse_participant_score(raw_participant),
+            final_items=parse_final_items(raw_participant),
         )
         for raw_participant in document["participants"]
     )

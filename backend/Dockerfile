@@ -19,6 +19,7 @@ COPY configs/catalog-mappings.yaml ./configs/catalog-mappings.yaml
 # decisões e pelos testes que comparam o schema com a allowlist do código.
 COPY configs/scope.yaml ./configs/scope.yaml
 COPY configs/empirical-rules.yaml ./configs/empirical-rules.yaml
+COPY configs/reconstruction-v10-legacy-context.json ./configs/reconstruction-v10-legacy-context.json
 COPY configs/feature-schema-v1.json ./configs/feature-schema-v1.json
 COPY configs/item-rules ./configs/item-rules
 COPY configs/ranking ./configs/ranking

@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Protocol
 
+from riftlab.ingestion.final_items import FinalItems
 from riftlab.ingestion.score import ParticipantScore
 from riftlab.shared.domain import SourceOrigin
 
@@ -210,6 +211,7 @@ class MatchParticipantSourceDTO:
     subject_hash: str
     role: str | None = None
     score: ParticipantScore = field(default_factory=ParticipantScore)
+    final_items: FinalItems | None = None
 
 
 @dataclass(frozen=True, slots=True)

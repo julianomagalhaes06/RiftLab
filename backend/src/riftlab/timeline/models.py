@@ -68,6 +68,7 @@ class MatchReconstructionModel(CreatedAtMixin, Base):
     match_id: Mapped[str] = mapped_column(String, primary_key=True)
     reconstruction_version: Mapped[int] = mapped_column(Integer, primary_key=True)
     catalog_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    rules_provenance: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)
 
 
 class DecisionStateModel(UuidPkMixin, CreatedAtMixin, Base):

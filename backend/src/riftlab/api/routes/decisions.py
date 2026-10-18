@@ -83,7 +83,17 @@ async def list_match_decisions(
         scope_path=Path(settings.scope_path),
     )
     return CursorPage[DecisionStateSummary](
-        items=[_to_summary(point) for point in page.items], next_cursor=page.next_cursor
+        items=[
+            _to_summary(point).model_copy(
+                update={
+                    "reconstruction_rules_health": page.health[point.id]["status"],
+                    "reconstruction_rules_verdict": page.health[point.id]["verdict"],
+                    "reconstruction_rules_wilson_upper": page.health[point.id]["wilsonUpper"],
+                }
+            )
+            for point in page.items
+        ],
+        next_cursor=page.next_cursor,
     )
 
 
@@ -173,5 +183,10 @@ def _to_detail(detail: DecisionDetail) -> DecisionState:
             classification_version=versions.classification_version,
             reconstruction_rules=detail.rules_application,
             reconstruction_rules_patch=detail.rules_patch,
+            reconstruction_rules_health=detail.health.get("status", "UNVERIFIED"),
+            reconstruction_rules_verdict=detail.health.get("verdict"),
+            reconstruction_rules_wilson_upper=detail.health.get("wilsonUpper"),
+            reconstruction_rules_clean_participants=detail.health.get("cleanParticipants", 0),
+            reconstruction_rules_failures=detail.health.get("failures", 0),
         ),
     )

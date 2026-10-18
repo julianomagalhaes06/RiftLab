@@ -27,6 +27,7 @@ from riftlab.candidates.domain import (
     enumerate_candidates,
 )
 from riftlab.candidates.rules import resolve_item_rules
+from riftlab.catalog.diff import catalog_diff, patch_catalog
 from riftlab.dataset.rows import _catalog
 from riftlab.decisions.features import build_pre_decision_view
 from riftlab.decisions.models import DecisionPointModel
@@ -41,6 +42,7 @@ from riftlab.ranking.engine import (
     rank,
 )
 from riftlab.shared.errors import ConflictError, NotFoundError
+from riftlab.timeline.health import health_for_state
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 ALGORITHM_VERSION = "analysis_v1"
@@ -97,12 +99,52 @@ async def _compute(
     )
     if item_rules is None:
         return _empty(decision_id, objective, "UNSUPPORTED", ["PATCH_UNSUPPORTED"], catalog_label)
+    if item_rules.inherited_from:
+        source_bundle = await patch_catalog(session, item_rules.inherited_from)
+        if source_bundle is None:
+            return _empty(
+                decision_id, objective, "UNSUPPORTED", ["PATCH_UNSUPPORTED"], catalog_label
+            )
+        changes = catalog_diff(
+            {i.item_id: i for i in source_bundle.items},
+            {i.item_id: i for i in bundle.items},
+            source_bundle.classification,
+            bundle.classification,
+        )
+        changed_main = {
+            i
+            for i in changes
+            if bundle.classification.classify(i).item_class.value == "MAIN"
+            or source_bundle.classification.classify(i).item_class.value == "MAIN"
+        }
+        item_rules = resolve_item_rules(
+            configs / "item-rules",
+            patch,
+            (
+                i.item_id
+                for i in bundle.items
+                if bundle.classification.classify(i.item_id).item_class.value == "MAIN"
+            ),
+            changed_item_ids=changed_main,
+        )
+        assert item_rules is not None
     state = await SqlAlchemyTimelineRepository(session).get_decision_state(point.decision_state_id)
     values = (point.features or {}).get("values", {})
     champion = values.get("self_champion_id")
     if state is None or not isinstance(champion, int):
         return _empty(
             decision_id, objective, "INSUFFICIENT_EVIDENCE", ["INVALID_STATE"], catalog_label
+        )
+    provenance = state.quality.get("empiricalRules") or []
+    health = await health_for_state(session, patch, point.reconstruction_version, provenance)
+    inherited = any(r.get("application") == "INHERITED" for r in provenance)
+    if inherited and health["status"] == "SUSPENDED":
+        return _empty(
+            decision_id,
+            objective,
+            "INSUFFICIENT_EVIDENCE",
+            ["INHERITED_RULES_SUSPENDED"],
+            catalog_label,
         )
     budget = body.get("budget")
     try:
@@ -162,6 +204,8 @@ async def _compute(
         rule.get("application") == "INHERITED" for rule in state.quality.get("empiricalRules") or []
     ):
         reason_codes.append("RECONSTRUCTION_RULES_INHERITED")
+        if health["status"] == "UNVERIFIED":
+            reason_codes.append("INHERITED_RULES_UNVERIFIED")
     if item_rules.inherited_from is not None:
         reason_codes.append("ITEM_RULES_INHERITED")
     gold = (point.budget or {}).get("value") if isinstance(point.budget, dict) else None

@@ -30,6 +30,7 @@ from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.ingestion.models import (
     ImportJobModel,
     MatchModel,
+    ParticipantFinalItemsModel,
     ParticipantModel,
     RiotRateLimitModel,
 )
@@ -112,6 +113,11 @@ async def reset_match(session_factory, match_id: str) -> None:
         )
         await session.execute(
             delete(ImportJobModel).where(ImportJobModel.requested_match_id == match_id)
+        )
+        await session.execute(
+            delete(ParticipantFinalItemsModel).where(
+                ParticipantFinalItemsModel.match_id == match_id
+            )
         )
         await session.execute(delete(ParticipantModel).where(ParticipantModel.match_id == match_id))
         await session.execute(delete(MatchModel).where(MatchModel.match_id == match_id))

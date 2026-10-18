@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from riftlab.ingestion.application import _persist_result
 from riftlab.ingestion.domain import (
@@ -20,8 +21,9 @@ from riftlab.ingestion.domain import (
     MatchSourceResult,
     Participant,
 )
+from riftlab.ingestion.final_items_backfill import backfill_final_items
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
-from riftlab.ingestion.models import ImportJobModel
+from riftlab.ingestion.models import ImportJobModel, ParticipantFinalItemsModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.ingestion.score import ParticipantScore
 from riftlab.ingestion.score_backfill import ScoreBackfillConflict, backfill_match_score
@@ -50,8 +52,27 @@ def _raw(match_id: str, *, first_kills: int = 5) -> bytes:
                         "assists": 8,
                         "totalMinionsKilled": 180,
                         "neutralMinionsKilled": 10,
+                        "item0": 1001,
+                        "item1": 0,
+                        "item2": 0,
+                        "item3": 0,
+                        "item4": 0,
+                        "item5": 0,
+                        "item6": 3340,
                     },
-                    {"participantId": 2, "championId": 81, "teamId": 200, "win": False},
+                    {
+                        "participantId": 2,
+                        "championId": 81,
+                        "teamId": 200,
+                        "win": False,
+                        "item0": 0,
+                        "item1": 0,
+                        "item2": 0,
+                        "item3": 0,
+                        "item4": 0,
+                        "item5": 0,
+                        "item6": 0,
+                    },
                 ],
             },
         }
@@ -164,6 +185,52 @@ async def test_backfill_hash_and_existing_score_divergence_are_atomic(
         repo = SqlAlchemyIngestionRepository(session)
         assert (await repo.get_participant(match_id, 1)).score == ParticipantScore()
         assert (await repo.get_participant(divergent_id, 1)).score == ParticipantScore(kills=99)
+
+
+async def test_final_items_backfill_is_hash_checked_idempotent_and_concurrent(
+    session_factory, tmp_path
+) -> None:
+    match_id = _id()
+    body = _raw(match_id)
+    digest = hashlib.sha256(body).hexdigest()
+    raw_dir = tmp_path / "final-items"
+    store = DurableRawMatchStore(raw_dir)
+    store.store(match_id, "match", body, digest)
+    await _seed(session_factory, match_id, digest)
+    first, second = await asyncio.gather(
+        backfill_final_items(session_factory, raw_dir, match_id),
+        backfill_final_items(session_factory, raw_dir, match_id),
+    )
+    assert sorted(result.status for result in (first, second)) == ["UNCHANGED", "UPDATED"]
+    async with session_factory() as session:
+        rows = (
+            await session.scalars(
+                select(ParticipantFinalItemsModel).where(
+                    ParticipantFinalItemsModel.match_id == match_id
+                )
+            )
+        ).all()
+        assert {(row.participant_id, tuple(row.items), row.trinket_item_id) for row in rows} == {
+            (1, (1001,), 3340),
+            (2, (), None),
+        }
+    wrong_id = _id()
+    wrong_body = _raw(wrong_id)
+    wrong_digest = hashlib.sha256(wrong_body).hexdigest()
+    wrong_store = DurableRawMatchStore(tmp_path / "wrong-final-items")
+    wrong_store.store(wrong_id, "match", wrong_body, wrong_digest)
+    await _seed(session_factory, wrong_id, "f" * 64)
+    with pytest.raises(ScoreBackfillConflict, match="MATCH_HASH_MISMATCH"):
+        await backfill_final_items(session_factory, tmp_path / "wrong-final-items", wrong_id)
+    async with session_factory() as session:
+        assert (
+            await session.scalar(
+                select(ParticipantFinalItemsModel).where(
+                    ParticipantFinalItemsModel.match_id == wrong_id
+                )
+            )
+            is None
+        )
 
 
 async def test_legacy_raw_backfill_reads_without_migrating_or_modifying_files(

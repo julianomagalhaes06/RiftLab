@@ -61,6 +61,7 @@ class MatchReconstructionMarker:
     match_id: str
     reconstruction_version: int
     catalog_id: uuid.UUID | None
+    rules_provenance: list[dict[str, Any]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,7 +116,11 @@ class TimelineRepository(Protocol):
         ...
 
     async def add_match_reconstruction(
-        self, match_id: str, reconstruction_version: int, catalog_id: uuid.UUID | None
+        self,
+        match_id: str,
+        reconstruction_version: int,
+        catalog_id: uuid.UUID | None,
+        rules_provenance: list[dict[str, Any]] | None = None,
     ) -> None:
         """Gravado na MESMA transação dos `DecisionState`s produzidos dessa
         versão — tudo ou nada. Levanta ConflictError (via

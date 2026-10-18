@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -108,16 +109,22 @@ class SqlAlchemyTimelineRepository:
             match_id=row.match_id,
             reconstruction_version=row.reconstruction_version,
             catalog_id=row.catalog_id,
+            rules_provenance=row.rules_provenance,
         )
 
     async def add_match_reconstruction(
-        self, match_id: str, reconstruction_version: int, catalog_id: uuid.UUID | None
+        self,
+        match_id: str,
+        reconstruction_version: int,
+        catalog_id: uuid.UUID | None,
+        rules_provenance: list[dict[str, Any]] | None = None,
     ) -> None:
         self._session.add(
             MatchReconstructionModel(
                 match_id=match_id,
                 reconstruction_version=reconstruction_version,
                 catalog_id=catalog_id,
+                rules_provenance=rules_provenance,
             )
         )
 

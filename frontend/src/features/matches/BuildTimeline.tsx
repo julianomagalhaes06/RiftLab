@@ -8,17 +8,18 @@ import { decisionsInVisit, isCompletedItem, maxOrder, shopVisits, SKILL_KEYS, sk
 type ParticipantTimeline = MatchTimeline["participants"][number];
 
 export function DecisionChip({ decision }: { decision: DecisionSummary }) {
+  const canAnalyze = decision.eligible && decision.reconstructionRulesHealth !== "SUSPENDED";
   const ordinal = ordinalLabel(decision.mainItemOrdinal);
-  const why = (decision.reasonCodes ?? []).map(reasonText).join(" ");
+  const why = decision.reconstructionRulesHealth === "SUSPENDED" ? "Herança suspensa por divergências de inventário neste patch." : (decision.reasonCodes ?? []).map(reasonText).join(" ");
   return (
     <Link
       to={{ name: "decision", decisionId: decision.decisionId }}
-      className={`decision-chip decision-chip--${decision.eligible ? "eligible" : "blocked"}`}
-      aria-label={`Decisão em ${formatGameTime(decision.timestampMs)}`}
-      title={decision.eligible ? undefined : why}
+      className={`decision-chip decision-chip--${canAnalyze ? "eligible" : "blocked"}`}
+      aria-label={`Decisão em ${formatGameTime(decision.timestampMs)}${canAnalyze ? "" : `. ${why || "Não pode analisar."}`}`}
+      title={canAnalyze ? undefined : why}
     >
       <span className="decision-chip__time">{formatGameTime(decision.timestampMs)}</span>
-      <span className="decision-chip__state">{decision.eligible ? "Analisar" : "Bloqueada"}</span>
+      <span className="decision-chip__state">{canAnalyze ? "Analisar" : "Bloqueada"}</span>
       {ordinal ? <span>{ordinal}</span> : null}
     </Link>
   );

@@ -1202,6 +1202,45 @@
             "title": "Reasoncodes",
             "type": "array"
           },
+          "reconstructionRulesHealth": {
+            "default": "UNVERIFIED",
+            "enum": [
+              "OK",
+              "UNVERIFIED",
+              "SUSPENDED"
+            ],
+            "title": "Reconstructionruleshealth",
+            "type": "string"
+          },
+          "reconstructionRulesVerdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ACCEPT",
+                  "REJECT",
+                  "NO_SAMPLE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructionrulesverdict"
+          },
+          "reconstructionRulesWilsonUpper": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructionruleswilsonupper"
+          },
           "staleFrame": {
             "title": "Staleframe",
             "type": "boolean"
@@ -1288,6 +1327,28 @@
             "title": "Reconstructionrules",
             "type": "string"
           },
+          "reconstructionRulesCleanParticipants": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Reconstructionrulescleanparticipants",
+            "type": "integer"
+          },
+          "reconstructionRulesFailures": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Reconstructionrulesfailures",
+            "type": "integer"
+          },
+          "reconstructionRulesHealth": {
+            "default": "UNVERIFIED",
+            "enum": [
+              "OK",
+              "UNVERIFIED",
+              "SUSPENDED"
+            ],
+            "title": "Reconstructionruleshealth",
+            "type": "string"
+          },
           "reconstructionRulesPatch": {
             "anyOf": [
               {
@@ -1299,6 +1360,35 @@
               }
             ],
             "title": "Reconstructionrulespatch"
+          },
+          "reconstructionRulesVerdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ACCEPT",
+                  "REJECT",
+                  "NO_SAMPLE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructionrulesverdict"
+          },
+          "reconstructionRulesWilsonUpper": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructionruleswilsonupper"
           },
           "reconstructionVersion": {
             "minimum": 1.0,
@@ -2211,6 +2301,33 @@
               }
             ],
             "title": "Deaths"
+          },
+          "finalItems": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 6,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalitems"
+          },
+          "finalTrinketItemId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finaltrinketitemid"
           },
           "kills": {
             "anyOf": [

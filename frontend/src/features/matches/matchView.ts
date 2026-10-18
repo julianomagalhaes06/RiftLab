@@ -139,12 +139,15 @@ export interface ReasonSummary {
 export function summarizeDecisions(decisions: DecisionSummary[]): ReasonSummary {
   const counts = new Map<string, number>();
   for (const decision of decisions) {
-    if (decision.eligible) continue;
-    for (const code of decision.reasonCodes ?? []) counts.set(code, (counts.get(code) ?? 0) + 1);
+    const suspended = decision.reconstructionRulesHealth === "SUSPENDED";
+    if (decision.eligible && !suspended) continue;
+    const codes = new Set(decision.reasonCodes ?? []);
+    if (suspended) codes.add("INHERITED_RULES_SUSPENDED");
+    for (const code of codes) counts.set(code, (counts.get(code) ?? 0) + 1);
   }
   return {
     total: decisions.length,
-    eligible: decisions.filter((decision) => decision.eligible).length,
+    eligible: decisions.filter((decision) => decision.eligible && decision.reconstructionRulesHealth !== "SUSPENDED").length,
     reasons: [...counts.entries()].sort((a, b) => b[1] - a[1]),
   };
 }

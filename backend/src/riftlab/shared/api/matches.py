@@ -44,6 +44,8 @@ class MatchParticipant(CamelModel):
     champion_id: int = Field(ge=1)
     team: int = Field(ge=0)
     role: str | None = Field(default=None, min_length=1, max_length=20)
+    final_items: list[int] | None = Field(default=None, max_length=6)
+    final_trinket_item_id: int | None = Field(default=None, ge=1)
     win: bool | None = Field(
         default=None, strict=True, description="Vitória deste participante; null se não observada."
     )
@@ -131,6 +133,9 @@ class DecisionStateSummary(CamelModel):
     event_source_index: int = Field(ge=0)
     timestamp_ms: int = Field(ge=0)
     eligible: bool
+    reconstruction_rules_health: Literal["OK", "UNVERIFIED", "SUSPENDED"] = "UNVERIFIED"
+    reconstruction_rules_verdict: Literal["ACCEPT", "REJECT", "NO_SAMPLE"] | None = None
+    reconstruction_rules_wilson_upper: float | None = Field(default=None, ge=0, le=1)
     reason_codes: list[str] = Field(default_factory=list)
     main_item_ordinal: int | None = Field(default=None, ge=1)
     budget_source: BudgetSource
@@ -208,6 +213,11 @@ class DecisionVersionInfo(CamelModel):
             "último patch validado anterior (reconstructionRulesPatch) ou nenhuma."
         ),
     )
+    reconstruction_rules_health: Literal["OK", "UNVERIFIED", "SUSPENDED"] = "UNVERIFIED"
+    reconstruction_rules_verdict: Literal["ACCEPT", "REJECT", "NO_SAMPLE"] | None = None
+    reconstruction_rules_wilson_upper: float | None = Field(default=None, ge=0, le=1)
+    reconstruction_rules_clean_participants: int = Field(default=0, ge=0)
+    reconstruction_rules_failures: int = Field(default=0, ge=0)
     reconstruction_rules_patch: str | None = Field(default=None, max_length=20)
 
 

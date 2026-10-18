@@ -98,11 +98,42 @@ function rulesLabel(application: DecisionState["versions"]["reconstructionRules"
 function InheritedRules({ decision, patch }: { decision: DecisionState; patch: string | null }) {
   if (decision.versions.reconstructionRules !== "INHERITED") return null;
   const source = decision.versions.reconstructionRulesPatch ?? "anterior";
+  const { reconstructionRulesHealth: health, reconstructionRulesCleanParticipants: n, reconstructionRulesFailures: failures } = decision.versions;
+  if (health === "SUSPENDED" && decision.versions.reconstructionRulesVerdict === "NO_SAMPLE") return (
+    <p className="decision-inherited" role="note">
+      Análise bloqueada: a amostra atual foi invalidada e precisa de recontagem. A suspensão foi
+      mantida pelo REJECT anterior das regras do patch {source}, que encontrou {failures} divergências
+      em {n} participantes limpos.
+    </p>
+  );
+  if (health === "SUSPENDED") return (
+    <p className="decision-inherited" role="note">
+      Análise bloqueada: a herança das regras do patch {source} foi suspensa.
+      A conferência encontrou {failures} divergências em {n} participantes limpos deste patch.
+    </p>
+  );
   return (
     <p className="decision-inherited" role="note">
       O inventário foi reconstruído com as regras confirmadas no patch {source}, aplicadas por herança
       {patch ? ` ao patch ${patch}` : ""}, que ainda não tem confirmação própria. Mudanças de itens ou de
-      mecânica neste patch podem não estar refletidas.
+      mecânica neste patch podem não estar refletidas.{" "}
+      {health === "OK" ? `Conferido em ${n} participantes deste patch; isso não substitui confirmação própria.` : "Ainda sem amostra para conferir."}
+    </p>
+  );
+}
+
+function ObservedRuleHealth({ decision }: { decision: DecisionState }) {
+  const versions = decision.versions;
+  if (
+    versions.reconstructionRules === "INHERITED" ||
+    versions.reconstructionRulesVerdict !== "REJECT"
+  ) return null;
+  const upper = versions.reconstructionRulesWilsonUpper;
+  return (
+    <p className="decision-inherited" role="note">
+      A conferência observacional das regras confirmadas neste patch resultou em REJECT:
+      limite superior de Wilson {upper == null ? "indisponível" : `${(upper * 100).toFixed(1)}%`}.
+      Isso não suspende regras confirmadas.
     </p>
   );
 }
@@ -284,7 +315,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
             {participant?.role ? <span>{roleShort(participant.role)}</span> : null}
             {ordinal ? <span>{ordinal}</span> : null}
             <span className={`badge ${decision.eligible ? "badge--eligible" : "badge--ineligible"}`}>
-              {decision.eligible ? "Elegível para análise" : "Inelegível para análise"}
+              {decision.versions.reconstructionRulesHealth === "SUSPENDED" ? "Análise bloqueada" : decision.eligible ? "Elegível para análise" : "Inelegível para análise"}
             </span>
           </p>
         </div>
@@ -302,6 +333,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
       ) : null}
 
       <InheritedRules decision={decision} patch={match?.patch ?? null} />
+      <ObservedRuleHealth decision={decision} />
 
       <ItemNames version={decision.versions.dataDragonVersion}>
         <div className="decision-grid">
@@ -318,7 +350,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
           </div>
           {match ? <TeamContext match={match} participantId={decision.participantId} /> : null}
         </div>
-        {decision.eligible ? <DecisionExperience decisionId={decision.decisionId} /> : null}
+        {decision.eligible && decision.versions.reconstructionRulesHealth !== "SUSPENDED" ? <DecisionExperience decisionId={decision.decisionId} /> : null}
       </ItemNames>
       <TechnicalDetails decision={decision} />
     </section>

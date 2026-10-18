@@ -969,6 +969,16 @@ export interface components {
             participantId: number;
             /** Reasoncodes */
             reasonCodes?: string[];
+            /**
+             * Reconstructionruleshealth
+             * @default UNVERIFIED
+             * @enum {string}
+             */
+            reconstructionRulesHealth: "OK" | "UNVERIFIED" | "SUSPENDED";
+            /** Reconstructionrulesverdict */
+            reconstructionRulesVerdict?: ("ACCEPT" | "REJECT" | "NO_SAMPLE") | null;
+            /** Reconstructionruleswilsonupper */
+            reconstructionRulesWilsonUpper?: number | null;
             /** Staleframe */
             staleFrame: boolean;
             /** Timestampms */
@@ -997,8 +1007,28 @@ export interface components {
              * @enum {string}
              */
             reconstructionRules: "VALIDATED" | "INHERITED" | "NONE";
+            /**
+             * Reconstructionrulescleanparticipants
+             * @default 0
+             */
+            reconstructionRulesCleanParticipants: number;
+            /**
+             * Reconstructionrulesfailures
+             * @default 0
+             */
+            reconstructionRulesFailures: number;
+            /**
+             * Reconstructionruleshealth
+             * @default UNVERIFIED
+             * @enum {string}
+             */
+            reconstructionRulesHealth: "OK" | "UNVERIFIED" | "SUSPENDED";
             /** Reconstructionrulespatch */
             reconstructionRulesPatch?: string | null;
+            /** Reconstructionrulesverdict */
+            reconstructionRulesVerdict?: ("ACCEPT" | "REJECT" | "NO_SAMPLE") | null;
+            /** Reconstructionruleswilsonupper */
+            reconstructionRulesWilsonUpper?: number | null;
             /** Reconstructionversion */
             reconstructionVersion: number;
             /** Scopeversion */
@@ -1386,6 +1416,10 @@ export interface components {
             championId: number;
             /** Deaths */
             deaths?: number | null;
+            /** Finalitems */
+            finalItems?: number[] | null;
+            /** Finaltrinketitemid */
+            finalTrinketItemId?: number | null;
             /** Kills */
             kills?: number | null;
             /** Neutralminionskilled */

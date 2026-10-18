@@ -69,4 +69,13 @@ describe("matchView", () => {
     ] as unknown as DecisionSummary[]);
     expect(summary).toEqual({ total: 3, eligible: 1, reasons: [["OUT_OF_SCOPE", 2], ["INVENTORY_UNCERTAIN", 1]] });
   });
+
+  it("separa elegibilidade persistida da disponibilidade atual e preserva a causa da suspensão", () => {
+    const summary = summarizeDecisions([
+      { eligible: true, reconstructionRulesHealth: "SUSPENDED", reasonCodes: [] },
+      { eligible: true, reconstructionRulesHealth: "UNVERIFIED", reasonCodes: [] },
+    ] as unknown as DecisionSummary[]);
+    expect(summary.eligible).toBe(1);
+    expect(summary.reasons).toEqual([["INHERITED_RULES_SUSPENDED", 1]]);
+  });
 });

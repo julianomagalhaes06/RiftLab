@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -59,6 +60,27 @@ class ParticipantModel(Base):
     assists: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_minions_killed: Mapped[int | None] = mapped_column(Integer, nullable=True)
     neutral_minions_killed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ParticipantFinalItemsModel(CreatedAtMixin, Base):
+    __tablename__ = "participant_final_items"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["match_id", "participant_id"],
+            ["participants.match_id", "participants.participant_id"],
+        ),
+        CheckConstraint(
+            "jsonb_typeof(items) = 'array' AND jsonb_array_length(items) <= 6",
+            name="final_items_array",
+        ),
+    )
+
+    match_id: Mapped[str] = mapped_column(String, primary_key=True)
+    participant_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    items: Mapped[list[int]] = mapped_column(JSONB, nullable=False)
+    trinket_item_id: Mapped[int | None] = mapped_column(Integer)
+    role_bound_item_id: Mapped[int | None] = mapped_column(Integer)
+    raw_hash: Mapped[str] = mapped_column(String, nullable=False)
 
 
 class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):

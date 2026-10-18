@@ -184,6 +184,8 @@ def test_match_response_schemas_expose_no_personal_identifier() -> None:
         "assists",
         "totalMinionsKilled",
         "neutralMinionsKilled",
+        "finalItems",
+        "finalTrinketItemId",
     }
     assert set(schemas["ChampionAsset"]["properties"]) == {
         "name",
