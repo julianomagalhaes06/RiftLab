@@ -130,10 +130,30 @@ def test_cli_export_popularity_never_overwrites_a_served_version(tmp_path: Any) 
     )
     output = tmp_path / "popularity-16.19-v9.json"
 
-    dataset_export_popularity(dataset=dataset, output=output, version="v9", source="teste")
+    dataset_export_popularity(
+        dataset=dataset, output=output, version="v9", source="teste", min_cell_support=0
+    )
     exported = json.loads(output.read_text(encoding="utf-8"))
     assert exported["cells"] == {"22|1": {"10": 1}}
     assert exported["datasetSha256"] == hashlib.sha256(raw).hexdigest()
 
     with pytest.raises(typer.Exit):
-        dataset_export_popularity(dataset=dataset, output=output, version="v9", source="teste")
+        dataset_export_popularity(
+            dataset=dataset, output=output, version="v9", source="teste", min_cell_support=0
+        )
+
+
+def test_export_cells_minimum_drops_small_cells_and_default_keeps_the_cc704_shape() -> None:
+    from riftlab.dataset.popularity import export_cells
+
+    rows = [{**row("train", 222, 1, 10, [10, 20]), "matchId": f"BR1_{i}"} for i in range(3)] + [
+        {**row("train", 51, 1, 20, [10, 20]), "matchId": "BR1_9"}
+    ]
+    kwargs = {"version": "v", "game_patch": "16.20", "source": "s", "dataset_sha256": "0" * 64}
+    default = export_cells(rows, **kwargs)
+    assert "minCellSupport" not in default
+    assert set(default["cells"]) == {"222|1", "51|1"}
+    assert export_cells(rows, min_cell_support=0, **kwargs) == default
+    strict = export_cells(rows, min_cell_support=3, **kwargs)
+    assert strict["minCellSupport"] == 3
+    assert strict["cells"] == {"222|1": {"10": 3}}

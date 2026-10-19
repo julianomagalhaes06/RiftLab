@@ -32,6 +32,9 @@ _CONFIG_KEYS = {
     "excludeRemakes",
     "split",
 }
+# CC-803: coletas por patch guardam as duas filas no mesmo armazenamento; a política
+# pode declarar que a outra fila é exclusão (OTHER_QUEUE) em vez de recusar o corpus.
+_OPTIONAL_CONFIG_KEYS = {"otherQueues"}
 
 
 class CorpusError(RuntimeError):
@@ -46,6 +49,7 @@ class DatasetPolicy:
     exclude_remakes: bool
     train_fraction: float
     validation_fraction: float = 0.0  # CC-401: 0 mantém a divisão treino/teste do CC-302
+    exclude_other_queues: bool = False
 
 
 def load_dataset_policy(path: Path) -> DatasetPolicy:
@@ -53,8 +57,15 @@ def load_dataset_policy(path: Path) -> DatasetPolicy:
         document: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError, UnicodeDecodeError) as exc:
         raise CorpusError("política do dataset ilegível") from exc
-    if not isinstance(document, dict) or set(document) != _CONFIG_KEYS:
+    if (
+        not isinstance(document, dict)
+        or not _CONFIG_KEYS <= set(document)
+        or set(document) - _CONFIG_KEYS - _OPTIONAL_CONFIG_KEYS
+    ):
         raise CorpusError("política do dataset com campos divergentes")
+    other_queues = document.get("otherQueues", "REFUSE")
+    if other_queues not in ("REFUSE", "EXCLUDE"):
+        raise CorpusError("política do dataset inválida")
     split = document["split"]
     if (
         document["schemaVersion"] != 1
@@ -77,6 +88,7 @@ def load_dataset_policy(path: Path) -> DatasetPolicy:
         exclude_remakes=document["excludeRemakes"],
         train_fraction=split["trainFraction"],
         validation_fraction=split.get("validationFraction", 0.0),
+        exclude_other_queues=other_queues == "EXCLUDE",
     )
 
 
@@ -96,14 +108,19 @@ def _exclusion(
     if not isinstance(metadata, dict) or metadata.get("matchId") != match_id:
         raise CorpusError("identidade de partida divergente no armazenamento")
     version = info.get("gameVersion")
+    queue = info.get("queueId")
     if (
         not isinstance(version, str)
         or ".".join(version.split(".")[:2]) != policy.patch
-        or info.get("queueId") != policy.queue_id
+        or (queue != policy.queue_id and not policy.exclude_other_queues)
         or info.get("mapId") != policy.map_id
         or info.get("endOfGameResult") != "GameComplete"
     ):
         raise CorpusError("partida fora do alvo no armazenamento; corpus recusado")
+    if queue != policy.queue_id:
+        if queue not in (420, 440):
+            raise CorpusError("fila fora das ranqueadas no armazenamento; corpus recusado")
+        return "OTHER_QUEUE"
     participants = info.get("participants")
     if policy.exclude_remakes and isinstance(participants, list):
         if any(isinstance(p, dict) and p.get("gameEndedInEarlySurrender") for p in participants):
@@ -142,7 +159,7 @@ def build_corpus_manifest(
             counts["pairs"] += 1
             if reason is not None:
                 exclusions[match_id] = reason
-                counts[f"excluded{reason.title()}"] += 1
+                counts[f"excluded{reason.title().replace('_', '')}"] += 1
                 continue
             start = info.get("gameStartTimestamp") or info.get("gameCreation")
             if not isinstance(start, int) or isinstance(start, bool) or start <= 0:

@@ -220,3 +220,35 @@ def test_repository_experiment_policy_is_70_15_15() -> None:
     policy = load_dataset_policy(_repo_config("experiments", "dataset-16.19-v2.yaml"))
 
     assert (policy.train_fraction, policy.validation_fraction) == (0.7, 0.15)
+
+
+def test_policy_may_declare_the_other_queue_as_exclusion(tmp_path: Path) -> None:
+    store = _store(
+        tmp_path / "mixed",
+        {f"BR1_{i}": _body(f"BR1_{i}", 1_000 + i) for i in range(1, 7)}
+        | {"BR1_90": _body("BR1_90", 1_002, queueId=440)},
+    )
+    strict = load_dataset_policy(_policy(tmp_path))
+    with pytest.raises(CorpusError, match="fora do alvo"):
+        build_corpus_manifest({"mixed": store}, strict, policy_sha256="0" * 64)
+    lenient = load_dataset_policy(
+        _policy(
+            tmp_path,
+            POLICY_TEXT.replace(
+                "excludeRemakes: true", "excludeRemakes: true\notherQueues: EXCLUDE"
+            ),
+        )
+    )
+    manifest = build_corpus_manifest({"mixed": store}, lenient, policy_sha256="0" * 64)
+    assert manifest["exclusions"] == {"BR1_90": "OTHER_QUEUE"}
+    assert manifest["sources"]["mixed"]["excludedOtherQueue"] == 1
+    assert "BR1_90" not in str(manifest["split"])
+    unranked = _store(tmp_path / "aram", {"BR1_91": _body("BR1_91", 1_001, queueId=450)})
+    with pytest.raises(CorpusError, match="fila fora das ranqueadas"):
+        build_corpus_manifest({"aram": unranked}, lenient, policy_sha256="0" * 64)
+
+
+def test_policy_rejects_unknown_other_queue_mode(tmp_path: Path) -> None:
+    text = POLICY_TEXT.replace("excludeRemakes: true", "excludeRemakes: true\notherQueues: KEEP")
+    with pytest.raises(CorpusError):
+        load_dataset_policy(_policy(tmp_path, text))

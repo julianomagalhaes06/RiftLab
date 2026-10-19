@@ -132,3 +132,37 @@ def resolve_item_rules(
             | frozenset(changed_item_ids),
         )
     return None
+
+
+async def resolve_catalog_item_rules(
+    session: Any, directory: Path, bundle: Any
+) -> ItemRules | None:
+    """Item rules for the patch of `bundle` (a `dataset.rows._catalog` bundle), as the
+    analysis applies them: own manifest, else the inherited one with every main item of
+    the patch that the source does not cover, or that changed structurally against the
+    source patch's catalog, marked uncovered. None when unsupported or the source catalog
+    is missing (fail closed)."""
+    from riftlab.catalog.diff import catalog_diff, patch_catalog
+
+    def main_ids(target: Any) -> set[int]:
+        return {
+            item.item_id
+            for item in target.items
+            if target.classification.classify(item.item_id).item_class.value == "MAIN"
+        }
+
+    patch = bundle.catalog.game_patch
+    rules = resolve_item_rules(directory, patch, main_ids(bundle))
+    if rules is None or not rules.inherited_from:
+        return rules
+    source = await patch_catalog(session, rules.inherited_from)
+    if source is None:
+        return None
+    changes = catalog_diff(
+        {i.item_id: i for i in source.items},
+        {i.item_id: i for i in bundle.items},
+        source.classification,
+        bundle.classification,
+    )
+    changed_main = set(changes) & (main_ids(bundle) | main_ids(source))
+    return resolve_item_rules(directory, patch, main_ids(bundle), changed_item_ids=changed_main)

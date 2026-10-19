@@ -204,7 +204,9 @@ def dataset_build_rows(
         _REPO_ROOT / ".private" / "dataset" / "corpus-16.19.json", help="Manifesto congelado."
     ),
     rules: Path = typer.Option(
-        _REPO_ROOT / "configs" / "item-rules" / "16.19.json", help="Regras de itens do patch."
+        _REPO_ROOT / "configs" / "item-rules" / "16.19.json",
+        help="Regras de itens do patch, ou o diretório configs/item-rules para resolver o "
+        "manifesto próprio ou herdado no catálogo do patch (CC-803).",
     ),
     output: Path = typer.Option(
         _REPO_ROOT / ".private" / "dataset" / "rows-16.19.json", help="Saída privada única."
@@ -228,17 +230,34 @@ def dataset_build_rows(
         typer.echo("BLOCKED: saída deve ser nova e ficar em .private", err=True)
         raise typer.Exit(code=1)
     corpus = _verified_private_json(manifest)
-    item_rules = load_item_rules(rules)
     settings = load_settings(env_file)
 
     async def _run() -> Any:
         engine = build_engine(settings.database_url)
+        session_factory = build_session_factory(engine)
         try:
-            return await build_rows(build_session_factory(engine), corpus, item_rules, task=task)
+            if rules.is_dir():
+                from riftlab.candidates.rules import resolve_catalog_item_rules
+                from riftlab.catalog.diff import patch_catalog
+
+                async with session_factory() as session:
+                    bundle = await patch_catalog(session, str(corpus.get("patch")))
+                    resolved = (
+                        await resolve_catalog_item_rules(session, rules, bundle)
+                        if bundle is not None
+                        else None
+                    )
+                if resolved is None:
+                    raise typer.BadParameter("patch sem regras de itens próprias nem herdáveis")
+                item_rules = resolved
+            else:
+                item_rules = load_item_rules(rules)
+            built = await build_rows(session_factory, corpus, item_rules, task=task)
+            return item_rules, built
         finally:
             await engine.dispose()
 
-    rows, counts = asyncio.run(_run())
+    item_rules, (rows, counts) = asyncio.run(_run())
     artifact = {
         "schemaVersion": 1,
         "card": "CC-302",
@@ -671,6 +690,12 @@ def dataset_freeze_final(
     collection_dir: Path = typer.Option(
         _REPO_ROOT / ".private" / "collection", help="Raiz privada das coletas (só leitura)."
     ),
+    raw_dir: list[str] = typer.Option(
+        None,
+        "--raw-dir",
+        help="Armazenamento bruto extra, relativo a --collection-dir (repetível; CC-803: "
+        "coletas por patch).",
+    ),
 ) -> None:
     """Congela o dataset final (CC-401): rótulos da divisão, cobertura e contaminação."""
     import hashlib
@@ -688,7 +713,7 @@ def dataset_freeze_final(
     artifact = build_final_dataset(
         rows_artifact,
         corpus,
-        _raw_directories(collection_dir),
+        _raw_directories(collection_dir) + [collection_dir / extra for extra in raw_dir or []],
         rows_sha256=hashlib.sha256(rows_path.read_bytes()).hexdigest(),
         manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest(),
     )
@@ -728,6 +753,12 @@ def dataset_export_popularity(
     output: Path = typer.Option(..., help="Artefato servido em configs/ranking (novo)."),
     version: str = typer.Option(..., help="Versão do artefato, ex.: popularity_16_19_v2."),
     source: str = typer.Option(..., help="Origem declarada no artefato."),
+    min_cell_support: int = typer.Option(
+        0,
+        min=0,
+        help="Mínimo de decisões de treino com alvo legal por célula (CC-803: 20); "
+        "0 mantém o artefato do CC-704 byte a byte.",
+    ),
 ) -> None:
     """Exporta as contagens de treino por campeão × ordem do item (CC-704), sem ids."""
     import hashlib
@@ -745,6 +776,7 @@ def dataset_export_popularity(
         game_patch=str(artifact["patch"]),
         source=source,
         dataset_sha256=hashlib.sha256(dataset.read_bytes()).hexdigest(),
+        min_cell_support=min_cell_support,
     )
     output.write_text(json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     typer.echo(json.dumps({"cells": len(document["cells"]), "version": version}))
@@ -765,19 +797,38 @@ def dataset_freeze_corpus(
     include_cc703: bool = typer.Option(
         False, "--include-cc703", help="Inclui a coleta em escala do CC-703 (corpus v3)."
     ),
+    source: list[str] = typer.Option(
+        None,
+        "--source",
+        help="Fonte explícita RÓTULO=CAMINHO (repetível; relativo a --collection-dir). "
+        "Substitui as fontes do 16.19 (CC-803: corpus de outro patch).",
+    ),
 ) -> None:
-    """Congela o corpus do patch (CC-316 + CC-323 [+ CC-703]) e a divisão, sem rede nem banco."""
+    """Congela o corpus do patch (padrão: CC-316 + CC-323 [+ CC-703]) e a divisão, sem rede
+    nem banco."""
     import json
 
     from riftlab.dataset.corpus import CorpusError, freeze_corpus
 
-    sources = {
-        "cc316-exploration": collection_dir / "cc316" / "raw-exploration",
-        "cc316-confirmation": collection_dir / "cc316" / "raw-confirmation",
-        "cc323": collection_dir / "cc323" / "raw",
-    }
-    if include_cc703:
-        sources["cc703"] = collection_dir / _CC703_RAW
+    if source:
+        if include_cc703:
+            typer.echo("BLOCKED: --source não se combina com --include-cc703", err=True)
+            raise typer.Exit(code=1)
+        sources = {}
+        for entry in source:
+            label, sep, relative = entry.partition("=")
+            if not sep or not label or not relative or label in sources:
+                typer.echo(f"BLOCKED: fonte inválida ou repetida: {entry!r}", err=True)
+                raise typer.Exit(code=1)
+            sources[label] = collection_dir / relative
+    else:
+        sources = {
+            "cc316-exploration": collection_dir / "cc316" / "raw-exploration",
+            "cc316-confirmation": collection_dir / "cc316" / "raw-confirmation",
+            "cc323": collection_dir / "cc323" / "raw",
+        }
+        if include_cc703:
+            sources["cc703"] = collection_dir / _CC703_RAW
     try:
         manifest, digest = freeze_corpus(output, sources, policy)
     except CorpusError as exc:
@@ -1443,3 +1494,107 @@ from riftlab.cli.rule_health import catalog_diff_command, rules_app  # noqa: E40
 
 app.add_typer(rules_app, name="rules")
 report_app.command("catalog-diff")(catalog_diff_command)
+
+
+@report_app.command("popularity-readiness")
+def popularity_readiness(
+    dataset: Path = typer.Option(..., help="Dataset congelado do patch (JSON com sidecar)."),
+    own_artifact: Path = typer.Option(..., help="Popularidade própria exportada com mínimo."),
+    split: str = typer.Option("validation", help="validation (escolha) ou test (uma vez)."),
+    output: Path = typer.Option(None, help="Saída privada nova (obrigatória no teste)."),
+    env_file: Path = typer.Option(None, help="Banco preparado com os catálogos dos patches."),
+) -> None:
+    """CC-803: células com o mínimo, cobertura e MRR/hit@1 da própria contra a herdada
+    filtrada e o uniforme. O teste é lido no máximo uma vez (marcador antes do cálculo)."""
+    import asyncio
+    import json
+    import os
+
+    from riftlab.catalog.diff import patch_catalog
+    from riftlab.catalog.repository import SqlAlchemyCatalogRepository
+    from riftlab.cli.env_file import load_settings
+    from riftlab.collection.cc316_adoption import canonical_json
+    from riftlab.collection.cc316_discovery import _atomic_write_once
+    from riftlab.dataset.rows import _catalog
+    from riftlab.db import build_engine
+    from riftlab.ranking.engine import Popularity
+    from riftlab.ranking.inheritance import (
+        PopularityCatalog,
+        filter_inherited_popularity,
+        latest_previous_artifact,
+    )
+    from riftlab.reports.popularity_readiness import cell_support, evaluate_split, selection
+    from riftlab.shared.db import build_session_factory
+
+    if split not in ("validation", "test"):
+        raise typer.BadParameter("split deve ser validation ou test")
+    if output is not None and (".private" not in output.parts or output.exists()):
+        typer.echo("BLOCKED: saída deve ser nova e ficar em .private", err=True)
+        raise typer.Exit(code=1)
+    artifact = _verified_private_json(dataset)
+    patch = str(artifact["patch"])
+    own_document = json.loads(own_artifact.read_text(encoding="utf-8"))
+    minimum = int(own_document.get("minCellSupport", 0))
+    if own_document.get("gamePatch") != patch or minimum < 1:
+        typer.echo("BLOCKED: artefato próprio de outro patch ou sem mínimo por célula", err=True)
+        raise typer.Exit(code=1)
+    own = Popularity.load_document(own_document)
+    settings = load_settings(env_file)
+
+    async def inherited() -> Any:
+        previous = latest_previous_artifact(_REPO_ROOT / "configs", patch)
+        if previous is None or previous.source_catalog_identity is None:
+            return None, "POPULARITY_SOURCE_CATALOG_IDENTITY_UNBOUND"
+        engine = build_engine(settings.database_url)
+        try:
+            async with build_session_factory(engine)() as session:
+                source = await SqlAlchemyCatalogRepository(
+                    session
+                ).find_catalog_version_by_content_hash(previous.source_catalog_identity["sha256"])
+                source_bundle = await _catalog(session, source.id) if source else None
+                target = await patch_catalog(session, patch)
+        finally:
+            await engine.dispose()
+        if target is None:
+            return None, "POPULARITY_DESTINATION_CATALOG_NOT_FOUND"
+
+        def view(bundle: Any) -> PopularityCatalog:
+            items = {item.item_id: item for item in bundle.items}
+            return PopularityCatalog(bundle.catalog, items, bundle.classification)
+
+        result = filter_inherited_popularity(
+            previous, view(source_bundle) if source_bundle else None, view(target)
+        )
+        return result.popularity, result.reason_code
+
+    inherited_popularity, inherited_reason = asyncio.run(inherited())
+    support = cell_support(artifact["rows"])
+    marker = dataset.with_name(dataset.name + ".test-used")
+    if split == "test":
+        if output is None:
+            typer.echo("BLOCKED: teste exige --output", err=True)
+            raise typer.Exit(code=1)
+        try:
+            fd = os.open(marker, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            typer.echo("BLOCKED: teste deste dataset já foi lido", err=True)
+            raise typer.Exit(code=1) from None
+        os.write(fd, canonical_json({"ownArtifactVersion": own.version, "split": "test"}))
+        os.close(fd)
+    report = {
+        "schemaVersion": 1,
+        "card": "CC-803",
+        "patch": patch,
+        "minCellSupport": minimum,
+        "ownArtifactVersion": own.version,
+        "trainCellSupport": support,
+        "cellsWithMinimum": sorted(cell for cell, n in support.items() if n >= minimum),
+        "inheritedReason": inherited_reason,
+        "metrics": evaluate_split(artifact["rows"], split, own, inherited_popularity),
+    }
+    if split == "validation":
+        report["selection"] = selection(report["metrics"], len(report["cellsWithMinimum"]))
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        _atomic_write_once(output, canonical_json(report))
+    typer.echo(json.dumps(report, ensure_ascii=False, sort_keys=True))

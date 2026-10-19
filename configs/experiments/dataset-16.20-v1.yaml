@@ -1,0 +1,16 @@
+# Política do dataset do patch 16.20 (CC-803 parte B): mesma divisão 70/15/15 do CC-401, só a
+# fila 420, o único domínio do 16.20 com confirmação própria (CC-802, reconstrução v12).
+# As coletas por patch guardam as duas filas no mesmo armazenamento; a outra fila vira exclusão
+# declarada (OTHER_QUEUE) em vez de recusar o corpus.
+schemaVersion: 1
+patch: "16.20"
+queueId: 420
+mapId: 11
+excludeRemakes: true
+otherQueues: EXCLUDE
+split:
+  # Cronológica por partida: treino < validação < teste pelo instante de início; nenhum
+  # instante atravessa duas partes. Validação escolhe; teste só uma vez, no fim.
+  method: CHRONOLOGICAL_BY_MATCH
+  trainFraction: 0.7
+  validationFraction: 0.15

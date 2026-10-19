@@ -26,8 +26,7 @@ from riftlab.candidates.domain import (
     UserBudget,
     enumerate_candidates,
 )
-from riftlab.candidates.rules import resolve_item_rules
-from riftlab.catalog.diff import catalog_diff, patch_catalog
+from riftlab.candidates.rules import resolve_catalog_item_rules
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.dataset.rows import RowsError, _catalog
 from riftlab.decisions.features import build_pre_decision_view
@@ -189,46 +188,9 @@ async def _compute(
     bundle = await _catalog(session, point.catalog_id)
     patch = bundle.catalog.game_patch
     catalog_label = f"{patch}/{bundle.catalog.data_dragon_version}"
-    item_rules = resolve_item_rules(
-        configs / "item-rules",
-        patch,
-        (
-            item.item_id
-            for item in bundle.items
-            if bundle.classification.classify(item.item_id).item_class.value == "MAIN"
-        ),
-    )
+    item_rules = await resolve_catalog_item_rules(session, configs / "item-rules", bundle)
     if item_rules is None:
         return _empty(decision_id, objective, "UNSUPPORTED", ["PATCH_UNSUPPORTED"], catalog_label)
-    if item_rules.inherited_from:
-        source_bundle = await patch_catalog(session, item_rules.inherited_from)
-        if source_bundle is None:
-            return _empty(
-                decision_id, objective, "UNSUPPORTED", ["PATCH_UNSUPPORTED"], catalog_label
-            )
-        changes = catalog_diff(
-            {i.item_id: i for i in source_bundle.items},
-            {i.item_id: i for i in bundle.items},
-            source_bundle.classification,
-            bundle.classification,
-        )
-        changed_main = {
-            i
-            for i in changes
-            if bundle.classification.classify(i).item_class.value == "MAIN"
-            or source_bundle.classification.classify(i).item_class.value == "MAIN"
-        }
-        item_rules = resolve_item_rules(
-            configs / "item-rules",
-            patch,
-            (
-                i.item_id
-                for i in bundle.items
-                if bundle.classification.classify(i.item_id).item_class.value == "MAIN"
-            ),
-            changed_item_ids=changed_main,
-        )
-        assert item_rules is not None
     state = await SqlAlchemyTimelineRepository(session).get_decision_state(point.decision_state_id)
     values = (point.features or {}).get("values", {})
     champion = values.get("self_champion_id")

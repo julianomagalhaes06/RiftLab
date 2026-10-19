@@ -106,9 +106,12 @@ def export_cells(
     game_patch: str,
     source: str,
     dataset_sha256: str,
+    min_cell_support: int = 0,
 ) -> dict[str, Any]:
     """Served popularity artifact (configs/ranking): the train cell counts of `fit`, nothing
-    else — aggregate counts by champion and main item ordinal, no identifiers (CC-704)."""
+    else — aggregate counts by champion and main item ordinal, no identifiers (CC-704).
+    `min_cell_support` (CC-803) drops cells with fewer train legal targets; the default 0
+    keeps the CC-704 artifacts byte for byte (no key is added)."""
     model = fit(row for row in rows if row["split"] == "train")
     cells = dict(
         sorted(
@@ -117,8 +120,10 @@ def export_cells(
                 {str(item): count for item, count in counter.most_common()},
             )
             for (champion, ordinal), counter in model.by_cell.items()
+            if sum(counter.values()) >= min_cell_support
         )
     )
+    extra = {"minCellSupport": min_cell_support} if min_cell_support else {}
     return {
         "schemaVersion": 1,
         "version": version,
@@ -126,5 +131,6 @@ def export_cells(
         "source": source,
         "datasetSha256": dataset_sha256,
         "smoothing": {"alpha": ALPHA, "prior": "frequência da mesma ordem do item"},
+        **extra,
         "cells": cells,
     }
