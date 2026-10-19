@@ -20,100 +20,162 @@
 schemaVersion: v3
 inheritance:
   mode: LATEST_VALIDATED_EARLIER
-  activatedInVersion: 12
-systemItemIds: [1200, 1201, 1202, 1203, 1204, 1206, 1207, 1208, 1209, 1220, 1221, 1222, 2001, 2002]
+  activatedInVersion: 13
+systemItemIds:
+- 1200
+- 1201
+- 1202
+- 1203
+- 1204
+- 1206
+- 1207
+- 1208
+- 1209
+- 1220
+- 1221
+- 1222
+- 2001
+- 2002
 domains:
-  "16.20/420":
-    patch: "16.20"
+  16.20/420:
+    patch: '16.20'
     queueId: 420
     catalogContext: FULL_CANONICAL_V1
-    evidence: "CC-802: confirmação pré-registrada (protocolo v5) no patch 16.20, fila 420, G-FINAL 4/122 (sup Wilson 0.0813) com R1, R2, R2i, R4s, R4w, R5, R7b, R7m, R8; auditoria única f06aef0b"
-    activatedInVersion: 12
+    evidence: 'CC-802: confirmação pré-registrada (protocolo v5) no patch 16.20, fila 420, G-FINAL 4/122 (sup Wilson 0.0813) com R1, R2, R2i, R4s, R4w, R5, R7b, R7m, R8; auditoria única f06aef0b; CC-1002: confirmação pré-registrada (protocolo 1) no patch 16.20, fila 420, G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    activatedInVersion: 13
+  16.19/420:
+    patch: '16.19'
+    queueId: 420
+    catalogContext: FULL_CANONICAL_V1
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) no patch 16.19, fila 420, G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    activatedInVersion: 13
+  16.19/440:
+    patch: '16.19'
+    queueId: 440
+    catalogContext: FULL_CANONICAL_V1
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) no patch 16.19, fila 440, G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    activatedInVersion: 13
+  16.20/440:
+    patch: '16.20'
+    queueId: 440
+    catalogContext: FULL_CANONICAL_V1
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) no patch 16.20, fila 440, G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+    activatedInVersion: 13
 rules:
   R1:
     ruleVersion: 1
     description: destroy de consumível POSSUÍDO, sem compra composta que o reivindique, é consumo de uma unidade
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
+    patchesValidated:
+    - '16.19'
     contraRate: 0.003457
     counterExamples: 8
-    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H1b 8/2314 (sup Wilson 0.0068), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 12
+    evidence: 'CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H1b 8/2314 (sup Wilson 0.0068), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.005470
-        counterExamples: 5
-        evidence: "CC-802: linha H1b 5/914 (sup Wilson 0.0127), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.00547
+      counterExamples: 5
+      evidence: 'CC-802: linha H1b 5/914 (sup Wilson 0.0127), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.005047
+      counterExamples: 23
+      evidence: 'CC-1002: linha H1b 23/4557 (sup Wilson 0.0076), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R2:
     ruleVersion: 1
     description: troca de trinket (destroy do trinket possuído no mesmo instante de uma compra de trinket)
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
+    patchesValidated:
+    - '16.19'
     contraRate: 0.026559
     counterExamples: 23
-    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H2g 23/866 (sup Wilson 0.0395), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 12
+    evidence: 'CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H2g 23/866 (sup Wilson 0.0395), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.014409
-        counterExamples: 5
-        evidence: "CC-802: linha H2g 5/347 (sup Wilson 0.0333), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.014409
+      counterExamples: 5
+      evidence: 'CC-802: linha H2g 5/347 (sup Wilson 0.0333), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.024334
+      counterExamples: 42
+      evidence: 'CC-1002: linha H2g 42/1726 (sup Wilson 0.0327), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R2i:
     ruleVersion: 1
     description: todo participante começa com o trinket padrão 3340
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
+    patchesValidated:
+    - '16.19'
     contraRate: 0.010893
     counterExamples: 5
-    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H2i 5/459 (sup Wilson 0.0252), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 12
+    evidence: 'CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H2i 5/459 (sup Wilson 0.0252), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.021390
-        counterExamples: 4
-        evidence: "CC-802: linha H2i 4/187 (sup Wilson 0.0537), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.02139
+      counterExamples: 4
+      evidence: 'CC-802: linha H2i 4/187 (sup Wilson 0.0537), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.008909
+      counterExamples: 8
+      evidence: 'CC-1002: linha H2i 8/898 (sup Wilson 0.0175), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R4s:
     ruleVersion: 1
     description: destroy sem posse de item de sistema/missão (systemItemIds) não altera o inventário nem marca
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
+    patchesValidated:
+    - '16.19'
     contraRate: 0.0
     counterExamples: 0
-    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H4s 0/4317 (sup Wilson 0.0009), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 12
+    evidence: 'CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H4s 0/4317 (sup Wilson 0.0009), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.000000
-        counterExamples: 0
-        evidence: "CC-802: linha H4s 0/1785 (sup Wilson 0.0021), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-802: linha H4s 0/1785 (sup Wilson 0.0021), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha H4s 0/8940 (sup Wilson 0.0004), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R4w:
     ruleVersion: 1
     description: compras do World Atlas (3865) do participantId 0 são o item inicial dos Apoios (falha segura)
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
+    patchesValidated:
+    - '16.19'
     contraRate: 0.0
     counterExamples: 0
-    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H4w 0/295 (sup Wilson 0.0129), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 12
+    evidence: 'CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H4w 0/295 (sup Wilson 0.0129), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.000000
-        counterExamples: 0
-        evidence: "CC-802: linha H4w 0/126 (sup Wilson 0.0296), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-802: linha H4w 0/126 (sup Wilson 0.0296), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.017857
+      counterExamples: 11
+      evidence: 'CC-1002: linha H4w 11/616 (sup Wilson 0.0317), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R5:
     ruleVersion: 1
     description: libera UNVALIDATED_DESTROY_ORDER_RECONCILIATION (destroy dos componentes antes da compra composta)
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
-    contraRate: 0.000063
+    patchesValidated:
+    - '16.19'
+    contraRate: 6.3e-05
     counterExamples: 1
-    evidence: "CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H5 1/15761 (sup Wilson 0.0004), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6"
-    activatedInVersion: 12
+    evidence: 'CC-322: confirmação pré-registrada CC-316 no patch 16.19, linha H5 1/15761 (sup Wilson 0.0004), G-FINAL 5/193 (sup Wilson 0.0592); auditoria única 74409fb6'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.000000
-        counterExamples: 0
-        evidence: "CC-802: linha H5 0/6854 (sup Wilson 0.0006), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-802: linha H5 0/6854 (sup Wilson 0.0006), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha H5 0/33506 (sup Wilson 0.0001), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R6:
     ruleVersion: 1
     description: undo em pilha (transação de compra transparente) e libera UNVALIDATED_UNDO_SEMANTICS
@@ -126,63 +188,356 @@ rules:
     domainsValidated: []
   R7b:
     ruleVersion: 1
-    description: "destroy sem posse do Biscoito da Vontade Eterna (2010), concedido pela runa 8345, é consumo da unidade concedida"
+    description: destroy sem posse do Biscoito da Vontade Eterna (2010), concedido pela runa 8345, é consumo da unidade concedida
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
+    patchesValidated:
+    - '16.19'
     contraRate: 0.005978
     counterExamples: 7
-    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H7b 7/1171 (sup Wilson 0.0123), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
-    activatedInVersion: 12
+    evidence: 'CC-324: confirmação pré-registrada no patch 16.19, linha H7b 7/1171 (sup Wilson 0.0123), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.003861
-        counterExamples: 1
-        evidence: "CC-802: linha H7b 1/259 (sup Wilson 0.0215), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.003861
+      counterExamples: 1
+      evidence: 'CC-802: linha H7b 1/259 (sup Wilson 0.0215), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.001554
+      counterExamples: 2
+      evidence: 'CC-1002: linha H7b 2/1287 (sup Wilson 0.0056), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R7m:
     ruleVersion: 1
-    description: "destroy sem posse dos Calçados Levemente Mágicos (2422), concedidos pela runa 8304, não altera o inventário"
+    description: destroy sem posse dos Calçados Levemente Mágicos (2422), concedidos pela runa 8304, não altera o inventário
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
+    patchesValidated:
+    - '16.19'
     contraRate: 0.003656
     counterExamples: 2
-    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H7m 2/547 (sup Wilson 0.0132), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
-    activatedInVersion: 12
+    evidence: 'CC-324: confirmação pré-registrada no patch 16.19, linha H7m 2/547 (sup Wilson 0.0132), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.000000
-        counterExamples: 0
-        evidence: "CC-802: linha H7m 0/112 (sup Wilson 0.0332), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-802: linha H7m 0/112 (sup Wilson 0.0332), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.012963
+      counterExamples: 7
+      evidence: 'CC-1002: linha H7m 7/540 (sup Wilson 0.0265), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R7x:
     ruleVersion: 1
-    description: "destroy sem posse dos elixires 2150/2151/2152, concedidos pela runa 8313, é consumo da unidade concedida"
+    description: destroy sem posse dos elixires 2150/2151/2152, concedidos pela runa 8313, é consumo da unidade concedida
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
-    contraRate: 0.000000
+    patchesValidated:
+    - '16.19'
+    contraRate: 0.0
     counterExamples: 0
-    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H7x 0/485 (sup Wilson 0.0079), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
-    activatedInVersion: 12
-    domainsValidated: []
+    evidence: 'CC-324: confirmação pré-registrada no patch 16.19, linha H7x 0/485 (sup Wilson 0.0079), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.20/420
+      contraRate: 0.005772
+      counterExamples: 4
+      evidence: 'CC-1002: linha H7x 4/693 (sup Wilson 0.0147), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.002475
+      counterExamples: 1
+      evidence: 'CC-1002: linha H7x 1/404 (sup Wilson 0.0139), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R8:
     ruleVersion: 1
-    description: "bota destruída no instante em que termina a missão de rota: BOTTOM (1202) remove a bota; MID (1201) troca a tier 2 pelo sucessor único do catálogo"
+    description: 'bota destruída no instante em que termina a missão de rota: BOTTOM (1202) remove a bota; MID (1201) troca a tier 2 pelo sucessor único do catálogo'
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
-    contraRate: 0.000000
+    patchesValidated:
+    - '16.19'
+    contraRate: 0.0
     counterExamples: 0
-    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H8 0/434 (sup Wilson 0.0088), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
-    activatedInVersion: 12
+    evidence: 'CC-324: confirmação pré-registrada no patch 16.19, linha H8 0/434 (sup Wilson 0.0088), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069'
+    activatedInVersion: 13
     domainsValidated:
-      - domain: "16.20/420"
-        contraRate: 0.000000
-        counterExamples: 0
-        evidence: "CC-802: linha H8 0/91 (sup Wilson 0.0405), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b"
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-802: linha H8 0/91 (sup Wilson 0.0405), G-FINAL 4/122 (sup Wilson 0.0813); auditoria única f06aef0b'
+    - domain: 16.20/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha H8 0/455 (sup Wilson 0.0084), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
   R8t:
     ruleVersion: 1
-    description: "Botas básicas (1001) destruídas no instante em que termina a missão do BOTTOM (1202) saem do inventário sem substituta"
+    description: Botas básicas (1001) destruídas no instante em que termina a missão do BOTTOM (1202) saem do inventário sem substituta
     status: EMPIRICALLY_SUPPORTED
-    patchesValidated: ["16.19"]
-    contraRate: 0.000000
+    patchesValidated:
+    - '16.19'
+    contraRate: 0.0
     counterExamples: 0
-    evidence: "CC-324: confirmação pré-registrada no patch 16.19, linha H8t1 0/216 (sup Wilson 0.0175), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069"
-    activatedInVersion: 12
-    domainsValidated: []
+    evidence: 'CC-324: confirmação pré-registrada no patch 16.19, linha H8t1 0/216 (sup Wilson 0.0175), G-FINAL 15/469 (sup Wilson 0.0521); auditoria única d1271069'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha H8t1 0/328 (sup Wilson 0.0116), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha H8t1 0/195 (sup Wilson 0.0193), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R1e:
+    ruleVersion: 1
+    description: consumível destruído sem posse antes da própria compra no mesmo instante é consumido na compra (a unidade não entra no inventário)
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.001466
+    counterExamples: 2
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 2/1364; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.002632
+      counterExamples: 1
+      evidence: 'CC-1002: linha C2 R1e 1/380 (sup Wilson 0.0148), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R1e 0/292 (sup Wilson 0.0130), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R1e 0/421 (sup Wilson 0.0090), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.00369
+      counterExamples: 1
+      evidence: 'CC-1002: linha C2 R1e 1/271 (sup Wilson 0.0206), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R6v:
+    ruleVersion: 1
+    description: undo correlacionado com a operação reversível anterior (imediata ou em pilha) restaura o inventário sem marcar; undo sem correlação continua marcando
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.001144
+    counterExamples: 7
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 7/6119; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.002728
+      counterExamples: 5
+      evidence: 'CC-1002: linha C2 R6v 5/1833 (sup Wilson 0.0064), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R6v 0/1196 (sup Wilson 0.0032), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.000541
+      counterExamples: 1
+      evidence: 'CC-1002: linha C2 R6v 1/1849 (sup Wilson 0.0031), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.000806
+      counterExamples: 1
+      evidence: 'CC-1002: linha C2 R6v 1/1241 (sup Wilson 0.0046), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R8m:
+    ruleVersion: 1
+    description: com a missão do MID (1201) já concluída, a bota tier 2 destruída antes da própria compra no mesmo instante entra como o sucessor único do catálogo
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.0
+    counterExamples: 0
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 0/1833; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R8m 0/543 (sup Wilson 0.0070), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R8m 0/375 (sup Wilson 0.0101), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R8m 0/550 (sup Wilson 0.0069), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R8m 0/365 (sup Wilson 0.0104), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R9:
+    ruleVersion: 1
+    description: 'transformação por linhagem (3003, 3004, 3119, 2526, 2420): o destroy da origem possuída, sem compra que a use, mantém a origem como identidade do resultado'
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.00417
+    counterExamples: 6
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 6/1439; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.004444
+      counterExamples: 2
+      evidence: 'CC-1002: linha C2 R9 2/450 (sup Wilson 0.0161), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.006969
+      counterExamples: 2
+      evidence: 'CC-1002: linha C2 R9 2/287 (sup Wilson 0.0250), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R9 0/443 (sup Wilson 0.0086), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.007722
+      counterExamples: 2
+      evidence: 'CC-1002: linha C2 R9 2/259 (sup Wilson 0.0277), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R10j:
+    ruleVersion: 1
+    description: pet da Selva (1101, 1102, 1103) possuído e destruído no instante em que termina a missão da Selva (1204) sai do inventário sem substituto
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.005109
+    counterExamples: 14
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 14/2740; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.007151
+      counterExamples: 6
+      evidence: 'CC-1002: linha C2 R10j 6/839 (sup Wilson 0.0155), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.005545
+      counterExamples: 3
+      evidence: 'CC-1002: linha C2 R10j 3/541 (sup Wilson 0.0162), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.003659
+      counterExamples: 3
+      evidence: 'CC-1002: linha C2 R10j 3/820 (sup Wilson 0.0107), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.003704
+      counterExamples: 2
+      evidence: 'CC-1002: linha C2 R10j 2/540 (sup Wilson 0.0134), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R11s:
+    ruleVersion: 1
+    description: 'cadeia do item de Apoio: o destroy do World Atlas (3865) possuído vira a Bússola Rúnica (3866) e o dela vira a Recompensa dos Mundos (3867), sem compra'
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.000353
+    counterExamples: 1
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 1/2829; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R11s 0/874 (sup Wilson 0.0044), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R11s 0/546 (sup Wilson 0.0070), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R11s 0/859 (sup Wilson 0.0045), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.001818
+      counterExamples: 1
+      evidence: 'CC-1002: linha C2 R11s 1/550 (sup Wilson 0.0102), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R12w:
+    ruleVersion: 1
+    description: 'Sentinela de Controle (2055) de um Apoio fica no espaço do papel: compra, destroy e venda não mudam o inventário normal'
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.0
+    counterExamples: 0
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 0/2378; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R12w 0/752 (sup Wilson 0.0051), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R12w 0/443 (sup Wilson 0.0086), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R12w 0/743 (sup Wilson 0.0051), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R12w 0/440 (sup Wilson 0.0087), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R8b:
+    ruleVersion: 1
+    description: 'com a missão do BOTTOM (1202) concluída, as botas ficam no espaço do papel: compra de bota não entra no inventário normal e o destroy de bota sem posse (melhoria) não marca'
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.0
+    counterExamples: 0
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 0/1568; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R8b 0/462 (sup Wilson 0.0082), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R8b 0/289 (sup Wilson 0.0131), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R8b 0/501 (sup Wilson 0.0076), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R8b 0/316 (sup Wilson 0.0120), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R11f:
+    ruleVersion: 1
+    description: 'Recompensa dos Mundos (3867) possuída destruída sem compra que a use no instante: a escolha final não é observada e a Recompensa continua como identidade lógica dela (3869, 3870, 3871, 3876, 3877)'
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.00036
+    counterExamples: 1
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 1/2775; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R11f 0/851 (sup Wilson 0.0045), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R11f 0/539 (sup Wilson 0.0071), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R11f 0/842 (sup Wilson 0.0045), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.001842
+      counterExamples: 1
+      evidence: 'CC-1002: linha C2 R11f 1/543 (sup Wilson 0.0104), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'
+  R7h:
+    ruleVersion: 1
+    description: 'Olho do Arauto (3513) concedido: ocupa o espaço do amuleto até ser usado (o destroy do amuleto sem compra seguido do uso do Olho não muda o amuleto) e o destroy dele sem posse é o uso'
+    status: EMPIRICALLY_SUPPORTED
+    patchesValidated: []
+    contraRate: 0.0
+    counterExamples: 0
+    evidence: 'CC-1002: confirmação pré-registrada (protocolo 1) em 16.19/420, 16.19/440, 16.20/420, 16.20/440; linhas C2 somadas 0/1189; auditoria única bc547773'
+    activatedInVersion: 13
+    domainsValidated:
+    - domain: 16.19/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R7h 0/363 (sup Wilson 0.0105), G-FINAL 8/4367 (sup Wilson 0.0036); auditoria única bc547773'
+    - domain: 16.19/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R7h 0/227 (sup Wilson 0.0166), G-FINAL 4/2799 (sup Wilson 0.0037); auditoria única bc547773'
+    - domain: 16.20/420
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R7h 0/365 (sup Wilson 0.0104), G-FINAL 4/4384 (sup Wilson 0.0023); auditoria única bc547773'
+    - domain: 16.20/440
+      contraRate: 0.0
+      counterExamples: 0
+      evidence: 'CC-1002: linha C2 R7h 0/234 (sup Wilson 0.0162), G-FINAL 5/2844 (sup Wilson 0.0041); auditoria única bc547773'

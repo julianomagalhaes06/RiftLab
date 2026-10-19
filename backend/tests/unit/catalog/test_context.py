@@ -334,7 +334,7 @@ async def test_unknown_runtime_strategy_fails_before_catalog_io():
 async def test_active_service_rejects_full_as_default_mode_before_io():
     prospective_override = CatalogContextPolicy(
         policy_version="test-attempt-to-activate-full",
-        active_reconstruction_contexts=((12, CatalogContextStrategy.FULL_CANONICAL_V1),),
+        active_reconstruction_contexts=((13, CatalogContextStrategy.FULL_CANONICAL_V1),),
         prospective_audit_context=CatalogContextStrategy.FULL_CANONICAL_V1,
     )
     with pytest.raises(TimelineReplayError, match="só por domínio confirmado"):

@@ -214,7 +214,7 @@ def _mutations() -> list[tuple[str, callable]]:
         del d["rules"]["R6"]
 
     def extra_rule(d: dict) -> None:
-        d["rules"]["R9"] = copy.deepcopy(d["rules"]["R1"])
+        d["rules"]["R99"] = copy.deepcopy(d["rules"]["R1"])
 
     def unknown_key(d: dict) -> None:
         d["rules"]["R1"]["extra"] = 1
@@ -560,15 +560,19 @@ def test_invalid_domain_documents_are_rejected(name: str, mutate: callable) -> N
     assert caught.value.code == "EMPIRICAL_RULES_CONFIG_INVALID"
 
 
-def test_repository_registry_validates_cc802_domain_for_solo_only() -> None:
+def test_repository_registry_validates_the_cc1002_domains() -> None:
     rules = load_empirical_rules(CONFIG, reconstruction_version=VERSION)
-    solo = rules.resolve("16.20", 420)
-    assert (solo.application, solo.source_queue, solo.catalog_context) == (
-        "VALIDATED",
-        420,
-        "FULL_CANONICAL_V1",
-    )
-    # R7x e R8t não passaram na confirmação própria; nada da fila 440 foi liberado.
-    assert {"R7x", "R8t"}.isdisjoint(solo.rule_ids)
-    assert rules.resolve("16.20", 440).application == "INHERITED"
-    assert rules.resolve("16.19", 420).rule_ids == rules.resolve("16.20", 440).rule_ids
+    new = {"R1e", "R6v", "R7h", "R8b", "R8m", "R9", "R10j", "R11s", "R11f", "R12w"}
+    for patch in ("16.19", "16.20"):
+        for queue in (420, 440):
+            resolved = rules.resolve(patch, queue)
+            assert (resolved.application, resolved.source_queue, resolved.catalog_context) == (
+                "VALIDATED",
+                queue,
+                "FULL_CANONICAL_V1",
+            )
+            assert new <= resolved.rule_ids and "R6" not in resolved.rule_ids
+    # CC-1002: R7x e R8t passam a valer no 16.20/420; o 16.20/440 tem confirmação própria.
+    assert {"R7x", "R8t"} <= rules.resolve("16.20", 420).rule_ids
+    assert rules.resolve("16.21", 440).application == "INHERITED"
+    assert rules.resolve("16.21", 440).source_queue == 440

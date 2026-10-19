@@ -72,10 +72,11 @@ CATALOG_CONTEXT_POLICY_V1 = CatalogContextPolicy(
         (10, CatalogContextStrategy.EVENT_RECIPE_CLOSURE_V11),
         (11, CatalogContextStrategy.EVENT_RECIPE_CLOSURE_V11),
         (12, CatalogContextStrategy.EVENT_RECIPE_CLOSURE_V11),
+        (13, CatalogContextStrategy.EVENT_RECIPE_CLOSURE_V11),
     ),
     prospective_audit_context=CatalogContextStrategy.FULL_CANONICAL_V1,
-    # v12 (CC-802): domínio confirmado em FULL_CANONICAL_V1 reconstrói em FULL.
-    registry_domain_versions=(12,),
+    # v12 (CC-802) e v13 (CC-1002): domínio confirmado em FULL_CANONICAL_V1 reconstrói em FULL.
+    registry_domain_versions=(12, 13),
 )
 
 
@@ -287,4 +288,4 @@ def carry_forward_context_version_is_known(
     """Version gate only. Service must still validate catalog, params and provenance."""
     if target_strategy is not CatalogContextStrategy.EVENT_RECIPE_CLOSURE_V11:
         return False
-    return source_reconstruction_version in {10, 11}
+    return source_reconstruction_version in {10, 11, 12}

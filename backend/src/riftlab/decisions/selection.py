@@ -1,5 +1,5 @@
 """Seleção retrospectiva de pontos de decisão, elegibilidade e orçamento
-(CC-204, `decision_selection_v1`). Módulo puro.
+(CC-204, `decision_selection_v1`; v2 na CC-1005: linhagem na classificação). Módulo puro.
 
 Duas etapas com dados DIFERENTES, propositalmente separadas:
 - Seleção RETROSPECTIVA (usa o item comprado e o bloco retrospectivo): decide
@@ -60,6 +60,12 @@ from riftlab.timeline.application import (
     STALE_FRAME_THRESHOLD_MS,
 )
 from riftlab.timeline.domain import DecisionState
+from riftlab.timeline.empirical_rules import (
+    SUPPORT_CHAIN_NEXT,
+    SUPPORT_FINAL_ITEM_IDS,
+    TRANSFORM_RESULT_BY_ORIGIN,
+    WORLD_ATLAS_ITEM_ID,
+)
 
 _UNCLASSIFIABLE = frozenset({ItemClass.UNKNOWN, ItemClass.EXCLUDED, ItemClass.UNCLASSIFIED})
 _NO_CATALOG_CODE = "NO_CATALOG"
@@ -157,6 +163,16 @@ def _check_catalog_consistency(
         )
 
 
+# Linhagem (decisão B da CC-802): a etapa seguinte da cadeia do item de Apoio, a escolha
+# final e o resultado de uma transformação ficam fora do catálogo curado (receita especial),
+# mas continuam a identidade da origem, que é classificável.
+_LINEAGE_IDENTITY: dict[int, int] = {
+    **{stage: WORLD_ATLAS_ITEM_ID for stage in SUPPORT_CHAIN_NEXT.values()},
+    **{final: WORLD_ATLAS_ITEM_ID for final in SUPPORT_FINAL_ITEM_IDS},
+    **{result: origin for origin, result in TRANSFORM_RESULT_BY_ORIGIN.items()},
+}
+
+
 def _owned_main_units(
     view: PreDecisionView, classification: ItemClassificationTable
 ) -> tuple[int, bool]:
@@ -165,7 +181,7 @@ def _owned_main_units(
     main_units = 0
     unclassifiable = False
     for item_id, count in view.inventory_items:
-        item_class = classification.classify(item_id).item_class
+        item_class = classification.classify(_LINEAGE_IDENTITY.get(item_id, item_id)).item_class
         if item_class is ItemClass.MAIN:
             main_units += count
         elif item_class in _UNCLASSIFIABLE:

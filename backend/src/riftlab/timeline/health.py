@@ -35,7 +35,7 @@ from riftlab.timeline.application import (
     reconstruct_participant,
 )
 from riftlab.timeline.closure import closure_detail, verdict
-from riftlab.timeline.empirical_rules import EmpiricalRules, attribute_system_purchases
+from riftlab.timeline.empirical_rules import EmpiricalRules, apply_role_prepasses
 from riftlab.timeline.models import MatchReconstructionModel
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
@@ -324,7 +324,7 @@ async def _contribution(session: AsyncSession, match: MatchModel) -> dict[str, A
             repo, marker.catalog_id, await _referenced_item_ids(events)
         )
     excluded = frozenset(i.item_id for i in await repo.list_excluded_items(marker.catalog_id))
-    if "R4w" in enabled:
+    if "R4w" in enabled or "R12w" in enabled:
         supports = (
             await session.scalars(
                 select(ParticipantModel.participant_id).where(
@@ -333,7 +333,7 @@ async def _contribution(session: AsyncSession, match: MatchModel) -> dict[str, A
                 )
             )
         ).all()
-        events = attribute_system_purchases(events, supports)
+        events = apply_role_prepasses(events, enabled, supports)
     for official in officials:
         replay = reconstruct_participant(
             participant_id=official.participant_id,

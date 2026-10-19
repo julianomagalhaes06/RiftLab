@@ -159,7 +159,7 @@ async def test_demo_0002_list_and_detail_through_the_api(
         "immediatePurchaseAssertable": False,
     }
     assert body["level"] == {"value": 1, "frameAgeMs": 472_000, "absentReason": None}
-    assert body["versions"]["selectionVersion"] == "decision_selection_v1"
+    assert body["versions"]["selectionVersion"] == "decision_selection_v2"
     assert body["versions"]["reconstructionVersion"] == RECONSTRUCTION_ALGORITHM_VERSION
     assert body["versions"]["scopeVersion"] == "demo_scope_v1"
     assert body["versions"]["dataDragonVersion"] == "demo-datadragon-1"
@@ -236,7 +236,7 @@ async def test_new_extraction_between_pages_does_not_change_the_pinned_extractio
     assert first["nextCursor"] is not None
 
     # outra tupla de versões vira a extração CORRENTE entre as páginas
-    monkeypatch.setattr(decisions_selection, "DECISION_SELECTION_VERSION", "decision_selection_v2")
+    monkeypatch.setattr(decisions_selection, "DECISION_SELECTION_VERSION", "decision_selection_v3")
     await extract_decisions(session_factory, match_id, scope_path=_NO_SCOPE_FILE)
     fresh = [i["decisionId"] for i in await _all_pages(app_client, match_id, 1, 100)]
     assert set(fresh).isdisjoint(original)  # sem cursor: a extração nova
@@ -255,9 +255,9 @@ async def test_new_extraction_between_pages_does_not_change_the_pinned_extractio
 
     # o detalhe de um ponto antigo segue disponível, com as versões dele
     old_detail = (await app_client.get(f"/api/v1/decisions/{original[0]}")).json()
-    assert old_detail["versions"]["selectionVersion"] == "decision_selection_v1"
+    assert old_detail["versions"]["selectionVersion"] == "decision_selection_v2"
     new_detail = (await app_client.get(f"/api/v1/decisions/{fresh[0]}")).json()
-    assert new_detail["versions"]["selectionVersion"] == "decision_selection_v2"
+    assert new_detail["versions"]["selectionVersion"] == "decision_selection_v3"
 
 
 # ---------------------------------------------------------------------------

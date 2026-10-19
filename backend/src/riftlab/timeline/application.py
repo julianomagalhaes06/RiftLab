@@ -48,19 +48,36 @@ from riftlab.timeline.empirical_rules import (
     BOT_LANE_QUEST_ITEM_ID,
     DEFAULT_TRINKET_ITEM_ID,
     GRANTED_ITEM_IDS_BY_RULE,
+    HERALD_EYE_ITEM_ID,
+    JUNGLE_PET_ITEM_IDS,
+    JUNGLE_QUEST_ITEM_ID,
     MID_LANE_QUEST_ITEM_ID,
+    ROLE_SLOT_PAYLOAD_KEY,
     RULE_R1,
+    RULE_R1E,
     RULE_R2,
     RULE_R2I,
     RULE_R4S,
-    RULE_R4W,
     RULE_R5,
     RULE_R6,
+    RULE_R6V,
+    RULE_R7H,
     RULE_R8,
+    RULE_R8B,
+    RULE_R8M,
     RULE_R8T,
+    RULE_R9,
+    RULE_R10J,
+    RULE_R11F,
+    RULE_R11S,
+    RULE_R12W,
+    SUPPORT_BOUNTY_ITEM_ID,
+    SUPPORT_CHAIN_NEXT,
+    SUPPORT_FINAL_ITEM_IDS,
     SUPPORT_ROLE,
+    TRANSFORM_RESULT_BY_ORIGIN,
     EmpiricalRules,
-    attribute_system_purchases,
+    apply_role_prepasses,
 )
 from riftlab.timeline.legacy_provenance import normalize_known_v10_provenance
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
@@ -131,10 +148,15 @@ STALE_FRAME_THRESHOLD_MS = 90_000
 #       A resolução passa a ser por (patch, fila) e o domínio escolhe o contexto do
 #       reducer. Partidas fora de domínios novos têm a mesma resolução e o mesmo
 #       contexto da v11 e são copiadas sem reabrir a fonte.
-RECONSTRUCTION_ALGORITHM_VERSION = 12
-# Versão anterior cujo reducer é idêntico ao da corrente (só a resolução das regras
-# mudou): base da cópia sem fonte.
-CARRY_FORWARD_FROM_VERSION = 11
+#   13 — REGRAS NOVAS (CC-1002): R1e, R6v, R7h, R8b, R8m, R9, R10j, R11s, R11f e R12w
+#       confirmadas em 16.19/420, 16.19/440, 16.20/420 e 16.20/440 (contexto FULL), R7x e
+#       R8t também no 16.20/420 e as regras atuais no 16.20/440. Com as regras novas
+#       desligadas o reducer é idêntico ao da v12: partidas com a mesma resolução (DEMO,
+#       patches sem regra) são copiadas sem reabrir a fonte.
+RECONSTRUCTION_ALGORITHM_VERSION = 13
+# Versão anterior cujo reducer é idêntico ao da corrente com as mesmas regras ligadas:
+# base da cópia sem fonte.
+CARRY_FORWARD_FROM_VERSION = 12
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens
@@ -618,17 +640,52 @@ def _lane_quest_boot_successor(
     if timestamp_ms in quest_ts.get(BOT_LANE_QUEST_ITEM_ID, set()):
         return 0
     if timestamp_ms in quest_ts.get(MID_LANE_QUEST_ITEM_ID, set()) and item_id != BOOTS_ITEM_ID:
-        successors = [
-            other_id
-            for other_id, other in catalog_items.items()
-            if isinstance(other.recipe, list)
-            and len(other.recipe) == 1
-            and isinstance(other.recipe[0], dict)
-            and other.recipe[0].get("itemId") == item_id
-            and other.recipe[0].get("quantity") == 1
-        ]
-        return successors[0] if len(successors) == 1 else None
+        return _boot_successor(item_id, catalog_items)
     return None
+
+
+def _is_boot(item_id: int, catalog_items: Mapping[int, Item]) -> bool:
+    """Botas (1001), item cuja receita contém as Botas, ou melhoria de uma bota (tier 3)."""
+    if item_id == BOOTS_ITEM_ID or BOOTS_ITEM_ID in _recipe_ids(catalog_items.get(item_id)):
+        return True
+    return any(
+        BOOTS_ITEM_ID in _recipe_ids(catalog_items.get(component))
+        for component in _recipe_ids(catalog_items.get(item_id))
+    )
+
+
+def _boot_successor(item_id: int, catalog_items: Mapping[int, Item]) -> int | None:
+    """Sucessor único do catálogo de uma bota tier 2 (receita = exatamente uma unidade dela)."""
+    if item_id == BOOTS_ITEM_ID or BOOTS_ITEM_ID not in _recipe_ids(catalog_items.get(item_id)):
+        return None
+    successors = [
+        other_id
+        for other_id, other in catalog_items.items()
+        if isinstance(other.recipe, list)
+        and len(other.recipe) == 1
+        and isinstance(other.recipe[0], dict)
+        and other.recipe[0].get("itemId") == item_id
+        and other.recipe[0].get("quantity") == 1
+    ]
+    return successors[0] if len(successors) == 1 else None
+
+
+def _claimed_later_same_instant(
+    item_id: int,
+    event: TimelineEvent,
+    owned_events: Sequence[TimelineEvent],
+    catalog_items: Mapping[int, Item],
+) -> bool:
+    """Uma compra do participante, no mesmo instante e depois deste destroy, usa o item na
+    receita (R5: o destroy dos componentes vem antes da compra composta)."""
+    return any(
+        other.type == "ITEM_PURCHASED"
+        and other.timestamp_ms == event.timestamp_ms
+        and other.source_index > event.source_index
+        and isinstance(other.payload.get("itemId"), int)
+        and item_id in _recipe_ids(catalog_items.get(other.payload["itemId"]))
+        for other in owned_events
+    )
 
 
 def _recipe_ids(item: Item | None) -> set[int]:
@@ -722,9 +779,50 @@ def reconstruct_participant(
             for event in owned_events
             if event.type == "ITEM_DESTROYED" and event.payload.get("itemId") == quest_id
         }
-        for quest_id in (BOT_LANE_QUEST_ITEM_ID, MID_LANE_QUEST_ITEM_ID)
+        for quest_id in (BOT_LANE_QUEST_ITEM_ID, MID_LANE_QUEST_ITEM_ID, JUNGLE_QUEST_ITEM_ID)
     }
-    undo_stack_enabled = RULE_R6 in enabled_rules
+    # R1e/R8m: destroy SEM posse seguido, no mesmo instante, da compra do mesmo item pelo
+    # participante. Pré-cálculo puro: (instante, item) -> source_index das compras.
+    purchase_index_by_ts_item: dict[tuple[int, int], list[int]] = {}
+    for event in owned_events:
+        if event.type == "ITEM_PURCHASED" and isinstance(event.payload.get("itemId"), int):
+            purchase_index_by_ts_item.setdefault(
+                (event.timestamp_ms, event.payload["itemId"]), []
+            ).append(event.source_index)
+    mid_quest_done_ts = min(quest_ts[MID_LANE_QUEST_ITEM_ID], default=None)
+    bot_quest_done_ts = min(quest_ts[BOT_LANE_QUEST_ITEM_ID], default=None)
+    # R7h: destroy do amuleto sem compra de amuleto no instante, cujo próximo evento de
+    # amuleto do participante é o uso do Olho do Arauto: o Olho ocupou o espaço e o amuleto
+    # volta depois do uso (source_index desses destroys).
+    herald_displaced: set[int] = set()
+    trinket_events = [
+        event
+        for event in owned_events
+        if event.type in ("ITEM_PURCHASED", "ITEM_DESTROYED")
+        and isinstance(event.payload.get("itemId"), int)
+        and (
+            event.payload["itemId"] == HERALD_EYE_ITEM_ID
+            or _has_trinket_tag(catalog_items.get(event.payload["itemId"]))
+        )
+    ]
+    for position, event in enumerate(trinket_events):
+        following = trinket_events[position + 1] if position + 1 < len(trinket_events) else None
+        if (
+            event.type == "ITEM_DESTROYED"
+            and event.payload["itemId"] != HERALD_EYE_ITEM_ID
+            and event.timestamp_ms not in trinket_purchase_ts
+            and following is not None
+            and following.type == "ITEM_DESTROYED"
+            and following.payload["itemId"] == HERALD_EYE_ITEM_ID
+        ):
+            herald_displaced.add(event.source_index)
+    # (instante, item) -> unidades: compras já "pagas" por um destroy anterior (R1e: nada
+    # entra no inventário; R8m: entra o sucessor). Nunca cruzam instante.
+    consumed_on_purchase: dict[tuple[int, int], int] = {}
+    upgraded_on_purchase: dict[tuple[int, int], list[int]] = {}
+    # R9: resultado -> origem com linhagem viva (o resultado continua a identidade da origem).
+    lineage_origin_by_result: dict[int, int] = {}
+    undo_stack_enabled = RULE_R6 in enabled_rules or RULE_R6V in enabled_rules
     rev_stack: list[_ReversibleOp] = []
     # R2i: todo participante começa com o trinket padrão (65/66 dos que nunca
     # compraram trinket terminaram com ele).
@@ -799,6 +897,24 @@ def reconstruct_participant(
 
         if event.type == "ITEM_PURCHASED":
             item_id = _require_int_field(event, "itemId")
+            role_slot = (
+                RULE_R12W in enabled_rules and bool(event.payload.get(ROLE_SLOT_PAYLOAD_KEY))
+            ) or (
+                # R8b: depois da missão do BOTTOM, as botas ficam no espaço do papel.
+                RULE_R8B in enabled_rules
+                and bot_quest_done_ts is not None
+                and bot_quest_done_ts < event.timestamp_ms
+                and _is_boot(item_id, catalog_items)
+            )
+            pending_key = (event.timestamp_ms, item_id)
+            consumed_now = consumed_on_purchase.get(pending_key, 0) > 0
+            if consumed_now:
+                consumed_on_purchase[pending_key] -= 1
+            upgrade_to = (
+                upgraded_on_purchase[pending_key].pop(0)
+                if upgraded_on_purchase.get(pending_key)
+                else None
+            )
             # Estado ao chegar nesta compra, com os ITEM_DESTROYED anteriores
             # (inclusive os do mesmo instante T) já aplicados provisoriamente.
             # `before` (o ponto de decisão) só é definido DEPOIS de saber quais
@@ -810,9 +926,19 @@ def reconstruct_participant(
             consumed: list[tuple[int, int]] = []
             backward_claimed: list[tuple[int, int]] = []
 
+            support_final = (
+                RULE_R11F in enabled_rules
+                and item_id in SUPPORT_FINAL_ITEM_IDS
+                and inventory.owned(SUPPORT_BOUNTY_ITEM_ID) > 0
+            )
             if not catalog_available:
                 _mark_uncertain("NO_CATALOG", event, item_id)
                 inventory = inventory.with_added(item_id, 1)
+            elif support_final:
+                # R11f: a escolha final comprada é lida pela Recompensa, que continua no
+                # inventário como identidade lógica (as escolhas ficam fora do catálogo curado).
+                for final_id in SUPPORT_FINAL_ITEM_IDS:
+                    lineage_origin_by_result[final_id] = SUPPORT_BOUNTY_ITEM_ID
             elif item_id in catalog_items:
                 item = catalog_items[item_id]
                 new_inventory = _consume_recipe(
@@ -824,11 +950,16 @@ def reconstruct_participant(
                     backward_claimed,
                 )
                 is_trinket = "Trinket" in item.attributes.get("tags", ())
-                new_inventory = (
-                    new_inventory.with_trinket(item_id)
-                    if is_trinket
-                    else new_inventory.with_added(item_id, 1)
-                )
+                if role_slot or consumed_now:
+                    # R12w: a Sentinela do Apoio vai para o espaço do papel. R1e: o
+                    # consumível já foi consumido pelo destroy anterior do mesmo instante.
+                    pass
+                elif is_trinket:
+                    new_inventory = new_inventory.with_trinket(item_id)
+                else:
+                    new_inventory = new_inventory.with_added(
+                        upgrade_to if upgrade_to is not None else item_id, 1
+                    )
                 inventory = new_inventory
                 if consumed:
                     bucket = pending_destroys.setdefault(event.timestamp_ms, {})
@@ -957,8 +1088,17 @@ def reconstruct_participant(
 
         elif event.type == "ITEM_SOLD":
             item_id = _require_int_field(event, "itemId")
+            if (
+                item_id in lineage_origin_by_result
+                and inventory.owned(item_id) == 0
+                and inventory.owned(lineage_origin_by_result[item_id]) > 0
+            ):
+                item_id = lineage_origin_by_result.pop(item_id)
             before = inventory
-            if inventory.trinket_item_id == item_id:
+            if RULE_R12W in enabled_rules and event.payload.get(ROLE_SLOT_PAYLOAD_KEY):
+                # R12w: venda da Sentinela do espaço do papel; o inventário normal não muda.
+                last_reversible = None
+            elif inventory.trinket_item_id == item_id:
                 inventory = inventory.with_trinket(None)
                 last_reversible = _ReversibleOp(
                     resulting_item_id=item_id,
@@ -984,8 +1124,106 @@ def reconstruct_participant(
 
         elif event.type == "ITEM_DESTROYED":
             item_id = _require_int_field(event, "itemId")
+            if (
+                item_id in lineage_origin_by_result
+                and inventory.owned(item_id) == 0
+                and inventory.owned(lineage_origin_by_result[item_id]) > 0
+            ):
+                # R9: o resultado da transformação é a origem (linhagem).
+                item_id = lineage_origin_by_result.pop(item_id)
+            later_own_purchase = any(
+                index > event.source_index
+                for index in purchase_index_by_ts_item.get((event.timestamp_ms, item_id), ())
+            )
             pending = pending_destroys.get(event.timestamp_ms)
-            if pending and pending.get(item_id, 0) > 0:
+            if RULE_R12W in enabled_rules and event.payload.get(ROLE_SLOT_PAYLOAD_KEY):
+                # R12w: Sentinela do espaço do papel; o inventário normal não muda.
+                last_reversible = None
+            elif (
+                RULE_R7H in enabled_rules
+                and event.source_index in herald_displaced
+                and inventory.trinket_item_id == item_id
+            ):
+                # R7h: o Olho do Arauto ocupa o espaço do amuleto até ser usado; o amuleto volta.
+                last_reversible = None
+            elif (
+                RULE_R8B in enabled_rules
+                and bot_quest_done_ts is not None
+                and bot_quest_done_ts < event.timestamp_ms
+                and inventory.owned(item_id) == 0
+                and _is_boot(item_id, catalog_items)
+            ):
+                # R8b: bota do espaço do papel consumida por uma melhoria; nada muda no normal.
+                last_reversible = None
+            elif (
+                RULE_R1E in enabled_rules
+                and inventory.owned(item_id) == 0
+                and _is_consumable_item(catalog_items.get(item_id))
+                and later_own_purchase
+            ):
+                # R1e: consumido antes de entrar; a compra seguinte do mesmo instante não
+                # acrescenta a unidade.
+                key = (event.timestamp_ms, item_id)
+                consumed_on_purchase[key] = consumed_on_purchase.get(key, 0) + 1
+                last_reversible = None
+            elif (
+                RULE_R8M in enabled_rules
+                and inventory.owned(item_id) == 0
+                and later_own_purchase
+                and mid_quest_done_ts is not None
+                and mid_quest_done_ts < event.timestamp_ms
+                and _boot_successor(item_id, catalog_items)
+            ):
+                # R8m: missão do MID concluída antes; a bota tier 2 comprada neste instante
+                # já entra como o sucessor (o destroy vem antes da própria compra).
+                upgraded_on_purchase.setdefault((event.timestamp_ms, item_id), []).append(
+                    _boot_successor(item_id, catalog_items) or item_id
+                )
+                last_reversible = None
+            elif (
+                RULE_R10J in enabled_rules
+                and item_id in JUNGLE_PET_ITEM_IDS
+                and inventory.owned(item_id) > 0
+                and event.timestamp_ms in quest_ts[JUNGLE_QUEST_ITEM_ID]
+            ):
+                # R10j: o pet da Selva sai, sem substituto, quando a missão da Selva termina.
+                inventory = inventory.with_removed(item_id, 1)
+                last_reversible = None
+            elif (
+                RULE_R11S in enabled_rules
+                and item_id in SUPPORT_CHAIN_NEXT
+                and inventory.owned(item_id) > 0
+                and not (pending and pending.get(item_id, 0) > 0)
+            ):
+                # R11s: a etapa do item de Apoio vira a seguinte, sem compra.
+                inventory = inventory.with_removed(item_id, 1).with_added(
+                    SUPPORT_CHAIN_NEXT[item_id], 1
+                )
+                last_reversible = None
+            elif (
+                RULE_R11F in enabled_rules
+                and item_id == SUPPORT_BOUNTY_ITEM_ID
+                and inventory.owned(item_id) > 0
+                and not (pending and pending.get(item_id, 0) > 0)
+                and not _claimed_later_same_instant(item_id, event, owned_events, catalog_items)
+            ):
+                # R11f: escolha final do Apoio sem compra observada; a Recompensa continua
+                # como identidade lógica da escolha (qualquer das cinco é lida como ela).
+                for final_id in SUPPORT_FINAL_ITEM_IDS:
+                    lineage_origin_by_result[final_id] = item_id
+                last_reversible = None
+            elif (
+                RULE_R9 in enabled_rules
+                and item_id in TRANSFORM_RESULT_BY_ORIGIN
+                and inventory.owned(item_id) > 0
+                and not (pending and pending.get(item_id, 0) > 0)
+                and not _claimed_later_same_instant(item_id, event, owned_events, catalog_items)
+            ):
+                # R9: transformação; a origem continua no inventário como identidade lógica
+                # do resultado, que passa a ser lido como a origem.
+                lineage_origin_by_result[TRANSFORM_RESULT_BY_ORIGIN[item_id]] = item_id
+                last_reversible = None
+            elif pending and pending.get(item_id, 0) > 0:
                 # Reconciliado por heurística de timestamp/item/quantidade:
                 # NUNCA removido de novo (evita dupla contagem — correto
                 # independente de a correlação ser semanticamente real ou
@@ -1129,7 +1367,7 @@ def reconstruct_participant(
                 # verdade. Em dado REAL, todo undo aplicado (mesmo
                 # "correlacionado") marca incerto a partir daqui; em DEMO, a
                 # regra é sintética e testada.
-                if not is_demo and RULE_R6 not in enabled_rules:
+                if not is_demo and RULE_R6 not in enabled_rules and RULE_R6V not in enabled_rules:
                     _mark_uncertain("UNVALIDATED_UNDO_SEMANTICS", event, before_id)
 
         if undo_stack_enabled:
@@ -1583,13 +1821,13 @@ async def reconstruct_match(
             excluded_item_ids = context.excluded_item_ids
             catalog_context = context.descriptor
 
-    if RULE_R4W in enabled_rules:
-        # R4w: pré-passo puro (reatribui as compras do World Atlas do
-        # participante 0 aos Apoios; falha segura).
-        events = attribute_system_purchases(
-            events,
-            [p.participant_id for p in source_result.participants if p.role == SUPPORT_ROLE],
-        )
+    # R4w (reatribui as compras do World Atlas do participante 0 aos Apoios; falha segura)
+    # e R12w (marca as Sentinelas dos Apoios): pré-passos puros, só com a regra ligada.
+    events = apply_role_prepasses(
+        events,
+        enabled_rules,
+        [p.participant_id for p in source_result.participants if p.role == SUPPORT_ROLE],
+    )
 
     all_decision_states: list[DecisionState] = []
     for participant_id in participant_ids:

@@ -62,6 +62,17 @@ RULE_R7M = "R7m"  # Calçados Levemente Mágicos concedidos por runa (CC-324)
 RULE_R7X = "R7x"  # elixires concedidos pelo Tônico Triplo (CC-324)
 RULE_R8 = "R8"  # missão de rota e bota tier 2: BOTTOM remove, MID troca pelo sucessor (CC-324)
 RULE_R8T = "R8t"  # missão do BOTTOM remove as Botas básicas (1001) (CC-324, origem exploratória)
+# CC-1002 (exploração no treino do 16.19; nascem PENDING, só ligam com confirmação):
+RULE_R1E = "R1e"  # consumível destruído antes da própria compra no mesmo instante
+RULE_R6V = "R6v"  # undo correlacionado (imediato ou em pilha) aplicado sem marcar
+RULE_R8M = "R8m"  # missão do MID já concluída: bota tier 2 comprada vira o sucessor na hora
+RULE_R9 = "R9"  # transformação por linhagem (o resultado continua a identidade da origem)
+RULE_R10J = "R10j"  # pet da Selva sai do inventário quando a missão da Selva termina
+RULE_R11S = "R11s"  # cadeia do item de Apoio: Atlas -> Bússola -> Recompensa sem compra
+RULE_R12W = "R12w"  # Sentinela de Controle do Apoio no espaço do papel, fora dos espaços normais
+RULE_R8B = "R8b"  # missão do BOTTOM concluída: botas compradas/melhoradas no espaço do papel
+RULE_R11F = "R11f"  # escolha final do Apoio sem compra: a Recompensa (3867) continua a identidade
+RULE_R7H = "R7h"  # Olho do Arauto (3513) concedido ocupa o espaço do amuleto até ser usado
 KNOWN_RULE_IDS = (
     RULE_R1,
     RULE_R2,
@@ -75,16 +86,47 @@ KNOWN_RULE_IDS = (
     RULE_R7X,
     RULE_R8,
     RULE_R8T,
+    RULE_R1E,
+    RULE_R6V,
+    RULE_R8M,
+    RULE_R9,
+    RULE_R10J,
+    RULE_R11S,
+    RULE_R12W,
+    RULE_R8B,
+    RULE_R11F,
+    RULE_R7H,
 )
 # Itens concedidos sem evento de compra, por regra (forma da exploração CC-324).
 GRANTED_ITEM_IDS_BY_RULE: dict[str, frozenset[int]] = {
     RULE_R7B: frozenset({2010}),
     RULE_R7M: frozenset({2422}),
     RULE_R7X: frozenset({2150, 2151, 2152}),
+    RULE_R7H: frozenset({3513}),
 }
 BOOTS_ITEM_ID = 1001
 BOT_LANE_QUEST_ITEM_ID = 1202
 MID_LANE_QUEST_ITEM_ID = 1201
+JUNGLE_QUEST_ITEM_ID = 1204
+JUNGLE_PET_ITEM_IDS = frozenset({1101, 1102, 1103})
+CONTROL_WARD_ITEM_ID = 2055
+# R11s: cada etapa destruída vira a seguinte sem evento de compra (specialRecipe do Data Dragon).
+SUPPORT_CHAIN_NEXT: dict[int, int] = {3865: 3866, 3866: 3867}
+# R11f: a Recompensa dos Mundos e as cinco escolhas finais (receita "from 3867" no Data Dragon).
+SUPPORT_BOUNTY_ITEM_ID = 3867
+SUPPORT_FINAL_ITEM_IDS = frozenset({3869, 3870, 3871, 3876, 3877})
+HERALD_EYE_ITEM_ID = 3513
+# R9: origem -> resultado. specialRecipe do Data Dragon (3003, 3004, 3119, 2526) e a
+# Braçadeira do Buscador quebrada depois do uso (2420 -> 2421, mesma receita).
+TRANSFORM_RESULT_BY_ORIGIN: dict[int, int] = {
+    3003: 3040,
+    3004: 3042,
+    3119: 3121,
+    2526: 2530,
+    2420: 2421,
+}
+# Marca do pré-passo R12w nos eventos de Sentinela de um Apoio.
+ROLE_SLOT_PAYLOAD_KEY = "roleSlot"
 
 STATUS_PENDING = "PENDING"
 STATUS_SUPPORTED = "EMPIRICALLY_SUPPORTED"
@@ -562,3 +604,44 @@ def attribute_system_purchases(
         else event
         for event in events
     ]
+
+
+def mark_support_ward_slot(
+    events: Sequence[TimelineEvent], support_participant_ids: Sequence[int]
+) -> list[TimelineEvent]:
+    """R12w (pré-passo PURO): os eventos de Sentinela de Controle (`2055`) de cada Apoio
+    ganham a marca `roleSlot`. Forma da exploração CC-1002 (treino 16.19): a missão do Apoio
+    repõe a Sentinela sem custo (compra no mesmo instante do destroy de 1203/1208), metade
+    dos Apoios termina com a Sentinela no espaço do papel (`roleBoundItem`) e nenhum dos
+    14.919 Apoios a tinha nos espaços normais no fim. O reducer, com a regra ligada, não
+    conta essas Sentinelas no inventário normal."""
+    supports = set(support_participant_ids)
+    return [
+        TimelineEvent(
+            event.match_id,
+            event.source_index,
+            event.timestamp_ms,
+            event.type,
+            {**event.payload, ROLE_SLOT_PAYLOAD_KEY: True},
+            event.schema_version,
+        )
+        if event.payload.get("participantId") in supports
+        and event.type in ("ITEM_PURCHASED", "ITEM_DESTROYED", "ITEM_SOLD")
+        and event.payload.get("itemId") == CONTROL_WARD_ITEM_ID
+        else event
+        for event in events
+    ]
+
+
+def apply_role_prepasses(
+    events: Sequence[TimelineEvent],
+    enabled_rules: frozenset[str],
+    support_participant_ids: Sequence[int],
+) -> list[TimelineEvent]:
+    """Pré-passos que dependem da função (R4w, R12w), na ordem fixa, só com a regra ligada."""
+    result = list(events)
+    if RULE_R4W in enabled_rules:
+        result = attribute_system_purchases(result, support_participant_ids)
+    if RULE_R12W in enabled_rules:
+        result = mark_support_ward_slot(result, support_participant_ids)
+    return result

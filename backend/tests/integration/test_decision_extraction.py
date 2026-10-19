@@ -119,7 +119,7 @@ async def test_demo_0002_end_to_end_persists_one_eligible_point_equal_to_the_pur
     assert point.budget["immediatePurchaseAssertable"] is False
     assert point.versions.to_payload() == {
         "reconstructionVersion": RECONSTRUCTION_ALGORITHM_VERSION,
-        "selectionVersion": "decision_selection_v1",
+        "selectionVersion": "decision_selection_v2",
         "featureSchemaVersion": "feature_schema_v1",
         "scopeVersion": "demo_scope_v1",
         "catalogId": str(catalog_id),
@@ -346,11 +346,11 @@ async def test_new_version_tuple_coexists_with_the_old_one_and_preserves_it(
     await _prepare(session_factory, tmp_path, match_id)
     first = await _extract(session_factory, match_id)
 
-    monkeypatch.setattr(decisions_selection, "DECISION_SELECTION_VERSION", "decision_selection_v2")
+    monkeypatch.setattr(decisions_selection, "DECISION_SELECTION_VERSION", "decision_selection_v3")
     second = await _extract(session_factory, match_id)
 
     assert second.reused is False and second.marker.id != first.marker.id
-    assert second.marker.versions.selection_version == "decision_selection_v2"
+    assert second.marker.versions.selection_version == "decision_selection_v3"
     assert [p.id for p in second.points] != [p.id for p in first.points]  # linhas novas
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyDecisionRepository(session)
@@ -439,7 +439,7 @@ async def test_concurrent_markers_for_the_same_tuple_only_one_wins(
     catalog_id = await _prepare(session_factory, tmp_path, match_id)
     versions = DecisionVersions(
         RECONSTRUCTION_ALGORITHM_VERSION,
-        "decision_selection_v1",
+        "decision_selection_v2",
         "feature_schema_v1",
         "demo_scope_v1",
         catalog_id,

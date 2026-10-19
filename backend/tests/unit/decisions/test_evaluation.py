@@ -646,7 +646,7 @@ def test_every_output_carries_all_versions() -> None:
     assert point is not None
     assert point.versions.to_payload() == {
         "reconstructionVersion": RECONSTRUCTION_ALGORITHM_VERSION,
-        "selectionVersion": "decision_selection_v1",
+        "selectionVersion": "decision_selection_v2",
         "featureSchemaVersion": "feature_schema_v1",
         "scopeVersion": "test_scope_v1",
         "catalogId": str(CATALOG_ID),
@@ -655,7 +655,7 @@ def test_every_output_carries_all_versions() -> None:
     }
 
 
-@pytest.mark.parametrize("old_version", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13])
+@pytest.mark.parametrize("old_version", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14])
 def test_state_of_another_reconstruction_version_is_rejected_without_fallback(
     old_version: int,
 ) -> None:

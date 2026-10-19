@@ -9,7 +9,9 @@ from typing import Any, Protocol
 from riftlab.ingestion.domain import Match, Participant
 from riftlab.shared.errors import DomainError
 
-DECISION_SELECTION_VERSION = "decision_selection_v1"
+# v2 (CC-1005): itens possuídos que são resultado de linhagem (cadeia do item de Apoio,
+# transformações) contam pela identidade da origem ao classificar o inventário.
+DECISION_SELECTION_VERSION = "decision_selection_v2"
 FEATURE_SCHEMA_VERSION = "feature_schema_v1"
 
 # Códigos de elegibilidade. Os três primeiros são os mínimos do contrato
