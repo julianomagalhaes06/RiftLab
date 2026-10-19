@@ -7,7 +7,7 @@ for (const width of [360, 1280]) {
     const calls = await mockApi(page);
     await page.goto(`/decisions/${DECISION_1}`);
     await expect(page.getByRole("heading", { name: "Comparação", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Analisar partida", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Analisar decisão", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText(/Qual destas você compraria/)).toHaveCount(0);
     expect(calls.count("POST /api/v1/learning-attempts")).toBe(0);
     expect(calls.count("POST /api/v1/analyses")).toBe(1);

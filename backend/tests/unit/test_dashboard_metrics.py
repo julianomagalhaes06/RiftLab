@@ -44,16 +44,18 @@ def test_zero_deaths_is_not_missing_and_empty_is_not_zero_performance():
 async def test_dashboard_http_validation_and_no_private_fields(monkeypatch):
     calls = []
 
-    async def fake(factory, settings, *, window, origin):
+    async def fake(factory, settings, *, window, origin, queue):
         from riftlab.dashboard.api import Dashboard
 
-        calls.append((window, origin))
+        calls.append((window, origin, queue))
         return Dashboard.model_validate(
             {
                 "origin": origin,
                 "status": "EMPTY",
                 "window": window,
-                "queue": 420,
+                "queue": queue or 420,
+                "queueSelection": "AUTO" if queue is None else "EXPLICIT",
+                "queues": [{"queue": 420, "totalMatches": 0}, {"queue": 440, "totalMatches": 0}],
                 "totalMatches": 0,
                 **summarize([]),
                 "champions": [],
@@ -67,11 +69,13 @@ async def test_dashboard_http_validation_and_no_private_fields(monkeypatch):
     app.state.settings = Settings()
     app.state.session_factory = None
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        for query in ("window=0", "window=101", "window=x", "origin=OTHER"):
+        for query in ("window=0", "window=101", "window=x", "origin=OTHER", "queue=440"):
             assert (await client.get("/api/v1/dashboard?" + query)).status_code == 422
         response = await client.get("/api/v1/dashboard?window=10&origin=DEMO")
         assert response.status_code == 200
         assert response.json()["winRate"] is None
-        assert calls == [(10, "DEMO")]
+        flex = await client.get("/api/v1/dashboard?queue=RANKED_FLEX_SR")
+        assert flex.status_code == 200 and flex.json()["queueSelection"] == "EXPLICIT"
+        assert calls == [(10, "DEMO", None), (20, "REAL", 440)]
         for name in ("subject_hash", "subjectHash", "puuid", "accountKey", "gameName"):
             assert name not in response.text

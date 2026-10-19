@@ -121,16 +121,23 @@ function InheritedRules({ decision, patch, queue }: { decision: DecisionState; p
       A conferência encontrou {failures} divergências em {n} participantes limpos deste patch.
     </p>
   );
+  const flexUnmeasured = queue === 440 && health !== "OK" && decision.versions.reconstructionRulesQueue !== 440;
+  // CC-904: uma linha curta visível; a explicação completa fica recolhida.
   return (
-    <p className="decision-inherited" role="note">
-      O inventário foi reconstruído com as regras confirmadas no patch {source}, aplicadas por herança
-      {patch ? ` ao patch ${patch}` : ""}, sem confirmação própria nesta fila. Mudanças de itens ou de
-      mecânica neste patch podem não estar refletidas.{" "}
-      {health === "OK" ? `Conferido em ${n} participantes deste patch; isso não substitui confirmação própria.` : "Ainda sem amostra para conferir."}
-      {queue === 440 && health !== "OK" && decision.versions.reconstructionRulesQueue !== 440
-        ? " Essas regras foram medidas em Solo/Duo; o Flex ainda não tem amostra suficiente para conferi-las."
-        : null}
-    </p>
+    <details className="decision-inherited" role="note">
+      <summary>
+        Inventário com regras herdadas do patch {source}.{" "}
+        {health === "OK" ? `Conferido em ${n} participantes deste patch.` : "Ainda sem amostra para conferir."}
+        {flexUnmeasured ? " Medidas em Solo/Duo." : null}
+      </summary>
+      <p>
+        O inventário foi reconstruído com as regras confirmadas no patch {source}, aplicadas por herança
+        {patch ? ` ao patch ${patch}` : ""}, sem confirmação própria nesta fila. Mudanças de itens ou de
+        mecânica neste patch podem não estar refletidas.
+        {health === "OK" ? " A conferência não substitui confirmação própria." : null}
+        {flexUnmeasured ? " Essas regras foram medidas em Solo/Duo; o Flex ainda não tem amostra suficiente para conferi-las." : null}
+      </p>
+    </details>
   );
 }
 
@@ -252,19 +259,22 @@ function TeamContext({ match, participantId }: { match: MatchDetail; participant
     <section aria-labelledby="context-heading" className="decision-card">
       <h3 id="context-heading">Composição dos times</h3>
       <p className="muted">Só campeões e funções, conhecidos desde a seleção; nenhum resultado posterior à compra.</p>
-      {teams.map((team) => (
-        <div key={team} className="team-context">
-          <h4>{team === self.team ? "Seu time" : "Time inimigo"}</h4>
-          <ul className="team-context__list">
-            {teamsOrdered(match.participants.filter((p) => p.team === team)).map((p) => (
-              <li key={p.participantId} className={p.participantId === participantId ? "team-context__member team-context__member--self" : "team-context__member"}>
-                <ChampionAvatar participant={p} size={36} />
-                <span><strong>{championName(p)}</strong><small>{roleShort(p.role) ?? "Função não informada"}</small></span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {/* CC-904: os dois times lado a lado, em linhas compactas. */}
+      <div className="team-context__teams">
+        {teams.map((team) => (
+          <div key={team} className="team-context">
+            <h4>{team === self.team ? "Seu time" : "Time inimigo"}</h4>
+            <ul className="team-context__list">
+              {teamsOrdered(match.participants.filter((p) => p.team === team)).map((p) => (
+                <li key={p.participantId} className={p.participantId === participantId ? "team-context__member team-context__member--self" : "team-context__member"}>
+                  <ChampionAvatar participant={p} size={28} />
+                  <span><strong>{championName(p)}</strong><small>{roleShort(p.role) ?? "Função não informada"}</small></span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

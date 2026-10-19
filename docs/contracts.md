@@ -205,8 +205,11 @@ Ao abrir a aba Histórico, a interface pede `POST /api/v1/history/sync` uma vez 
 
 ## Painel descritivo (CC-309)
 
-`GET /api/v1/dashboard?origin=REAL|DEMO&window=20` é somente leitura no banco,
-sem coleta ou inferência. `window` aceita 1–100. A fila é Solo/Duo (420).
+`GET /api/v1/dashboard?origin=REAL|DEMO&window=20[&queue=RANKED_SOLO_5x5|RANKED_FLEX_SR]` é
+somente leitura no banco, sem coleta ou inferência. `window` aceita 1–100. Sem `queue`, a fila
+do recorte é a da partida própria mais recente (`queueSelection` AUTO; empate fica com
+Solo/Duo); com `queue`, é a pedida (EXPLICIT). `queue` na resposta traz 420 ou 440 e `queues`
+o total de partidas próprias por fila (CC-904); valor fora dos dois retorna 422.
 REAL requer a conta local e o vínculo HMAC da observação mais recente dessa conta
 em League-V4; sem esse vínculo, retorna `IDENTITY_UNAVAILABLE`, sem atribuir dados
 de outros participantes. Partidas com vínculo ambíguo são excluídas. DEMO é uma

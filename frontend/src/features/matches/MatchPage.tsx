@@ -58,6 +58,12 @@ function DecisionsSummary({ decisions }: { decisions: DecisionSummary[] }) {
             : `Nenhuma das ${summary.total} decisões de compra desta partida pode ser analisada.`
           : `${summary.eligible} de ${count(summary.total, "decisão de compra", "decisões de compra")} ${summary.eligible === 1 ? "pode ser analisada" : "podem ser analisadas"}.`}
       </p>
+      {summary.eligible === 0 ? (
+        // CC-904: sem beco sem saída; o que a partida ainda oferece.
+        <p className="decisions-summary__next">
+          O trajeto de compras, a ordem de habilidades e o gráfico de ouro continuam disponíveis abaixo.
+        </p>
+      ) : null}
       {blocked > 0 && summary.reasons.length ? (
         <ul className="decisions-summary__reasons">
           {summary.reasons.map(([code, count]) => (

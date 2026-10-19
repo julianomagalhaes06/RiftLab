@@ -26,6 +26,9 @@ describe("Campeões com padrões observados", () => {
     expect(screen.getByRole("link", { name: "Abrir contexto" })).toHaveAttribute("href", "/historico/BR1_123?participant=4");
     expect(screen.getByRole("link", { name: "Analisar decisão" })).toHaveAttribute("href", "/decisions/11111111-1111-4111-8111-111111111111");
     expect(screen.getByText(/Sem ranking de itens validado/)).toBeInTheDocument();
+    // CC-904: campeão sem partida no filtro sai da lista e aparece numa linha.
+    expect(screen.queryByRole("button", { name: /Miss Fortune/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Sem partidas neste patch: Miss Fortune.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Jinx/ }));
     expect(await screen.findByText("Ainda não há trajetos elegíveis neste filtro")).toBeInTheDocument();
     expect(screen.queryByText("Infinity Edge")).not.toBeInTheDocument();

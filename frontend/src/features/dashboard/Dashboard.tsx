@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Dashboard as DashboardData } from "../../shared/api/client";
+import { api, type Dashboard as DashboardData, type DashboardQueueParam } from "../../shared/api/client";
 import { isAbortError } from "../../shared/api/errors";
 import { Link } from "../../shared/router/Link";
 import { ChampionBadge } from "../matches/ChampionBadge";
@@ -10,32 +10,48 @@ import "./dashboard.css";
 import { useDemoNotice } from "../../app/demoNotice";
 
 const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+const QUEUE_NAME: Record<number, string> = { 420: "Solo/Duo", 440: "Flex" };
+
+/** Diz qual fila está no recorte e, na escolha automática, por quê (CC-904). */
+function queueSentence(data: DashboardData): string {
+  const name = QUEUE_NAME[data.queue] ?? `fila ${data.queue}`;
+  const other = data.queues.find((entry) => entry.queue !== data.queue && entry.totalMatches > 0);
+  const base = `Estatísticas descritivas da fila ${name}`;
+  if (data.queueSelection === "AUTO") {
+    return `${base}, a da sua partida importada mais recente.${other ? ` Também há ${count(other.totalMatches, "partida", "partidas")} em ${QUEUE_NAME[other.queue] ?? other.queue}.` : ""}`;
+  }
+  return `${base}.`;
+}
 
 export function Dashboard() {
   const [origin, setOrigin] = useState<"REAL" | "DEMO">("REAL");
   useDemoNotice(origin === "DEMO");
   const [windowSize, setWindowSize] = useState(20);
+  const [queue, setQueue] = useState<DashboardQueueParam | "AUTO">("AUTO");
   const [retry, setRetry] = useState(0);
-  const key = `${origin}:${windowSize}:${retry}`;
+  const key = `${origin}:${windowSize}:${queue}:${retry}`;
   const [result, setResult] = useState<{ key: string; data: DashboardData } | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    api.getDashboard({ origin, window: windowSize }, controller.signal).then((data) => {
+    api.getDashboard({ origin, window: windowSize, queue: queue === "AUTO" ? undefined : queue }, controller.signal).then((data) => {
       if (!controller.signal.aborted) setResult({ key, data });
     }).catch((error: unknown) => {
       if (!controller.signal.aborted && !isAbortError(error)) setErrorKey(key);
     });
     return () => controller.abort();
-  }, [origin, windowSize, key]);
+  }, [origin, windowSize, queue, key]);
   const data = result?.key === key ? result.data : null;
   const failed = errorKey === key;
   return <>
     <section className="dashboard" aria-labelledby="dashboard-heading">
       <div className="dashboard__heading">
         <div><h3 id="dashboard-heading">Seu recorte de partidas</h3>
-          <p>Estatísticas descritivas da fila Solo/Duo importada.</p></div>
+          <p>{data ? queueSentence(data) : "Estatísticas descritivas das suas partidas importadas."}</p></div>
         <div className="dashboard__filters">
+          <label>Fila<select value={queue} onChange={(event) => setQueue(event.target.value as DashboardQueueParam | "AUTO")}>
+            <option value="AUTO">Automática</option><option value="RANKED_SOLO_5x5">Solo/Duo</option><option value="RANKED_FLEX_SR">Flex</option>
+          </select></label>
           <label>Origem<select value={origin} onChange={(event) => setOrigin(event.target.value as "REAL" | "DEMO")}>
             <option value="REAL">Conta própria · real</option><option value="DEMO">Demonstração sintética</option>
           </select></label>

@@ -43,7 +43,7 @@ export function DecisionExperience({ decisionId }: { decisionId: string }) {
   const practice = new URLSearchParams(href.split("?")[1]).get("mode") === "practice";
   return <>
     <div className="decision-mode" role="group" aria-label="Modo de revisão">
-      <button className="button button--secondary" aria-pressed={!practice} onClick={() => navigate(`/decisions/${decisionId}`)}>Analisar partida</button>
+      <button className="button button--secondary" aria-pressed={!practice} onClick={() => navigate(`/decisions/${decisionId}`)}>Analisar decisão</button>
       <button className="button button--secondary" aria-pressed={practice} onClick={() => navigate(`/decisions/${decisionId}?mode=practice`)}>Praticar decisão</button>
     </div>
     {practice ? <>

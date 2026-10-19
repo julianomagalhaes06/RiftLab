@@ -24,7 +24,7 @@ for (const width of [1280, 1440, 360, 390]) {
     await page.screenshot({ path: `${evidence}/painel-${width}.png`, fullPage: true });
 
     for (const [label, heading] of [
-      ["Campeões", "Uma compra ganha sentido no contexto."],
+      ["Campeões", "Padrões de compra por campeão"],
       ["Minha posição", "Classificação da conta própria"],
       ["Histórico", "Partidas para estudar"],
     ]) {

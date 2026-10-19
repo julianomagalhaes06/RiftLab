@@ -122,6 +122,82 @@ async def test_own_matches_only_ordered_by_end_and_unknown_scores(
 
 
 @pytest.mark.asyncio
+async def test_queue_follows_latest_own_match_unless_requested(
+    session_factory, tmp_path, monkeypatch
+):
+    """CC-904: sem fila pedida, o recorte é a fila da partida própria mais recente."""
+    settings = settings_for(tmp_path / "account.json")
+    settings.catalog_mappings_path = str(tmp_path / "no-mapping.yaml")
+    monkeypatch.setattr("riftlab.dashboard.application.account_key", lambda *_: "dash-queue")
+    plan = [("BR1_3091001", 420, 0), ("BR1_3091002", 420, 60), ("BR1_3091003", 440, 120)]
+    ids = [mid for mid, _, _ in plan]
+    async with unit_of_work(session_factory) as session:
+        session.add(
+            Observation(
+                account_key="dash-queue",
+                subject_hash="own-q",
+                queue=SOLO_QUEUE,
+                season="2026-3",
+                captured_at=BASE,
+                state="READY",
+                origin="RIOT_LEAGUE_V4",
+            )
+        )
+        for mid, queue, minutes in plan:
+            session.add(
+                MatchModel(
+                    match_id=mid,
+                    queue=queue,
+                    map_id=11,
+                    patch="16.20",
+                    start_at=BASE + timedelta(minutes=minutes),
+                    duration_seconds=1800,
+                    raw_hash="b" * 64,
+                )
+            )
+        await session.flush()
+        for mid, _, _ in plan:
+            session.add(
+                ParticipantModel(
+                    match_id=mid,
+                    participant_id=3,
+                    champion_id=64,
+                    team=100,
+                    role="JUNGLE",
+                    subject_hash="own-q",
+                    win=True,
+                    kills=1,
+                    deaths=1,
+                    assists=1,
+                )
+            )
+    try:
+        auto = await dashboard(session_factory, settings, window=20, origin="REAL")
+        assert (auto.queue, auto.queue_selection, auto.total_matches) == (440, "AUTO", 1)
+        assert [(q.queue, q.total_matches) for q in auto.queues] == [(420, 2), (440, 1)]
+        solo = await dashboard(session_factory, settings, window=20, origin="REAL", queue=420)
+        assert (solo.queue, solo.queue_selection, solo.total_matches) == (420, "EXPLICIT", 2)
+        app = create_app(settings)
+        app.state.settings = settings
+        app.state.session_factory = session_factory
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            flex = await client.get("/api/v1/dashboard", params={"queue": "RANKED_FLEX_SR"})
+            assert flex.status_code == 200 and flex.json()["queue"] == 440
+            assert flex.json()["queueSelection"] == "EXPLICIT"
+            bad = await client.get("/api/v1/dashboard", params={"queue": "ARAM"})
+            assert bad.status_code == 422
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(
+                delete(ParticipantModel).where(ParticipantModel.match_id.in_(ids))
+            )
+            await session.execute(delete(MatchModel).where(MatchModel.match_id.in_(ids)))
+            await session.execute(
+                delete(Observation).where(Observation.account_key == "dash-queue")
+            )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("_demo_match", ["DEMO-0008"], indirect=True)
 async def test_study_counts_are_local_separate_by_origin_and_idempotent(
     app_client, session_factory, tmp_path, _demo_match

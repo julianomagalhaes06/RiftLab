@@ -105,7 +105,7 @@ export interface paths {
         };
         /**
          * Painel descritivo da conta própria ou demonstração explícita
-         * @description Só leitura no banco. Sem rede, coleta ou identificação de terceiros. DEMO usa o participante sintético 1; progresso é local, por origem e de todas as datas.
+         * @description Só leitura no banco. Sem rede, coleta ou identificação de terceiros. DEMO usa o participante sintético 1; progresso é local, por origem e de todas as datas. `queue` escolhe Solo/Duo ou Flex; sem ele, vale a fila da partida própria mais recente.
          */
         get: operations["get_dashboard_api_v1_dashboard_get"];
         put?: never;
@@ -852,7 +852,11 @@ export interface components {
             /** Nextcursor */
             nextCursor?: string | null;
         };
-        /** Dashboard */
+        /**
+         * Dashboard
+         * @description `queue` é a fila do recorte (420 Solo/Duo, 440 Flex). Sem `queue` no pedido, é a fila
+         *     da partida própria mais recente (`queueSelection` AUTO); `queues` traz o total por fila.
+         */
         Dashboard: {
             /** Champions */
             champions: components["schemas"]["DashboardChampion"][];
@@ -870,6 +874,13 @@ export interface components {
             progress: components["schemas"]["DashboardProgress"];
             /** Queue */
             queue: number;
+            /**
+             * Queueselection
+             * @enum {string}
+             */
+            queueSelection: "AUTO" | "EXPLICIT";
+            /** Queues */
+            queues: components["schemas"]["DashboardQueue"][];
             /** Recentmatches */
             recentMatches: components["schemas"]["DashboardMatch"][];
             /** Sampledmatches */
@@ -921,6 +932,13 @@ export interface components {
             reflections: number;
             /** Revealed */
             revealed: number;
+        };
+        /** DashboardQueue */
+        DashboardQueue: {
+            /** Queue */
+            queue: number;
+            /** Totalmatches */
+            totalMatches: number;
         };
         /**
          * DecisionBudget
@@ -2214,6 +2232,7 @@ export interface operations {
             query?: {
                 window?: number;
                 origin?: "REAL" | "DEMO";
+                queue?: ("RANKED_SOLO_5x5" | "RANKED_FLEX_SR") | null;
             };
             header?: never;
             path?: never;

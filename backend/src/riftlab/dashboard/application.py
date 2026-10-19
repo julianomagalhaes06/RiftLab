@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -17,6 +17,7 @@ from riftlab.dashboard.api import (
     DashboardChampion,
     DashboardMatch,
     DashboardProgress,
+    DashboardQueue,
 )
 from riftlab.decisions.models import DecisionPointModel
 from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfigError, load_riot_account
@@ -27,6 +28,9 @@ from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.api.matches import ChampionAsset, MatchParticipant
 from riftlab.shared.db import read_only_unit_of_work
 from riftlab.shared.errors import SourceSchemaError
+
+QUEUE_IDS = {"RANKED_SOLO_5x5": 420, "RANKED_FLEX_SR": 440}
+DASHBOARD_QUEUES = (420, 440)
 
 
 def summarize(rows: list[tuple[MatchModel, ParticipantModel]]) -> dict[str, int | float | None]:
@@ -53,6 +57,7 @@ async def dashboard(
     *,
     window: int,
     origin: Literal["REAL", "DEMO"],
+    queue: int | None = None,
 ) -> Dashboard:
     mapping = None
     mapping_path = Path(settings.catalog_mappings_path)
@@ -107,6 +112,8 @@ async def dashboard(
         available = origin == "DEMO" or subject is not None
         rows: list[tuple[MatchModel, ParticipantModel]] = []
         total = 0
+        chosen = queue or DASHBOARD_QUEUES[0]
+        totals: dict[int, int] = dict.fromkeys(DASHBOARD_QUEUES, 0)
         if available:
             own = (
                 select(ParticipantModel.match_id)
@@ -119,17 +126,33 @@ async def dashboard(
                 .having(func.count() == 1)
             )
             ended = MatchModel.start_at + MatchModel.duration_seconds * text("INTERVAL '1 second'")
+            conditions = (
+                MatchModel.match_id.in_(own),
+                demo_match if origin == "DEMO" else ~demo_match,
+                ParticipantModel.participant_id == 1
+                if origin == "DEMO"
+                else ParticipantModel.subject_hash == subject,
+            )
+            latest: dict[int, Any] = {}
+            for queue_id in DASHBOARD_QUEUES:
+                count, last = (
+                    await session.execute(
+                        select(func.count(), func.max(ended))
+                        .select_from(MatchModel)
+                        .join(ParticipantModel, ParticipantModel.match_id == MatchModel.match_id)
+                        .where(*conditions, MatchModel.queue == queue_id)
+                    )
+                ).one()
+                totals[queue_id] = int(count or 0)
+                latest[queue_id] = last
+            if queue is None:
+                # Sem fila pedida: a da partida própria mais recente (empate: Solo/Duo).
+                dated = [(latest[q], -i, q) for i, q in enumerate(DASHBOARD_QUEUES) if latest[q]]
+                chosen = max(dated)[2] if dated else DASHBOARD_QUEUES[0]
             query = (
                 select(MatchModel, ParticipantModel)
                 .join(ParticipantModel, ParticipantModel.match_id == MatchModel.match_id)
-                .where(
-                    MatchModel.match_id.in_(own),
-                    MatchModel.queue == 420,
-                    demo_match if origin == "DEMO" else ~demo_match,
-                    ParticipantModel.participant_id == 1
-                    if origin == "DEMO"
-                    else ParticipantModel.subject_hash == subject,
-                )
+                .where(*conditions, MatchModel.queue == chosen)
             )
             total = int(
                 await session.scalar(select(func.count()).select_from(query.subquery())) or 0
@@ -196,7 +219,9 @@ async def dashboard(
             origin=origin,
             status="IDENTITY_UNAVAILABLE" if not available else "READY" if rows else "EMPTY",
             window=window,
-            queue=420,
+            queue=chosen,
+            queue_selection="AUTO" if queue is None else "EXPLICIT",
+            queues=[DashboardQueue(queue=q, total_matches=totals[q]) for q in DASHBOARD_QUEUES],
             total_matches=total,
             **summarize(rows),
             champions=champions,

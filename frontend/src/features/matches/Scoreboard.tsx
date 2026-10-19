@@ -138,7 +138,7 @@ export function Scoreboard({
                 <th scope="col">Campeão</th>
                 <th scope="col">K / D / A</th>
                 <th scope="col">Farm</th>
-                <th scope="col"><abbr title="Participação em abates do time">P/Abate</abbr></th>
+                <th scope="col"><abbr title="Participação em abates do time">Part. abates</abbr></th>
                 <th scope="col">Itens finais</th>
               </tr>
             </thead>

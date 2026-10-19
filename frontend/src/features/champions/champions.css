@@ -46,3 +46,5 @@
   .champion-stats { grid-template-columns: 1fr; gap: 8px; }
   .champions-content .quiet-surface { padding: 20px; }
 }
+
+.champions-roster__absent { margin: 4px 2px 0; color: var(--ntext-muted); font-size: .8rem; line-height: 1.4; }

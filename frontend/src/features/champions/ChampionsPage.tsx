@@ -8,6 +8,7 @@ import { ItemNames } from "../../shared/ui/ItemNames";
 import { useItemName } from "../../shared/hooks/useItemName";
 import "./champions.css";
 import { count } from "../../shared/text/count";
+import { championName } from "../matches/format";
 
 const PHASES = { sequence: "1º → 2º item", first: "Primeiro item", second: "Segundo item" } as const;
 
@@ -50,6 +51,9 @@ export function ChampionsPage() {
   const loading = result?.key !== queryKey;
   const failed = loading && errorKey === queryKey;
   const chosen = data?.champions.find((champion) => champion.championId === data.championId);
+  const selected = championId ?? data?.championId;
+  const roster = (data?.champions ?? []).filter((c) => c.matches > 0 || c.championId === selected);
+  const absent = (data?.champions ?? []).filter((c) => c.matches === 0 && c.championId !== selected);
   function update(name: string, value: string) {
     const next = new URLSearchParams(href.split("?")[1]);
     next.set(name, value);
@@ -58,7 +62,7 @@ export function ChampionsPage() {
   return <div className="area-page champions-page">
     <div className="page-intro">
       <p className="page-intro__kicker">Campeões · estudo pós-partida</p>
-      <h2>Uma compra ganha sentido no contexto.</h2>
+      <h2>Padrões de compra por campeão</h2>
       <p>Explore trajetos observados nas partidas importadas e volte ao momento da decisão para estudar suas alternativas.</p>
     </div>
     {failed ? <section className="quiet-surface" role="alert">
@@ -75,16 +79,18 @@ export function ChampionsPage() {
         <label>Etapa da build<select value={phase} onChange={(event) => update("phase", event.target.value)}>
           {Object.entries(PHASES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <p>Origem: partidas reais importadas. Até {data.sampleLimit} participações recentes por campeão.</p>
+        <p>Origem: partidas reais importadas. Até {data.sampleLimit} participações recentes por campeão. O guia cobre hoje os atiradores da rota inferior.</p>
       </div>
       <div className="champions-layout">
         <nav className="champions-roster" aria-label="Selecionar campeão">
-          {data.champions.map((champion) => <button key={champion.championId} type="button"
+          {roster.map((champion) => <button key={champion.championId} type="button"
             aria-pressed={champion.championId === (championId ?? data.championId)}
             onClick={() => update("champion", String(champion.championId))}>
             <ChampionBadge participant={champion} size={40} />
             <small>{loading ? "Carregando…" : champion.matches ? count(champion.matches, "partida", "partidas") : "Sem partidas"}</small>
           </button>)}
+          {/* CC-904: campeões sem partida no filtro saem da lista e viram uma linha. */}
+          {absent.length ? <p className="champions-roster__absent">Sem partidas neste patch: {absent.map((c) => championName(c)).join(", ")}.</p> : null}
         </nav>
         <div className="champions-content" aria-live="polite" aria-busy={loading}>
           {loading ? <p role="status">Carregando padrões deste filtro…</p> : <>

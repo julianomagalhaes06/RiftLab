@@ -3,6 +3,9 @@ import { Link } from "../../shared/router/Link";
 import { isDemoMatchId } from "../../shared/router/routes";
 import { championName } from "../matches/format";
 import { ChampionAvatar } from "./ChampionAvatar";
+import { useItemName } from "../../shared/hooks/useItemName";
+import { ItemIcon } from "../../shared/ui/ItemIcon";
+import { ItemNames } from "../../shared/ui/ItemNames";
 import {
   decimal,
   localPerformance,
@@ -16,6 +19,27 @@ import {
 } from "./presentation";
 
 const RESULT_TEXT = { WIN: "Vitória", LOSS: "Derrota" } as const;
+
+/** CC-904: itens finais oficiais da conta própria, como nos sites de estatísticas. */
+function FinalBuild({ items, trinket }: { items: number[]; trinket: number | null }) {
+  const itemName = useItemName();
+  return (
+    <span className="match-card__build" role="group" aria-label="Itens finais">
+      {items.map((itemId, index) => (
+        <span key={`${itemId}-${index}`} title={itemName({ itemId })}>
+          <ItemIcon itemId={itemId} />
+          <span className="sr-only">{itemName({ itemId })}</span>
+        </span>
+      ))}
+      {trinket ? (
+        <span className="match-card__trinket" title={`Amuleto: ${itemName({ itemId: trinket })}`}>
+          <ItemIcon itemId={trinket} />
+          <span className="sr-only">Amuleto: {itemName({ itemId: trinket })}</span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 function TeamList({ team, localId, label }: { team: MatchParticipant[]; localId: number | null; label: string }) {
   return (
@@ -69,10 +93,15 @@ export function MatchCard({ match, now }: { match: MatchSummary; now?: Date }) {
               <span className="match-card__kda">{performance.kda === null ? "KDA indisponível" : `${decimal(performance.kda, 2)} KDA`}</span>
             </div>
             <dl className="match-card__stats">
-              <div><dt>P/Abate</dt><dd>{performance.killParticipation === null ? "–" : percent(performance.killParticipation)}</dd></div>
+              <div><dt>Part. abates</dt><dd>{performance.killParticipation === null ? "–" : percent(performance.killParticipation)}</dd></div>
               <div><dt>Farm</dt><dd>{performance.cs === null ? "–" : <>{performance.cs}{performance.csPerMinute !== null ? <small> ({decimal(performance.csPerMinute)}/min)</small> : null}</>}</dd></div>
               <div><dt>Patch</dt><dd>{match.patch}</dd></div>
             </dl>
+            {local.finalItems?.length ? (
+              <ItemNames version={local.champion?.dataDragonVersion ?? null}>
+                <FinalBuild items={local.finalItems} trinket={local.finalTrinketItemId ?? null} />
+              </ItemNames>
+            ) : null}
           </div>
         ) : (
           <div className="match-card__hero match-card__hero--unknown">

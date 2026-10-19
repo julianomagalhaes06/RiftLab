@@ -29,6 +29,20 @@ describe("Painel da conta própria", () => {
     expect(screen.queryByRole("region", { name: "Partidas importadas recentes" })).not.toBeInTheDocument();
   });
 
+  it("explica a fila automática e pede a fila escolhida no seletor (CC-904)", async () => {
+    const api = setup();
+    api.on("GET", /^\/api\/v1\/dashboard$/, ({ search }) =>
+      search.get("queue") === "RANKED_SOLO_5x5"
+        ? json(200, dashboard({ queue: 420, queueSelection: "EXPLICIT" }))
+        : json(200, dashboard({ queue: 440, queueSelection: "AUTO", queues: [{ queue: 420, totalMatches: 10 }, { queue: 440, totalMatches: 8 }] })),
+    );
+    render(<App />);
+    expect(await screen.findByText("Estatísticas descritivas da fila Flex, a da sua partida importada mais recente. Também há 10 partidas em Solo/Duo.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Fila"), { target: { value: "RANKED_SOLO_5x5" } });
+    expect(await screen.findByText("Estatísticas descritivas da fila Solo/Duo.")).toBeInTheDocument();
+    expect(api.callsTo("GET", /dashboard/).map((call) => call.search.get("queue"))).toEqual([null, "RANKED_SOLO_5x5"]);
+  });
+
   it("esconde o recorte anterior enquanto troca a origem e não converte ausência em zero", async () => {
     const api = setup();
     let release!: (r: Response) => void;

@@ -888,6 +888,7 @@
       },
       "Dashboard": {
         "additionalProperties": false,
+        "description": "`queue` é a fila do recorte (420 Solo/Duo, 440 Flex). Sem `queue` no pedido, é a fila\nda partida própria mais recente (`queueSelection` AUTO); `queues` traz o total por fila.",
         "properties": {
           "champions": {
             "items": {
@@ -929,6 +930,21 @@
           "queue": {
             "title": "Queue",
             "type": "integer"
+          },
+          "queueSelection": {
+            "enum": [
+              "AUTO",
+              "EXPLICIT"
+            ],
+            "title": "Queueselection",
+            "type": "string"
+          },
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardQueue"
+            },
+            "title": "Queues",
+            "type": "array"
           },
           "recentMatches": {
             "items": {
@@ -983,6 +999,8 @@
           "status",
           "window",
           "queue",
+          "queueSelection",
+          "queues",
           "totalMatches",
           "sampledMatches",
           "winSamples",
@@ -1084,6 +1102,25 @@
           "matches"
         ],
         "title": "DashboardProgress",
+        "type": "object"
+      },
+      "DashboardQueue": {
+        "additionalProperties": false,
+        "properties": {
+          "queue": {
+            "title": "Queue",
+            "type": "integer"
+          },
+          "totalMatches": {
+            "title": "Totalmatches",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queue",
+          "totalMatches"
+        ],
+        "title": "DashboardQueue",
         "type": "object"
       },
       "DecisionBudget": {
@@ -4150,7 +4187,7 @@
     },
     "/api/v1/dashboard": {
       "get": {
-        "description": "Só leitura no banco. Sem rede, coleta ou identificação de terceiros. DEMO usa o participante sintético 1; progresso é local, por origem e de todas as datas.",
+        "description": "Só leitura no banco. Sem rede, coleta ou identificação de terceiros. DEMO usa o participante sintético 1; progresso é local, por origem e de todas as datas. `queue` escolhe Solo/Duo ou Flex; sem ele, vale a fila da partida própria mais recente.",
         "operationId": "get_dashboard_api_v1_dashboard_get",
         "parameters": [
           {
@@ -4177,6 +4214,26 @@
               ],
               "title": "Origin",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "queue",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "RANKED_SOLO_5x5",
+                    "RANKED_FLEX_SR"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queue"
             }
           }
         ],

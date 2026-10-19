@@ -38,6 +38,8 @@ export type LearningAttempt = Schemas["LearningAttemptPublicState"];
 export type AnalysisResult = Schemas["AnalysisResult"];
 export type AnalysisCandidate = Schemas["AnalysisCandidate"];
 export type AnalysisReferenceSource = Schemas["AnalysisReferenceSource"];
+/** Fila do Painel (CC-904): sem valor, o servidor usa a da partida própria mais recente. */
+export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 export type ObjectiveForm = Schemas["ObjectiveForm"];
@@ -59,7 +61,7 @@ interface RequestOptions {
 }
 
 export interface ApiClient {
-  getDashboard(params: { origin: "REAL" | "DEMO"; window: number }, signal?: AbortSignal): Promise<Dashboard>;
+  getDashboard(params: { origin: "REAL" | "DEMO"; window: number; queue?: DashboardQueueParam }, signal?: AbortSignal): Promise<Dashboard>;
   getChampionPatterns(params: { championId?: number; patch?: string; phase?: "first" | "second" | "sequence" }, signal?: AbortSignal): Promise<ChampionPatterns>;
   getRankedMe(signal?: AbortSignal, queue?: RankedQueue): Promise<RankedMe>;
   getHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
@@ -168,7 +170,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
 
   return {
     getChampionPatterns: (params, signal) => request("GET", `/api/v1/champions/patterns${queryString(params)}`, { signal }),
-    getDashboard: (params, signal) => request("GET", `/api/v1/dashboard?origin=${params.origin}&window=${params.window}`, { signal }),
+    getDashboard: (params, signal) =>
+      request("GET", `/api/v1/dashboard?origin=${params.origin}&window=${params.window}${params.queue ? `&queue=${params.queue}` : ""}`, { signal }),
     getRankedMe: (signal, queue) => request("GET", `/api/v1/ranked/me${queryString({ queue })}`, { signal }),
     // CC-901: o POST só agenda; a rede com a Riot roda no worker.
     getHistorySync: (signal) => request("GET", "/api/v1/history/sync", { signal }),
