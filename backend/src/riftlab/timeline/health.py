@@ -159,8 +159,15 @@ async def invalidate_patch_health(session: AsyncSession, patch: str) -> int:
 
 
 async def health_for_state(
-    session: AsyncSession, patch: str, version: int, provenance: list[dict[str, Any]]
+    session: AsyncSession,
+    patch: str,
+    version: int,
+    provenance: list[dict[str, Any]],
+    queue: int | None = None,
 ) -> dict[str, Any]:
+    """Saúde aplicável a um estado. Com `queue` (CC-804), vale a medição da própria fila:
+    REJECT de uma fila suspende só ela, e um ACCEPT de outra população não esconde esse
+    REJECT. Sem linha da fila (histórico antigo), vale o agregado do grupo."""
     inherited = any(r.get("application") == "INHERITED" for r in provenance)
     applied = [r for r in provenance if r.get("application") != "WITHHELD"]
     if not applied:
@@ -168,42 +175,37 @@ async def health_for_state(
     first = applied[0]
     application = first.get("application") or "VALIDATED"
     source = first.get("appliedFromPatch") or patch
-    row = (
-        await session.scalars(
-            select(PatchRuleHealthModel)
-            .where(
-                PatchRuleHealthModel.game_patch == patch,
-                PatchRuleHealthModel.queue.is_(None),
-                PatchRuleHealthModel.application == application,
-                PatchRuleHealthModel.source_patch == source,
-                PatchRuleHealthModel.reconstruction_version == version,
-                PatchRuleHealthModel.rules_fingerprint == fingerprint(provenance),
-            )
-            .order_by(PatchRuleHealthModel.computed_at.desc(), PatchRuleHealthModel.id.desc())
-            .limit(1)
+
+    def query(dimension: int | None, *, measured_only: bool = False) -> Any:
+        statement = select(PatchRuleHealthModel).where(
+            PatchRuleHealthModel.game_patch == patch,
+            PatchRuleHealthModel.queue.is_(None)
+            if dimension is None
+            else PatchRuleHealthModel.queue == dimension,
+            PatchRuleHealthModel.application == application,
+            PatchRuleHealthModel.source_patch == source,
+            PatchRuleHealthModel.reconstruction_version == version,
+            PatchRuleHealthModel.rules_fingerprint == fingerprint(provenance),
         )
-    ).first()
+        if measured_only:
+            statement = statement.where(PatchRuleHealthModel.is_invalidation.is_(False))
+        return statement.order_by(
+            PatchRuleHealthModel.computed_at.desc(), PatchRuleHealthModel.id.desc()
+        ).limit(1)
+
+    dimension = queue
+    row = (await session.scalars(query(queue))).first() if queue is not None else None
+    if row is None:
+        dimension = None
+        row = (await session.scalars(query(None))).first()
     # Só lápides de invalidação retêm a medição vigente anterior. Um NO_SAMPLE
     # produzido por medição real é uma nova observação e encerra retenção.
     retained_reject = None
     if inherited and row is not None and row.is_invalidation:
-        latest_measurement = await session.scalar(
-            select(PatchRuleHealthModel)
-            .where(
-                PatchRuleHealthModel.game_patch == patch,
-                PatchRuleHealthModel.queue.is_(None),
-                PatchRuleHealthModel.application == application,
-                PatchRuleHealthModel.source_patch == source,
-                PatchRuleHealthModel.reconstruction_version == version,
-                PatchRuleHealthModel.rules_fingerprint == fingerprint(provenance),
-                PatchRuleHealthModel.is_invalidation.is_(False),
-            )
-            .order_by(PatchRuleHealthModel.computed_at.desc(), PatchRuleHealthModel.id.desc())
-            .limit(1)
-        )
+        latest_measurement = await session.scalar(query(dimension, measured_only=True))
         if latest_measurement is not None and latest_measurement.verdict == "REJECT":
             retained_reject = latest_measurement
-    return public_health(row, inherited, retained_reject)
+    return {**public_health(row, inherited, retained_reject), "queue": dimension}
 
 
 async def compute_health(

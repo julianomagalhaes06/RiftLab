@@ -102,7 +102,7 @@ function rulesLabel(
 
 /** Regras de reconstrução herdadas: a análise é possível, mas com regras confirmadas em
  * outro patch. Mostrado sempre que a reconstrução usou herança, elegível ou não. */
-function InheritedRules({ decision, patch }: { decision: DecisionState; patch: string | null }) {
+function InheritedRules({ decision, patch, queue }: { decision: DecisionState; patch: string | null; queue?: number | null }) {
   if (decision.versions.reconstructionRules !== "INHERITED") return null;
   const source = decision.versions.reconstructionRulesPatch ?? "anterior";
   const { reconstructionRulesHealth: health, reconstructionRulesCleanParticipants: n, reconstructionRulesFailures: failures } = decision.versions;
@@ -125,6 +125,9 @@ function InheritedRules({ decision, patch }: { decision: DecisionState; patch: s
       {patch ? ` ao patch ${patch}` : ""}, sem confirmação própria nesta fila. Mudanças de itens ou de
       mecânica neste patch podem não estar refletidas.{" "}
       {health === "OK" ? `Conferido em ${n} participantes deste patch; isso não substitui confirmação própria.` : "Ainda sem amostra para conferir."}
+      {queue === 440 && health !== "OK" && decision.versions.reconstructionRulesQueue !== 440
+        ? " Essas regras foram medidas em Solo/Duo; o Flex ainda não tem amostra suficiente para conferi-las."
+        : null}
     </p>
   );
 }
@@ -339,7 +342,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         </div>
       ) : null}
 
-      <InheritedRules decision={decision} patch={match?.patch ?? null} />
+      <InheritedRules decision={decision} patch={match?.patch ?? null} queue={match?.queue ?? null} />
       <ObservedRuleHealth decision={decision} />
 
       <ItemNames version={decision.versions.dataDragonVersion}>

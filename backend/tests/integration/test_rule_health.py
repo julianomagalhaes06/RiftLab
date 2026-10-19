@@ -554,3 +554,134 @@ async def test_health_changes_read_and_analysis_without_mutating_point(
         await session.execute(
             delete(PatchRuleHealthModel).where(PatchRuleHealthModel.game_patch == "DEMO-1")
         )
+
+
+@pytest.mark.asyncio
+async def test_queue_health_suspends_only_its_queue_and_never_hides_a_queue_reject(
+    session_factory,
+):
+    """CC-804: a medição da fila vale para a decisão da fila; o agregado só sem linha."""
+    patch = "TEST-QUEUE"
+    provenance = [
+        {"ruleId": "R1", "ruleVersion": 1, "application": "INHERITED", "appliedFromPatch": "16.19"}
+    ]
+    fp = fingerprint(provenance)
+    version = RECONSTRUCTION_ALGORITHM_VERSION
+    now = datetime(2026, 10, 19, tzinfo=UTC)
+
+    def row(queue, verdict, *, at, invalidation=False):
+        sample = verdict != "NO_SAMPLE"
+        return PatchRuleHealthModel(
+            game_patch=patch,
+            queue=queue,
+            application="INHERITED",
+            source_patch="16.19",
+            rules_fingerprint=fp,
+            reconstruction_version=version,
+            clean_participants=200 if sample else 0,
+            failures=(30 if verdict == "REJECT" else 2) if sample else 0,
+            contributing_matches=60 if sample else 0,
+            wilson_upper=(0.2 if verdict == "REJECT" else 0.03) if sample else None,
+            verdict=verdict,
+            is_invalidation=invalidation,
+            computed_at=now + timedelta(seconds=at),
+        )
+
+    async with session_factory.begin() as session:
+        await session.execute(
+            delete(PatchRuleHealthModel).where(PatchRuleHealthModel.game_patch == patch)
+        )
+        session.add_all(
+            [row(None, "ACCEPT", at=0), row(420, "ACCEPT", at=0), row(440, "REJECT", at=0)]
+        )
+    async with session_factory() as session:
+        flex = await health_for_state(session, patch, version, provenance, 440)
+        solo = await health_for_state(session, patch, version, provenance, 420)
+        general = await health_for_state(session, patch, version, provenance)
+    assert (flex["status"], flex["verdict"], flex["queue"]) == ("SUSPENDED", "REJECT", 440)
+    assert (solo["status"], solo["queue"]) == ("OK", 420)
+    assert (general["status"], general["queue"]) == ("OK", None)
+
+    # Invalidação da fila retém o REJECT só dela; a outra fila não herda a retenção.
+    async with session_factory.begin() as session:
+        session.add_all(
+            [
+                row(440, "NO_SAMPLE", at=1, invalidation=True),
+                row(420, "NO_SAMPLE", at=1, invalidation=True),
+            ]
+        )
+    async with session_factory() as session:
+        flex = await health_for_state(session, patch, version, provenance, 440)
+        solo = await health_for_state(session, patch, version, provenance, 420)
+    assert flex["status"] == "SUSPENDED" and flex["verdict"] == "NO_SAMPLE"
+    assert solo["status"] == "UNVERIFIED"
+
+    # Histórico sem linha da fila: vale o agregado do grupo.
+    async with session_factory() as session:
+        other = await health_for_state(session, patch, version + 1, provenance, 440)
+    assert other["queue"] is None and other["status"] == "UNVERIFIED"
+    async with session_factory.begin() as session:
+        await session.execute(
+            delete(PatchRuleHealthModel).where(PatchRuleHealthModel.game_patch == patch)
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("_demo_match", ["DEMO-0008"], indirect=True)
+async def test_flex_decision_warns_rules_measured_in_solo_until_flex_sample_accepts(
+    app_client, session_factory, tmp_path, _demo_match
+):
+    """CC-804 parte A: regras sem domínio da fila 440 aplicadas no Flex levam aviso enquanto
+    a saúde do Flex não tiver ACCEPT próprio; REJECT do Flex suspende o Flex."""
+    decision = (await _decisions(app_client, session_factory, tmp_path, _demo_match))[-1]
+    provenance = [
+        {"ruleId": "R1", "ruleVersion": 1, "application": "INHERITED", "appliedFromPatch": "16.19"}
+    ]
+    async with session_factory.begin() as session:
+        point = await session.get(DecisionPointModel, uuid.UUID(decision["decisionId"]))
+        state = await session.get(DecisionStateModel, point.decision_state_id)
+        state.quality = {**state.quality, "empiricalRules": provenance}
+        version = point.reconstruction_version
+        match = await session.get(MatchModel, _demo_match)
+        match.queue = 440
+    try:
+        for outcome, n, k, upper in [
+            ("NO_SAMPLE", 17, 1, 0.27),
+            ("ACCEPT", 120, 1, 0.04),
+            ("REJECT", 200, 30, 0.2),
+        ]:
+            async with session_factory.begin() as session:
+                session.add(
+                    PatchRuleHealthModel(
+                        game_patch="DEMO-1",
+                        queue=440,
+                        application="INHERITED",
+                        source_patch="16.19",
+                        rules_fingerprint=fingerprint(provenance),
+                        reconstruction_version=version,
+                        clean_participants=n,
+                        failures=k,
+                        contributing_matches=14,
+                        wilson_upper=upper,
+                        verdict=outcome,
+                    )
+                )
+            analysis = await app_client.post(
+                "/api/v1/analyses",
+                json={"decisionId": decision["decisionId"], "objective": {"priority": "BALANCED"}},
+                headers={"Idempotency-Key": str(uuid.uuid4())},
+            )
+            codes = analysis.json()["support"]["reasonCodes"]
+            if outcome == "REJECT":
+                assert analysis.json()["status"] == "INSUFFICIENT_EVIDENCE"
+                assert codes == ["INHERITED_RULES_SUSPENDED"]
+            else:
+                assert analysis.json()["status"] == "AVAILABLE"
+                assert ("RULES_MEASURED_IN_SOLO_DUO" in codes) == (outcome == "NO_SAMPLE")
+    finally:
+        async with session_factory.begin() as session:
+            match = await session.get(MatchModel, _demo_match)
+            match.queue = 420
+            await session.execute(
+                delete(PatchRuleHealthModel).where(PatchRuleHealthModel.game_patch == "DEMO-1")
+            )

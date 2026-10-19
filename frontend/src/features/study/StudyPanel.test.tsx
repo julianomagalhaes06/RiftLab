@@ -142,6 +142,22 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
     expect(screen.getByText(/As contagens de referência foram herdadas/)).toBeInTheDocument();
   });
 
+  it("explica o aviso de regras medidas em Solo/Duo numa decisão Flex", async () => {
+    const flex = {
+      ...COMPARISON,
+      support: { ...COMPARISON.support, level: "LIMITED", reasonCodes: ["RECONSTRUCTION_RULES_INHERITED", "RULES_MEASURED_IN_SOLO_DUO"] },
+    };
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
+    mock.on("POST", /\/reveal$/, () =>
+      json(200, attempt({ status: "REVEALED", analysisId: flex.analysisId, comparison: flex })),
+    );
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText("Thornmail");
+    fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
+    expect(await screen.findByText(/foram medidas em Solo\/Duo; o Flex ainda não tem amostra suficiente/)).toBeInTheDocument();
+  });
+
   it("explica quando a referência anterior não pôde ser vinculada ao catálogo", async () => {
     const unavailable = {
       ...COMPARISON,

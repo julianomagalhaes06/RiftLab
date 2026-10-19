@@ -259,6 +259,7 @@ async def list_decision_points(
                 match.patch,
                 point.versions.reconstruction_version,
                 await decisions.get_rules_provenance(point.decision_state_id),
+                match.queue,
             )
 
     items = rows[:limit]
@@ -300,6 +301,7 @@ async def get_decision_detail(
             match.patch,
             point.versions.reconstruction_version,
             provenance,
+            match.queue,
         )
         item_names: dict[int, str | None] = {}
         catalog_id = point.versions.catalog_id

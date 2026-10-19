@@ -351,6 +351,28 @@ describe("decisão reconstruída com regras herdadas", () => {
     expect(screen.getByText("herdadas do patch 16.19 (sem confirmação própria nesta fila)")).toBeInTheDocument();
   });
 
+  it("decisão Flex com regras herdadas avisa que foram medidas em Solo/Duo", async () => {
+    setup(`/decisions/${DECISION_1}`, (mock) => {
+      mock.on("GET", /^\/api\/v1\/decisions\/.+$/, () =>
+        json(
+          200,
+          decisionState({
+            versions: {
+              ...decisionState().versions,
+              reconstructionRules: "INHERITED",
+              reconstructionRulesPatch: "16.19",
+              reconstructionRulesHealth: "UNVERIFIED",
+            },
+          }),
+        ),
+      );
+      mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008$/, () => json(200, matchDetail({ patch: "16.20", queue: 440 })));
+      mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008\/decisions$/, () => json(200, { items: [], nextCursor: null }));
+    });
+    const note = await screen.findByText(/regras confirmadas no patch 16\.19, aplicadas por herança/);
+    await waitFor(() => expect(note).toHaveTextContent("medidas em Solo/Duo; o Flex ainda não tem amostra suficiente"));
+  });
+
   it("confirmação própria de uma fila aparece com a fila nos detalhes técnicos", async () => {
     setup(`/decisions/${DECISION_1}`, (mock) => {
       mock.on("GET", /^\/api\/v1\/decisions\/.+$/, () =>

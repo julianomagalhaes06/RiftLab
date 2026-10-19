@@ -42,6 +42,8 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
     "O inventário usa regras de reconstrução confirmadas num patch anterior, herdadas porque este patch ainda não tem confirmação própria nesta fila.",
   ITEM_RULES_INHERITED:
     "Os limites de itens (exclusividade) vêm do último patch revisado; itens que ele não cobre ficam fora das alternativas.",
+  RULES_MEASURED_IN_SOLO_DUO:
+    "As regras de inventário foram medidas em Solo/Duo; o Flex ainda não tem amostra suficiente para conferi-las.",
   POPULARITY_INHERITED: "As contagens de referência foram herdadas de um patch anterior e filtradas pelo catálogo desta decisão.",
   POPULARITY_SOURCE_CATALOG_IDENTITY_UNBOUND: "A referência anterior não identifica exatamente o catálogo de origem; foi usado o critério de regras explícitas.",
   POPULARITY_SOURCE_CATALOG_IDENTITY_INVALID: "A identidade do catálogo de origem da referência anterior é inválida; foi usado o critério de regras explícitas.",

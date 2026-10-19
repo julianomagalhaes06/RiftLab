@@ -31,6 +31,7 @@ from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.dataset.rows import RowsError, _catalog
 from riftlab.decisions.features import build_pre_decision_view
 from riftlab.decisions.models import DecisionPointModel
+from riftlab.ingestion.models import MatchModel
 from riftlab.ml.registry import resolve_active
 from riftlab.ranking.engine import (
     POPULARITY,
@@ -51,6 +52,7 @@ from riftlab.timeline.health import health_for_state
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 ALGORITHM_VERSION = "analysis_v1"
+FLEX_QUEUE = 440
 REGISTRY_TASK = "purchase_decision"  # escopo do registro = patch do catálogo
 
 
@@ -199,7 +201,9 @@ async def _compute(
             decision_id, objective, "INSUFFICIENT_EVIDENCE", ["INVALID_STATE"], catalog_label
         )
     provenance = state.quality.get("empiricalRules") or []
-    health = await health_for_state(session, patch, point.reconstruction_version, provenance)
+    match = await session.get(MatchModel, point.match_id)
+    queue = match.queue if match is not None else None
+    health = await health_for_state(session, patch, point.reconstruction_version, provenance, queue)
     inherited = any(r.get("application") == "INHERITED" for r in provenance)
     if inherited and health["status"] == "SUSPENDED":
         return _empty(
@@ -277,6 +281,16 @@ async def _compute(
             reason_codes.append("INHERITED_RULES_UNVERIFIED")
     if item_rules.inherited_from is not None:
         reason_codes.append("ITEM_RULES_INHERITED")
+    # CC-804: regras confirmadas só em Solo/Duo aplicadas no Flex sem medição própria
+    # suficiente; um ACCEPT da fila 440 dispensa o aviso.
+    if (
+        queue == FLEX_QUEUE
+        and provenance
+        and not any(rule.get("appliedFromQueue") == FLEX_QUEUE for rule in provenance)
+        and health.get("queue") == FLEX_QUEUE
+        and health["status"] == "UNVERIFIED"
+    ):
+        reason_codes.append("RULES_MEASURED_IN_SOLO_DUO")
     gold = (point.budget or {}).get("value") if isinstance(point.budget, dict) else None
     return {
         "decisionId": str(decision_id),

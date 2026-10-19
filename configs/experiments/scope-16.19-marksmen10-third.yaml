@@ -1,0 +1,18 @@
+# Recorte EXPERIMENTAL do CC-804 parte B: os mesmos dez atiradores do CC-702/CC-704 (BOTTOM,
+# Solo/Duo, mapa 11, patch 16.19), avaliando só a decisão do 3º item principal. O produto não
+# usa este arquivo e continua no 1º e 2º item (configs/scope.yaml). As linhas vêm do artefato
+# tardio do CC-701 (late_planning_v1): âncora na primeira compra depois do 2º item,
+# estritamente antes do alvo, sem deslizar para um estado posterior.
+schemaVersion: v1-marksmen10-third
+frozenAt: "2026-10-19"
+frozenByCard: CC-804
+
+queue: 420
+map: 11
+role: BOTTOM
+mainItemOrdinal: 3
+
+championIds: [51, 145, 222, 81, 202, 804, 18, 22, 21, 29]
+
+patches:
+  - gamePatch: "16.19"
