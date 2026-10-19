@@ -318,7 +318,11 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         {participant ? <ChampionAvatar participant={participant} size={56} className="decision-hero__portrait" /> : null}
         <div>
           <h2 id="decision-heading">
-            Decisão em {formatGameTime(decision.timestampMs)} — participante {decision.participantId}
+            {participant && match?.localParticipantId === decision.participantId
+              ? `Sua decisão em ${formatGameTime(decision.timestampMs)}`
+              : participant
+                ? `Decisão de ${championName(participant)} em ${formatGameTime(decision.timestampMs)}`
+                : `Decisão em ${formatGameTime(decision.timestampMs)} — participante ${decision.participantId}`}
           </h2>
           <p className="decision-hero__meta">
             {participant ? <strong>{championName(participant)}</strong> : null}

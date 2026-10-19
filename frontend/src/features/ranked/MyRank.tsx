@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from "react";
 import { api, type RankedMe, type RankedQueue } from "../../shared/api/client";
 import "./ranked.css";
 import { preferredQueue } from "./preferredQueue";
+import { count } from "../../shared/text/count";
 
 const tierNames: Record<string, string> = {
   IRON: "Ferro", BRONZE: "Bronze", SILVER: "Prata", GOLD: "Ouro",
@@ -99,7 +100,9 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
           {!apex && <div className="my-rank__track" role="img" aria-label={`${position.leaguePoints} de 100 pontos de liga para a próxima divisão`}>
             <span style={{ width: `${Math.min(position.leaguePoints ?? 0, 100)}%` }} />
           </div>}
-          <p className="my-rank__record">{position.wins} vitórias · {position.losses} derrotas na fila</p>
+          {position.wins != null && position.losses != null && (
+            <p className="my-rank__record">{count(position.wins, "vitória", "vitórias")} · {count(position.losses, "derrota", "derrotas")} na fila</p>
+          )}
         </>}
         {data?.status === "STALE" && <p className="my-rank__stale" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}
         {position?.origin === "DEMO_FICTITIOUS" && <p className="my-rank__stale" role="note">Elo fictício de demonstração: não foi consultado na Riot e não pertence a nenhuma conta.</p>}

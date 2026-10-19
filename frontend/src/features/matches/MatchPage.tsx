@@ -8,6 +8,7 @@ import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { usePagedList } from "../../shared/hooks/usePagedList";
 import { ItemNames } from "../../shared/ui/ItemNames";
 import { ChampionAvatar } from "../history/ChampionAvatar";
+import { championWithRole } from "../history/presentation";
 import { BuildTimeline, DecisionChip, SkillOrder } from "./BuildTimeline";
 import { championName, reasonText } from "./format";
 import { GoldChart } from "./GoldChart";
@@ -17,6 +18,7 @@ import { PreparationPanel } from "./PreparationPanel";
 import { PurgePanel } from "./PurgePanel";
 import { Scoreboard } from "./Scoreboard";
 import "./match.css";
+import { count } from "../../shared/text/count";
 
 /** Preparação em andamento (PENDING/RUNNING) é o único estado não terminal. */
 function preparationSettled(match: MatchDetail): boolean {
@@ -49,8 +51,10 @@ function DecisionsSummary({ decisions }: { decisions: DecisionSummary[] }) {
     <div className={`decisions-summary${summary.eligible ? "" : " decisions-summary--blocked"}`} role="note">
       <p className="decisions-summary__headline">
         {summary.eligible === 0
-          ? `Nenhuma das ${summary.total} decisões de compra desta partida pode ser analisada.`
-          : `${summary.eligible} de ${summary.total} decisões de compra podem ser analisadas.`}
+          ? summary.total === 1
+            ? "A decisão de compra desta partida não pode ser analisada."
+            : `Nenhuma das ${summary.total} decisões de compra desta partida pode ser analisada.`
+          : `${summary.eligible} de ${count(summary.total, "decisão de compra", "decisões de compra")} ${summary.eligible === 1 ? "pode ser analisada" : "podem ser analisadas"}.`}
       </p>
       {blocked > 0 && summary.reasons.length ? (
         <ul className="decisions-summary__reasons">
@@ -69,10 +73,12 @@ function ParticipantSection({
   matchId,
   participant,
   timeline,
+  local,
 }: {
   matchId: string;
   participant: MatchParticipant;
   timeline: MatchTimeline | null;
+  local: boolean;
 }) {
   const participantId = participant.participantId;
   const list = usePagedList<DecisionSummary>({
@@ -81,13 +87,14 @@ function ParticipantSection({
   });
   const cursorExpired = isApiError(list.loadMoreError) && list.loadMoreError.code === "INVALID_CURSOR";
   const ownTimeline = timeline?.participants.find((p) => p.participantId === participantId) ?? null;
+  const owner = championWithRole(championName(participant), participant.role);
   return (
     <section aria-labelledby="decisions-heading" className="match-panel">
       <div className="match-panel__heading">
         <ChampionAvatar participant={participant} size={40} />
         <div>
-          <h3 id="decisions-heading">Decisões do participante {participantId}</h3>
-          <p className="muted">{championName(participant)} · compras na ordem do tempo, agrupadas por volta à loja</p>
+          <h3 id="decisions-heading">{local ? `Suas decisões — ${owner}` : `Decisões de ${owner}`}</h3>
+          <p className="muted">Compras na ordem do tempo, agrupadas por volta à loja</p>
         </div>
       </div>
       {list.status === "loading" ? <p className="muted" aria-busy="true">Carregando decisões…</p> : null}
@@ -238,6 +245,7 @@ export function MatchPage({
                   matchId={match.matchId}
                   participant={selectedParticipant}
                   timeline={timelineState?.timeline ?? null}
+                  local={selectedId === localId}
                 />
               )}
               {timelineState?.timeline ? (
@@ -257,7 +265,7 @@ export function MatchPage({
           ) : null}
 
           <details className="match-more">
-            <summary>Mais ações</summary>
+            <summary>Remover esta partida do RiftLab</summary>
             <PurgePanel key={match.matchId} matchId={match.matchId} />
           </details>
         </ItemNames>

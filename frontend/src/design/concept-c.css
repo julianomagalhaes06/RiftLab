@@ -102,8 +102,9 @@ body { background: var(--n0); color: var(--ntext); font-family: Inter, sans-seri
 .button:hover, .app a.button:hover { background: #cbbdff; }
 .button--secondary, .app a.button--secondary { background: var(--n1); color: var(--accent); border-color: var(--nline); }
 .button--secondary:hover, .app a.button--secondary:hover { background: var(--n2); color: var(--accent); border-color: var(--accent); }
-.button--link { color: var(--accent); }
-.app a.button--link { color: var(--accent); }
+/* CC-902: botão com cara de link nunca herda o fundo do botão primário (texto sumia). */
+.button--link, .app a.button--link { background: transparent; border-color: transparent; color: var(--accent); text-decoration: underline; }
+.button--link:hover, .app a.button--link:hover { background: transparent; border-color: transparent; color: #cbbdff; }
 .list__item, .details { background: var(--n1); border-color: var(--nline); }
 .list__link--selected { border-color: var(--accent); }
 .tag { background: var(--n2); color: var(--ntext); }

@@ -143,7 +143,7 @@ describe("fluxo principal: demonstração → importação → partida → decis
     expect(screen.getByText("Atirador")).toBeInTheDocument();
     expect(screen.getByText("Função não informada")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: /Participante 1 — Campeão #9001/ }));
-    await screen.findByRole("heading", { name: "Decisões do participante 1" });
+    await screen.findByRole("heading", { name: "Decisões de Campeão #9001 (Atirador)" });
     expect(window.location.search).toBe("?participant=1");
     expect(api.callsTo("GET", /decisions$/)[0].search.get("participantId")).toBe("1");
 
@@ -161,7 +161,7 @@ describe("fluxo principal: demonstração → importação → partida → decis
 
     // Detalhe da decisão.
     fireEvent.click(screen.getByRole("link", { name: "Decisão em 7:52" }));
-    await screen.findByRole("heading", { name: /Decisão em 7:52 — participante 1/ });
+    await screen.findByRole("heading", { name: /em 7:52/ });
     expect(window.location.pathname).toBe(`/decisions/${DECISION_1}`);
     expect(await screen.findByText("Componente Sintético A")).toBeInTheDocument();
     expect(screen.getByText("×2")).toBeInTheDocument();
@@ -172,7 +172,7 @@ describe("fluxo principal: demonstração → importação → partida → decis
 
     // Volta às decisões do mesmo participante.
     fireEvent.click(screen.getByRole("link", { name: /Voltar às decisões da partida DEMO-0008/ }));
-    await screen.findByRole("heading", { name: "Decisões do participante 1" });
+    await screen.findByRole("heading", { name: "Decisões de Campeão #9001 (Atirador)" });
     expect(window.location.search).toBe("?participant=1");
 
     // Nada consulta o progresso da importação depois do SUCCEEDED, nem a partida depois de READY.

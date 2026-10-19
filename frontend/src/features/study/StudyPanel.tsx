@@ -16,6 +16,7 @@ import { GlossaryDisclosure } from "../review/components/GlossaryDisclosure";
 import { useItemName } from "../../shared/hooks/useItemName";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
 import "../review/review.css";
+import { count } from "../../shared/text/count";
 
 /**
  * Jornada de estudo de uma decisão (CC-304/305, docs/learning-design.md): escolher o
@@ -320,8 +321,8 @@ function Progress() {
   }
   return (
     <p className="muted">
-      Neste computador: {progress.study.attempts} estudo(s), {progress.study.reflections} com
-      reflexão, {progress.study.usedHints} com pistas; {progress.transfer.attempts} prática(s) sem
+      Neste computador: {count(progress.study.attempts, "estudo", "estudos")}, {progress.study.reflections} com
+      reflexão, {progress.study.usedHints} com pistas; {count(progress.transfer.attempts, "prática", "práticas")} sem
       pistas. São só contagens: não medem habilidade.
     </p>
   );

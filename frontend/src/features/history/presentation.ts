@@ -92,6 +92,12 @@ export function roleShort(role: string | null | undefined): string | null {
   return role ? (ROLE_SHORT[role] ?? role) : null;
 }
 
+/** "Graves (Selva)": campeão e função curta, quando conhecida. */
+export function championWithRole(name: string, role: string | null | undefined): string {
+  const short = roleShort(role);
+  return short ? `${name} (${short})` : name;
+}
+
 /** Os dois times em ordem de rota (topo → suporte); sem função, pela posição. */
 export function teamsOf(match: MatchSummary): MatchParticipant[][] {
   const byTeam = new Map<number, MatchParticipant[]>();

@@ -53,7 +53,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     // Participante → decisões
     await page.getByRole("link", { name: /^Participante 1 —/ }).click();
     await expect(page).toHaveURL(/\/matches\/DEMO-0008\?participant=1$/);
-    await expect(page.getByRole("heading", { name: "Decisões do participante 1" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^(Suas decisões — |Decisões de )/ })).toBeVisible();
     const decisionLink = page.getByRole("link", { name: /^Decisão em / }).first();
     await expect(decisionLink).toBeVisible();
     await expect(page.getByText("Analisar", { exact: true }).first()).toBeVisible();
@@ -61,7 +61,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     // Detalhe: inventário com nomes do catálogo fixado, orçamento e elegibilidade
     await decisionLink.click();
     await expect(page).toHaveURL(/\/decisions\/[0-9a-f-]{36}$/);
-    await expect(page.getByRole("heading", { name: /^Decisão em .* — participante 1$/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^(Sua decisão|Decisão de .+) em / })).toBeVisible();
     await expect(page.getByText("Componente Sintético A")).toBeVisible();
     await expect(page.getByText("Componente Sintético B")).toBeVisible();
     await expect(
@@ -135,14 +135,14 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(page.getByText("Componente Sintético A")).toBeVisible();
     expect(page.url()).toBe(detailUrl);
     await page.goto(`${matchUrl}?participant=1`);
-    await expect(page.getByRole("heading", { name: "Decisões do participante 1" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^(Suas decisões — |Decisões de )/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Decisão em / }).first()).toBeVisible();
 
     // Voltar / avançar do navegador
     await page.goBack(); // do deep link para o detalhe recarregado
     await expect(page.getByText("Componente Sintético A")).toBeVisible();
     await page.goForward();
-    await expect(page.getByRole("heading", { name: "Decisões do participante 1" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^(Suas decisões — |Decisões de )/ })).toBeVisible();
 
     // Outro participante da partida (o 6, do time 200): 200 com lista vazia, que é
     // diferente de "não preparado" (409)
@@ -161,7 +161,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible();
 
     // Remoção (CC-603): prévia, confirmação digitada e job PURGE processado pelo worker real
-    await page.getByText("Mais ações").click();
+    await page.getByText("Remover esta partida do RiftLab").click();
     await page.getByRole("button", { name: "Ver o que será removido" }).click();
     await expect(page.getByText(/eventos da linha do tempo/)).toBeVisible();
     await page.getByLabel(/Digite o id da partida/).fill("DEMO-0008");

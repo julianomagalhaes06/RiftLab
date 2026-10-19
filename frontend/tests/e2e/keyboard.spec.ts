@@ -42,7 +42,7 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
   await expectFocusVisible(page);
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\?participant=1$/);
-  await expect(page.getByRole("heading", { name: "Decisões do participante 1" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Decisões de Campeão #9000/ })).toBeVisible();
   expect(await focusedLabel(page)).toBe(participantLabel);
 
   // Decisões: "Carregar mais" por Espaço.
@@ -60,7 +60,7 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
   });
   await expectFocusVisible(page);
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: /Decisão em 7:52 — participante 1/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /em 7:52/ })).toBeVisible();
   await expect.poll(() => activeId(page)).toBe("conteudo");
   await expect(page.getByText("Componente Sintético A")).toBeVisible();
 
@@ -68,7 +68,7 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
   await tabTo(page, /^Voltar às decisões da partida DEMO-0008/);
   await expectFocusVisible(page);
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Decisões do participante 1" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Decisões de Campeão #9000/ })).toBeVisible();
   await expect(page).toHaveURL(/\/matches\/DEMO-0008\?participant=1$/);
 });
 

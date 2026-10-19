@@ -71,7 +71,7 @@ describe("tela da partida", () => {
     expect(self).toHaveAttribute("aria-current", "true"); // a conta local vem selecionada
     expect(within(self).getByText("Você")).toBeInTheDocument();
 
-    expect(await screen.findByText(/Nenhuma das 1 decisões de compra/)).toBeInTheDocument();
+    expect(await screen.findByText("A decisão de compra desta partida não pode ser analisada.")).toBeInTheDocument();
     const officialBuilds = await screen.findAllByRole("group", { name: "Inventário final oficial" });
     expect(officialBuilds).toHaveLength(2);
     expect(within(officialBuilds[0]).getByText("—")).toBeInTheDocument();
@@ -88,6 +88,6 @@ describe("tela da partida", () => {
     expect(chart).toBeInTheDocument();
     fireEvent.click(screen.getByText("Ver em tabela"));
     expect(screen.getByRole("cell", { name: "+1,1 mil" })).toBeInTheDocument(); // minuto 1: azul 2.700 − vermelho 1.600
-    expect(screen.getByText("Mais ações")).toBeInTheDocument();
+    expect(screen.getByText("Remover esta partida do RiftLab")).toBeInTheDocument();
   });
 });

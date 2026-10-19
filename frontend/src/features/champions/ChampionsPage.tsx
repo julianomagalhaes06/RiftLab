@@ -7,6 +7,7 @@ import { ChampionBadge } from "../matches/ChampionBadge";
 import { ItemNames } from "../../shared/ui/ItemNames";
 import { useItemName } from "../../shared/hooks/useItemName";
 import "./champions.css";
+import { count } from "../../shared/text/count";
 
 const PHASES = { sequence: "1º → 2º item", first: "Primeiro item", second: "Segundo item" } as const;
 
@@ -82,7 +83,7 @@ export function ChampionsPage() {
             aria-pressed={champion.championId === (championId ?? data.championId)}
             onClick={() => update("champion", String(champion.championId))}>
             <ChampionBadge participant={champion} size={40} />
-            <small>{loading ? "Carregando…" : `${champion.matches} partidas`}</small>
+            <small>{loading ? "Carregando…" : champion.matches ? count(champion.matches, "partida", "partidas") : "Sem partidas"}</small>
           </button>)}
         </nav>
         <div className="champions-content" aria-live="polite" aria-busy={loading}>

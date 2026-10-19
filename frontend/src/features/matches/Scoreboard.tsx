@@ -32,8 +32,7 @@ function Build({ items, participant }: { items: MatchTimeline["participants"][nu
         )) : <span className="muted" aria-label={source}>—</span>}
       {trinket ? (
         <span className="scoreboard__trinket" role="group" aria-label="Amuleto final oficial">
-          <span className="muted">Amuleto</span>
-          <span title={itemName({ itemId: trinket })}>
+          <span title={`Amuleto: ${itemName({ itemId: trinket })}`}>
             <ItemIcon itemId={trinket} />
             <span className="sr-only">{itemName({ itemId: trinket })}</span>
           </span>

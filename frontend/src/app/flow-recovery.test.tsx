@@ -392,7 +392,7 @@ describe("URL: deep link, recarregar e voltar/avançar", () => {
     fireEvent.click(await screen.findByRole("link", { name: /DEMO-0008/ }));
     await screen.findByRole("heading", { name: /^Partida DEMO-0008/ });
     fireEvent.click(await screen.findByRole("link", { name: /Participante 2/ }));
-    await screen.findByRole("heading", { name: "Decisões do participante 2" });
+    await screen.findByRole("heading", { name: "Decisões de Campeão #9002" });
 
     window.history.back();
     await waitFor(() => expect(window.location.search).toBe(""));

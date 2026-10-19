@@ -11,6 +11,7 @@ import { HistorySync } from "./HistorySync";
 import { MatchCard } from "./MatchCard";
 import { dayKey, dayLabel, decimal, percent, record, summarizeLoaded } from "./presentation";
 import "./history.css";
+import { count } from "../../shared/text/count";
 
 const PAGE_SIZE = 20;
 
@@ -42,7 +43,7 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
   if (!summary.games) {
     return (
       <section className="history-summary" aria-label="Resumo das páginas carregadas">
-        <strong>{matches.length} partidas carregadas</strong>
+        <strong>{count(matches.length, "partida carregada", "partidas carregadas")}</strong>
         <span>{matches.length - demoCount} RIOT · {demoCount} DEMO</span>
         <p>Sua conta não foi identificada nas partidas carregadas; resultado e KDA dependem da observação de elo da conta configurada.</p>
       </section>
@@ -79,7 +80,7 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
           </li>
         ))}
       </ul>
-      <p className="history-overview__scope">Calculado só nas páginas carregadas ({matches.length} partidas, {demoCount} DEMO).</p>
+      <p className="history-overview__scope">Calculado só nas páginas carregadas ({count(matches.length, "partida", "partidas")}, {demoCount} DEMO).</p>
     </section>
   );
 }

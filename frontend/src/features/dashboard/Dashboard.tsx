@@ -5,6 +5,7 @@ import { Link } from "../../shared/router/Link";
 import { ChampionBadge } from "../matches/ChampionBadge";
 import { RecentMatches } from "../history/RecentMatches";
 import { matchDate, matchDuration } from "../history/presentation";
+import { count } from "../../shared/text/count";
 import "./dashboard.css";
 
 const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -56,15 +57,15 @@ export function Dashboard() {
             <p>Importe partidas concluídas {origin === "REAL" ? "da conta configurada" : "da demonstração"} para ver as métricas.</p>
             <Link to="/">Importar ou abrir demonstração</Link>
           </div> : <>
-            <p>{data.sampledMatches} de até {data.window} partidas, ordenadas pelo término. {data.totalMatches} disponíveis da conta nesta origem.</p>
+            <p>{data.sampledMatches} de até {count(data.window, "partida", "partidas")}, ordenadas pelo término. {count(data.totalMatches, "disponível", "disponíveis")} da conta nesta origem.</p>
             <dl className="dashboard__metrics">
-              <div><dt>Taxa de vitória</dt><dd>{data.winRate === null ? "Indisponível" : `${number(data.winRate * 100)}%`}<small>{data.wins} vitórias em {data.winSamples} partidas com resultado de {data.sampledMatches} no recorte</small></dd></div>
-              <div><dt>KDA do recorte</dt><dd>{data.kda === null ? "Indisponível" : number(data.kda)}<small>{data.kdaSamples} partidas com placar completo de {data.sampledMatches}; (abates + assistências) ÷ mortes, mínimo 1</small></dd></div>
-              <div><dt>Campeões no recorte</dt><dd>{data.distinctChampions}<small>Distintos nas {data.sampledMatches} partidas</small></dd></div>
+              <div><dt>Taxa de vitória</dt><dd>{data.winRate === null ? "Indisponível" : `${number(data.winRate * 100)}%`}<small>{count(data.wins, "vitória", "vitórias")} em {count(data.winSamples, "partida", "partidas")} com resultado de {data.sampledMatches} no recorte</small></dd></div>
+              <div><dt>KDA do recorte</dt><dd>{data.kda === null ? "Indisponível" : number(data.kda)}<small>{count(data.kdaSamples, "partida", "partidas")} com placar completo de {data.sampledMatches}; (abates + assistências) ÷ mortes, mínimo 1</small></dd></div>
+              <div><dt>Campeões no recorte</dt><dd>{data.distinctChampions}<small>{data.sampledMatches === 1 ? "Na única partida" : `Distintos nas ${data.sampledMatches} partidas`}</small></dd></div>
             </dl>
             <div className="dashboard__champions"><h4>Campeões em foco</h4>
               <ul>{data.champions.map((champion) => <li key={champion.championId}>
-                <ChampionBadge participant={champion} /><span>{champion.matches} de {data.sampledMatches} partidas</span>
+                <ChampionBadge participant={champion} /><span>{champion.matches} de {count(data.sampledMatches, "partida", "partidas")}</span>
                 <Link to={`/campeoes?champion=${champion.championId}`}>Explorar campeão</Link>
               </li>)}</ul>
             </div>
@@ -81,7 +82,7 @@ export function Dashboard() {
                   <Link to={{ name: "historyMatch", matchId: match.matchId, participantId: p.participantId }} aria-label={`Contexto da partida ${match.matchId}`}>Contexto</Link>
                 </li>;
               })}</ul>
-              <p>Mostrando {data.recentMatches.length} de {data.sampledMatches} partidas do recorte. <Link to="/historico">Ver as {data.totalMatches} partidas da conta no Histórico geral</Link></p>
+              <p>Mostrando {data.recentMatches.length} de {count(data.sampledMatches, "partida", "partidas")} do recorte. <Link to="/historico">Ver {data.totalMatches === 1 ? "a partida" : `as ${data.totalMatches} partidas`} da conta no Histórico geral</Link></p>
               <small>O Histórico reúne todas as origens importadas. Tropas = tropas de rota + monstros neutros.</small>
             </section>
           </>}
@@ -92,7 +93,7 @@ export function Dashboard() {
               <div><dt>Decisões revistas</dt><dd>{data.progress.revealed}<small>Tentativas reveladas de {data.progress.attempts} iniciadas</small></dd></div>
               <div><dt>Reflexões registradas</dt><dd>{data.progress.reflections}<small>Sobre as tentativas desta origem</small></dd></div>
             </dl>
-            <p>{data.progress.matches} partidas com tentativas iniciadas. Contagens de atividade; não medem aprendizagem ou evolução de elo.</p>
+            <p>{count(data.progress.matches, "partida", "partidas")} com tentativas iniciadas. Contagens de atividade; não medem aprendizagem ou evolução de elo.</p>
           </section>
         </>}
     </section>
