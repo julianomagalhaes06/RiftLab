@@ -252,7 +252,7 @@ async def _prepare(
     if job.mode != ImportMode.DEMO:
         from riftlab.ingestion.final_items_backfill import backfill_final_items
         from riftlab.shared.errors import SourceSchemaError
-        from riftlab.timeline.health import compute_health
+        from riftlab.timeline.health import record_match_health
 
         backfill = await backfill_final_items(
             session_factory, Path(settings.raw_storage_dir), match_id
@@ -262,7 +262,8 @@ async def _prepare(
                 code="FINAL_ITEMS_RAW_INVALID",
                 detail="dados locais inválidos para preencher o inventário final",
             )
-        await compute_health(session_factory, rules, match.patch)
+        # CC-906: só esta partida (e as desatualizadas), não o patch inteiro.
+        await record_match_health(session_factory, match_id)
 
 
 def frames_document(frames: Iterable[FrameLike]) -> list[dict[str, Any]]:
