@@ -18,3 +18,28 @@
 .dashboard__empty { margin-block: 24px; }
 .dashboard__recent time { color: var(--ntext-muted); font-size: .875rem; }
 @media (max-width: 600px) { .dashboard { padding: 16px; } .dashboard__filters, .dashboard__filters label { width: 100%; } .dashboard li { align-items: start; } }
+
+.dashboard__progress summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; cursor: pointer; min-height: 44px; }
+.dashboard__progress summary h4 { display: inline; margin: 0; }
+.dashboard__progress summary span { color: var(--ntext-muted); font-size: .86rem; }
+
+/* CC-905: linhas compactas nas partidas recentes e nos campeões em foco. */
+.dashboard__recent li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: 6px 16px; padding-block: 12px; }
+.dashboard li > .dashboard__recent-who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dashboard li > .dashboard__recent-stats { display: flex; flex-wrap: wrap; gap: 2px 12px; color: var(--ntext-muted); font-size: .86rem; }
+.dashboard__recent-stats span:first-child { color: var(--ntext); font-weight: 600; }
+.dashboard__champions li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 16px; padding-block: 10px; }
+@media (max-width: 600px) {
+  .dashboard__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-block: 16px; }
+  .dashboard__metrics dd { font-size: 1.45rem; margin: 4px 0; }
+  .dashboard__metrics small { font-size: .72rem; line-height: 1.4; }
+  .dashboard__recent li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who link" "stats stats"; }
+  .dashboard__recent-who { grid-area: who; }
+  .dashboard__recent-stats { grid-area: stats; }
+  .dashboard__recent li > a { grid-area: link; }
+  .dashboard__champions li { grid-template-columns: minmax(0, 1fr) auto; }
+  .dashboard__champions li > .dashboard__champion-count { grid-column: 1; grid-row: 2; color: var(--ntext-muted); font-size: .86rem; }
+  .dashboard__champions li > a { grid-column: 2; grid-row: 1 / span 2; }
+  .dashboard__filters { display: grid; grid-template-columns: 1fr 1fr; }
+  .dashboard__filters label:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+}

@@ -10,7 +10,11 @@ export function PanelPage() {
         <h2>Entenda a partida. Evolua a decisão.</h2>
         <p>Abra o contexto de uma partida concluída e estude as decisões de compra, com seus limites de observação.</p>
       </div>
+      {/* CC-905: a posição vem primeiro no DOM (topo no celular); no desktop fica à direita. */}
       <div className="panel-layout">
+        <div className="panel-rank">
+          <MyRank compact />
+        </div>
         <div className="panel-main">
           <section className="study-entry" aria-labelledby="panel-study-heading">
             <div>
@@ -21,14 +25,11 @@ export function PanelPage() {
           </section>
           <Dashboard />
         </div>
-        <div className="panel-side">
-          <MyRank compact />
-          <section className="quiet-surface panel-import">
-            <h3>Nova partida</h3>
-            <p>Importe um ID de partida concluída ou percorra a demonstração sintética.</p>
-            <Link to="/importar">Importar ou abrir demonstração</Link>
-          </section>
-        </div>
+        <section className="quiet-surface panel-import">
+          <h3>Nova partida</h3>
+          <p>Importe um ID de partida concluída ou percorra a demonstração sintética.</p>
+          <Link to="/importar">Importar ou abrir demonstração</Link>
+        </section>
       </div>
     </div>
   );

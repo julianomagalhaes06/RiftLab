@@ -12,6 +12,7 @@ import {
   ok,
   preparation,
 } from "./support/mock-api";
+import { dashboard } from "../../src/test/dashboard";
 
 /**
  * 360 px (CC-205, critério "360 px sem overflow"): em cada página do fluxo o
@@ -199,4 +200,45 @@ test("página não encontrada e protótipo ilustrativo cabem em 360 px", async (
   await page.goto("/prototipo");
   await expect(page.locator("#entrada-heading")).toBeVisible();
   await expectNoHorizontalOverflow(page, "protótipo (entrada)");
+});
+
+test("Painel em 360 px: posição ranqueada no topo e estudo recolhido (CC-905)", async ({ page }) => {
+  await mockApi(page, {
+    "GET /api/v1/dashboard": () => ok(dashboard()),
+    "GET /api/v1/ranked/me": () =>
+      ok({
+        status: "READY", reason: null, change: null,
+        position: { queue: "RANKED_SOLO_5x5", tier: "PLATINUM", division: "III", leaguePoints: 41, wins: 10, losses: 9,
+          season: "2026", capturedAt: "2026-10-16T12:00:00Z", origin: "RIOT_LEAGUE_V4" },
+      }),
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Seu recorte de partidas" })).toBeVisible();
+  const rank = await page.locator(".panel-rank").boundingBox();
+  const main = await page.locator(".panel-main").boundingBox();
+  expect(rank && main && rank.y < main.y).toBe(true);
+  // Linha de base antes do CC-905, com estes mesmos dados simulados: 3.698 px.
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  expect(height).toBeLessThan(3000);
+  await expect(page.getByText("Tentativas reveladas de 12 iniciadas")).toBeHidden();
+  await page.getByText("Seu estudo nesta instalação").click();
+  await expect(page.getByText("Tentativas reveladas de 12 iniciadas")).toBeVisible();
+  await expectNoHorizontalOverflow(page, "painel");
+});
+
+test("ordem de habilidades em 360 px: níveis de dois dígitos não quebram e a grade rola sozinha (CC-905)", async ({ page }) => {
+  const skills = Array.from({ length: 18 }, (_, i) => ({ timestampMs: i * 60_000, skillSlot: [1, 2, 3, 1, 1, 4, 1, 3, 1, 3, 4, 3, 3, 2, 2, 4, 2, 2][i], levelUpType: "NORMAL" }));
+  await mockApi(page, {
+    "GET /api/v1/matches/:id": () => ok(matchDetail({ localParticipantId: 1 })),
+    "GET /api/v1/matches/:id/timeline": () =>
+      ok({ matchId: "DEMO-0008", dataDragonVersion: null, participants: [{ participantId: 1, items: [], skills }], kills: [], objectives: [], goldFrames: [] }),
+  });
+  await page.goto("/historico/DEMO-0008?participant=1");
+  const header = page.locator(".skill-order__grid thead th").filter({ hasText: /^18$/ });
+  await expect(header).toBeVisible();
+  const lineHeights = await page.locator(".skill-order__grid thead th").evaluateAll((cells) =>
+    cells.map((cell) => cell.getBoundingClientRect().height),
+  );
+  expect(Math.max(...lineHeights)).toBeLessThan(26);
+  await expectNoHorizontalOverflow(page, "ordem de habilidades");
 });

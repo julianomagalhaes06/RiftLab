@@ -83,7 +83,7 @@ export function Dashboard() {
             </dl>
             <div className="dashboard__champions"><h4>Campeões em foco</h4>
               <ul>{data.champions.map((champion) => <li key={champion.championId}>
-                <ChampionBadge participant={champion} /><span>{champion.matches} de {count(data.sampledMatches, "partida", "partidas")}</span>
+                <ChampionBadge participant={champion} /><span className="dashboard__champion-count">{champion.matches} de {count(data.sampledMatches, "partida", "partidas")}</span>
                 <Link to={`/campeoes?champion=${champion.championId}`}>Explorar campeão</Link>
               </li>)}</ul>
             </div>
@@ -93,26 +93,33 @@ export function Dashboard() {
                 const p = match.participant;
                 const score = [p.kills, p.deaths, p.assists].map((v) => v ?? "—").join(" / ");
                 const cs = p.totalMinionsKilled == null || p.neutralMinionsKilled == null ? null : p.totalMinionsKilled + p.neutralMinionsKilled;
+                // CC-905: uma linha de identidade e uma de números, como no Histórico.
                 return <li key={match.matchId}>
-                  <div><ChampionBadge participant={p} /><strong>{p.win == null ? "Resultado indisponível" : p.win ? "Vitória" : "Derrota"}</strong></div>
-                  <div><span>Abates / mortes / assistências: {score}</span><span>Tropas: {cs ?? "indisponíveis"} · duração {matchDuration(match.durationSeconds)}</span>
-                    <time dateTime={match.endedAt}>Término: {matchDate(match.endedAt)}</time></div>
+                  <div className="dashboard__recent-who"><ChampionBadge participant={p} /><strong>{p.win == null ? "Resultado indisponível" : p.win ? "Vitória" : "Derrota"}</strong></div>
+                  <div className="dashboard__recent-stats">
+                    <span aria-label={`Abates, mortes e assistências: ${score}`}>{score}</span>
+                    <span>{cs == null ? "tropas indisponíveis" : count(cs, "tropa", "tropas")}</span>
+                    <span>{matchDuration(match.durationSeconds)}</span>
+                    <time dateTime={match.endedAt}>{matchDate(match.endedAt)}</time>
+                  </div>
                   <Link to={{ name: "historyMatch", matchId: match.matchId, participantId: p.participantId }} aria-label={`Contexto da partida ${match.matchId}`}>Contexto</Link>
                 </li>;
               })}</ul>
               <p>Mostrando {data.recentMatches.length} de {count(data.sampledMatches, "partida", "partidas")} do recorte. <Link to="/historico">Ver {data.totalMatches === 1 ? "a partida" : `as ${data.totalMatches} partidas`} da conta no Histórico geral</Link></p>
-              <small>O Histórico reúne todas as origens importadas. Tropas = tropas de rota + monstros neutros.</small>
+              <small>Números: abates / mortes / assistências, tropas (de rota + monstros neutros), duração e término. O Histórico reúne todas as origens importadas.</small>
             </section>
           </>}
-          <section className="dashboard__progress" aria-labelledby="dashboard-progress-heading">
-            <h4 id="dashboard-progress-heading">Seu estudo nesta instalação</h4>
+          {/* CC-905: recolhido por padrão; o resumo traz o número principal. */}
+          <details className="dashboard__progress" aria-labelledby="dashboard-progress-heading">
+            <summary><h4 id="dashboard-progress-heading">Seu estudo nesta instalação</h4>
+              <span>{count(data.progress.revealed, "decisão revista", "decisões revistas")}</span></summary>
             <p>{data.origin} · todas as datas, incluindo estudo de terceiros e exercícios sem pistas. Independente da janela de desempenho.</p>
             <dl className="dashboard__metrics">
               <div><dt>Decisões revistas</dt><dd>{data.progress.revealed}<small>Tentativas reveladas de {data.progress.attempts} iniciadas</small></dd></div>
               <div><dt>Reflexões registradas</dt><dd>{data.progress.reflections}<small>Sobre as tentativas desta origem</small></dd></div>
             </dl>
             <p>{count(data.progress.matches, "partida", "partidas")} com tentativas iniciadas. Contagens de atividade; não medem aprendizagem ou evolução de elo.</p>
-          </section>
+          </details>
         </>}
     </section>
     {(!data || data.status !== "READY") && <RecentMatches />}

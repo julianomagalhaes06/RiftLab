@@ -104,7 +104,9 @@
 /* Ordem de habilidades */
 .skill-order__priority { margin: 0 0 8px; font-size: .84rem; color: var(--ntext-muted); }
 .skill-order kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 4px; background: var(--n2); border: 1px solid var(--nline); color: var(--ntext); font: 700 .74rem var(--font-body); }
-.skill-order__grid { border-collapse: separate; border-spacing: 2px; font-size: .68rem; }
+/* CC-905: a grade rola dentro do próprio bloco; números de dois dígitos não quebram. */
+.skill-order__grid { border-collapse: separate; border-spacing: 2px; font-size: .68rem; width: max-content; }
+.skill-order__grid th, .skill-order__cell { white-space: nowrap; min-width: 22px; }
 .skill-order__grid th { color: var(--ntext-muted); font-weight: 600; width: 22px; text-align: center; }
 .skill-order__cell { width: 22px; height: 22px; background: var(--n2); border-radius: 3px; text-align: center; }
 .skill-order__cell span { font-weight: 700; color: var(--on-color); }

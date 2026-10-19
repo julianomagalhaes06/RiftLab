@@ -22,7 +22,9 @@ describe("Painel da conta própria", () => {
     expect(await screen.findByText("57,14%")).toBeInTheDocument();
     expect(screen.getByText(/4 vitórias em 7 partidas com resultado de 8/)).toBeInTheDocument();
     expect(screen.getByText(/6 partidas com placar completo de 8/)).toBeInTheDocument();
-    expect(screen.getByText("Tropas: 104 · duração 30:00")).toBeInTheDocument();
+    expect(screen.getByText("104 tropas")).toBeInTheDocument();
+    expect(screen.getByLabelText("Abates, mortes e assistências: 5 / 0 / 2")).toBeInTheDocument();
+    expect(screen.getByText("30:00")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Contexto da partida BR1_3090001" })).toHaveAttribute("href", "/historico/BR1_3090001?participant=4");
     expect(screen.getByText("Tentativas reveladas de 12 iniciadas")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Explorar campeão" })).toHaveAttribute("href", "/campeoes?champion=51");

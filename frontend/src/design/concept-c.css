@@ -38,8 +38,10 @@
 /* Painel: CTA curto, cinco registros verificáveis e posição observada. */
 .panel-page .page-intro { max-width: 1050px; margin-bottom: 24px; }
 
-.panel-layout { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(300px, 1fr); align-items: start; gap: 22px; }
-.panel-main, .panel-side { display: grid; gap: 22px; min-width: 0; }
+.panel-layout { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(300px, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "main rank" "main import"; align-items: start; gap: 22px; }
+.panel-main { grid-area: main; display: grid; gap: 22px; min-width: 0; }
+.panel-rank { grid-area: rank; min-width: 0; }
+.panel-import { grid-area: import; }
 .study-entry { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 24px; border: 1px solid var(--nline); border-left: 3px solid var(--accent); background: var(--n1); }
 .study-entry h3 { font: 600 1.28rem/1.2 var(--font-display); margin: 0 0 6px; }
 .study-entry p { color: var(--ntext-muted); margin: 0; line-height: 1.45; }
@@ -111,8 +113,7 @@
   .app__topbar { padding: 0 20px; }
   .main-nav { gap: 0; }
   .app .main-nav__link { padding: 0 7px; gap: 5px; }
-  .panel-layout { grid-template-columns: 1fr; }
-  .panel-side { grid-template-columns: minmax(0, 1.4fr) minmax(220px, .8fr); }
+  .panel-layout { grid-template-columns: minmax(0, 1.4fr) minmax(220px, .8fr); grid-template-rows: auto auto; grid-template-areas: "rank import" "main main"; }
 }
 
 @media (max-width: 700px) {
@@ -126,7 +127,7 @@
   .app .main-nav__link { flex: 1; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 0; min-width: 0; font-size: .68rem; text-align: center; }
   .main-nav__link--active::after { bottom: auto; top: 0; left: 10px; right: 10px; }
   .main-nav__link svg { width: 19px; height: 19px; }
-  .panel-side { grid-template-columns: 1fr; }
+  .panel-layout { grid-template-columns: 1fr; grid-template-areas: "rank" "main" "import"; }
   .import-grid { grid-template-columns: 1fr; }
   .study-entry { align-items: flex-start; flex-direction: column; padding: 18px; }
   .page-intro { margin-bottom: 24px; }
