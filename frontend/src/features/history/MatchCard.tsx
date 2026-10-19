@@ -6,6 +6,7 @@ import { ChampionAvatar } from "./ChampionAvatar";
 import { useItemName } from "../../shared/hooks/useItemName";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
 import { ItemNames } from "../../shared/ui/ItemNames";
+import { count } from "../../shared/text/count";
 import {
   decimal,
   localPerformance,
@@ -122,6 +123,16 @@ export function MatchCard({ match, now }: { match: MatchSummary; now?: Date }) {
 
         <div className="match-card__actions">
           {demo ? <span className="origin-badge origin-badge--demo">DEMO</span> : null}
+          {match.reviewPurchases && match.reviewPurchases.total > 0 ? (
+            <span
+              className={match.reviewPurchases.ready > 0 ? "review-badge" : "review-badge review-badge--none"}
+              title="Compras do 1º ao 5º item comparadas com jogadores do mesmo campeão e rota"
+            >
+              {match.reviewPurchases.ready > 0
+                ? `Revisão: ${match.reviewPurchases.ready} de ${count(match.reviewPurchases.total, "compra", "compras")}`
+                : "Sem compras para revisar"}
+            </span>
+          ) : null}
           <Link
             to={{ name: "historyMatch", matchId: match.matchId, participantId: local?.participantId ?? null }}
             className="match-card__open"

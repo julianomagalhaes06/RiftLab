@@ -172,6 +172,29 @@ export function historySync(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Revisão da partida (F1): uma compra comum, sem habilidades, rota nem gráfico. */
+export function matchReview(overrides: Record<string, unknown> = {}) {
+  return {
+    matchId: "DEMO-0008",
+    participantId: 1,
+    championId: 9001,
+    role: "BOTTOM",
+    patch: "DEMO-1",
+    queue: 420,
+    referenceVersion: "16.19-solo-v1",
+    referenceInherited: true,
+    purchases: [
+      { decisionId: DECISION_1, timestampMs: 472_000, ordinal: 1, itemId: 3031, status: "READY", label: "COMMON", share: 0.4, rank: 1, support: 50, referenceTop: [{ itemId: 3031, share: 0.4 }] },
+    ],
+    skills: null,
+    lane: null,
+    winProbability: null,
+    winProbabilityUnavailable: "FRAMES_WITHOUT_XP",
+    counts: { purchases: 1, ready: 1, common: 1, alternative: 0, uncommon: 0, noReference: 0 },
+    ...overrides,
+  };
+}
+
 export type RouteKey =
   | "GET /api/v1/champions/patterns"
   | "POST /api/v1/imports"
@@ -180,6 +203,7 @@ export type RouteKey =
   | "GET /api/v1/matches"
   | "GET /api/v1/matches/:id"
   | "GET /api/v1/matches/:id/timeline"
+  | "GET /api/v1/matches/:id/review"
   | "POST /api/v1/matches/:id/preparation"
   | "GET /api/v1/matches/:id/decisions"
   | "GET /api/v1/decisions/:id"
@@ -207,6 +231,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/imports/:id", "GET", /^\/api\/v1\/imports\/[^/]+$/],
   ["GET /api/v1/matches", "GET", /^\/api\/v1\/matches$/],
   ["GET /api/v1/matches/:id/timeline", "GET", /^\/api\/v1\/matches\/[^/]+\/timeline$/],
+  ["GET /api/v1/matches/:id/review", "GET", /^\/api\/v1\/matches\/[^/]+\/review$/],
   ["POST /api/v1/matches/:id/preparation", "POST", /^\/api\/v1\/matches\/[^/]+\/preparation$/],
   ["GET /api/v1/matches/:id/decisions", "GET", /^\/api\/v1\/matches\/[^/]+\/decisions$/],
   ["GET /api/v1/matches/:id/purge-preview", "GET", /^\/api\/v1\/matches\/[^/]+\/purge-preview$/],
@@ -369,6 +394,7 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
     objectives: [],
     goldFrames: [],
   }),
+  "GET /api/v1/matches/:id/review": ({ url }) => ok(matchReview({ participantId: Number(url.searchParams.get("participantId") ?? 1) })),
   "POST /api/v1/matches/:id/preparation": () => ok(preparation({ status: "PENDING", attempts: 0 }), 202),
   "GET /api/v1/matches/:id/decisions": ({ url }) =>
     url.searchParams.get("cursor")

@@ -13,6 +13,7 @@ import { BuildTimeline, DecisionChip, SkillOrder } from "./BuildTimeline";
 import { championName, reasonText } from "./format";
 import { GoldChart } from "./GoldChart";
 import { MatchHeader } from "./MatchHeader";
+import { MatchReviewPanel } from "./MatchReviewPanel";
 import { summarizeDecisions } from "./matchView";
 import { PreparationPanel } from "./PreparationPanel";
 import { PurgePanel } from "./PurgePanel";
@@ -249,13 +250,21 @@ export function MatchPage({
                   <p>O participante {selectedId} não existe nesta partida.</p>
                 </div>
               ) : (
-                <ParticipantSection
-                  key={selectedId}
+                <>
+                  <MatchReviewPanel
+                    key={`review-${selectedId}`}
+                    matchId={match.matchId}
+                    participant={selectedParticipant}
+                    participants={match.participants}
+                  />
+                  <ParticipantSection
+                    key={selectedId}
                   matchId={match.matchId}
                   participant={selectedParticipant}
-                  timeline={timelineState?.timeline ?? null}
-                  local={selectedId === localId}
-                />
+                    timeline={timelineState?.timeline ?? null}
+                    local={selectedId === localId}
+                  />
+                </>
               )}
               {timelineState?.timeline ? (
                 <section aria-labelledby="gold-heading" className="match-panel">

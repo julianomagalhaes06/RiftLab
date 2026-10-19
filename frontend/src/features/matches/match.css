@@ -228,3 +228,50 @@
 
 /* CC-902: amuleto só com ícone, separado dos itens. */
 .scoreboard__trinket { display: inline-flex; align-items: center; margin-left: var(--space-1); padding-left: var(--space-1); border-left: 1px solid var(--color-border); }
+
+/* F1 (CC-1005): revisão da partida. */
+.match-panel.review h4 { margin: var(--space-4) 0 var(--space-1); font-size: 1rem; }
+.review__lead { color: var(--color-muted); margin: 0 0 4px; }
+.review__summary { margin: 0 0 8px; }
+.review-purchases { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.review-purchase {
+  display: grid;
+  grid-template-columns: 72px minmax(160px, 1.2fr) 120px minmax(200px, 2fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--nline-soft);
+  border-left: 3px solid var(--nline-strong);
+  border-radius: 6px;
+  background: var(--color-surface-alt);
+}
+.review-purchase--common { border-left-color: var(--win); }
+.review-purchase--alternative { border-left-color: var(--color-warning); }
+.review-purchase--uncommon { border-left-color: var(--loss); }
+.review-purchase__order { color: var(--color-muted); font-size: .85rem; }
+.review-purchase__item { display: flex; gap: 8px; align-items: center; }
+.review-purchase__item small { color: var(--color-muted); }
+.review-purchase__label { font-weight: 600; }
+.review-purchase__detail { color: var(--color-muted); font-size: .9rem; }
+.review-purchase__top { display: block; }
+.review-purchase__open { white-space: nowrap; }
+.review-lane { border-collapse: collapse; width: 100%; max-width: 640px; }
+.review-lane th, .review-lane td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--nline-soft); }
+.review-lane abbr { text-decoration: none; }
+.review-lane small { color: var(--color-muted); }
+.review-lane--ahead small { color: var(--win); }
+.review-lane--behind small { color: var(--loss); }
+.review-win { margin: 0; max-width: 680px; }
+.review-win svg { width: 100%; height: auto; display: block; }
+.review-win__line { fill: none; stroke: var(--accent); stroke-width: 2; }
+.review-win__half { stroke: var(--chart-grid); stroke-dasharray: 4 4; }
+.review-win__tick { fill: var(--color-muted); font-size: 11px; }
+.review-win__moment { fill: var(--win); }
+.review-win__moment--down { fill: var(--loss); }
+.review-moments { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+
+@media (max-width: 700px) {
+  .review-purchase { grid-template-columns: 1fr auto; }
+  .review-purchase__order { grid-column: 1 / -1; }
+  .review-purchase__detail { grid-column: 1 / -1; }
+}

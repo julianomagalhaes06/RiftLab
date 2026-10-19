@@ -116,3 +116,7 @@
 .history-sync--warning {
   border-color: var(--color-warning);
 }
+
+/* F1 (CC-1005): selo da revisão no cartão. */
+.review-badge { width: fit-content; color: var(--win); border: 1px solid var(--nline-strong); padding: 3px 7px; font-size: .69rem; font-weight: 700; }
+.review-badge--none { color: var(--color-muted); }

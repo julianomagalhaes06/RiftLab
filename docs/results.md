@@ -378,6 +378,94 @@ final) quase nunca tem evento de compra; desfazer compra segue sem regra validad
 as rotas. Propostas de regra foram registradas para confirmação futura; nenhuma regra,
 escopo ou produto mudou. Popularidade descreve imitação, não qualidade da compra.
 
+## 9.4 Regras novas de inventário (CC-1001/CC-1002)
+
+As formas nasceram só no treino do corpus 16.19 v3. A confirmação foi pré-registrada e selada
+antes de ler as partidas novas, com auditor executado uma única vez sobre 1.534 partidas
+coletadas para isso (16.19: 463 Solo/Duo e 298 Flex; 16.20: 468 e 305). A coleta usou 3.760
+requisições, a partir das contas com consentimento. Contexto de catálogo completo
+(FULL_CANONICAL_V1).
+
+Linha de cada regra: participantes limpos cujo resultado muda quando a regra é retirada;
+contraexemplo = inventário final previsto diferente do oficial (ε = 0,05, mínimo de 60).
+G-FINAL: todos os participantes limpos sob o conjunto testado (ε = 0,10). Cada célula mostra
+contraexemplos/unidades e, entre parênteses, o limite superior de Wilson 95%.
+
+| Regra | Forma | 16.19/420 | 16.19/440 | 16.20/420 | 16.20/440 |
+| --- | --- | --- | --- | --- | --- |
+| R6v | desfazer correlacionado (imediato ou em pilha) restaura o estado | 5/1833 (0,006) | 0/1196 (0,003) | 1/1849 (0,003) | 1/1241 (0,005) |
+| R10j | pet da Selva sai no fim da missão da Selva | 6/839 (0,016) | 3/541 (0,016) | 3/820 (0,011) | 2/540 (0,013) |
+| R8m | bota tier 2 comprada após a missão do Meio entra como tier 3 | 0/543 (0,007) | 0/375 (0,010) | 0/550 (0,007) | 0/365 (0,010) |
+| R8b | botas do Atirador no espaço do papel após a missão | 0/462 (0,008) | 0/289 (0,013) | 0/501 (0,008) | 0/316 (0,012) |
+| R11s | Atlas → Bússola → Recompensa sem compra | 0/874 (0,004) | 0/546 (0,007) | 0/859 (0,004) | 1/550 (0,010) |
+| R11f | escolha final do Apoio pela Recompensa (linhagem) | 0/851 (0,004) | 0/539 (0,007) | 0/842 (0,005) | 1/543 (0,010) |
+| R12w | Sentinela do Apoio no espaço do papel | 0/752 (0,005) | 0/443 (0,009) | 0/743 (0,005) | 0/440 (0,009) |
+| R9 | transformações por linhagem | 2/450 (0,016) | 2/287 (0,025) | 0/443 (0,009) | 2/259 (0,028) |
+| R1e | consumível usado antes de entrar no inventário | 1/380 (0,015) | 0/292 (0,013) | 0/421 (0,009) | 1/271 (0,021) |
+| R7h | Olho do Arauto no espaço do amuleto | 0/363 (0,010) | 0/227 (0,017) | 0/365 (0,010) | 0/234 (0,016) |
+| G-FINAL | — | 8/4367 (0,0036) | 4/2799 (0,0037) | 4/4384 (0,0023) | 5/2844 (0,0041) |
+
+Todas as linhas e os quatro G-FINAL ficaram ACCEPT. R7x e R8t passaram também no 16.20/420 (4/693
+e 0/328), e as onze regras atuais passaram no 16.20/440, que deixa de herdar do 16.19. Quase
+todos os contraexemplos vêm do amuleto inicial do Fiddlesticks (3330), limitação conhecida da R2i.
+A hipótese antiga de que todo desfazer se correlaciona com a operação anterior continua
+reprovada (CC-316). O desfazer sem correlação segue marcando incerteza. A R6v testa outra
+coisa: a validade do desfazer que se correlaciona.
+
+Ressalvas:
+- Quase três quartos das partidas da confirmação têm algum jogador do treino, porque a coleta
+  parte das mesmas sementes. A linha restrita às partidas sem jogador em comum foi registrada
+  e não é decisiva: teve de 0 a 2 contraexemplos por regra, e as amostras abaixo de 73
+  unidades não alcançam ε = 0,05 nem com zero contraexemplos.
+- Linhagem é escolha de representação: o inventário guarda a identidade da origem.
+- As regras são empíricas, não semântica oficial da Riot.
+
+Efeito no treino com o caminho do produto:
+
+| Rota | Participantes limpos antes | Participantes limpos depois | Compras de itens ≥ 2.000 de ouro com pré-decisão limpa |
+| --- | ---: | ---: | ---: |
+| Topo | 43% | 97% | 98% |
+| Selva | 3% | 92% | 93% |
+| Meio | 4% | 95% | 96% |
+| Atirador | 22% | 93% | 94% |
+| Suporte | 1% | 93% | 95% |
+
+## 9.5 Revisão da partida (F1, CC-1003–CC-1005)
+
+**Referência.** Contada em treino + validação do corpus 16.19 v3 (9.062 partidas), com a
+reconstrução v13 e a seleção v2, que classifica a cadeia do item de Apoio e os resultados de
+transformação pela identidade da origem. Resultado: 251.215 compras do 1º ao 5º item
+principal prontas, em 2.985 células campeão × rota × etapa. As 1.252 células com pelo menos 20
+jogadores cobrem 96,5% dessas compras; há também 329 células de prioridade de habilidades com
+amostra suficiente.
+
+Os rótulos são de popularidade:
+- **comum:** entre as 3 mais escolhidas, com ≥ 10%;
+- **alternativa:** ≥ 3%;
+- **incomum:** < 3%;
+- **sem referência:** célula com menos de 20 jogadores.
+
+Popularidade não é qualidade.
+
+**Chance de vitória por minuto.** Regressão logística sobre diferenças entre os times até o
+minuto: ouro, XP, abates, torres, inibidores, dragões, Ancião, Barão, Arauto e Vastilarvas.
+Ajuste no treino (225.509 minutos). Avaliação única e pré-registrada na validação (47.685
+minutos de 1.599 partidas, bootstrap por partida):
+
+| Modelo | Brier | Log loss |
+| --- | ---: | ---: |
+| Modelo | 0,166 | 0,494 |
+| Só ouro | 0,172 | — |
+| Constante | 0,250 | — |
+
+- **Calibração (ECE):** 0,016.
+- **Ganho sobre a constante:** 0,337 (IC 0,313–0,359).
+- **Diferença para o modelo só de ouro:** −0,0054 (IC −0,0074 a −0,0033).
+
+O gate do produto passou (ECE ≤ 0,05 e ganho ≥ 0,20, com o limite inferior do IC ≥ 0,15).
+Momentos-chave são as maiores variações de um minuto para o outro, com os abates e objetivos
+do intervalo. É correlação: a tela diz quando a chance estimada mudou, não por quê.
+
 ## 10. Limitações e próximos passos
 
 - **Pertinência:** concluir a revisão de especialistas (CC-602) e reportar a concordância.
@@ -393,9 +481,12 @@ escopo ou produto mudou. Popularidade descreve imitação, não qualidade da com
   sinal de forma robusta. Qualquer nova experiência exige protocolo separado.
 - **Interpretador:** uma nova rodada de ajuste exigiria teste novo, mais exemplos de injeção,
   frases vagas e exclusões, e decodificação restrita com abstenção.
-- **Todos os campeões (F0, §9.3):** a referência já é sólida no Topo (1º–4º), no Atirador
-  (1º–5º, todos os campeões) e no 1º item de Selva e Meio; o resto depende de regras de
-  inventário novas (pet da Selva, bota do Meio, cadeia do Suporte, desfazer).
+- **Todos os campeões (§9.3–9.5):** as regras novas foram confirmadas no 16.19 e no 16.20
+  (Solo/Duo e Flex), e a revisão da partida cobre as cinco rotas até o 5º item. A referência é
+  do 16.19 Solo/Duo e vale por herança, com aviso, para outros patches e para o Flex. Atualizar
+  por patch exige coleta e confirmação próprias. Desfazer em sequência sem correlação, itens
+  concedidos de campeões específicos (por exemplo, Pyke e Kalista) e o amuleto do Fiddlesticks
+  continuam marcando incerteza.
 - **Aprendizagem:** o piloto pedagógico com voluntários, se houver recursos e aprovação
   institucional.
 

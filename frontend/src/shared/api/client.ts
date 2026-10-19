@@ -20,6 +20,8 @@ export type MatchSummary = Schemas["MatchSummary"];
 export type MatchDetail = Schemas["MatchDetail"];
 export type MatchParticipant = Schemas["MatchParticipant"];
 export type MatchTimeline = Schemas["MatchTimeline"];
+export type MatchReview = Schemas["MatchReview"];
+export type ReviewPurchase = Schemas["ReviewPurchase"];
 export type TimelineItemEvent = Schemas["TimelineItemEvent"];
 export type TimelineObjective = Schemas["TimelineObjective"];
 export type ChampionAsset = Schemas["ChampionAsset"];
@@ -76,6 +78,7 @@ export interface ApiClient {
   listMatches(params?: MatchListParams, signal?: AbortSignal): Promise<MatchPage>;
   getMatch(matchId: string, signal?: AbortSignal): Promise<MatchDetail>;
   getMatchTimeline(matchId: string, signal?: AbortSignal): Promise<MatchTimeline>;
+  getMatchReview(matchId: string, participantId: number, signal?: AbortSignal): Promise<MatchReview>;
   prepareMatch(matchId: string, signal?: AbortSignal): Promise<MatchPreparation>;
   listDecisions(
     matchId: string,
@@ -193,6 +196,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     getMatch: (matchId, signal) => request("GET", `/api/v1/matches/${enc(matchId)}`, { signal }),
     getMatchTimeline: (matchId, signal) =>
       request("GET", `/api/v1/matches/${enc(matchId)}/timeline`, { signal }),
+    getMatchReview: (matchId, participantId, signal) =>
+      request("GET", `/api/v1/matches/${enc(matchId)}/review${queryString({ participantId })}`, { signal }),
     getPurgePreview: (matchId, signal) =>
       request("GET", `/api/v1/matches/${enc(matchId)}/purge-preview`, { signal }),
     purgeMatch: (matchId, signal) =>
