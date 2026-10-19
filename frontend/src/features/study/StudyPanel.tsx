@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   api,
   type AnalysisCandidate,
+  type AnalysisReferenceSource,
   type AnalysisResult,
   type LearningAttempt,
   type LearningProgress,
@@ -41,7 +42,22 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
     "O inventário usa regras de reconstrução confirmadas num patch anterior, herdadas porque este patch ainda não tem confirmação própria.",
   ITEM_RULES_INHERITED:
     "Os limites de itens (exclusividade) vêm do último patch revisado; itens que ele não cobre ficam fora das alternativas.",
+  POPULARITY_INHERITED: "As contagens de referência foram herdadas de um patch anterior e filtradas pelo catálogo desta decisão.",
+  POPULARITY_SOURCE_CATALOG_IDENTITY_UNBOUND: "A referência anterior não identifica exatamente o catálogo de origem; foi usado o critério de regras explícitas.",
+  POPULARITY_SOURCE_CATALOG_IDENTITY_INVALID: "A identidade do catálogo de origem da referência anterior é inválida; foi usado o critério de regras explícitas.",
+  POPULARITY_SOURCE_CATALOG_NOT_FOUND: "O catálogo exato da referência anterior não está disponível; foi usado o critério de regras explícitas.",
+  POPULARITY_SOURCE_CATALOG_IDENTITY_MISMATCH: "O catálogo não corresponde à identidade congelada da referência; foi usado o critério de regras explícitas.",
+  POPULARITY_SOURCE_PATCH_NOT_PREVIOUS: "A referência não pertence a um patch numérico anterior; foi usado o critério de regras explícitas.",
+  NO_INHERITED_POPULARITY_FOR_CELL: "Após o filtro do catálogo não restaram decisões de referência para esta célula; foi usado o critério de regras explícitas.",
 };
+
+function engineText(engine: string, referenceSource?: AnalysisReferenceSource | null): string {
+  // Na herança, as decisões de referência são do patch de origem, não do patch da partida.
+  if (engine === "POPULARITY" && referenceSource?.type === "INHERITED") {
+    return `Popularidade nas decisões de referência do patch ${referenceSource.patch} deste campeão nesta etapa da build`;
+  }
+  return ENGINE_TEXT[engine] ?? engine;
+}
 
 function reasonText(code: string): string {
   return REASON_TEXT[code] ?? `Motivo: ${code}`;
@@ -60,6 +76,7 @@ export function Comparison({ comparison, selectedItemId, historicalItemId, headi
   }
   const candidates: AnalysisCandidate[] = comparison.candidates ?? [];
   const reasons = comparison.support?.reasonCodes ?? [];
+  const referenceSource = comparison.support?.referenceSource;
   return (
     <section className="section" aria-labelledby="comparison-heading">
       <h3 id="comparison-heading" ref={headingRef} tabIndex={-1}>
@@ -67,8 +84,22 @@ export function Comparison({ comparison, selectedItemId, historicalItemId, headi
       </h3>
       <p className="muted">
         Objetivo: {objectiveLabel(comparison.objective.priority)} ({objectiveSource ?? objectiveOrigin(comparison.objective)}) ·
-        Critério: {ENGINE_TEXT[comparison.engine] ?? comparison.engine}
+        Critério: {engineText(comparison.engine, referenceSource)}
       </p>
+      {referenceSource ? (
+        <p className="muted" data-testid="reference-source">
+          {referenceSource.type === "INHERITED"
+            ? `Referência da popularidade: patch ${referenceSource.patch} (herdada; filtrada pelo catálogo desta decisão).`
+            : referenceSource.type === "OWN"
+              ? `Referência da popularidade: patch ${referenceSource.patch} (própria).`
+              : `Referência da popularidade do patch ${referenceSource.patch} não foi usada.`}
+        </p>
+      ) : null}
+      {comparison.engine === "RULES" && referenceSource?.type === "UNAVAILABLE" ? (
+        <ul className="muted" aria-label="Motivo da referência indisponível">
+          {reasons.map((code) => <li key={code}>{reasonText(code)}</li>)}
+        </ul>
+      ) : null}
       {candidates.length === 0 ? (
         <div className="notice notice--info" role="note">
           <p>Não há comparação disponível para esta decisão.</p>

@@ -64,6 +64,21 @@ class AnalysisQuality(CamelModel):
     user_gold: int | None = Field(default=None, ge=0, le=100000)
 
 
+class AnalysisReferenceSource(CamelModel):
+    """Origem explícita das contagens que ordenaram candidatos."""
+
+    type: Literal["OWN", "INHERITED", "UNAVAILABLE"]
+    patch: str = Field(min_length=1, max_length=20)
+    ranking_version: str = Field(min_length=1, max_length=40)
+    dataset_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    catalog_id: UUID | None = None
+    catalog_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    data_dragon_version: str | None = Field(default=None, max_length=40)
+    mapping_version: str | None = Field(default=None, max_length=80)
+    raw_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    curation_rules_version: str | None = Field(default=None, max_length=80)
+
+
 class AnalysisSupport(CamelModel):
     """level nao e enumerado por completo em docs/contracts.md (so o exemplo
     "LIMITED"); reasonCodes e lista aberta ("minimos", ver
@@ -73,6 +88,7 @@ class AnalysisSupport(CamelModel):
     reason_codes: list[str] = Field(default_factory=list)
     legal_candidates: int | None = Field(default=None, ge=0)
     reference_decisions: int | None = Field(default=None, ge=0)
+    reference_source: AnalysisReferenceSource | None = None
 
 
 class AnalysisExplanation(CamelModel):
@@ -131,6 +147,7 @@ __all__ = [
     "AnalysisCandidate",
     "AnalysisExplanation",
     "AnalysisQuality",
+    "AnalysisReferenceSource",
     "AnalysisRequest",
     "AnalysisResult",
     "AnalysisSupport",

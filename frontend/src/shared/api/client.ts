@@ -37,6 +37,7 @@ export type BudgetSource = Schemas["BudgetSource"];
 export type LearningAttempt = Schemas["LearningAttemptPublicState"];
 export type AnalysisResult = Schemas["AnalysisResult"];
 export type AnalysisCandidate = Schemas["AnalysisCandidate"];
+export type AnalysisReferenceSource = Schemas["AnalysisReferenceSource"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 export type ObjectiveForm = Schemas["ObjectiveForm"];
 export type ObjectiveInterpretation = Schemas["ObjectiveInterpretResult"];

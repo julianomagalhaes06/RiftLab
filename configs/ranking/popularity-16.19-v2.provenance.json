@@ -1,0 +1,14 @@
+{
+ "schemaVersion": 1,
+ "artifactSha256": "af0eb4178c7b3479763777b94fa686f46b908a49df430a2220ae2a66a67a37fa",
+ "datasetSha256": "c6093efa31519b376a91b6bc1ce12440c11863b46c8325a7ad89fb74fe15b5a8",
+ "sourceCatalogIdentity": {
+  "gamePatch": "16.19",
+  "dataDragonVersion": "16.19.1",
+  "sha256": "a509145313c549e015a12fddc8d757e11fabe00671bd996b85dc1aa08617fd0e",
+  "mappingVersion": "v1",
+  "rawHash": "72c996d05a316ca194c0f5c02b25016a553bd204a974db09b4312c40cee3d477",
+  "curationRulesVersion": "data_dragon_v5"
+ },
+ "derivation": "Reconstruído em 18/10/2026 no CC-803, depois da exportação do CC-704; não é manifesto original. As linhas do dataset 16.19 v3 vieram da remedição do CC-702, que fixou o item.json 16.19.1 pelo hash bruto e recusava outros patches; curadoria data_dragon_v5, mapping v1 e a função de identidade não mudaram entre esse commit e esta entrega. O exportador reproduz este artefato byte a byte a partir do dataset, e o catálogo curado reproduzido coincide item a item com o catálogo 16.19 persistido."
+}

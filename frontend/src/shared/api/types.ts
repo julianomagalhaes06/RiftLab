@@ -555,6 +555,35 @@ export interface components {
             warnings?: string[];
         };
         /**
+         * AnalysisReferenceSource
+         * @description Origem explícita das contagens que ordenaram candidatos.
+         */
+        AnalysisReferenceSource: {
+            /** Catalogid */
+            catalogId?: string | null;
+            /** Catalogsha256 */
+            catalogSha256?: string | null;
+            /** Curationrulesversion */
+            curationRulesVersion?: string | null;
+            /** Datadragonversion */
+            dataDragonVersion?: string | null;
+            /** Datasetsha256 */
+            datasetSha256?: string | null;
+            /** Mappingversion */
+            mappingVersion?: string | null;
+            /** Patch */
+            patch: string;
+            /** Rankingversion */
+            rankingVersion: string;
+            /** Rawhash */
+            rawHash?: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "OWN" | "INHERITED" | "UNAVAILABLE";
+        };
+        /**
          * AnalysisRequest
          * @description {decisionId,objective,budget?} + Idempotency-Key (header HTTP, fora do
          *     corpo). Reenvio da mesma chave com corpo identico e idempotente (200);
@@ -621,6 +650,7 @@ export interface components {
             reasonCodes?: string[];
             /** Referencedecisions */
             referenceDecisions?: number | null;
+            referenceSource?: components["schemas"]["AnalysisReferenceSource"] | null;
         };
         /** AnalysisVersions */
         AnalysisVersions: {

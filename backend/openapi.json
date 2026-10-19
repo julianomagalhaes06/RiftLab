@@ -164,6 +164,124 @@
         "title": "AnalysisQuality",
         "type": "object"
       },
+      "AnalysisReferenceSource": {
+        "additionalProperties": false,
+        "description": "Origem explícita das contagens que ordenaram candidatos.",
+        "properties": {
+          "catalogId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalogid"
+          },
+          "catalogSha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalogsha256"
+          },
+          "curationRulesVersion": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Curationrulesversion"
+          },
+          "dataDragonVersion": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datadragonversion"
+          },
+          "datasetSha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasetsha256"
+          },
+          "mappingVersion": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mappingversion"
+          },
+          "patch": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Patch",
+            "type": "string"
+          },
+          "rankingVersion": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Rankingversion",
+            "type": "string"
+          },
+          "rawHash": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rawhash"
+          },
+          "type": {
+            "enum": [
+              "OWN",
+              "INHERITED",
+              "UNAVAILABLE"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "patch",
+          "rankingVersion"
+        ],
+        "title": "AnalysisReferenceSource",
+        "type": "object"
+      },
       "AnalysisRequest": {
         "additionalProperties": false,
         "description": "{decisionId,objective,budget?} + Idempotency-Key (header HTTP, fora do\ncorpo). Reenvio da mesma chave com corpo identico e idempotente (200);\ncorpo divergente e 409 IDEMPOTENCY_CONFLICT — validado no handler, nao\nneste schema de corpo.",
@@ -308,6 +426,16 @@
               }
             ],
             "title": "Referencedecisions"
+          },
+          "referenceSource": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisReferenceSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

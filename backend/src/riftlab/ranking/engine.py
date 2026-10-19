@@ -52,6 +52,9 @@ class RankedCandidate:
 class Popularity:
     version: str
     cells: Mapping[str, Mapping[str, int]]
+    dataset_sha256: str | None = None
+    source_catalog_identity: Mapping[str, Any] | None = None
+    game_patch: str | None = None
 
     @classmethod
     def load(cls, path: Path) -> Popularity:
@@ -59,7 +62,13 @@ class Popularity:
 
     @classmethod
     def load_document(cls, document: Mapping[str, Any]) -> Popularity:
-        return cls(document["version"], document["cells"])
+        return cls(
+            document["version"],
+            document["cells"],
+            document.get("datasetSha256"),
+            document.get("sourceCatalogIdentity"),
+            document.get("gamePatch"),
+        )
 
     def support(self, decision: DecisionFacts) -> int:
         return sum(

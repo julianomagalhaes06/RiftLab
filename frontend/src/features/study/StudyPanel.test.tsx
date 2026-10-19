@@ -102,6 +102,78 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
     await screen.findByRole("heading", { name: "Comparação" });
     expect(screen.getByText(/versão ativa foi recusada porque o arquivo não confere com o hash/)).toBeInTheDocument();
   });
+  it("identifica a popularidade herdada pela versão e origem recebidas da API", async () => {
+    const inherited = {
+      ...COMPARISON,
+      support: {
+        level: "LIMITED",
+        reasonCodes: ["POPULARITY_INHERITED"],
+        legalCandidates: 90,
+        referenceDecisions: 19,
+        referenceSource: {
+          type: "INHERITED",
+          patch: "16.19",
+          rankingVersion: "popularity_16_19_v2",
+          datasetSha256: "c".repeat(64),
+          catalogId: "55555555-5555-4555-8555-555555555555",
+          catalogSha256: "d".repeat(64),
+          dataDragonVersion: "16.19.1",
+          mappingVersion: "mapping-v1",
+          rawHash: "e".repeat(64),
+          curationRulesVersion: "data_dragon_v5",
+        },
+      },
+    };
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
+    mock.on("POST", /\/reveal$/, () =>
+      json(200, attempt({ status: "REVEALED", analysisId: inherited.analysisId, comparison: inherited })),
+    );
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText("Thornmail");
+    fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
+    const source = await screen.findByTestId("reference-source");
+    expect(source).toHaveTextContent(/patch 16\.19 \(herdada; filtrada pelo catálogo desta decisão\)/);
+    // O UUID do catálogo fica na API para auditoria, não na frase para o jogador.
+    expect(source).not.toHaveTextContent(/55555555/);
+    expect(
+      screen.getByText(/Critério: Popularidade nas decisões de referência do patch 16\.19 deste campeão/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/As contagens de referência foram herdadas/)).toBeInTheDocument();
+  });
+
+  it("explica quando a referência anterior não pôde ser vinculada ao catálogo", async () => {
+    const unavailable = {
+      ...COMPARISON,
+      engine: "RULES",
+      support: {
+        level: "LIMITED",
+        reasonCodes: ["POPULARITY_SOURCE_CATALOG_IDENTITY_UNBOUND"],
+        legalCandidates: 90,
+        referenceDecisions: 0,
+        referenceSource: {
+          type: "UNAVAILABLE",
+          patch: "16.19",
+          rankingVersion: "popularity_16_19_v2",
+          datasetSha256: "c".repeat(64),
+          catalogId: null,
+          catalogSha256: null,
+        },
+      },
+    };
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
+    mock.on("POST", /\/reveal$/, () =>
+      json(200, attempt({ status: "REVEALED", analysisId: unavailable.analysisId, comparison: unavailable })),
+    );
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText("Thornmail");
+    fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
+    expect(await screen.findByTestId("reference-source")).toHaveTextContent(/patch 16\.19/);
+    expect(screen.getByLabelText("Motivo da referência indisponível")).toHaveTextContent(
+      /não identifica exatamente o catálogo de origem/,
+    );
+  });
 
   it("sem alternativas mostra os motivos em vez de tela vazia", async () => {
     mock.on("POST", /^\/api\/v1\/learning-attempts$/, () =>

@@ -28,7 +28,8 @@ from riftlab.candidates.domain import (
 )
 from riftlab.candidates.rules import resolve_item_rules
 from riftlab.catalog.diff import catalog_diff, patch_catalog
-from riftlab.dataset.rows import _catalog
+from riftlab.catalog.repository import SqlAlchemyCatalogRepository
+from riftlab.dataset.rows import RowsError, _catalog
 from riftlab.decisions.features import build_pre_decision_view
 from riftlab.decisions.models import DecisionPointModel
 from riftlab.ml.registry import resolve_active
@@ -41,12 +42,112 @@ from riftlab.ranking.engine import (
     load_default,
     rank,
 )
+from riftlab.ranking.inheritance import (
+    PopularityCatalog,
+    filter_inherited_popularity,
+    latest_previous_artifact,
+)
 from riftlab.shared.errors import ConflictError, NotFoundError
 from riftlab.timeline.health import health_for_state
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
 ALGORITHM_VERSION = "analysis_v1"
 REGISTRY_TASK = "purchase_decision"  # escopo do registro = patch do catálogo
+
+
+def _support_level(supported: bool, reason_codes: list[str]) -> str:
+    return "SUPPORTED" if supported and not reason_codes else "LIMITED"
+
+
+def _ranking_version(popularity: Any, reference: dict[str, Any] | None, fallback: str) -> str:
+    # versions.ranking tem max_length=40; "popularity_16_19_v2 (herdado)" usa 29.
+    # A herança continua marcada por POPULARITY_INHERITED se o sufixo não couber.
+    version = str(popularity.version or fallback)
+    if reference is not None and reference.get("type") == "INHERITED":
+        inherited = f"{version} (herdado)"
+        return inherited if len(inherited) <= 40 else version
+    return version
+
+
+def _reference_payload(
+    kind: str, popularity: Any, *, catalog_id: str | None = None, catalog_sha256: str | None = None
+) -> dict[str, Any]:
+    identity = popularity.source_catalog_identity or {}
+    return {
+        "type": kind,
+        "patch": popularity.game_patch or "unknown",
+        "rankingVersion": popularity.version,
+        "datasetSha256": popularity.dataset_sha256,
+        "catalogId": catalog_id,
+        "catalogSha256": catalog_sha256,
+        "dataDragonVersion": identity.get("dataDragonVersion"),
+        "mappingVersion": identity.get("mappingVersion"),
+        "rawHash": identity.get("rawHash"),
+        "curationRulesVersion": identity.get("curationRulesVersion"),
+    }
+
+
+async def _popularity_for_analysis(
+    session: AsyncSession,
+    configs: Path,
+    patch: str,
+    decision: DecisionFacts,
+    destination_bundle: Any,
+    own: Any,
+) -> tuple[Any, int, list[str], dict[str, Any] | None]:
+    """Own supported artifact wins; otherwise try exactly the latest prior patch."""
+    own_support = own.support(decision) if own is not None else 0
+    if own is not None and own_support > 0:
+        return own, own_support, [], _reference_payload("OWN", own)
+
+    previous = latest_previous_artifact(configs, patch)
+    if previous is None:
+        reference = _reference_payload("OWN", own) if own is not None else None
+        return None, 0, ["NO_POPULARITY_FOR_CELL"], reference
+
+    identity = previous.source_catalog_identity
+    source_bundle = None
+    if isinstance(identity, dict) and isinstance(identity.get("sha256"), str):
+        try:
+            repository = SqlAlchemyCatalogRepository(session)
+            catalog = await repository.find_catalog_version_by_content_hash(identity["sha256"])
+            if catalog is not None:
+                source_bundle = await _catalog(session, catalog.id)
+        except RowsError:
+            source_bundle = None
+
+    result = filter_inherited_popularity(
+        previous,
+        (
+            PopularityCatalog(
+                source_bundle.catalog,
+                {item.item_id: item for item in source_bundle.items},
+                source_bundle.classification,
+            )
+            if source_bundle is not None
+            else None
+        ),
+        PopularityCatalog(
+            destination_bundle.catalog,
+            {item.item_id: item for item in destination_bundle.items},
+            destination_bundle.classification,
+        ),
+    )
+    reference = _reference_payload(
+        "UNAVAILABLE",
+        previous,
+        catalog_id=result.source_catalog_id,
+        catalog_sha256=result.source_catalog_sha256,
+    )
+    if result.popularity is None:
+        return None, 0, [result.reason_code or "POPULARITY_INHERITANCE_UNAVAILABLE"], reference
+    support = result.popularity.support(decision)
+    if support <= 0:
+        return None, 0, ["NO_INHERITED_POPULARITY_FOR_CELL"], reference
+    reference["type"] = "INHERITED"
+    reference["catalogId"] = result.source_catalog_id
+    reference["catalogSha256"] = result.source_catalog_sha256
+    return result.popularity, support, ["POPULARITY_INHERITED"], reference
 
 
 def request_hash(body: dict[str, Any]) -> str:
@@ -185,8 +286,14 @@ async def _compute(
         for c in result.candidates
     ]
     decision = DecisionFacts(champion, point.main_item_ordinal, None, None)
-    popularity, rules, objective_cfg = load_default(configs, patch)
-    supported = popularity is not None and popularity.support(decision) > 0
+    own_popularity, rules, objective_cfg = load_default(configs, patch)
+    (
+        popularity,
+        reference_decisions,
+        popularity_reasons,
+        reference_source,
+    ) = await _popularity_for_analysis(session, configs, patch, decision, bundle, own_popularity)
+    supported = popularity is not None and reference_decisions > 0
     engine = POPULARITY if supported else RULES
     ranked = rank(
         decision,
@@ -197,7 +304,7 @@ async def _compute(
         rules=rules,
         objective=objective_cfg,
     )
-    reason_codes = [] if supported else ["NO_POPULARITY_FOR_CELL"]
+    reason_codes = list(popularity_reasons)
     # Herança (reconstrução v10 e legalidade): análise possível, mas com regras
     # confirmadas em outro patch; o motivo vai junto do resultado.
     if any(
@@ -219,7 +326,9 @@ async def _compute(
             "catalog": catalog_label,
             "features": "feature_schema_v1",
             "candidates": ALGORITHM_VERSION,
-            "ranking": popularity.version if supported and popularity else rules.version,
+            "ranking": _ranking_version(popularity, reference_source, rules.version)
+            if supported and popularity
+            else rules.version,
             "objective": objective_cfg.version,
             "itemRules": f"{item_rules.inherited_from}.json (herdado)"
             if item_rules.inherited_from
@@ -234,10 +343,11 @@ async def _compute(
             "userGold": int(budget["gold"]) if budget else None,
         },
         "support": {
-            "level": "SUPPORTED" if supported and not reason_codes else "LIMITED",
+            "level": _support_level(supported, reason_codes),
             "reasonCodes": reason_codes,
             "legalCandidates": len(facts),
-            "referenceDecisions": popularity.support(decision) if popularity else 0,
+            "referenceDecisions": reference_decisions,
+            "referenceSource": reference_source,
         },
         "candidates": [as_payload(item) for item in ranked],
         "scoreNote": "Pontuações são relativas a esta decisão; não são probabilidades.",
