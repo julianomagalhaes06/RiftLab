@@ -5195,6 +5195,24 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "description": "all: importadas; account: conta local; demo: sintéticas; account_and_demo: conta local e sintéticas. Filtro anterior à paginação; conta não identificada nunca inclui partidas reais de terceiros.",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "description": "all: importadas; account: conta local; demo: sintéticas; account_and_demo: conta local e sintéticas. Filtro anterior à paginação; conta não identificada nunca inclui partidas reais de terceiros.",
+              "enum": [
+                "all",
+                "account",
+                "demo",
+                "account_and_demo"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
           }
         ],
         "responses": {

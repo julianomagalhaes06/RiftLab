@@ -121,12 +121,16 @@ function DayGroups({ matches }: { matches: MatchSummary[] }) {
 
 export function HistoryPage() {
   const [query, setQuery] = useState("");
-  const [origin, setOrigin] = useState<OriginFilter>("ALL");
+  const [origin, setOrigin] = useState<OriginFilter>("RIOT");
   const [result, setResult] = useState<ResultFilter>("ALL");
   const [queue, setQueue] = useState<QueueFilter>("ALL");
   const list = usePagedList<MatchSummary>({
-    resetKey: "history-matches",
-    fetchPage: (cursor, signal) => api.listMatches({ cursor, limit: PAGE_SIZE }, signal),
+    resetKey: `history-matches-${origin}`,
+    fetchPage: (cursor, signal) => api.listMatches({
+      cursor,
+      limit: PAGE_SIZE,
+      scope: origin === "RIOT" ? "account" : origin === "DEMO" ? "demo" : "account_and_demo",
+    }, signal),
   });
   const visible = filterLoadedMatches(list.items, query, origin, result, queue);
   const hasLocal = list.items.some((match) => match.localParticipantId != null);
@@ -137,7 +141,7 @@ export function HistoryPage() {
       <div className="page-intro">
         <p className="page-intro__kicker">Histórico de partidas importadas</p>
         <h2>Partidas para estudar</h2>
-        <p>Veja como foi cada partida e abra a análise das suas compras.</p>
+        <p>Partidas da conta configurada. Veja como foi cada partida e abra a análise das suas compras.</p>
       </div>
 
       <HistorySync onNewMatches={list.refresh} />
@@ -155,7 +159,7 @@ export function HistoryPage() {
           {hasLocal ? (
             <FilterGroup<ResultFilter> label="Resultado" value={result} onChange={setResult} options={[["ALL", "Todos"], ["WIN", "Vitórias"], ["LOSS", "Derrotas"]] as const} />
           ) : null}
-          <FilterGroup<OriginFilter> label="Origem da partida" value={origin} onChange={setOrigin} options={[["ALL", "Todas as origens"], ["RIOT", "RIOT"], ["DEMO", "DEMO"]] as const} />
+          <FilterGroup<OriginFilter> label="Origem da partida" value={origin} onChange={setOrigin} options={[["ALL", "Minha conta e DEMO"], ["RIOT", "Minha conta"], ["DEMO", "DEMO"]] as const} />
         </div>
         {!hasLocal && list.status === "ready" ? (
           <p className="history-controls__limit">Filtro de resultado indisponível: sua conta não foi identificada nas partidas carregadas.</p>
@@ -179,7 +183,7 @@ export function HistoryPage() {
           ) : (
             <div className="empty-state">
               <h4>{list.items.length ? "Nenhuma partida neste filtro" : "Nenhuma partida importada"}</h4>
-              <p>{list.items.length ? "Ajuste a busca ou carregue mais páginas." : "Importe uma partida concluída ou abra a demonstração para começar."}</p>
+              <p>{list.items.length ? "Ajuste a busca ou carregue mais páginas." : origin === "RIOT" ? "Nenhuma partida foi identificada para a conta configurada. Confira a conta e a atualização em Minha posição ou selecione DEMO." : "Importe uma partida concluída ou abra a demonstração para começar."}</p>
               <Link to="/importar">Importar ou abrir demonstração</Link>
               {list.nextCursor !== null && <button className="button button--secondary" type="button" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? "Carregando…" : "Carregar mais partidas"}</button>}
             </div>

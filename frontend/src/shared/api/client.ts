@@ -1,5 +1,5 @@
 import { ApiError, INVALID_RESPONSE, NETWORK_ERROR, isAbortError, parseProblem } from "./errors";
-import type { components } from "./types";
+import type { components, paths } from "./types";
 
 /**
  * Cliente ÚNICO da API do RiftLab (CC-205). Todo tipo de requisição/resposta é um
@@ -54,6 +54,10 @@ export interface PageParams {
   limit?: number;
 }
 
+export interface MatchListParams extends PageParams {
+  scope?: NonNullable<paths["/api/v1/matches"]["get"]["parameters"]["query"]>["scope"];
+}
+
 interface RequestOptions {
   body?: unknown;
   signal?: AbortSignal;
@@ -69,7 +73,7 @@ export interface ApiClient {
   createImport(matchId: string, mode: ImportMode, signal?: AbortSignal): Promise<ImportJobAccepted>;
   getImport(jobId: string, signal?: AbortSignal): Promise<ImportJobStatus>;
   retryImport(jobId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
-  listMatches(params?: PageParams, signal?: AbortSignal): Promise<MatchPage>;
+  listMatches(params?: MatchListParams, signal?: AbortSignal): Promise<MatchPage>;
   getMatch(matchId: string, signal?: AbortSignal): Promise<MatchDetail>;
   getMatchTimeline(matchId: string, signal?: AbortSignal): Promise<MatchTimeline>;
   prepareMatch(matchId: string, signal?: AbortSignal): Promise<MatchPreparation>;
@@ -183,7 +187,7 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     retryImport: (jobId, signal) =>
       request("POST", `/api/v1/imports/${enc(jobId)}/retry`, { signal }),
     listMatches: (params = {}, signal) =>
-      request("GET", `/api/v1/matches${queryString({ cursor: params.cursor, limit: params.limit })}`, {
+      request("GET", `/api/v1/matches${queryString({ cursor: params.cursor, limit: params.limit, scope: params.scope })}`, {
         signal,
       }),
     getMatch: (matchId, signal) => request("GET", `/api/v1/matches/${enc(matchId)}`, { signal }),

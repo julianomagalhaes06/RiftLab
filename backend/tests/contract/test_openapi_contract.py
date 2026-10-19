@@ -150,7 +150,9 @@ def test_match_routes_document_order_pagination_and_errors() -> None:
     assert set(detail["get"]["responses"]) == {"200", "404", "422"}
     assert set(prepare["post"]["responses"]) == {"202", "404", "422"}
     params = {p["name"]: p for p in listing["get"]["parameters"]}
-    assert set(params) == {"cursor", "limit"}
+    assert set(params) == {"cursor", "limit", "scope"}
+    assert params["scope"]["schema"]["default"] == "all"
+    assert params["scope"]["schema"]["enum"] == ["all", "account", "demo", "account_and_demo"]
     assert (
         params["limit"]["schema"]["default"] == 20 and params["limit"]["schema"]["maximum"] == 100
     )

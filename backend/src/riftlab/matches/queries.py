@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
 from riftlab.champions.application import ChampionAsset, champion_assets
-from riftlab.ingestion.domain import Match, Participant
+from riftlab.ingestion.domain import Match, MatchListScope, Participant
 from riftlab.ingestion.models import ParticipantFinalItemsModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.ingestion.score import ParticipantScore
@@ -129,16 +129,17 @@ async def list_matches(
     cursor: str | None,
     mapping: CatalogMapping | None = None,
     local_subject: LocalSubject | None = None,
+    scope: MatchListScope = "all",
 ) -> MatchPage:
     """`local_subject` resolve, na mesma transação, o hash da conta local; ele só é
     comparado no banco e vira `local_participant_id` (DEMO: participante 1)."""
     after = decode_match_cursor(cursor) if cursor else None
     async with read_only_unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
-        rows = await repo.list_matches_page(after, limit + 1)
+        subject = await local_subject(session) if local_subject is not None else None
+        rows = await repo.list_matches_page(after, limit + 1, scope=scope, local_subject=subject)
         page = rows[:limit]
         jobs = await repo.list_latest_preparation_jobs([m.match_id for m in page])
-        subject = await local_subject(session) if local_subject is not None else None
         finals = {
             (f.match_id, f.participant_id): f
             for f in (

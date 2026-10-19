@@ -2801,6 +2801,8 @@ export interface operations {
             query?: {
                 cursor?: string | null;
                 limit?: number;
+                /** @description all: importadas; account: conta local; demo: sintéticas; account_and_demo: conta local e sintéticas. Filtro anterior à paginação; conta não identificada nunca inclui partidas reais de terceiros. */
+                scope?: "all" | "account" | "demo" | "account_and_demo";
             };
             header?: never;
             path?: never;

@@ -183,6 +183,17 @@ CLI prevista (implementar em S1–S6): cc catalog sync; cc ingest --manifest PAT
 
 Rotas de análise direta permanecem para revisão explícita; o fluxo Estudo usa tentativas e não solicita ranking no carregamento. Não é barreira antifraude contra o próprio operador local, mas separação intencional de contrato para não vazar resposta na UI. GET report pode receber attemptId vinculado à analysis para incluir aprendizado; tentativa de outra análise retorna 422. Toda justificativa é escapada e omitida de logs. Não pontuar resposta com rank como verdade absoluta.
 
+## Histórico da conta configurada
+
+`GET /api/v1/matches` aceita `scope=all|account|demo|account_and_demo` (padrão `all`,
+preservando a consulta administrativa de importadas). O escopo `account` seleciona
+somente partidas reais com participação da conta configurada, usando a mesma
+identificação local de `localParticipantId`. Sem identificação, retorna uma página
+vazia; nunca inclui contas de terceiros como alternativa. `demo` seleciona somente
+partidas sintéticas, e `account_and_demo` reúne os dois conjuntos. A seleção acontece
+no banco antes do limite e do cursor. O Histórico abre com `scope=account`; seus
+filtros de origem mudam o escopo e reiniciam a paginação. Nenhum dado é apagado.
+
 ## CC-310 — Minha posição da conta local
 
 Seleção inicial automática (16/10/2026): UI consulta ambas as filas em paralelo uma vez por montagem, com timeout de dez segundos. Classificação READY tem precedência sobre UNRANKED/ausência; entre classificações, observação com status READY precede STALE, seguida por tier, divisão e PDL. Empate mantém Solo/Duo; UNRANKED conhecido precede ausência. Nenhuma classificação é criada por inferência. A escolha manual é estado independente e nunca sobrescrita por resposta posterior; navegação desmonta e cancela as consultas. Observações ficam em memória durante a página e mudam após recarregar. Este comportamento substitui a consulta por troca de fila descrita na extensão original abaixo; a API e seu padrão Solo/Duo permanecem inalterados.

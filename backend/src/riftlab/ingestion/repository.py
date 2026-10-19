@@ -17,6 +17,7 @@ from riftlab.ingestion.domain import (
     ImportMode,
     JobKind,
     Match,
+    MatchListScope,
     Participant,
 )
 from riftlab.ingestion.models import (
@@ -315,11 +316,33 @@ class SqlAlchemyIngestionRepository:
         return job
 
     async def list_matches_page(
-        self, after: tuple[datetime, str] | None, limit: int
+        self,
+        after: tuple[datetime, str] | None,
+        limit: int,
+        *,
+        scope: MatchListScope = "all",
+        local_subject: str | None = None,
     ) -> list[Match]:
         """Partidas importadas, da mais recente para a mais antiga: ordem
         estável (start_at DESC, match_id DESC), keyset sobre essa dupla."""
         stmt = select(MatchModel)
+        is_demo = MatchModel.match_id.startswith("DEMO-")
+        is_account = ~is_demo & (
+            select(ParticipantModel.match_id)
+            .where(
+                ParticipantModel.match_id == MatchModel.match_id,
+                ParticipantModel.subject_hash == local_subject,
+            )
+            .exists()
+            if local_subject is not None
+            else literal(False)
+        )
+        if scope == "account":
+            stmt = stmt.where(is_account)
+        elif scope == "demo":
+            stmt = stmt.where(is_demo)
+        elif scope == "account_and_demo":
+            stmt = stmt.where(or_(is_account, is_demo))
         if after is not None:
             stmt = stmt.where(
                 tuple_(MatchModel.start_at, MatchModel.match_id)

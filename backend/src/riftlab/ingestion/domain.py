@@ -4,11 +4,13 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from riftlab.ingestion.final_items import FinalItems
 from riftlab.ingestion.score import ParticipantScore
 from riftlab.shared.domain import SourceOrigin
+
+MatchListScope = Literal["all", "account", "demo", "account_and_demo"]
 
 
 class ImportMode(StrEnum):

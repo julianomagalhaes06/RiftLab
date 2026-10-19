@@ -22,7 +22,7 @@ from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_
 from riftlab.catalog.patches import load_persisted_mapping
 from riftlab.champions.application import ChampionAsset as ChampionAssetData
 from riftlab.errors import ProblemDetail
-from riftlab.ingestion.domain import Match
+from riftlab.ingestion.domain import Match, MatchListScope
 from riftlab.ingestion.purge import purge_preview, request_purge
 from riftlab.matches.queries import MatchParticipantFactsView, get_match_detail, list_matches
 from riftlab.matches.timeline import get_match_timeline
@@ -90,12 +90,21 @@ async def list_imported_matches(
     request: Request,
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=PAGINATION_MAX_LIMIT)] = PAGINATION_DEFAULT_LIMIT,
+    scope: Annotated[
+        MatchListScope,
+        Query(
+            description="all: importadas; account: conta local; demo: sintéticas; "
+            "account_and_demo: conta local e sintéticas. Filtro anterior à paginação; "
+            "conta não identificada nunca inclui partidas reais de terceiros."
+        ),
+    ] = "all",
 ) -> CursorPage[MatchSummary]:
     settings = request.app.state.settings
     page = await list_matches(
         request.app.state.session_factory,
         limit=limit,
         cursor=cursor,
+        scope=scope,
         mapping=await _catalog_mapping_or_none(
             request.app.state.session_factory,
             Path(settings.catalog_mappings_path),

@@ -27,6 +27,7 @@ describe("Histórico com dados realmente disponíveis", () => {
     render(<App />);
 
     expect(await screen.findByText("2 partidas carregadas")).toBeInTheDocument();
+    expect(api.callsTo("GET", /^\/api\/v1\/matches$/)[0].search.get("scope")).toBe("account");
     expect(screen.getByText("1 RIOT · 1 DEMO")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Contexto da partida BR1_123" })).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "kai" } });
@@ -35,11 +36,12 @@ describe("Histórico com dados realmente disponíveis", () => {
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "br1_12" } });
     expect(screen.getByRole("link", { name: "Contexto da partida BR1_123" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "DEMO" }));
-    expect(screen.getByText("Nenhuma partida neste filtro")).toBeInTheDocument();
+    expect(await screen.findByText("Nenhuma partida neste filtro")).toBeInTheDocument();
+    expect(api.callsTo("GET", /^\/api\/v1\/matches$/).at(-1)?.search.get("scope")).toBe("demo");
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "" } });
     expect(screen.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Todas as origens" }));
-    fireEvent.click(screen.getByRole("button", { name: "Carregar mais partidas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Minha conta e DEMO" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Carregar mais partidas" }));
     expect(await screen.findByRole("link", { name: "Contexto da partida BR1_456" })).toBeInTheDocument();
     expect(screen.getByText("3 partidas carregadas")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Vitórias" })).not.toBeInTheDocument();
@@ -124,6 +126,7 @@ describe("Histórico com dados realmente disponíveis", () => {
     api.on("GET", /^\/api\/v1\/matches\/DEMO-0008\/decisions$/, () => json(200, { items: [], nextCursor: null }));
     vi.stubGlobal("fetch", api.fetch);
     render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "DEMO" }));
     fireEvent.click(await screen.findByRole("link", { name: "Contexto da partida DEMO-0008" }));
     expect(window.location.pathname).toBe("/historico/DEMO-0008");
     fireEvent.click(await screen.findByRole("link", { name: /Participante 1/ }));
