@@ -20,10 +20,12 @@ import fcntl
 import hashlib
 import heapq
 import json
+import math
 import os
 import re
 import stat
 import time
+import unicodedata
 from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -36,10 +38,21 @@ from riftlab.collection.cc316_adoption import (
     private_root_for,
     read_private_with_sidecar,
 )
-from riftlab.collection.cc316_discovery import BudgetJournal, DiscoveryError, _atomic_write_once
+from riftlab.collection.cc316_discovery import (
+    _DIAGNOSTIC_CAUSE_CATEGORIES,
+    _DIAGNOSTIC_EXCEPTION_CLASSES,
+    _DIAGNOSTIC_REQUEST_CLASSES,
+    _DIAGNOSTIC_RESULTS,
+    BudgetJournal,
+    DiscoveryError,
+    _atomic_write_once,
+)
 from riftlab.collection.seeds import Seed
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
-from riftlab.ingestion.infrastructure.riot_transport import RawRiotResponse
+from riftlab.ingestion.infrastructure.riot_transport import (
+    RawRiotResponse,
+    _diagnostic_result_for_status,
+)
 from riftlab.shared.errors import (
     SourceAuthError,
     SourceError,
@@ -67,6 +80,8 @@ DESIGNED_STOPS = frozenset(
 )
 _SHUTDOWN_RESERVE_NS = 300_000_000_000
 _MATCH_ID = re.compile(r"^BR1_[0-9]{1,20}$")
+_PATCH = re.compile(r"^[0-9]{1,3}\.[0-9]{1,3}$")
+_CAMPAIGN_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 _TERMINAL_JOURNAL_STATUSES = frozenset(
     {"COMPLETED", "INTERRUPTED", "STOPPED_AUTH", "STOPPED_RATE_OR_BUDGET"}
@@ -113,10 +128,20 @@ class Campaign:
     sample_per_player: int | None = None
     sample_salt: str = ""
     known_raw_subdirectories: tuple[str, ...] = ("cc316/raw-exploration", "cc316/raw-confirmation")
+    patch: str = TARGET_PATCH
+    queues: tuple[int, ...] = (TARGET_QUEUE,)
+    map_id: int = TARGET_MAP
+    schema_version: int = 1
+    scope_position: str = SCOPE_POSITION
+    campaign_name: str | None = None
 
     @property
     def kept_per_player(self) -> int:
         return self.listing_count if self.sample_per_player is None else self.sample_per_player
+
+    @property
+    def is_generic(self) -> bool:
+        return self.schema_version == 2
 
     def keep(self, puuid: str, match_ids: Sequence[str]) -> list[str]:
         if self.sample_per_player is None:
@@ -160,6 +185,92 @@ CC703 = Campaign(
 CAMPAIGNS = {campaign.campaign_id: campaign for campaign in (CC323, CC703)}
 
 
+def build_patch_campaign(
+    *,
+    patch: str,
+    campaign_name: str,
+    window_start: int,
+    window_end: int,
+    max_pairs: int = 1_200,
+    max_requests: int = 3_000,
+    max_seconds: int = 7_200,
+    queues: tuple[int, ...] = (420, 440),
+    map_id: int = TARGET_MAP,
+    scope_champions: frozenset[int] = SCOPE_CHAMPIONS,
+    scope_position: str = SCOPE_POSITION,
+    known_raw_subdirectories: tuple[str, ...] = (
+        "cc316/raw-exploration",
+        "cc316/raw-confirmation",
+        "cc323/raw",
+        "cc703/raw",
+        "preview-real/raw",
+    ),
+) -> Campaign:
+    """Create a validated v2 profile; the legacy named campaigns remain v1."""
+    name = unicodedata.normalize("NFKC", campaign_name)
+    if name != campaign_name or not _CAMPAIGN_NAME.fullmatch(name):
+        raise DiscoveryError("nome da campanha deve ser ASCII seguro (a-z, 0-9, _ ou -)")
+    if not isinstance(patch, str) or not _PATCH.fullmatch(patch):
+        raise DiscoveryError("patch da campanha deve ser major.minor numérico")
+    if (
+        isinstance(window_start, bool)
+        or isinstance(window_end, bool)
+        or not isinstance(window_start, int)
+        or not isinstance(window_end, int)
+        or window_start < 0
+        or window_start >= window_end
+    ):
+        raise DiscoveryError("janela da campanha inválida")
+    if (
+        not queues
+        or len(set(queues)) != len(queues)
+        or any(isinstance(q, bool) or not isinstance(q, int) or q not in {420, 440} for q in queues)
+    ):
+        raise DiscoveryError("a campanha aceita somente filas distintas 420 e/ou 440")
+    if map_id != TARGET_MAP:
+        raise DiscoveryError("a campanha patch aceita somente o mapa 11")
+    if (
+        not isinstance(max_pairs, int)
+        or isinstance(max_pairs, bool)
+        or not 1 <= max_pairs <= 1_200
+        or not isinstance(max_requests, int)
+        or isinstance(max_requests, bool)
+        or not 1 <= max_requests <= 3_000
+        or not isinstance(max_seconds, int)
+        or isinstance(max_seconds, bool)
+        or not 1 <= max_seconds <= 7_200
+    ):
+        raise DiscoveryError("tetos da campanha genérica excedem os limites técnicos")
+    if not scope_champions or any(
+        isinstance(champion, bool) or not isinstance(champion, int) or champion <= 0
+        for champion in scope_champions
+    ):
+        raise DiscoveryError("champions da prioridade devem ser IDs inteiros positivos")
+    if scope_position != SCOPE_POSITION:
+        raise DiscoveryError("prioridade de campanha usa a posição BOTTOM congelada")
+    campaign_id = f"PATCH-CAMPAIGN-{patch}-{name}"
+    return Campaign(
+        campaign_id=campaign_id,
+        output_dir_name=f"patch-{patch.replace('.', '-')}-{name}",
+        window_start=window_start,
+        window_end=window_end,
+        max_pairs=max_pairs,
+        max_requests=max_requests,
+        max_seconds=max_seconds,
+        scope_champions=scope_champions,
+        listing_count=100,
+        sample_per_player=5,
+        sample_salt=f"{campaign_id}-listing-v1",
+        known_raw_subdirectories=known_raw_subdirectories,
+        patch=patch,
+        queues=queues,
+        map_id=map_id,
+        schema_version=2,
+        scope_position=scope_position,
+        campaign_name=name,
+    )
+
+
 class CollectionTransport(Protocol):
     @property
     def requests_made(self) -> int: ...
@@ -199,6 +310,8 @@ class CollectionTransport(Protocol):
 class CollectionAuthorization:
     max_requests: int
     seeds_sha256: str
+    schema_version: int = 1
+    manifest_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,8 +397,316 @@ def prior_campaign_usage(output_dir: Path, attempt_number: int) -> tuple[int, in
     return requests, elapsed_ns
 
 
+def prior_patch_campaign_usage(
+    output_dir: Path, attempt_number: int, manifest_sha256: str
+) -> tuple[int, int]:
+    """Validate each completed v2 history against its request diagnostics and manifest."""
+    if not _SHA256_HEX.fullmatch(manifest_sha256):
+        raise DiscoveryError("hash do manifesto da campanha inválido")
+    private_root = private_root_for(output_dir)
+    if any(part.is_symlink() for part in (output_dir, *output_dir.parents)):
+        raise DiscoveryError("caminho de campanha v2 contém symlink")
+    try:
+        output_dir.resolve().relative_to(private_root.resolve())
+    except ValueError as exc:
+        raise DiscoveryError("saída de campanha v2 fora de .private") from exc
+    manifest_path = output_dir / PATCH_CAMPAIGN_MANIFEST
+    _manifest, actual_manifest_sha = read_private_with_sidecar(
+        manifest_path, "manifesto da campanha"
+    )
+    if actual_manifest_sha != manifest_sha256:
+        raise DiscoveryError("manifesto da campanha diverge do histórico")
+    requests_total = elapsed_total = 0
+    for previous in range(1, attempt_number):
+        paths = attempt_paths(output_dir, previous)
+        if any(
+            part.is_symlink()
+            for key in ("budget", "lifecycle", "report", "marker")
+            for part in (paths[key], *paths[key].parents)
+        ):
+            raise DiscoveryError(f"histórico v2 da tentativa {previous:02d} contém symlink")
+        if not paths["marker"].is_file():
+            raise DiscoveryError(f"histórico v2 da tentativa {previous:02d} sem marcador")
+        binding = {
+            "campaign": json.loads(_manifest).get("campaign"),
+            "attemptNumber": previous,
+            "manifestSha256": manifest_sha256,
+        }
+        try:
+            budget = json.loads(paths["budget"].read_text(encoding="utf-8"))
+            lifecycle = json.loads(paths["lifecycle"].read_text(encoding="utf-8"))
+            report = json.loads(paths["report"].read_text(encoding="utf-8"))
+            diagnostics = budget.get("diagnostics") if isinstance(budget, dict) else None
+            reserved = budget.get("requestsReserved") if isinstance(budget, dict) else None
+            if not isinstance(diagnostics, list) or not _non_negative_int(reserved):
+                raise ValueError("diagnostics")
+            http_rows = [
+                row
+                for row in diagnostics
+                if isinstance(row, dict) and row.get("requestReserved") is True
+            ]
+            local_rows = [
+                row
+                for row in diagnostics
+                if isinstance(row, dict) and row.get("requestReserved") is False
+            ]
+            journal_status = budget.get("status")
+            http_diagnostics_coherent = True
+            expected_diagnostic_keys = {
+                "sequence",
+                "ordinal",
+                "requestClass",
+                "result",
+                "statusCode",
+                "durationMs",
+                "exceptionClass",
+                "causeCategory",
+                "requestReserved",
+            }
+            for row in diagnostics:
+                if not isinstance(row, dict) or set(row) != expected_diagnostic_keys:
+                    http_diagnostics_coherent = False
+                    break
+                result = row.get("result")
+                status_code = row.get("statusCode")
+                duration = row.get("durationMs")
+                exception_class = row.get("exceptionClass")
+                cause = row.get("causeCategory")
+                if type(row.get("requestReserved")) is not bool:
+                    http_diagnostics_coherent = False
+                    break
+                if row["requestReserved"]:
+                    duration_valid = (
+                        isinstance(duration, (int, float))
+                        and not isinstance(duration, bool)
+                        and math.isfinite(duration)
+                        and duration >= 0
+                    )
+                    if result == "PENDING":
+                        coherent = (
+                            journal_status == "INTERRUPTED"
+                            and status_code is None
+                            and duration is None
+                            and exception_class is None
+                            and cause is None
+                        )
+                    elif result == "HTTP_ERROR":
+                        coherent = (
+                            status_code is None
+                            and duration_valid
+                            and exception_class in _DIAGNOSTIC_EXCEPTION_CLASSES
+                            and cause in _DIAGNOSTIC_CAUSE_CATEGORIES
+                        )
+                    else:
+                        coherent = (
+                            isinstance(status_code, int)
+                            and not isinstance(status_code, bool)
+                            and 100 <= status_code <= 599
+                            and result == _diagnostic_result_for_status(status_code)
+                            and duration_valid
+                            and exception_class is None
+                            and cause is None
+                        )
+                else:
+                    coherent = (
+                        result in {"LOCAL_REQUEST_BUDGET", "LOCAL_TIME_BUDGET"}
+                        and row.get("ordinal") is None
+                        and status_code is None
+                        and duration is None
+                        and exception_class is None
+                        and cause is None
+                    )
+                if not coherent:
+                    http_diagnostics_coherent = False
+                    break
+            ordinals = [row.get("ordinal") for row in http_rows]
+            sequences = [row.get("sequence") for row in diagnostics if isinstance(row, dict)]
+            if (
+                len(http_rows) != reserved
+                or not all(_non_negative_int(value) for value in ordinals)
+                or sorted(cast(list[int], ordinals)) != list(range(1, reserved + 1))
+                or len(sequences) != len(diagnostics)
+                or not all(_non_negative_int(value) for value in sequences)
+                or sorted(cast(list[int], sequences)) != list(range(1, len(diagnostics) + 1))
+                or any(row.get("result") not in _DIAGNOSTIC_RESULTS for row in http_rows)
+                or any(
+                    row.get("result") not in {"LOCAL_REQUEST_BUDGET", "LOCAL_TIME_BUDGET"}
+                    for row in local_rows
+                )
+                or any(
+                    row.get("requestClass") not in _DIAGNOSTIC_REQUEST_CLASSES
+                    for row in diagnostics
+                    if isinstance(row, dict)
+                )
+                or not http_diagnostics_coherent
+                or report.get("requests") != reserved
+                or report.get("campaignManifestSha256") != manifest_sha256
+                or report.get("status")
+                not in DESIGNED_STOPS
+                | {
+                    "STOPPED_AUTH",
+                    "STOPPED_RATE_LIMITED",
+                    "STOPPED_SOURCE_ERROR",
+                    "INTERRUPTED",
+                }
+            ):
+                raise ValueError("coerência")
+            marks = [lifecycle.get(field) for field in _LIFECYCLE_FIELDS]
+            elapsed = lifecycle.get("processElapsedNs")
+            if (
+                budget.get("schemaVersion") != 4
+                or budget.get("campaignBinding") != binding
+                or budget.get("status") not in _TERMINAL_JOURNAL_STATUSES
+                or lifecycle.get("schemaVersion") != 1
+                or lifecycle.get("campaignBinding") != binding
+                or lifecycle.get("attemptNumber") != previous
+                or lifecycle.get("lifecycleStatus") not in {"COMPLETE", "SHUTDOWN_TIMEOUT"}
+                or lifecycle.get("runOutcome") not in {"COMPLETED", "INTERRUPTED"}
+                or (lifecycle.get("runOutcome") == "INTERRUPTED")
+                != (budget.get("status") == "INTERRUPTED")
+                or not all(_non_negative_int(mark) for mark in marks)
+                or not _non_negative_int(elapsed)
+            ):
+                raise ValueError("binding/lifecycle")
+            started, coroutine_started, coroutine_finished, finished = cast(list[int], marks)
+            if not (
+                started <= coroutine_started <= coroutine_finished <= finished
+                and elapsed == finished - started
+            ):
+                raise ValueError("tempo")
+            if budget.get("status") == "COMPLETED" and any(
+                row.get("result") == "PENDING" for row in http_rows
+            ):
+                raise ValueError("request pendente em journal completo")
+            requests_total += reserved
+            elapsed_total += cast(int, elapsed)
+        except (OSError, json.JSONDecodeError, UnicodeError, ValueError, TypeError) as exc:
+            raise DiscoveryError(
+                f"histórico v2 da tentativa {previous:02d} incoerente; revisão"
+            ) from exc
+    return requests_total, elapsed_total
+
+
+PATCH_CAMPAIGN_MANIFEST = "campaign-manifest-v2.json"
+
+
+def effective_campaign_source_sha256() -> str:
+    """Fingerprint the source files that can affect the v2 campaign before network use."""
+    source_root = Path(__file__).resolve().parents[3]
+    relative_files = (
+        "src/riftlab/cli/collect.py",
+        "src/riftlab/collection/dataset_collection.py",
+        "src/riftlab/collection/cc316_discovery.py",
+        "src/riftlab/collection/cc316_adoption.py",
+        "src/riftlab/collection/seeds.py",
+        "src/riftlab/ingestion/infrastructure/riot_transport.py",
+        "src/riftlab/ingestion/infrastructure/riot_rate_limiter.py",
+        "src/riftlab/ingestion/infrastructure/raw_store.py",
+    )
+    digest = hashlib.sha256()
+    for relative in relative_files:
+        path = source_root / relative
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def validate_private_campaign_path(private_root: Path, path: Path, label: str) -> None:
+    """Reject a campaign path that escapes the private root or traverses a symlink."""
+    if any(part.is_symlink() for part in (path, *path.parents)):
+        raise DiscoveryError(f"{label} contém symlink")
+    try:
+        path.resolve().relative_to(private_root.resolve())
+    except ValueError as exc:
+        raise DiscoveryError(f"{label} fora de .private") from exc
+
+
+def patch_campaign_manifest(
+    campaign: Campaign,
+    *,
+    private_root: Path,
+    output_dir: Path,
+    seeds_sha256: str,
+    scope_sha256: str,
+    tool_sha256: str,
+) -> dict[str, object]:
+    """Canonical immutable v2 campaign identity, including inputs and storage roots."""
+    if not campaign.is_generic or campaign.campaign_name is None:
+        raise DiscoveryError("manifesto v2 exige campanha genérica")
+    resolved_private = private_root.resolve()
+    resolved_output = output_dir.resolve()
+    try:
+        relative_output = resolved_output.relative_to(resolved_private)
+    except ValueError as exc:
+        raise DiscoveryError("raiz da campanha deve ficar dentro de .private") from exc
+    if any(component.is_symlink() for component in (private_root, *output_dir.parents, output_dir)):
+        raise DiscoveryError("caminho da campanha contém symlink")
+    roots = list(campaign.known_raw_subdirectories)
+    if any(Path(root).is_absolute() or ".." in Path(root).parts for root in roots):
+        raise DiscoveryError("raiz de raw conhecida fora do contrato privado")
+    for root in roots:
+        candidate = private_root / root
+        validate_private_campaign_path(private_root, candidate, "raiz raw conhecida")
+    for digest in (seeds_sha256, scope_sha256, tool_sha256):
+        if not isinstance(digest, str) or not _SHA256_HEX.fullmatch(digest):
+            raise DiscoveryError("hash de entrada do manifesto inválido")
+    return {
+        "schemaVersion": 2,
+        "campaign": campaign.campaign_id,
+        "campaignName": campaign.campaign_name,
+        "target": {
+            "patch": campaign.patch,
+            "queueIds": list(campaign.queues),
+            "mapId": campaign.map_id,
+            "gameComplete": True,
+        },
+        "window": {"startTime": campaign.window_start, "endTime": campaign.window_end},
+        "caps": {
+            "maxPairs": campaign.max_pairs,
+            "maxRequests": campaign.max_requests,
+            "maxSeconds": campaign.max_seconds,
+        },
+        "expansion": {
+            "listingCount": campaign.listing_count,
+            "samplePerPlayerPerQueue": campaign.sample_per_player,
+            "sampleSalt": campaign.sample_salt,
+            "scopeChampionIds": sorted(campaign.scope_champions),
+            "scopePosition": campaign.scope_position,
+        },
+        "roots": {
+            "output": relative_output.as_posix(),
+            "knownRaw": roots,
+        },
+        "inputHashes": {
+            "seedsSha256": seeds_sha256,
+            "scopeSha256": scope_sha256,
+            "toolSha256": tool_sha256,
+        },
+    }
+
+
+def persist_patch_campaign_manifest_once(output_dir: Path, manifest: dict[str, object]) -> str:
+    """Write a v2 manifest exactly once, or verify byte-identical continuation."""
+    path = output_dir / PATCH_CAMPAIGN_MANIFEST
+    encoded = canonical_json(manifest)
+    digest = hashlib.sha256(encoded).hexdigest()
+    if path.exists() or path.with_suffix(path.suffix + ".sha256").exists():
+        existing, existing_digest = read_private_with_sidecar(path, "manifesto da campanha")
+        if existing != encoded or existing_digest != digest:
+            raise DiscoveryError("manifesto da campanha diverge; não será sobrescrito")
+        return digest
+    _atomic_write_once(path, encoded)
+    return digest
+
+
 def load_collection_authorization(
-    path: Path, *, attempt_number: int, campaign: Campaign = CC323
+    path: Path,
+    *,
+    attempt_number: int,
+    campaign: Campaign = CC323,
+    manifest_sha256: str | None = None,
 ) -> CollectionAuthorization:
     """Verify the user's authorization of one campaign attempt (JSON with SHA-256 sidecar)."""
     label = f"autorização {campaign.campaign_id} inválida"
@@ -302,24 +723,42 @@ def load_collection_authorization(
         raise DiscoveryError(f"{label}: JSON ilegível") from exc
     require(isinstance(document, dict), "raiz deve ser objeto")
     state = cast(dict[str, object], document)
+    v1_keys = {
+        "schemaVersion",
+        "campaign",
+        "scope",
+        "attemptNumber",
+        "maxPairs",
+        "maxRequests",
+        "maxSeconds",
+        "window",
+        "seedsSha256",
+        "decisionRecord",
+    }
+    v2_keys = v1_keys | {
+        "campaignName",
+        "patch",
+        "queues",
+        "mapId",
+        "manifestSha256",
+    }
+    schema = state.get("schemaVersion")
+    if campaign.is_generic:
+        require(schema == 2 and set(state) == v2_keys, "perfil v2/campos divergentes")
+        require(
+            state["campaignName"] == campaign.campaign_name
+            and state["patch"] == campaign.patch
+            and state["queues"] == list(campaign.queues)
+            and state["mapId"] == campaign.map_id
+            and isinstance(manifest_sha256, str)
+            and state["manifestSha256"] == manifest_sha256
+            and bool(_SHA256_HEX.fullmatch(str(state["manifestSha256"]))),
+            "identidade ou hash do manifesto diverge",
+        )
+    else:
+        require(schema == 1 and set(state) == v1_keys, "perfil v1/campos divergentes")
     require(
-        set(state)
-        == {
-            "schemaVersion",
-            "campaign",
-            "scope",
-            "attemptNumber",
-            "maxPairs",
-            "maxRequests",
-            "maxSeconds",
-            "window",
-            "seedsSha256",
-            "decisionRecord",
-        },
-        "campos divergentes",
-    )
-    require(
-        state["schemaVersion"] == 1
+        schema == (2 if campaign.is_generic else 1)
         and state["campaign"] == campaign.campaign_id
         and state["scope"] == AUTHORIZATION_SCOPE,
         "versão, campanha ou escopo",
@@ -361,12 +800,21 @@ def load_collection_authorization(
         "caminho ou hash do registro da decisão",
     )
     try:
-        record_bytes = (private_root / cast(str, relative)).read_bytes()
+        record_path = private_root / cast(str, relative)
+        if any(part.is_symlink() for part in (record_path, *record_path.parents)):
+            raise DiscoveryError(f"{label}: registro da decisão contém symlink")
+        record_path.resolve().relative_to(private_root.resolve())
+        record_bytes = record_path.read_bytes()
     except OSError as exc:
         raise DiscoveryError(f"{label}: registro da decisão ausente") from exc
+    except ValueError as exc:
+        raise DiscoveryError(f"{label}: registro da decisão fora de .private") from exc
     require(hashlib.sha256(record_bytes).hexdigest() == digest, "registro da decisão alterado")
     return CollectionAuthorization(
-        max_requests=cast(int, max_requests), seeds_sha256=cast(str, seeds_sha256)
+        max_requests=cast(int, max_requests),
+        seeds_sha256=cast(str, seeds_sha256),
+        schema_version=cast(int, schema),
+        manifest_sha256=manifest_sha256 if campaign.is_generic else None,
     )
 
 
@@ -377,8 +825,14 @@ def _json_or_none(body: bytes) -> object:
         return None
 
 
-def _target_mismatch(document: object, match_id: str) -> str | None:
-    """Why a match body falls outside 16.19 / 420 / map 11 / GameComplete, or None."""
+def _target_mismatch(
+    document: object,
+    match_id: str,
+    campaign: Campaign = CC323,
+    *,
+    expected_queue: int | None = None,
+) -> str | None:
+    """Why a match body falls outside the immutable campaign target, or None."""
     if not isinstance(document, dict):
         return "IDENTITY_MISMATCH"
     metadata, info = document.get("metadata"), document.get("info")
@@ -387,11 +841,13 @@ def _target_mismatch(document: object, match_id: str) -> str | None:
     if not isinstance(info, dict):
         return "IDENTITY_MISMATCH"
     version = info.get("gameVersion")
-    if not isinstance(version, str) or ".".join(version.split(".")[:2]) != TARGET_PATCH:
+    if not isinstance(version, str) or ".".join(version.split(".")[:2]) != campaign.patch:
         return "OTHER_PATCH"
-    if info.get("queueId") != TARGET_QUEUE:
+    if info.get("queueId") not in campaign.queues:
         return "OTHER_QUEUE"
-    if info.get("mapId") != TARGET_MAP:
+    if expected_queue is not None and info.get("queueId") != expected_queue:
+        return "LISTED_QUEUE_MISMATCH"
+    if info.get("mapId") != campaign.map_id:
         return "OTHER_MAP"
     if info.get("endOfGameResult") != "GameComplete":
         return "NOT_COMPLETE"
@@ -457,6 +913,7 @@ class _Expansion:
         self.max_pairs = max_pairs
         self.before_request = before_request
         self.counts: Counter[str] = Counter()
+        self.queue_stats: dict[int, Counter[str]] = {queue: Counter() for queue in campaign.queues}
         self.new_ids: list[str] = []
         self._queue: list[tuple[int, int, str]] = []
         self._best_priority: dict[str, int] = {}
@@ -492,31 +949,44 @@ class _Expansion:
             if puuid in self._listed:
                 continue
             self._listed.add(puuid)
-            self.before_request()
-            try:
-                listed = await self.transport.list_match_ids_by_puuid(
-                    puuid,
-                    queue=TARGET_QUEUE,
-                    start=0,
-                    count=self.campaign.listing_count,
-                    start_time=self.campaign.window_start,
-                    end_time=self.campaign.window_end,
-                )
-            except (SourceNotFoundError, SourceSchemaError):
-                self.counts["PLAYER_LISTING_UNAVAILABLE"] += 1
-                continue
-            self.counts["PLAYERS_LISTED"] += 1
-            match_ids = self.campaign.keep(puuid, listed)
-            if len(listed) > len(match_ids):
-                self.counts["LISTED_IDS_NOT_SAMPLED"] += len(listed) - len(match_ids)
-            for match_id in match_ids:
-                if self.pair_cap_reached:
-                    break
-                await self._visit(match_id)
+            for queue in self.campaign.queues:
+                self.before_request()
+                before = self.transport.requests_made
+                try:
+                    listed = await self.transport.list_match_ids_by_puuid(
+                        puuid,
+                        queue=queue,
+                        start=0,
+                        count=self.campaign.listing_count,
+                        start_time=self.campaign.window_start,
+                        end_time=self.campaign.window_end,
+                    )
+                except (SourceNotFoundError, SourceSchemaError):
+                    self.counts["PLAYER_LISTING_UNAVAILABLE"] += 1
+                    self.queue_stats[queue]["playerListingUnavailable"] += 1
+                    continue
+                finally:
+                    self.queue_stats[queue]["listingRequests"] += (
+                        self.transport.requests_made - before
+                    )
+                self.counts["PLAYERS_LISTED"] += 1
+                self.queue_stats[queue]["playersListed"] += 1
+                self.queue_stats[queue]["matchIdsListed"] += len(listed)
+                match_ids = self.campaign.keep(puuid, listed)
+                if len(listed) > len(match_ids):
+                    discarded = len(listed) - len(match_ids)
+                    self.counts["LISTED_IDS_NOT_SAMPLED"] += discarded
+                    self.queue_stats[queue]["listedIdsNotSampled"] += discarded
+                for match_id in match_ids:
+                    if self.pair_cap_reached:
+                        break
+                    await self._visit(match_id, queue=queue)
         return "PAIR_CAP_REACHED" if self.pair_cap_reached else "QUEUE_EXHAUSTED"
 
-    async def _visit(self, match_id: str) -> None:
+    async def _visit(self, match_id: str, *, queue: int) -> None:
+        self.queue_stats[queue]["selectedMatchIds"] += 1
         if match_id in self._seen_matches:
+            self.queue_stats[queue]["duplicateMatchIds"] += 1
             return
         self._seen_matches.add(match_id)
         if not _MATCH_ID.fullmatch(match_id):
@@ -524,9 +994,11 @@ class _Expansion:
             return
         self.counts["MATCHES_LISTED"] += 1
         if match_id in self.stored or match_id in self.known:
+            self.queue_stats[queue]["knownPairs"] += 1
             self._expand(self._known_document(match_id), new_pair=False)
             return
         self.before_request()
+        before = self.transport.requests_made
         try:
             match = await self.transport.fetch_match(match_id)
         except SourceNotFoundError:
@@ -535,20 +1007,34 @@ class _Expansion:
         except SourceSchemaError:
             self.counts["MATCH_SCHEMA_UNSUPPORTED"] += 1
             return
+        finally:
+            self.queue_stats[queue]["matchRequests"] += self.transport.requests_made - before
         self.counts["MATCHES_FETCHED"] += 1
+        self.queue_stats[queue]["matchesFetched"] += 1
         document = _json_or_none(match.body)
-        reason = _target_mismatch(document, match_id)
-        if reason == "IDENTITY_MISMATCH":
+        reason = _target_mismatch(
+            document,
+            match_id,
+            self.campaign,
+            expected_queue=queue if self.campaign.is_generic else None,
+        )
+        if reason in {"IDENTITY_MISMATCH", "LISTED_QUEUE_MISMATCH"}:
             self.counts[reason] += 1
-            return  # an untrusted body never feeds the expansion
+            self.queue_stats[queue][reason] += 1
+            return  # untrusted or misattributed payload never feeds the expansion
         if reason is not None:
             self.counts[reason] += 1
+            self.queue_stats[queue][reason] += 1
             self._expand(document, new_pair=False)
             return
-        self._expand(document, new_pair=await self._store_pair(match_id, match))
+        self.queue_stats[queue]["targetMatches"] += 1
+        stored = await self._store_pair(match_id, match, queue=queue)
+        self.queue_stats[queue]["newPairs"] += int(stored)
+        self._expand(document, new_pair=stored)
 
-    async def _store_pair(self, match_id: str, match: RawRiotResponse) -> bool:
+    async def _store_pair(self, match_id: str, match: RawRiotResponse, *, queue: int) -> bool:
         self.before_request()
+        before = self.transport.requests_made
         try:
             timeline = await self.transport.fetch_timeline(match_id)
         except SourceNotFoundError:
@@ -557,8 +1043,11 @@ class _Expansion:
         except SourceSchemaError:
             self.counts["TIMELINE_SCHEMA_UNSUPPORTED"] += 1
             return False
+        finally:
+            self.queue_stats[queue]["timelineRequests"] += self.transport.requests_made - before
         if not _timeline_identity_matches(timeline.body, match_id):
             self.counts["TIMELINE_IDENTITY_MISMATCH"] += 1
+            self.queue_stats[queue]["TIMELINE_IDENTITY_MISMATCH"] += 1
             return False
         self.store.store(match_id, "match", match.body, match.sha256)
         self.store.store(match_id, "timeline", timeline.body, timeline.sha256)
@@ -598,6 +1087,7 @@ async def run_dataset_collection(
     max_requests: int | None = None,
     max_seconds: int | None = None,
     campaign: Campaign = CC323,
+    campaign_manifest_sha256: str | None = None,
     clock: Callable[[], float] = time.monotonic,
     process_started_monotonic_ns: int | None = None,
     clock_ns: Callable[[], int] = time.monotonic_ns,
@@ -609,6 +1099,19 @@ async def run_dataset_collection(
     request and still feed the expansion. A source failure ends the attempt
     with a partial report; only a local fault raises. Caps default to the campaign's.
     """
+    if campaign.is_generic:
+        for label, override, ceiling in (
+            ("pares", max_pairs, campaign.max_pairs),
+            ("requisições", max_requests, campaign.max_requests),
+            ("tempo", max_seconds, campaign.max_seconds),
+        ):
+            if override is not None and (
+                isinstance(override, bool)
+                or not isinstance(override, int)
+                or override < 1
+                or override > ceiling
+            ):
+                raise DiscoveryError(f"override de {label} excede ou invalida o teto do manifesto")
     max_pairs = campaign.max_pairs if max_pairs is None else max_pairs
     max_requests = campaign.max_requests if max_requests is None else max_requests
     max_seconds = campaign.max_seconds if max_seconds is None else max_seconds
@@ -640,6 +1143,37 @@ async def run_dataset_collection(
     if output_mode & 0o077:
         raise DiscoveryError(f"diretório {name} deve usar modo privado")
 
+    if campaign.is_generic:
+        if not isinstance(campaign_manifest_sha256, str) or not _SHA256_HEX.fullmatch(
+            campaign_manifest_sha256
+        ):
+            raise DiscoveryError("hash do manifesto v2 ausente")
+        manifest_path = output_dir / PATCH_CAMPAIGN_MANIFEST
+        raw_manifest, digest = read_private_with_sidecar(manifest_path, "manifesto da campanha")
+        if digest != campaign_manifest_sha256:
+            raise DiscoveryError("manifesto v2 alterado durante a campanha")
+        try:
+            stored_manifest = json.loads(raw_manifest)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise DiscoveryError("manifesto v2 ilegível") from exc
+        if not isinstance(stored_manifest, dict):
+            raise DiscoveryError("manifesto v2 deve ser objeto")
+        input_hashes = stored_manifest.get("inputHashes")
+        if not isinstance(input_hashes, dict):
+            raise DiscoveryError("hashes do manifesto v2 ausentes")
+        if input_hashes.get("toolSha256") != effective_campaign_source_sha256():
+            raise DiscoveryError("fontes ativas da campanha divergem do manifesto")
+        expected = patch_campaign_manifest(
+            campaign,
+            private_root=private_root_for(output_dir),
+            output_dir=output_dir,
+            seeds_sha256=cast(str, input_hashes.get("seedsSha256", "")),
+            scope_sha256=cast(str, input_hashes.get("scopeSha256", "")),
+            tool_sha256=cast(str, input_hashes.get("toolSha256", "")),
+        )
+        if stored_manifest != expected:
+            raise DiscoveryError("manifesto v2 não corresponde à configuração ativa")
+
     paths = attempt_paths(output_dir, attempt_number)
     started = clock()
     process_started = (
@@ -651,7 +1185,12 @@ async def run_dataset_collection(
         or process_started < 0
     ):
         raise DiscoveryError("início monotônico do processo inválido")
-    prior_requests, prior_elapsed_ns = prior_campaign_usage(output_dir, attempt_number)
+    if campaign.is_generic:
+        prior_requests, prior_elapsed_ns = prior_patch_campaign_usage(
+            output_dir, attempt_number, campaign_manifest_sha256 or ""
+        )
+    else:
+        prior_requests, prior_elapsed_ns = prior_campaign_usage(output_dir, attempt_number)
     request_limit = min(max_requests - prior_requests, authorized_max_requests)
     if request_limit < 1:
         raise DiscoveryError("teto cumulativo de requisições da campanha já consumido")
@@ -667,12 +1206,25 @@ async def run_dataset_collection(
 
     raw_directory = paths["raw"]
     try:
+        if campaign.is_generic:
+            validate_private_campaign_path(
+                private_root_for(output_dir), raw_directory, "raiz raw da campanha"
+            )
         raw_directory.mkdir(mode=0o700, exist_ok=True)
         raw_directory.chmod(0o700)
         store = DurableRawMatchStore(raw_directory)
         stored = _complete_pairs(raw_directory)
         known: dict[str, DurableRawMatchStore] = {}
         for directory in known_raw_directories:
+            if campaign.is_generic:
+                private_root = private_root_for(output_dir)
+                resolved_private = private_root.resolve()
+                if any(part.is_symlink() for part in (directory, *directory.parents)):
+                    raise DiscoveryError("raiz raw conhecida contém symlink")
+                try:
+                    directory.resolve().relative_to(resolved_private)
+                except ValueError as exc:
+                    raise DiscoveryError("raiz raw conhecida fora de .private") from exc
             known_store = DurableRawMatchStore(directory, create=False)
             for match_id in sorted(_complete_pairs(directory)):
                 known.setdefault(match_id, known_store)
@@ -699,7 +1251,16 @@ async def run_dataset_collection(
         os.close(marker_fd)
 
     try:
-        with BudgetJournal(paths["budget"], limit=request_limit) as journal:
+        binding = (
+            {
+                "campaign": campaign.campaign_id,
+                "attemptNumber": attempt_number,
+                "manifestSha256": campaign_manifest_sha256,
+            }
+            if campaign.is_generic
+            else None
+        )
+        with BudgetJournal(paths["budget"], limit=request_limit, binding=binding) as journal:
             local_stops: list[str] = []
 
             def record_local_budget(request_class: str, budget_kind: str) -> None:
@@ -753,21 +1314,29 @@ async def run_dataset_collection(
             requests_used = journal.requests_reserved
             elapsed_seconds = round(clock() - started, 3)
             report: dict[str, object] = {
-                "schemaVersion": 1,
+                "schemaVersion": campaign.schema_version,
                 "campaign": campaign.campaign_id,
                 "attemptNumber": attempt_number,
                 "status": status,
                 "target": {
-                    "patch": TARGET_PATCH,
-                    "queueId": TARGET_QUEUE,
-                    "mapId": TARGET_MAP,
+                    "patch": campaign.patch,
+                    **(
+                        {"queueIds": list(campaign.queues)}
+                        if campaign.is_generic
+                        else {"queueId": campaign.queues[0]}
+                    ),
+                    "mapId": campaign.map_id,
                     "gameComplete": True,
                 },
                 "window": {"startTime": campaign.window_start, "endTime": campaign.window_end},
                 "expansion": {
                     "source": "CONSENTED_SEEDS_PLUS_ALL_PARTICIPANTS",
                     "maximumParticipantHops": None,
-                    "matchesListedPerPlayer": campaign.kept_per_player,
+                    (
+                        "matchesListedPerPlayerPerQueue"
+                        if campaign.is_generic
+                        else "matchesListedPerPlayer"
+                    ): campaign.kept_per_player,
                     "listingRequestedPerPlayer": campaign.listing_count,
                     "listingSelection": (
                         "MOST_RECENT"
@@ -801,6 +1370,12 @@ async def run_dataset_collection(
                     "databaseAccessed": False,
                 },
             }
+            if campaign.is_generic:
+                report["campaignManifestSha256"] = campaign_manifest_sha256
+                report["requestCountsByQueue"] = {
+                    str(queue): dict(sorted(expansion.queue_stats[queue].items()))
+                    for queue in campaign.queues
+                }
             try:
                 report_sha256 = _atomic_write_once(paths["report"], canonical_json(report))
             except Exception:

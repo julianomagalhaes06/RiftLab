@@ -89,6 +89,13 @@ def fingerprint(provenance: list[dict[str, Any]]) -> str:
             r.get("application"),
             r.get("appliedFromPatch"),
             tuple(r.get("systemItemIds", ())) if r["ruleId"] == "R4s" else (),
+            # Só proveniência de domínio (v12) carrega fila/contexto; a forma antiga
+            # mantém o mesmo fingerprint.
+            *(
+                (r.get("appliedFromQueue"), r.get("catalogContext"))
+                if "appliedFromQueue" in r
+                else ()
+            ),
         )
         for r in provenance
         if r.get("application") != "WITHHELD"
@@ -248,9 +255,14 @@ async def compute_health(
             full_catalog = {i.item_id: i for i in bundle.items}
             repo = SqlAlchemyCatalogRepository(session)
             events = await SqlAlchemyTimelineRepository(session).list_events(match.match_id)
-            catalog = await _load_catalog_items_closure(
-                repo, marker.catalog_id, await _referenced_item_ids(events)
-            )
+            # O replay usa o mesmo contexto de catálogo da reconstrução (domínio FULL
+            # confirmado no CC-802); a forma antiga é o fecho de receitas da v11.
+            if any(r.get("catalogContext") == "FULL_CANONICAL_V1" for r in applied):
+                catalog = full_catalog
+            else:
+                catalog = await _load_catalog_items_closure(
+                    repo, marker.catalog_id, await _referenced_item_ids(events)
+                )
             excluded = frozenset(
                 i.item_id for i in await repo.list_excluded_items(marker.catalog_id)
             )

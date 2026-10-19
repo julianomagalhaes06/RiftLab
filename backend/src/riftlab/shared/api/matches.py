@@ -219,6 +219,8 @@ class DecisionVersionInfo(CamelModel):
     reconstruction_rules_clean_participants: int = Field(default=0, ge=0)
     reconstruction_rules_failures: int = Field(default=0, ge=0)
     reconstruction_rules_patch: str | None = Field(default=None, max_length=20)
+    # Fila do domínio quando a confirmação de origem vale só para uma fila (v12).
+    reconstruction_rules_queue: Literal[420, 440] | None = None
 
 
 class DecisionState(CamelModel):

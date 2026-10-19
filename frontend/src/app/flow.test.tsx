@@ -348,7 +348,29 @@ describe("decisão reconstruída com regras herdadas", () => {
     const note = await screen.findByText(/regras confirmadas no patch 16\.19, aplicadas por herança/);
     await waitFor(() => expect(note).toHaveTextContent("ao patch 16.20"));
     fireEvent.click(screen.getByText("Detalhes técnicos"));
-    expect(screen.getByText("herdadas do patch 16.19 (sem confirmação própria)")).toBeInTheDocument();
+    expect(screen.getByText("herdadas do patch 16.19 (sem confirmação própria nesta fila)")).toBeInTheDocument();
+  });
+
+  it("confirmação própria de uma fila aparece com a fila nos detalhes técnicos", async () => {
+    setup(`/decisions/${DECISION_1}`, (mock) => {
+      mock.on("GET", /^\/api\/v1\/decisions\/.+$/, () =>
+        json(
+          200,
+          decisionState({
+            versions: {
+              ...decisionState().versions,
+              reconstructionRules: "VALIDATED",
+              reconstructionRulesPatch: "16.20",
+              reconstructionRulesQueue: 420,
+            },
+          }),
+        ),
+      );
+    });
+    await screen.findByRole("heading", { name: /^Decisão em 7:52/ });
+    expect(screen.queryByText(/aplicadas por herança/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Detalhes técnicos"));
+    expect(screen.getByText("confirmadas neste patch na fila Solo/Duo")).toBeInTheDocument();
   });
 
   it("não mostra o aviso quando as regras são do próprio patch", async () => {

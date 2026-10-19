@@ -80,6 +80,7 @@ class RiotFetchBudget:
     max_attempts_per_request: int = 5
     max_total_seconds: float = 300.0
     request_timeout_seconds: float = 10.0
+    stop_on_429: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,6 +269,7 @@ class RiotHttpTransport:
             max_attempts_per_request=self._budget.max_attempts_per_request,
             max_total_seconds=self._budget.max_total_seconds,
             request_timeout_seconds=self._budget.request_timeout_seconds,
+            stop_on_429=self._budget.stop_on_429,
         )
 
     def set_total_time_limit(self, seconds: float) -> None:
@@ -282,6 +284,7 @@ class RiotHttpTransport:
             max_attempts_per_request=self._budget.max_attempts_per_request,
             max_total_seconds=seconds,
             request_timeout_seconds=self._budget.request_timeout_seconds,
+            stop_on_429=self._budget.stop_on_429,
         )
 
     async def aclose(self) -> None:
@@ -492,7 +495,11 @@ class RiotHttpTransport:
                 retry_after = _parse_retry_after(response.headers.get("Retry-After"))
                 if retry_after is not None and self._rate_limiter is not None:
                     self._rate_limiter.penalize(retry_after)  # vale para TODAS as chamadas
-                if retry_after is None or attempt >= self._budget.max_attempts_per_request:
+                if (
+                    self._budget.stop_on_429
+                    or retry_after is None
+                    or attempt >= self._budget.max_attempts_per_request
+                ):
                     raise SourceRateLimitedError(
                         code="RIOT_RATE_LIMITED",
                         detail="limite de taxa excedido",

@@ -51,6 +51,7 @@ class World:
     """Synthetic Riot data: listings per PUUID and match specs keyed by match ID."""
 
     listings: dict[str, list[str]] = field(default_factory=dict)
+    queue_listings: dict[tuple[int, str], list[str]] = field(default_factory=dict)
     matches: dict[str, dict[str, Any]] = field(default_factory=dict)
     accounts: dict[tuple[str, str], str] = field(
         default_factory=lambda: {("FakeSeed", "TEST"): "puuid-seed"}
@@ -62,12 +63,14 @@ class World:
         participants: list[tuple[str, int, str]],
         *,
         version: str = "16.19.715.1234",
+        queue: int = 420,
         result: str = "GameComplete",
         identity: str | None = None,
     ) -> None:
         self.matches[match_id] = {
             "participants": participants,
             "version": version,
+            "queue": queue,
             "result": result,
             "identity": identity or match_id,
         }
@@ -82,7 +85,7 @@ def _match_body(match_id: str, spec: dict[str, Any]) -> bytes:
             },
             "info": {
                 "gameVersion": spec["version"],
-                "queueId": 420,
+                "queueId": spec["queue"],
                 "mapId": 11,
                 "endOfGameResult": spec["result"],
                 "participants": [
@@ -204,7 +207,8 @@ class FakeTransport:
                 "endTime": end_time,
             }
         )
-        return list(self.world.listings.get(puuid, []))[start : start + count]
+        listed = self.world.queue_listings.get((queue, puuid), self.world.listings.get(puuid, []))
+        return list(listed)[start : start + count]
 
     async def fetch_match(self, match_id: str) -> RawRiotResponse:
         spec = self.world.matches.get(match_id)
@@ -749,10 +753,697 @@ def test_authorization_returns_caps_for_the_exact_attempt(tmp_path: Path) -> Non
     granted = dataset.load_collection_authorization(
         _write_authorization(tmp_path), attempt_number=1
     )
-
     assert granted == dataset.CollectionAuthorization(
         max_requests=4_000, seeds_sha256=hashlib.sha256(SEEDS_BYTES).hexdigest()
     )
+
+
+def test_patch_campaign_v2_is_immutable_authorized_and_counts_queues_separately(
+    tmp_path: Path,
+) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20", campaign_name="offline-check", window_start=100, window_end=200
+    )
+    output_dir = private_dir(tmp_path / ".private" / "collection" / campaign.output_dir_name)
+    digests = {
+        "seeds": hashlib.sha256(b"seeds").hexdigest(),
+        "scope": hashlib.sha256(b"scope").hexdigest(),
+        "tool": dataset.effective_campaign_source_sha256(),
+    }
+    manifest = dataset.patch_campaign_manifest(
+        campaign,
+        private_root=tmp_path / ".private",
+        output_dir=output_dir,
+        seeds_sha256=digests["seeds"],
+        scope_sha256=digests["scope"],
+        tool_sha256=digests["tool"],
+    )
+    manifest_digest = dataset.persist_patch_campaign_manifest_once(output_dir, manifest)
+    assert "preview-real/raw" in manifest["roots"]["knownRaw"]
+    assert dataset.persist_patch_campaign_manifest_once(output_dir, manifest) == manifest_digest
+    with pytest.raises(DiscoveryError, match="diverge"):
+        dataset.persist_patch_campaign_manifest_once(
+            output_dir, {**manifest, "campaignName": "changed"}
+        )
+
+    world = World(
+        queue_listings={
+            (420, "puuid-seed"): ["BR1_1"],
+            (440, "puuid-seed"): ["BR1_2"],
+        }
+    )
+    world.match("BR1_1", [("puuid-seed", KAISA, "BOTTOM")], version="16.20.800.1", queue=420)
+    world.match("BR1_2", [("puuid-seed", CAITLYN, "BOTTOM")], version="16.20.800.1", queue=440)
+    transport = FakeTransport(world)
+    summary = asyncio.run(
+        dataset.run_dataset_collection(
+            transport=transport,
+            seeds=[SEED],
+            output_dir=output_dir,
+            attempt_number=1,
+            authorized_max_requests=100,
+            campaign=campaign,
+            campaign_manifest_sha256=manifest_digest,
+        )
+    )
+
+    report = json.loads(Path(summary.report_path).read_text(encoding="utf-8"))
+    assert report["schemaVersion"] == 2
+    assert report["target"]["queueIds"] == [420, 440]
+    assert report["campaignManifestSha256"] == manifest_digest
+    assert report["requestCountsByQueue"]["420"]["matchesFetched"] == 1
+    assert report["requestCountsByQueue"]["440"]["matchesFetched"] == 1
+    assert report["expansion"]["matchesListedPerPlayerPerQueue"] == 5
+    assert "matchesListedPerPlayer" not in report["expansion"]
+    assert manifest["expansion"]["samplePerPlayerPerQueue"] == 5
+    assert "samplePerPlayer" not in manifest["expansion"]
+    assert summary.pairs_new == 2
+    assert transport.listing_params[0]["queue"] == 420
+    assert transport.listing_params[1]["queue"] == 440
+    assert "puuid-" not in json.dumps(report)
+
+
+@pytest.mark.asyncio
+async def test_patch_campaign_rejects_payload_queue_different_from_listing(tmp_path: Path) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20", campaign_name="queue-mismatch", window_start=100, window_end=200
+    )
+    output_dir = private_dir(tmp_path / ".private" / "collection" / campaign.output_dir_name)
+    manifest = dataset.patch_campaign_manifest(
+        campaign,
+        private_root=tmp_path / ".private",
+        output_dir=output_dir,
+        seeds_sha256=hashlib.sha256(b"seeds").hexdigest(),
+        scope_sha256=hashlib.sha256(b"scope").hexdigest(),
+        tool_sha256=dataset.effective_campaign_source_sha256(),
+    )
+    manifest_digest = dataset.persist_patch_campaign_manifest_once(output_dir, manifest)
+    world = World(queue_listings={(420, "puuid-seed"): ["BR1_9"], (440, "puuid-seed"): []})
+    world.match("BR1_9", [("puuid-seed", KAISA, "BOTTOM")], version="16.20.800.1", queue=440)
+    summary = await dataset.run_dataset_collection(
+        transport=FakeTransport(world),
+        seeds=[SEED],
+        output_dir=output_dir,
+        attempt_number=1,
+        authorized_max_requests=100,
+        campaign=campaign,
+        campaign_manifest_sha256=manifest_digest,
+    )
+    report = json.loads(Path(summary.report_path).read_text(encoding="utf-8"))
+    assert report["counts"]["LISTED_QUEUE_MISMATCH"] == 1
+    assert report["requestCountsByQueue"]["420"]["LISTED_QUEUE_MISMATCH"] == 1
+    assert report["requestCountsByQueue"]["440"].get("LISTED_QUEUE_MISMATCH", 0) == 0
+    assert summary.pairs_new == 0
+    assert "puuid-" not in json.dumps(report)
+
+
+@pytest.mark.asyncio
+async def test_v2_campaign_rejects_stale_source_fingerprint_before_http(tmp_path: Path) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20", campaign_name="stale-source", window_start=100, window_end=200
+    )
+    output_dir = private_dir(tmp_path / ".private" / "collection" / campaign.output_dir_name)
+    manifest = dataset.patch_campaign_manifest(
+        campaign,
+        private_root=tmp_path / ".private",
+        output_dir=output_dir,
+        seeds_sha256=hashlib.sha256(b"seeds").hexdigest(),
+        scope_sha256=hashlib.sha256(b"scope").hexdigest(),
+        tool_sha256="f" * 64,
+    )
+    manifest_digest = dataset.persist_patch_campaign_manifest_once(output_dir, manifest)
+    transport = FakeTransport(World())
+    with pytest.raises(DiscoveryError, match="fontes ativas"):
+        await dataset.run_dataset_collection(
+            transport=transport,
+            seeds=[SEED],
+            output_dir=output_dir,
+            attempt_number=1,
+            authorized_max_requests=100,
+            campaign=campaign,
+            campaign_manifest_sha256=manifest_digest,
+        )
+    assert transport.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("max_pairs", 1_201), ("max_requests", 3_001), ("max_seconds", 7_201)],
+)
+async def test_v2_direct_cap_overrides_cannot_exceed_manifest_before_http(
+    tmp_path: Path, field: str, value: int
+) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20", campaign_name=f"cap-{field}", window_start=100, window_end=200
+    )
+    output_dir = private_dir(tmp_path / ".private" / "collection" / campaign.output_dir_name)
+    transport = FakeTransport(World())
+    with pytest.raises(DiscoveryError, match="override"):
+        await dataset.run_dataset_collection(
+            transport=transport,
+            seeds=[SEED],
+            output_dir=output_dir,
+            attempt_number=1,
+            authorized_max_requests=100,
+            campaign=campaign,
+            **{field: value},
+        )
+    assert transport.calls == []
+
+
+@pytest.mark.asyncio
+async def test_v2_cancellation_preserves_reserved_http_journal_and_blocks_unfinished_resume(
+    tmp_path: Path,
+) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20", campaign_name="cancel-check", window_start=100, window_end=200
+    )
+    output_dir = private_dir(tmp_path / ".private" / "collection" / campaign.output_dir_name)
+    manifest = dataset.patch_campaign_manifest(
+        campaign,
+        private_root=tmp_path / ".private",
+        output_dir=output_dir,
+        seeds_sha256=hashlib.sha256(b"seeds").hexdigest(),
+        scope_sha256=hashlib.sha256(b"scope").hexdigest(),
+        tool_sha256=dataset.effective_campaign_source_sha256(),
+    )
+    manifest_sha = dataset.persist_patch_campaign_manifest_once(output_dir, manifest)
+
+    class CancelOnMatch(FakeTransport):
+        async def fetch_match(self, match_id: str) -> RawRiotResponse:
+            await super().fetch_match(match_id)
+            raise asyncio.CancelledError
+
+    transport = CancelOnMatch(
+        World(
+            queue_listings={(420, "puuid-seed"): ["BR1_10"]},
+            matches={
+                "BR1_10": {
+                    "participants": [("puuid-seed", KAISA, "BOTTOM")],
+                    "version": "16.20.800.1",
+                    "queue": 420,
+                    "result": "GameComplete",
+                    "identity": "BR1_10",
+                }
+            },
+        )
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await dataset.run_dataset_collection(
+            transport=transport,
+            seeds=[SEED],
+            output_dir=output_dir,
+            attempt_number=1,
+            authorized_max_requests=100,
+            campaign=campaign,
+            campaign_manifest_sha256=manifest_sha,
+        )
+    paths = dataset.attempt_paths(output_dir, 1)
+    budget = json.loads(paths["budget"].read_text(encoding="utf-8"))
+    assert budget["schemaVersion"] == 4
+    assert budget["status"] == "INTERRUPTED"
+    assert (
+        budget["requestsReserved"]
+        == len([row for row in budget["diagnostics"] if row["requestReserved"] is True])
+        == 3
+    )
+    assert [row["ordinal"] for row in budget["diagnostics"]] == [1, 2, 3]
+    assert not paths["report"].exists()
+
+    retry = FakeTransport(World())
+    with pytest.raises(DiscoveryError, match="incompleto|incoerente"):
+        await dataset.run_dataset_collection(
+            transport=retry,
+            seeds=[SEED],
+            output_dir=output_dir,
+            attempt_number=2,
+            authorized_max_requests=100,
+            campaign=campaign,
+            campaign_manifest_sha256=manifest_sha,
+        )
+    assert retry.calls == []
+
+
+@pytest.mark.asyncio
+async def test_v2_local_failure_after_first_raw_half_never_publishes_pair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20", campaign_name="half-pair-check", window_start=100, window_end=200
+    )
+    output_dir = private_dir(tmp_path / ".private" / "collection" / campaign.output_dir_name)
+    manifest = dataset.patch_campaign_manifest(
+        campaign,
+        private_root=tmp_path / ".private",
+        output_dir=output_dir,
+        seeds_sha256=hashlib.sha256(b"seeds").hexdigest(),
+        scope_sha256=hashlib.sha256(b"scope").hexdigest(),
+        tool_sha256=dataset.effective_campaign_source_sha256(),
+    )
+    manifest_sha = dataset.persist_patch_campaign_manifest_once(output_dir, manifest)
+    real_store = dataset.DurableRawMatchStore
+    stores_written = 0
+
+    class FailSecondRawWrite:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self.inner = real_store(*args, **kwargs)
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self.inner, name)
+
+        def store(self, *args: Any, **kwargs: Any) -> Any:
+            nonlocal stores_written
+            stores_written += 1
+            if stores_written == 2:
+                raise OSError("synthetic local disk failure")
+            return self.inner.store(*args, **kwargs)
+
+    monkeypatch.setattr(dataset, "DurableRawMatchStore", FailSecondRawWrite)
+    world = World(queue_listings={(420, "puuid-seed"): ["BR1_11"], (440, "puuid-seed"): []})
+    world.match("BR1_11", [("puuid-seed", KAISA, "BOTTOM")], version="16.20.800.1")
+    with pytest.raises(OSError, match="synthetic local disk failure"):
+        await dataset.run_dataset_collection(
+            transport=FakeTransport(world),
+            seeds=[SEED],
+            output_dir=output_dir,
+            attempt_number=1,
+            authorized_max_requests=100,
+            campaign=campaign,
+            campaign_manifest_sha256=manifest_sha,
+        )
+    paths = dataset.attempt_paths(output_dir, 1)
+    budget = json.loads(paths["budget"].read_text(encoding="utf-8"))
+    assert budget["status"] == "INTERRUPTED"
+    assert list(paths["raw"].glob("*.match.ref"))
+    assert not list(paths["raw"].glob("*.timeline.ref"))
+    assert not paths["report"].exists()
+
+
+@pytest.mark.parametrize("queues", [(420,), (440,), (420, 440)])
+def test_patch_campaign_accepts_only_supported_queues(queues: tuple[int, ...]) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20",
+        campaign_name="queue-check",
+        window_start=100,
+        window_end=200,
+        queues=queues,
+    )
+    assert campaign.queues == queues
+
+
+@pytest.mark.parametrize("queues", [(400,), (420, 420), (440, 400)])
+def test_patch_campaign_rejects_unsupported_or_repeated_queues(
+    queues: tuple[int, ...],
+) -> None:
+    with pytest.raises(DiscoveryError, match="filas distintas 420 e/ou 440"):
+        dataset.build_patch_campaign(
+            patch="16.20",
+            campaign_name="queue-check",
+            window_start=100,
+            window_end=200,
+            queues=queues,
+        )
+
+
+def test_patch_campaign_authorization_is_bound_to_manifest_and_queue_order(tmp_path: Path) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20", campaign_name="offline-check", window_start=100, window_end=200
+    )
+    digest = "a" * 64
+    path = _write_authorization(tmp_path)
+    record = path.parent / "99-user-decision-synthetic.md"
+    state: dict[str, object] = {
+        "schemaVersion": 2,
+        "campaign": campaign.campaign_id,
+        "scope": dataset.AUTHORIZATION_SCOPE,
+        "attemptNumber": 1,
+        "maxPairs": campaign.max_pairs,
+        "maxRequests": 100,
+        "maxSeconds": campaign.max_seconds,
+        "window": {"startTime": campaign.window_start, "endTime": campaign.window_end},
+        "seedsSha256": hashlib.sha256(SEEDS_BYTES).hexdigest(),
+        "decisionRecord": {
+            "path": "validation/sprint-3/CC-323/99-user-decision-synthetic.md",
+            "sha256": hashlib.sha256(record.read_bytes()).hexdigest(),
+        },
+        "campaignName": campaign.campaign_name,
+        "patch": campaign.patch,
+        "queues": list(campaign.queues),
+        "mapId": campaign.map_id,
+        "manifestSha256": digest,
+    }
+    write_private_with_sidecar(path, (json.dumps(state, sort_keys=True) + "\n").encode())
+
+    granted = dataset.load_collection_authorization(
+        path, attempt_number=1, campaign=campaign, manifest_sha256=digest
+    )
+    assert granted.schema_version == 2 and granted.manifest_sha256 == digest
+    with pytest.raises(DiscoveryError):
+        dataset.load_collection_authorization(
+            path, attempt_number=1, campaign=campaign, manifest_sha256="b" * 64
+        )
+    state["queues"] = [440, 420]
+    write_private_with_sidecar(path, (json.dumps(state, sort_keys=True) + "\n").encode())
+    with pytest.raises(DiscoveryError):
+        dataset.load_collection_authorization(
+            path, attempt_number=1, campaign=campaign, manifest_sha256=digest
+        )
+
+
+def test_v2_resume_requires_diagnostics_and_manifest_bound_history(tmp_path: Path) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20",
+        campaign_name="resume-check",
+        window_start=100,
+        window_end=200,
+        max_requests=2,
+    )
+    output = private_dir(tmp_path / ".private" / "collection" / campaign.output_dir_name)
+    manifest = dataset.patch_campaign_manifest(
+        campaign,
+        private_root=tmp_path / ".private",
+        output_dir=output,
+        seeds_sha256="a" * 64,
+        scope_sha256="b" * 64,
+        tool_sha256=dataset.effective_campaign_source_sha256(),
+    )
+    manifest_sha = dataset.persist_patch_campaign_manifest_once(output, manifest)
+    paths = dataset.attempt_paths(output, 1)
+    binding = {
+        "campaign": campaign.campaign_id,
+        "attemptNumber": 1,
+        "manifestSha256": manifest_sha,
+    }
+    paths["marker"].write_text("started", encoding="ascii")
+    diagnostics = [
+        {
+            "sequence": 1,
+            "ordinal": 1,
+            "requestClass": "match",
+            "result": "HTTP_200",
+            "statusCode": 200,
+            "durationMs": 1.0,
+            "exceptionClass": None,
+            "causeCategory": None,
+            "requestReserved": True,
+        }
+    ]
+    paths["budget"].write_text(
+        json.dumps(
+            {
+                "schemaVersion": 4,
+                "campaignBinding": binding,
+                "status": "COMPLETED",
+                "requestsReserved": 1,
+                "diagnostics": diagnostics,
+            }
+        ),
+        encoding="utf-8",
+    )
+    paths["lifecycle"].write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "campaignBinding": binding,
+                "attemptNumber": 1,
+                "lifecycleStatus": "COMPLETE",
+                "runOutcome": "COMPLETED",
+                "processStartedMonotonicNs": 10,
+                "coroutineStartedMonotonicNs": 11,
+                "coroutineFinishedMonotonicNs": 19,
+                "processFinishedMonotonicNs": 20,
+                "processElapsedNs": 10,
+            }
+        ),
+        encoding="utf-8",
+    )
+    paths["report"].write_text(
+        json.dumps(
+            {
+                "requests": 1,
+                "campaignManifestSha256": manifest_sha,
+                "status": "QUEUE_EXHAUSTED",
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert dataset.prior_patch_campaign_usage(output, 2, manifest_sha) == (1, 10)
+
+    second_paths = dataset.attempt_paths(output, 2)
+    second_binding = {**binding, "attemptNumber": 2}
+    second_paths["marker"].write_text("started", encoding="ascii")
+    second_paths["budget"].write_text(
+        json.dumps(
+            {
+                "schemaVersion": 4,
+                "campaignBinding": second_binding,
+                "status": "COMPLETED",
+                "requestsReserved": 1,
+                "diagnostics": diagnostics,
+            }
+        ),
+        encoding="utf-8",
+    )
+    second_paths["lifecycle"].write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "campaignBinding": second_binding,
+                "attemptNumber": 2,
+                "lifecycleStatus": "COMPLETE",
+                "runOutcome": "COMPLETED",
+                "processStartedMonotonicNs": 100,
+                "coroutineStartedMonotonicNs": 101,
+                "coroutineFinishedMonotonicNs": 119,
+                "processFinishedMonotonicNs": 120,
+                "processElapsedNs": 20,
+            }
+        ),
+        encoding="utf-8",
+    )
+    second_paths["report"].write_text(
+        json.dumps(
+            {
+                "requests": 1,
+                "campaignManifestSha256": manifest_sha,
+                "status": "QUEUE_EXHAUSTED",
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert dataset.prior_patch_campaign_usage(output, 3, manifest_sha) == (2, 30)
+
+    for altered in (
+        {"requestsReserved": 0},
+        {"diagnostics": []},
+        {
+            "requestsReserved": 2,
+            "diagnostics": [diagnostics[0], {**diagnostics[0], "sequence": 2}],
+        },
+        {"diagnostics": [{**diagnostics[0], "result": "HTTP_429"}]},
+        {"campaignBinding": {**binding, "manifestSha256": "d" * 64}},
+    ):
+        budget = json.loads(paths["budget"].read_text(encoding="utf-8"))
+        budget.update(altered)
+        paths["budget"].write_text(json.dumps(budget), encoding="utf-8")
+        with pytest.raises(DiscoveryError, match="incoerente"):
+            dataset.prior_patch_campaign_usage(output, 2, manifest_sha)
+        budget.update(
+            {
+                "requestsReserved": 1,
+                "diagnostics": diagnostics,
+                "campaignBinding": binding,
+            }
+        )
+        paths["budget"].write_text(json.dumps(budget), encoding="utf-8")
+
+    retry = FakeTransport(World())
+    with pytest.raises(DiscoveryError, match="requisições da campanha já consumido"):
+        asyncio.run(
+            dataset.run_dataset_collection(
+                transport=retry,
+                seeds=[SEED],
+                output_dir=output,
+                attempt_number=3,
+                authorized_max_requests=2,
+                campaign=campaign,
+                campaign_manifest_sha256=manifest_sha,
+            )
+        )
+    assert retry.calls == []
+
+
+def test_generic_target_mismatch_requires_listed_queue() -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20", campaign_name="target-check", window_start=100, window_end=200
+    )
+    document = {
+        "metadata": {"matchId": "BR1_12"},
+        "info": {
+            "gameVersion": "16.20.800.1",
+            "queueId": 440,
+            "mapId": 11,
+            "endOfGameResult": "GameComplete",
+        },
+    }
+    assert dataset._target_mismatch(document, "BR1_12", campaign, expected_queue=420) == (
+        "LISTED_QUEUE_MISMATCH"
+    )
+    assert dataset._target_mismatch(document, "BR1_12", campaign, expected_queue=440) is None
+
+
+def _write_v2_completed_attempt(
+    output: Path, campaign: dataset.Campaign, manifest_sha: str, attempt: int, elapsed_ns: int
+) -> None:
+    paths = dataset.attempt_paths(output, attempt)
+    binding = {
+        "campaign": campaign.campaign_id,
+        "attemptNumber": attempt,
+        "manifestSha256": manifest_sha,
+    }
+    paths["marker"].write_text("started", encoding="ascii")
+    paths["budget"].write_text(
+        json.dumps(
+            {
+                "schemaVersion": 4,
+                "campaignBinding": binding,
+                "status": "COMPLETED",
+                "requestsReserved": 1,
+                "diagnostics": [
+                    {
+                        "sequence": 1,
+                        "ordinal": 1,
+                        "requestClass": "match",
+                        "result": "HTTP_200",
+                        "statusCode": 200,
+                        "durationMs": 1.0,
+                        "exceptionClass": None,
+                        "causeCategory": None,
+                        "requestReserved": True,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    started = attempt * 1_000_000
+    paths["lifecycle"].write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "campaignBinding": binding,
+                "attemptNumber": attempt,
+                "lifecycleStatus": "COMPLETE",
+                "runOutcome": "COMPLETED",
+                "processStartedMonotonicNs": started,
+                "coroutineStartedMonotonicNs": started + 1,
+                "coroutineFinishedMonotonicNs": started + elapsed_ns - 1,
+                "processFinishedMonotonicNs": started + elapsed_ns,
+                "processElapsedNs": elapsed_ns,
+            }
+        ),
+        encoding="utf-8",
+    )
+    paths["report"].write_text(
+        json.dumps(
+            {
+                "requests": 1,
+                "campaignManifestSha256": manifest_sha,
+                "status": "QUEUE_EXHAUSTED",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.asyncio
+async def test_v2_sums_elapsed_time_from_distinct_process_clocks_before_next_attempt(
+    tmp_path: Path,
+) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20",
+        campaign_name="cumulative-time",
+        window_start=100,
+        window_end=200,
+        max_requests=3,
+        max_seconds=301,
+    )
+    output = private_dir(tmp_path / ".private" / "collection" / campaign.output_dir_name)
+    manifest = dataset.patch_campaign_manifest(
+        campaign,
+        private_root=tmp_path / ".private",
+        output_dir=output,
+        seeds_sha256="a" * 64,
+        scope_sha256="b" * 64,
+        tool_sha256=dataset.effective_campaign_source_sha256(),
+    )
+    manifest_sha = dataset.persist_patch_campaign_manifest_once(output, manifest)
+    each_process_ns = 151_000_000_000
+    _write_v2_completed_attempt(output, campaign, manifest_sha, 1, each_process_ns)
+    _write_v2_completed_attempt(output, campaign, manifest_sha, 2, each_process_ns)
+    assert dataset.prior_patch_campaign_usage(output, 3, manifest_sha) == (
+        2,
+        each_process_ns * 2,
+    )
+    transport = FakeTransport(World())
+    with pytest.raises(DiscoveryError, match="teto cumulativo de tempo"):
+        await dataset.run_dataset_collection(
+            transport=transport,
+            seeds=[SEED],
+            output_dir=output,
+            attempt_number=3,
+            authorized_max_requests=3,
+            campaign=campaign,
+            campaign_manifest_sha256=manifest_sha,
+        )
+    assert transport.calls == []
+
+
+def test_v2_rejects_symlinked_private_roots_and_decision_record(tmp_path: Path) -> None:
+    campaign = dataset.build_patch_campaign(
+        patch="16.20",
+        campaign_name="symlink-check",
+        window_start=100,
+        window_end=200,
+        known_raw_subdirectories=("known",),
+    )
+    private = private_dir(tmp_path / ".private")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (private / "known").symlink_to(outside, target_is_directory=True)
+    output = private_dir(private / "collection" / campaign.output_dir_name)
+    with pytest.raises(DiscoveryError, match="symlink"):
+        dataset.patch_campaign_manifest(
+            campaign,
+            private_root=private,
+            output_dir=output,
+            seeds_sha256="a" * 64,
+            scope_sha256="b" * 64,
+            tool_sha256="c" * 64,
+        )
+    (private / "known").unlink()
+    linked_output = private / "linked-output"
+    (private / "actual-output").mkdir()
+    linked_output.symlink_to(private / "actual-output", target_is_directory=True)
+    with pytest.raises(DiscoveryError, match="symlink"):
+        dataset.patch_campaign_manifest(
+            campaign,
+            private_root=private,
+            output_dir=linked_output,
+            seeds_sha256="a" * 64,
+            scope_sha256="b" * 64,
+            tool_sha256="c" * 64,
+        )
+
+    auth = _write_authorization(tmp_path)
+    record = auth.parent / "99-user-decision-synthetic.md"
+    external_record = outside / "decision.md"
+    external_record.write_bytes(record.read_bytes())
+    record.unlink()
+    record.symlink_to(external_record)
+    with pytest.raises(DiscoveryError, match="symlink"):
+        dataset.load_collection_authorization(auth, attempt_number=1)
 
 
 @pytest.mark.parametrize(

@@ -233,7 +233,7 @@ async def _prepare(
     rules = load_empirical_rules_or_disabled(
         Path(settings.empirical_rules_path), reconstruction_version=RECONSTRUCTION_ALGORITHM_VERSION
     )
-    resolution = rules.resolve(match.patch)
+    resolution = rules.resolve(match.patch, match.queue)
     if job.mode != ImportMode.DEMO and resolution.application == "INHERITED":
         try:
             await _ensure_catalog(

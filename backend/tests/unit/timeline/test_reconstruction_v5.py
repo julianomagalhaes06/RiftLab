@@ -63,11 +63,11 @@ def _reduce(
     )
 
 
-def test_algorithm_version_is_eleven() -> None:
-    """A v10 (regras empíricas do registro, validadas ou herdadas por patch) mantém tudo
-    da v5/v6 (nível, timestamp do evento, bloco retrospectivo); os testes deste arquivo
-    seguem valendo porque, com as regras desligadas, o resultado é idêntico ao da v6."""
-    assert RECONSTRUCTION_ALGORITHM_VERSION == 11
+def test_algorithm_version_is_twelve() -> None:
+    """A v12 (regras empíricas do registro por patch e fila, validadas ou herdadas) mantém
+    tudo da v5/v6 (nível, timestamp do evento, bloco retrospectivo); os testes deste
+    arquivo seguem valendo porque, com as regras desligadas, o resultado é idêntico ao da v6."""
+    assert RECONSTRUCTION_ALGORITHM_VERSION == 12
 
 
 # --- observação de nível ---------------------------------------------------

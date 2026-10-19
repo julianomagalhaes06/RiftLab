@@ -18,7 +18,17 @@ from typing import Any, Protocol
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from riftlab.catalog.domain import Item
+from riftlab.catalog.context import (
+    CATALOG_CONTEXT_POLICY_V1,
+    CatalogContextDescriptor,
+    CatalogContextPolicy,
+    CatalogContextStrategy,
+    carry_forward_context_version_is_known,
+    load_catalog_items_for_context,
+    materialize_catalog_context,
+    referenced_item_ids,
+)
+from riftlab.catalog.domain import CatalogVersion, Item
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.ingestion.domain import MatchSource
@@ -116,10 +126,15 @@ STALE_FRAME_THRESHOLD_MS = 90_000
 #       regras é o mesmo da v9 tem resultado idêntico ao da v9, e a v10 copia
 #       esses estados sem reabrir a fonte (`_carry_forward`), o que preserva as
 #       partidas cujo bruto não está nesta máquina.
-RECONSTRUCTION_ALGORITHM_VERSION = 11
+#   12 — DOMÍNIO patch × fila (CC-802, registro v3): a confirmação própria do
+#       16.20 valeu só para a fila 420, no contexto de catálogo FULL_CANONICAL_V1.
+#       A resolução passa a ser por (patch, fila) e o domínio escolhe o contexto do
+#       reducer. Partidas fora de domínios novos têm a mesma resolução e o mesmo
+#       contexto da v11 e são copiadas sem reabrir a fonte.
+RECONSTRUCTION_ALGORITHM_VERSION = 12
 # Versão anterior cujo reducer é idêntico ao da corrente (só a resolução das regras
 # mudou): base da cópia sem fonte.
-CARRY_FORWARD_FROM_VERSION = 10
+CARRY_FORWARD_FROM_VERSION = 11
 
 # 6 slots normais (docs/domain-model.md) — trinket é uma slot própria, nunca
 # conta aqui. Achado real da revisão: um inventário com mais de 6 itens
@@ -1293,37 +1308,16 @@ async def _load_catalog_items_closure(
     aparecem nos eventos) precisa estar disponível para `_consume_recipe`
     decompor C até A quando B não está na posse — sem isto, o orquestrador
     só via os IDs presentes em eventos, nunca as receitas intermediárias."""
-    resolved: dict[int, Item] = {}
-    pending = set(seed_item_ids)
-    while pending:
-        item_id = pending.pop()
-        if item_id in resolved:
-            continue
-        item = await catalog_repo.get_item(catalog_id, item_id)
-        if item is None:
-            continue
-        resolved[item_id] = item
-        for component in item.recipe:
-            component_id = component.get("itemId")
-            if (
-                isinstance(component_id, int)
-                and not isinstance(component_id, bool)
-                and component_id not in resolved
-            ):
-                pending.add(component_id)
-    return resolved
+    return await load_catalog_items_for_context(
+        catalog_repo,
+        catalog_id,
+        CatalogContextStrategy.EVENT_RECIPE_CLOSURE_V11,
+        seed_item_ids,
+    )
 
 
 async def _referenced_item_ids(events: Sequence[TimelineEvent]) -> set[int]:
-    ids: set[int] = set()
-    for event in events:
-        if event.type not in _RELEVANT_EVENT_TYPES:
-            continue
-        for field_name in ("itemId", "beforeId", "afterId"):
-            value = event.payload.get(field_name)
-            if isinstance(value, int) and not isinstance(value, bool) and value != 0:
-                ids.add(value)
-    return ids
+    return referenced_item_ids(events)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1335,6 +1329,9 @@ class MatchReconstruction:
     match_id: str
     catalog_id: uuid.UUID | None
     decision_states: list[DecisionState] = field(default_factory=list)
+    # In-memory evidence only. V11 intentionally does not persist this new
+    # descriptor into historical states or marker provenance.
+    catalog_context: CatalogContextDescriptor | None = None
 
 
 def _rule_set(provenance: Sequence[dict[str, Any]]) -> frozenset[tuple[Any, ...]]:
@@ -1345,6 +1342,8 @@ def _rule_set(provenance: Sequence[dict[str, Any]]) -> frozenset[tuple[Any, ...]
             rule.get("application"),
             rule.get("appliedFromPatch"),
             tuple(rule.get("systemItemIds", ())) if rule.get("ruleId") == "R4s" else (),
+            rule.get("appliedFromQueue"),
+            rule.get("catalogContext"),
         )
         for rule in provenance
         if rule.get("application") != "WITHHELD"
@@ -1358,17 +1357,26 @@ async def _carry_forward(
     catalog_id: uuid.UUID | None,
     provenance: Sequence[dict[str, Any]],
     timeline_repo_factory: Any,
+    catalog_context_strategy: CatalogContextStrategy = (
+        CatalogContextStrategy.EVENT_RECIPE_CLOSURE_V11
+    ),
 ) -> MatchReconstruction | None:
-    """Copia v10 para v11 quando o resultado é o mesmo por construção:
-    marca v10 com o MESMO catálogo, estados existentes e a MESMA proveniência
-    efetiva de regras (id/versão/aplicação/origem/parâmetros) que v11 ligaria.
-    Linhas novas (ids novos, v11, só a
-    proveniência atualizada); as da v9 ficam intactas. Qualquer diferença (ex.: patch
+    """Copia a versão anterior para a corrente quando o resultado é o mesmo por
+    construção: marca anterior com o MESMO catálogo, estados existentes e a MESMA
+    proveniência efetiva de regras (id/versão/aplicação/origem/fila/contexto/parâmetros)
+    que a corrente ligaria. Linhas novas (ids novos, versão corrente, só a
+    proveniência atualizada); as anteriores ficam intactas. Qualquer diferença (ex.: patch
     que agora herda regras) ⇒ None, e a reconstrução segue fresca a partir da fonte."""
     async with unit_of_work(session_factory) as session:
         repo = timeline_repo_factory(session)
         previous = await repo.get_match_reconstruction(match_id, CARRY_FORWARD_FROM_VERSION)
-        if previous is None or previous.catalog_id != catalog_id:
+        if (
+            previous is None
+            or previous.catalog_id != catalog_id
+            or not carry_forward_context_version_is_known(
+                previous.reconstruction_version, catalog_context_strategy
+            )
+        ):
             return None
         participants = await SqlAlchemyIngestionRepository(session).list_participants(match_id)
         old_states = [
@@ -1428,6 +1436,7 @@ async def reconstruct_match(
     match_id: str,
     *,
     empirical_rules: EmpiricalRules | None = None,
+    catalog_context_policy: CatalogContextPolicy = CATALOG_CONTEXT_POLICY_V1,
 ) -> MatchReconstruction:
     """Orquestrador (CC-203): busca (banco+fonte local, fora de transação de
     escrita) -> reduz (puro, um participante por vez) -> persiste (uma única
@@ -1451,6 +1460,17 @@ async def reconstruct_match(
     desligadas (comportamento da v6). As regras ligadas são resolvidas pelo
     PATCH da partida."""
     rules = empirical_rules if empirical_rules is not None else EmpiricalRules.disabled()
+    if (
+        catalog_context_policy.resolve_active(RECONSTRUCTION_ALGORITHM_VERSION)
+        is not CatalogContextStrategy.EVENT_RECIPE_CLOSURE_V11
+    ):
+        raise TimelineReplayError(
+            code="INACTIVE_CATALOG_CONTEXT",
+            detail=(
+                f"reconstrução v{RECONSTRUCTION_ALGORITHM_VERSION} usa EVENT_RECIPE_CLOSURE_V11 "
+                "por padrão; FULL_CANONICAL_V1 só por domínio confirmado do registro"
+            ),
+        )
     ingestion_repo_factory = SqlAlchemyIngestionRepository
     timeline_repo_factory = SqlAlchemyTimelineRepository
     catalog_repo_factory = SqlAlchemyCatalogRepository
@@ -1486,6 +1506,7 @@ async def reconstruct_match(
         )
 
     catalog_id: uuid.UUID | None = None
+    catalog_version: CatalogVersion | None = None
     entry = mapping.resolve(match.patch)
     if entry is not None:
         async with unit_of_work(session_factory) as session:
@@ -1497,9 +1518,26 @@ async def reconstruct_match(
     from riftlab.timeline.rule_resolution import resolve_rules
 
     async with unit_of_work(session_factory) as session:
-        enabled_rules, provenance = await resolve_rules(session, rules, match.patch, catalog_id)
+        enabled_rules, provenance = await resolve_rules(
+            session, rules, match.patch, catalog_id, match.queue
+        )
+    # O domínio confirmado escolhe o contexto do reducer (o mesmo do auditor);
+    # fora dele, o contexto ativo da versão.
+    try:
+        catalog_context_strategy = catalog_context_policy.resolve_for_domain(
+            RECONSTRUCTION_ALGORITHM_VERSION,
+            rules.resolve(match.patch, match.queue).catalog_context,
+        )
+    except ValueError as exc:
+        raise TimelineReplayError(code="INACTIVE_CATALOG_CONTEXT", detail=str(exc)) from exc
     carried = await _carry_forward(
-        session_factory, match_id, match.patch, catalog_id, provenance, timeline_repo_factory
+        session_factory,
+        match_id,
+        match.patch,
+        catalog_id,
+        provenance,
+        timeline_repo_factory,
+        catalog_context_strategy,
     )
     if carried is not None:
         return carried
@@ -1529,14 +1567,21 @@ async def reconstruct_match(
 
     catalog_items: dict[int, Item] = {}
     excluded_item_ids: frozenset[int] = frozenset()
-    if catalog_id is not None:
+    catalog_context: CatalogContextDescriptor | None = None
+    if catalog_id is not None and catalog_version is not None:
         seeds = await _referenced_item_ids(events)
         async with unit_of_work(session_factory) as session:
             catalog_repo = catalog_repo_factory(session)
-            catalog_items = await _load_catalog_items_closure(catalog_repo, catalog_id, seeds)
-            excluded_item_ids = frozenset(
-                excluded.item_id for excluded in await catalog_repo.list_excluded_items(catalog_id)
+            context = await materialize_catalog_context(
+                catalog_repo,
+                catalog_version,
+                strategy=catalog_context_strategy,
+                seed_item_ids=seeds,
+                policy_version=catalog_context_policy.policy_version,
             )
+            catalog_items = dict(context.items)
+            excluded_item_ids = context.excluded_item_ids
+            catalog_context = context.descriptor
 
     if RULE_R4W in enabled_rules:
         # R4w: pré-passo puro (reatribui as compras do World Atlas do
@@ -1580,5 +1625,8 @@ async def reconstruct_match(
         ) from exc
 
     return MatchReconstruction(
-        match_id=match_id, catalog_id=catalog_id, decision_states=all_decision_states
+        match_id=match_id,
+        catalog_id=catalog_id,
+        decision_states=all_decision_states,
+        catalog_context=catalog_context,
     )

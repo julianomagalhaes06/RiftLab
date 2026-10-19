@@ -1055,6 +1055,8 @@ export interface components {
             reconstructionRulesHealth: "OK" | "UNVERIFIED" | "SUSPENDED";
             /** Reconstructionrulespatch */
             reconstructionRulesPatch?: string | null;
+            /** Reconstructionrulesqueue */
+            reconstructionRulesQueue?: (420 | 440) | null;
             /** Reconstructionrulesverdict */
             reconstructionRulesVerdict?: ("ACCEPT" | "REJECT" | "NO_SAMPLE") | null;
             /** Reconstructionruleswilsonupper */

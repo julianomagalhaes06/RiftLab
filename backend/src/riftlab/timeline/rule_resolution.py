@@ -16,9 +16,10 @@ async def resolve_rules(
     rules: EmpiricalRules,
     patch: str,
     catalog_id: uuid.UUID | None,
+    queue: int | None = None,
 ) -> tuple[frozenset[str], list[dict[str, Any]]]:
-    resolution = rules.resolve(patch)
-    provenance = rules.provenance_for(patch)
+    resolution = rules.resolve(patch, queue)
+    provenance = rules.provenance_for(patch, queue)
     if resolution.application != "INHERITED":
         for entry in provenance:
             if entry["ruleId"] == "R4s" and entry.get("application") != "WITHHELD":

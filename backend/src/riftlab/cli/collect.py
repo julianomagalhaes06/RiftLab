@@ -43,6 +43,13 @@ _DEFAULT_CC316_OUTPUT = _ROOT / ".private" / "collection" / "cc316"
 _DEFAULT_CC323_OUTPUT = _ROOT / ".private" / "collection" / "cc323"
 
 
+def _effective_campaign_source_sha256() -> str:
+    """Compatibility wrapper for campaign source fingerprinting."""
+    from riftlab.collection.dataset_collection import effective_campaign_source_sha256
+
+    return effective_campaign_source_sha256()
+
+
 @collect_app.command("structural-cc316")
 def collect_structural_cc316(
     seeds_file: Path = typer.Option(
@@ -348,7 +355,6 @@ def _run_cc316_partition_fetch(
         raise _blocked(
             "esta tentativa já foi iniciada ou produziu estado local; revisão necessária"
         )
-
     settings = load_settings(env_file)
     if not settings.riot_api_key:
         raise _blocked("chave Riot ausente; nada foi consultado")
@@ -475,6 +481,9 @@ def _run_dataset_campaign(
     seeds_file: Path,
     output_dir: Path,
     env_file: Path | None,
+    *,
+    campaign_manifest: dict[str, object] | None = None,
+    campaign_manifest_sha256: str | None = None,
 ) -> None:
     current_process_started_monotonic_ns = time.monotonic_ns()
     import riftlab.collection.dataset_collection as dataset
@@ -491,7 +500,10 @@ def _run_dataset_campaign(
     name = campaign.output_dir_name
     try:
         granted = dataset.load_collection_authorization(
-            authorization, attempt_number=attempt, campaign=campaign
+            authorization,
+            attempt_number=attempt,
+            campaign=campaign,
+            manifest_sha256=campaign_manifest_sha256,
         )
     except DiscoveryError as exc:
         raise _blocked(str(exc)) from exc
@@ -502,42 +514,79 @@ def _run_dataset_campaign(
         output_dir.chmod(0o700)
     except OSError as exc:
         raise _blocked("diretório de saída privada indisponível") from exc
+    if campaign.is_generic:
+        if campaign_manifest is None or campaign_manifest_sha256 is None:
+            raise _blocked("manifesto imutável v2 ausente; nada foi consultado")
+        try:
+            written_digest = dataset.persist_patch_campaign_manifest_once(
+                output_dir, campaign_manifest
+            )
+        except DiscoveryError as exc:
+            raise _blocked(str(exc)) from exc
+        if written_digest != campaign_manifest_sha256:
+            raise _blocked("hash do manifesto v2 divergente; nada foi consultado")
     paths = dataset.attempt_paths(output_dir, attempt)
     try:
-        dataset.prior_campaign_usage(output_dir, attempt)
+        if campaign.is_generic:
+            dataset.prior_patch_campaign_usage(output_dir, attempt, campaign_manifest_sha256 or "")
+        else:
+            dataset.prior_campaign_usage(output_dir, attempt)
     except DiscoveryError as exc:
         raise _blocked(str(exc)) from exc
     if any(paths[name].exists() for name in ("report", "budget", "lifecycle", "marker")):
         raise _blocked(
             "esta tentativa já foi iniciada ou produziu estado local; revisão necessária"
         )
+    if campaign.is_generic:
+        try:
+            dataset.validate_private_campaign_path(
+                _ROOT / ".private", paths["raw"], "raiz raw da campanha"
+            )
+        except DiscoveryError as exc:
+            raise _blocked(str(exc)) from exc
     try:
         if hashlib.sha256(seeds_file.read_bytes()).hexdigest() != granted.seeds_sha256:
             raise _blocked("arquivo de sementes diverge do autorizado; nada foi consultado")
         seeds = load_seeds(seeds_file)
     except (SeedsFileError, OSError) as exc:
         raise _blocked(f"sementes consentidas indisponíveis ({type(exc).__name__})") from exc
+    root = _ROOT / ".private" if campaign.is_generic else output_dir.parent
     known_raw_directories = [
         directory
-        for directory in (
-            output_dir.parent / relative for relative in campaign.known_raw_subdirectories
-        )
+        for directory in (root / relative for relative in campaign.known_raw_subdirectories)
         if directory.is_dir()
     ]
+    if campaign.is_generic:
+        input_hashes = campaign_manifest.get("inputHashes") if campaign_manifest else None
+        if (
+            not isinstance(input_hashes, dict)
+            or input_hashes.get("toolSha256") != _effective_campaign_source_sha256()
+        ):
+            raise _blocked("fontes ativas da campanha divergem do manifesto; nada foi consultado")
 
     settings = load_settings(env_file)
     if not settings.riot_api_key:
         raise _blocked("chave Riot ausente; nada foi consultado")
-    try:
-        connectivity_preflight()
-    except DiscoveryError as exc:
-        raise _blocked(str(exc)) from exc
+    if not campaign.is_generic:
+        try:
+            connectivity_preflight()
+        except DiscoveryError as exc:
+            raise _blocked(str(exc)) from exc
 
     try:
         lifecycle = ProcessLifecycleJournal(
             paths["lifecycle"],
             attempt_number=attempt,
             process_started_monotonic_ns=current_process_started_monotonic_ns,
+            binding=(
+                {
+                    "campaign": campaign.campaign_id,
+                    "attemptNumber": attempt,
+                    "manifestSha256": campaign_manifest_sha256,
+                }
+                if campaign.is_generic
+                else None
+            ),
         )
         lifecycle.__enter__()
     except DiscoveryError as exc:
@@ -555,6 +604,7 @@ def _run_dataset_campaign(
                     max_attempts_per_request=5,
                     max_total_seconds=campaign.max_seconds,
                     request_timeout_seconds=10,
+                    stop_on_429=campaign.is_generic,
                 ),
                 rate_limiter=RiotRateLimiter(),
             )
@@ -566,6 +616,7 @@ def _run_dataset_campaign(
                 authorized_max_requests=granted.max_requests,
                 known_raw_directories=known_raw_directories,
                 campaign=campaign,
+                campaign_manifest_sha256=campaign_manifest_sha256,
                 process_started_monotonic_ns=lifecycle.process_started_monotonic_ns,
             )
         finally:
@@ -606,6 +657,127 @@ def _run_dataset_campaign(
         raise typer.Exit(code=EXIT_INCOMPLETE)
 
 
+@collect_app.command("patch-campaign")
+def collect_patch_campaign(
+    patch: str = typer.Option(..., help="Patch major.minor, numérico e explícito."),
+    campaign_name: str = typer.Option(..., "--campaign", help="Nome ASCII seguro da campanha."),
+    attempt: int = typer.Option(..., min=1, help="Tentativa sequencial desta campanha."),
+    authorization: Path = typer.Option(..., help="Autorização v2 privada com sidecar SHA-256."),
+    window_start: int = typer.Option(..., help="Início epoch da janela congelada."),
+    window_end: int = typer.Option(..., help="Fim epoch exclusivo da janela congelada."),
+    queues: str = typer.Option("420,440", help="Filas permitidas separadas por vírgula."),
+    max_pairs: int = typer.Option(1_200, min=1, help="Teto global imutável de pares novos."),
+    max_requests: int = typer.Option(3_000, min=1, help="Teto global imutável de requests."),
+    max_seconds: int = typer.Option(7_200, min=1, help="Teto global imutável em segundos."),
+    seeds_file: Path = typer.Option(_DEFAULT_CC316_SEEDS, help="Sementes consentidas privadas."),
+    scope_file: Path | None = typer.Option(None, help="Recorte versionado da campanha."),
+    known_raw_root: list[Path] | None = typer.Option(
+        None, "--known-raw-root", help="Raiz raw privada existente para deduplicação (repetível)."
+    ),
+    env_file: Path | None = typer.Option(None, help="Arquivo de ambiente Riot local."),
+) -> None:
+    """Campanha snowball genérica v2. Sem autorização exata não inicia nem consulta rede."""
+    import yaml
+
+    import riftlab.collection.dataset_collection as dataset
+    from riftlab.collection.cc316_adoption import canonical_json
+    from riftlab.collection.cc316_discovery import DiscoveryError
+
+    scope_file = scope_file or (_ROOT / "configs" / "scope.yaml")
+
+    try:
+        queue_ids = tuple(int(value.strip()) for value in queues.split(",") if value.strip())
+        scope_bytes = scope_file.read_bytes()
+        scope_document = yaml.safe_load(scope_bytes)
+        if not isinstance(scope_document, dict):
+            raise ValueError("recorte inválido")
+        configured_queues = scope_document.get("queues", [scope_document.get("queue")])
+        champions = scope_document.get("championIds")
+        role = scope_document.get("role")
+        map_id = scope_document.get("map")
+        if (
+            not isinstance(configured_queues, list)
+            or any(
+                isinstance(value, bool) or not isinstance(value, int) for value in configured_queues
+            )
+            or not set(queue_ids) <= set(configured_queues)
+            or not isinstance(champions, list)
+            or any(isinstance(value, bool) or not isinstance(value, int) for value in champions)
+            or isinstance(map_id, bool)
+            or not isinstance(map_id, int)
+            or role != "BOTTOM"
+        ):
+            raise ValueError("escopo de fila/role/champions incompatível")
+        private_root = _ROOT / ".private"
+        known_roots: tuple[str, ...] | None = None
+        if known_raw_root:
+            normalized_roots: list[str] = []
+            for raw_root in known_raw_root:
+                if any(part.is_symlink() for part in (raw_root, *raw_root.parents)):
+                    raise DiscoveryError("raiz raw conhecida contém symlink")
+                relative = raw_root.resolve().relative_to(private_root.resolve())
+                if not raw_root.is_dir():
+                    raise DiscoveryError("raiz raw conhecida deve ser diretório existente")
+                normalized_roots.append(relative.as_posix())
+            if len(set(normalized_roots)) != len(normalized_roots):
+                raise DiscoveryError("raiz raw conhecida duplicada")
+            known_roots = tuple(normalized_roots)
+        campaign = dataset.build_patch_campaign(
+            patch=patch,
+            campaign_name=campaign_name,
+            window_start=window_start,
+            window_end=window_end,
+            max_pairs=max_pairs,
+            max_requests=max_requests,
+            max_seconds=max_seconds,
+            queues=queue_ids,
+            map_id=map_id,
+            scope_champions=frozenset(champions),
+            scope_position=role,
+            **({"known_raw_subdirectories": known_roots} if known_roots is not None else {}),
+        )
+        if any(part.is_symlink() for part in (seeds_file, *seeds_file.parents)):
+            raise DiscoveryError("arquivo de sementes contém symlink")
+        try:
+            seeds_file.resolve().relative_to(private_root.resolve())
+        except ValueError as exc:
+            raise DiscoveryError("arquivo de sementes deve ficar dentro de .private") from exc
+        seeds_bytes = seeds_file.read_bytes()
+        seeds_digest = hashlib.sha256(seeds_bytes).hexdigest()
+        manifest = dataset.patch_campaign_manifest(
+            campaign,
+            private_root=private_root,
+            output_dir=_ROOT / ".private" / "collection" / campaign.output_dir_name,
+            seeds_sha256=seeds_digest,
+            scope_sha256=hashlib.sha256(scope_bytes).hexdigest(),
+            tool_sha256=_effective_campaign_source_sha256(),
+        )
+        manifest_digest = hashlib.sha256(canonical_json(manifest)).hexdigest()
+        grant = dataset.load_collection_authorization(
+            authorization,
+            attempt_number=attempt,
+            campaign=campaign,
+            manifest_sha256=manifest_digest,
+        )
+        if grant.seeds_sha256 != seeds_digest:
+            raise DiscoveryError("sementes divergem da autorização")
+    except (DiscoveryError, OSError, UnicodeError, ValueError, TypeError, yaml.YAMLError) as exc:
+        raise _blocked(
+            f"campanha recusada ({type(exc).__name__}); nenhuma requisição iniciada"
+        ) from exc
+
+    _run_dataset_campaign(
+        campaign,
+        attempt,
+        authorization,
+        seeds_file,
+        _ROOT / ".private" / "collection" / campaign.output_dir_name,
+        env_file,
+        campaign_manifest=manifest,
+        campaign_manifest_sha256=manifest_digest,
+    )
+
+
 @report_app.command("patch-readiness")
 def report_patch_readiness(
     env_file: Path = typer.Option(None, help="Arquivo de ambiente do banco alvo."),
@@ -625,6 +797,40 @@ def report_patch_readiness(
             await engine.dispose()
 
     typer.echo(json.dumps(asyncio.run(run()), indent=2, sort_keys=True))
+
+
+@report_app.command("blockers")
+def report_blockers(
+    patch: str | None = typer.Option(None, help="Restringe ao patch numérico, por exemplo 16.20."),
+    queue: int | None = typer.Option(None, help="Restringe à fila 420 ou 440."),
+    in_scope: bool = typer.Option(
+        False, "--in-scope", help="Restringe aos pontos dentro do recorte."
+    ),
+    env_file: Path | None = typer.Option(None, help="Caminho do .env do banco alvo."),
+    scope: Path | None = typer.Option(None, help="Recorte real (padrão: configs/scope.yaml)."),
+    as_json: bool = typer.Option(False, "--json", help="Emite JSON em vez de Markdown."),
+) -> None:
+    """Censo agregado da extração corrente; só SELECT em transações READ ONLY."""
+    import re
+
+    from riftlab.reports.blockers import build_blockers_report, render_blockers_report
+
+    if patch is not None and not re.fullmatch(r"[0-9]{1,3}\.[0-9]{1,3}", patch):
+        raise _blocked("--patch deve ser numérico (major.minor)")
+    if queue is not None and queue not in {420, 440}:
+        raise _blocked("--queue aceita somente 420 ou 440")
+
+    async def build(session_factory: Any, loaded: Any) -> dict[str, Any]:
+        return await build_blockers_report(
+            session_factory,
+            _scope_file(loaded, scope),
+            patch=patch,
+            queue=queue,
+            in_scope_only=in_scope,
+        )
+
+    data = _run_db_report(env_file, build)
+    _emit(data, render_blockers_report(data), as_json)
 
 
 @report_app.command("gate")

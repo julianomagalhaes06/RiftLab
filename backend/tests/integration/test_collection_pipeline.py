@@ -44,6 +44,7 @@ from riftlab.ingestion.models import (
 )
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.preparation import application as preparation
+from riftlab.reports.blockers import build_blockers_report, render_blockers_report
 from riftlab.reports.diversity import build_diversity_report, render_diversity_report
 from riftlab.reports.integrity import check_integrity, render_integrity_report
 from riftlab.reports.reconstruction import (
@@ -51,6 +52,8 @@ from riftlab.reports.reconstruction import (
     render_reconstruction_report,
 )
 from riftlab.shared.db import unit_of_work
+from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION
+from riftlab.timeline.health import PatchRuleHealthModel
 from riftlab.timeline.models import MatchReconstructionModel, TimelineEventModel
 from support.collection_harness import (
     SEED_A_PUUID,
@@ -81,16 +84,26 @@ def _ids(count: int) -> list[str]:
 class Sample:
     """Uma amostra sintética coletada, com as configs de preparação REAL do teste."""
 
-    def __init__(self, tmp_path, count: int, *, seeds: int = 1) -> None:
-        self.patch = unique_patch()
+    def __init__(
+        self,
+        tmp_path,
+        count: int,
+        *,
+        seeds: int = 1,
+        patch: str | None = None,
+        queues: tuple[int, ...] = (420,),
+    ) -> None:
+        self.patch = patch or unique_patch()
+        self.queues = queues
         self.ids = _ids(count)
         self.h: Harness = one_seed(tmp_path, []) if seeds == 1 else two_seeds(tmp_path)
-        self.h.filters = MatchFilterConfig(frozenset({420}), 11, frozenset({self.patch}))
-        for match_id in self.ids:
+        self.h.filters = MatchFilterConfig(frozenset(queues), 11, frozenset({self.patch}))
+        for index, match_id in enumerate(self.ids):
             self.h.stub.add_match(
                 match_id,
                 seed_puuid=SEED_A_PUUID,
                 patch=self.patch,
+                queue=queues[index % len(queues)],
                 purchases=PURCHASES,
                 other_purchases=(
                     (130_000, 3006),
@@ -98,7 +111,10 @@ class Sample:
             )
         (tmp_path / "cfg").mkdir(exist_ok=True)
         base = write_prepare_configs(
-            tmp_path / "cfg", scope_patch=self.patch, mapped_patches=(self.patch,)
+            tmp_path / "cfg",
+            scope_patch=self.patch,
+            mapped_patches=(self.patch,),
+            queues=queues,
         )
         self.settings: Settings = base.model_copy(update={"subject_hash_secret": HASH_SECRET})
         self.scope_path = tmp_path / "cfg" / "scope.yaml"
@@ -119,6 +135,111 @@ class Sample:
             session_factory, self.raw_store, self.settings, catalog_source_factory=self.catalog
         )
         return enqueue, drain
+
+
+async def test_blockers_report_selects_exact_current_tuple_and_counts_missing_versions(
+    session_factory, tmp_path
+) -> None:
+    queues = (420, 440)
+    current_sample = Sample(tmp_path / "current", 2, queues=queues)
+    stale_sample = Sample(tmp_path / "stale", 1, patch=current_sample.patch, queues=queues)
+    try:
+        await current_sample.h.run()
+        await current_sample.import_all(session_factory)
+        stale_run = await stale_sample.h.run()
+        assert stale_run.stop_reason == StopReason.COMPLETED
+        await enqueue_collected_imports(
+            session_factory, stale_sample.raw_store, stale_sample.h.manifest().fetched_ids()
+        )
+        assert await ingestion_application.process_next_job(
+            session_factory, stale_sample.raw_store, stale_sample.settings, local_only=True
+        )
+
+        historical_match_id = current_sample.ids[0]
+        async with unit_of_work(session_factory) as session:
+            current_marker = await session.scalar(
+                select(DecisionExtractionModel).where(
+                    DecisionExtractionModel.match_id == historical_match_id,
+                    DecisionExtractionModel.reconstruction_version
+                    == RECONSTRUCTION_ALGORITHM_VERSION,
+                )
+            )
+            assert current_marker is not None
+            old_version = RECONSTRUCTION_ALGORITHM_VERSION - 1
+            session.add(
+                MatchReconstructionModel(
+                    match_id=historical_match_id,
+                    reconstruction_version=old_version,
+                    catalog_id=current_marker.catalog_id,
+                    rules_provenance=[],
+                )
+            )
+            await session.flush()
+            session.add(
+                DecisionExtractionModel(
+                    id=uuid.uuid4(),
+                    match_id=historical_match_id,
+                    reconstruction_version=old_version,
+                    selection_version=f"{current_marker.selection_version}_historical",
+                    feature_schema_version=current_marker.feature_schema_version,
+                    scope_version=current_marker.scope_version,
+                    classification_version=current_marker.classification_version,
+                    curation_rules_version=current_marker.curation_rules_version,
+                    catalog_id=current_marker.catalog_id,
+                    point_count=0,
+                    eligible_count=0,
+                )
+            )
+
+        async with unit_of_work(session_factory) as session:
+            session.add(
+                PatchRuleHealthModel(
+                    game_patch=current_sample.patch,
+                    queue=queues[0],
+                    application="VALIDATED",
+                    source_patch=current_sample.patch,
+                    rules_fingerprint="a" * 64,
+                    reconstruction_version=RECONSTRUCTION_ALGORITHM_VERSION,
+                    clean_participants=2,
+                    failures=1,
+                    contributing_matches=1,
+                    wilson_upper=0.8,
+                    verdict="REJECT",
+                    is_invalidation=False,
+                )
+            )
+        report = await build_blockers_report(
+            session_factory, current_sample.scope_path, patch=current_sample.patch
+        )
+        selected_queue = queues[0]
+        missing_queue = f"{current_sample.patch}/{selected_queue}"
+        other_queue = queues[1]
+        other_key = f"{current_sample.patch}/{other_queue}"
+        assert report["importedMatches"] == 3
+        assert report["matchesWithoutCurrentVersions"] == 1
+        assert report["currentVersionFailureCodes"] == {"RECONSTRUCTION_REQUIRED": 1}
+        assert report["totals"]["decisions"] == 4
+        assert report["totals"]["sourceDecisions"] == 4
+        assert report["byPatchQueue"][missing_queue]["importedMatches"] == 2
+        assert report["byPatchQueue"][missing_queue]["matchesWithoutCurrentVersions"] == 1
+        assert report["byPatchQueue"][missing_queue]["currentExtractionMatches"] == 1
+        assert report["byPatchQueue"][missing_queue]["decisions"] == 2
+        assert report["byPatchQueue"][other_key]["importedMatches"] == 1
+        assert report["byPatchQueue"][other_key]["currentExtractionMatches"] == 1
+        assert report["byPatchQueue"][other_key]["decisions"] == 2
+        assert sum(row["currentExtractionMatches"] for row in report["versions"]) == 2
+        assert report["privacy"]["matchIds"] is False
+        assert report["operationalState"] == "PERSISTED_READ_ONLY"
+        persisted_reject = next(
+            row for row in report["healthByContext"] if row["rulesFingerprint"] == "a" * 64
+        )
+        assert persisted_reject["verdict"] == "REJECT"
+        assert persisted_reject["queueId"] == queues[0]
+        assert report["patchReadiness"][current_sample.patch]["matches"] == 3
+        assert "REJECT" in render_blockers_report(report)
+    finally:
+        await current_sample.cleanup(session_factory)
+        await stale_sample.cleanup(session_factory)
 
 
 @pytest.fixture(autouse=True)
@@ -193,6 +314,12 @@ async def test_collect_import_prepare_and_report_without_personal_data(
                 session_factory, sample.scope_path, match_ids=sample.ids
             )
         ).as_dict()
+        blockers = await build_blockers_report(
+            session_factory, sample.scope_path, patch=sample.patch, queue=420
+        )
+        absent_queue = await build_blockers_report(
+            session_factory, sample.scope_path, patch=sample.patch, queue=440
+        )
         diversity = await build_diversity_report(
             session_factory, sample.scope_path, match_ids=sample.ids
         )
@@ -202,6 +329,11 @@ async def test_collect_import_prepare_and_report_without_personal_data(
         collection = build_collection_report(sample.h.manifest())
 
         assert reconstruction["matchesImported"] == 3
+        assert blockers["measured"] and blockers["totals"]["decisions"] == 6
+        assert blockers["versions"][0]["currentExtractionMatches"] == 3
+        assert not absent_queue["measured"] and absent_queue["totals"]["decisions"] == 0
+        absent_queue_key = f"{sample.patch}/440"
+        assert absent_queue["byPatchQueue"][absent_queue_key]["measurementStatus"] == "NOT_MEASURED"
         assert reconstruction["preparation"] == {"READY": 3}
         assert reconstruction["matchesReconstructed"] == reconstruction["matchesExtracted"] == 3
         assert reconstruction["byPatch"][sample.patch]["matches"] == 3
@@ -230,6 +362,10 @@ async def test_collect_import_prepare_and_report_without_personal_data(
         outputs = [
             json.dumps(reconstruction),
             render_reconstruction_report(reconstruction),
+            json.dumps(blockers),
+            render_blockers_report(blockers),
+            json.dumps(absent_queue),
+            render_blockers_report(absent_queue),
             json.dumps(diversity),
             render_diversity_report(diversity),
             json.dumps(integrity),

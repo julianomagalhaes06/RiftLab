@@ -49,6 +49,8 @@ def _pending(document: dict, rule_id: str) -> dict:
         evidence=None,
         activatedInVersion=None,
     )
+    if "domainsValidated" in document["rules"][rule_id]:
+        document["rules"][rule_id]["domainsValidated"] = []
     return document["rules"][rule_id]
 
 
@@ -61,6 +63,8 @@ def _supported(document: dict, rule_id: str = "R5", patches: tuple[str, ...] = (
         evidence="validation/sprint-2/CC-207/50-confirmation-result.json",
         activatedInVersion=VERSION,
     )
+    if "domainsValidated" in document["rules"][rule_id]:
+        document["rules"][rule_id]["domainsValidated"] = []
     return document
 
 
@@ -146,6 +150,7 @@ def _inheriting(document: dict) -> dict:
     document["inheritance"] = {"mode": "LATEST_VALIDATED_EARLIER", "activatedInVersion": VERSION}
     for rule_id in KNOWN_RULE_IDS:
         _pending(document, rule_id)
+    document["domains"] = {}
     return document
 
 
@@ -386,3 +391,184 @@ def test_r4w_leaves_other_participant_zero_events_alone() -> None:
     events = [_event(0, 0, 0, 1038), _event(1, 0, 0, 3865, "ITEM_DESTROYED"), _event(2, 0, 0, 3865)]
     assert attribute_system_purchases(events, [3]) == [events[0], events[1], _event(2, 0, 3, 3865)]
     assert attribute_system_purchases([], [3, 8]) == []
+
+
+# ---------------------------------------------------------------------------
+# domínios patch × fila (schema v3, reconstrução v12, CC-802)
+# ---------------------------------------------------------------------------
+
+
+def _domain(document: dict, rule_id: str, patch: str, queue: int, context: str) -> dict:
+    key = f"{patch}/{queue}"
+    document.setdefault("domains", {})[key] = {
+        "patch": patch,
+        "queueId": queue,
+        "catalogContext": context,
+        "evidence": "confirmação de teste",
+        "activatedInVersion": VERSION,
+    }
+    entry = document["rules"][rule_id]
+    if entry["status"] == "PENDING":
+        entry.update(
+            status="EMPIRICALLY_SUPPORTED",
+            contraRate=0.0,
+            counterExamples=0,
+            evidence="sem patch inteiro",
+            activatedInVersion=VERSION,
+        )
+    entry["domainsValidated"].append(
+        {"domain": key, "contraRate": 0.01, "counterExamples": 1, "evidence": f"linha {key}"}
+    )
+    return document
+
+
+def _domains_document() -> dict:
+    document = _supported(_supported(_inheriting(_document()), "R1", ("16.19",)), "R5", ("16.19",))
+    return _domain(document, "R5", "16.20", 420, "FULL_CANONICAL_V1")
+
+
+def test_domain_validation_is_per_queue_and_carries_its_catalog_context() -> None:
+    rules = parse_empirical_rules(_domains_document(), reconstruction_version=VERSION)
+    solo = rules.resolve("16.20", 420)
+    assert (solo.rule_ids, solo.application, solo.source_patch, solo.source_queue) == (
+        {"R5"},
+        "VALIDATED",
+        "16.20",
+        420,
+    )
+    assert solo.catalog_context == "FULL_CANONICAL_V1"
+    # Flex do mesmo patch não usa a confirmação da fila 420: herda do 16.19 inteiro.
+    flex = rules.resolve("16.20", 440)
+    assert (flex.rule_ids, flex.application, flex.source_patch, flex.source_queue) == (
+        {"R1", "R5"},
+        "INHERITED",
+        "16.19",
+        None,
+    )
+    assert flex.catalog_context == "EVENT_RECIPE_CLOSURE_V11"
+    # Sem fila (chamada antiga) só vale a validação do patch inteiro.
+    assert rules.resolve("16.20").source_patch == "16.19"
+
+
+def test_a_later_patch_inherits_the_domain_of_its_own_queue_with_that_context() -> None:
+    rules = parse_empirical_rules(_domains_document(), reconstruction_version=VERSION)
+    solo = rules.resolve("16.21", 420)
+    assert (solo.rule_ids, solo.application, solo.source_patch, solo.source_queue) == (
+        {"R5"},
+        "INHERITED",
+        "16.20",
+        420,
+    )
+    assert solo.catalog_context == "FULL_CANONICAL_V1"
+    flex = rules.resolve("16.21", 440)
+    assert (flex.source_patch, flex.source_queue, flex.catalog_context) == (
+        "16.19",
+        None,
+        "EVENT_RECIPE_CLOSURE_V11",
+    )
+
+
+def test_domain_provenance_records_queue_context_and_domain_evidence() -> None:
+    rules = parse_empirical_rules(_domains_document(), reconstruction_version=VERSION)
+    [item] = rules.provenance_for("16.20", 420)
+    assert (item["appliedFromPatch"], item["appliedFromQueue"], item["catalogContext"]) == (
+        "16.20",
+        420,
+        "FULL_CANONICAL_V1",
+    )
+    assert (item["contraRate"], item["counterExamples"], item["evidence"]) == (
+        0.01,
+        1,
+        "linha 16.20/420",
+    )
+    # Proveniência de patch inteiro mantém a forma antiga (sem fila/contexto).
+    patch_wide = rules.provenance_for("16.19", 420)
+    assert all("appliedFromQueue" not in r and "catalogContext" not in r for r in patch_wide)
+
+
+def test_schema_v2_documents_without_domains_are_still_accepted() -> None:
+    document = _supported(_inheriting(_document()), "R5", ("16.19",))
+    document["schemaVersion"] = "v2"
+    del document["domains"]
+    for entry in document["rules"].values():
+        entry.pop("domainsValidated", None)
+    rules = parse_empirical_rules(document, reconstruction_version=VERSION)
+    assert rules.resolve("16.20", 420).source_patch == "16.19"
+
+
+def _domain_mutations() -> list[tuple[str, callable]]:
+    def wrong_key(d: dict) -> None:
+        d["domains"]["16.20/440"] = d["domains"].pop("16.20/420")
+
+    def unknown_context(d: dict) -> None:
+        d["domains"]["16.20/420"]["catalogContext"] = "GUESS"
+
+    def bad_queue(d: dict) -> None:
+        d["domains"]["16.20/420"]["queueId"] = 450
+
+    def stale_domain_version(d: dict) -> None:
+        d["domains"]["16.20/420"]["activatedInVersion"] = VERSION - 1
+
+    def undeclared_domain(d: dict) -> None:
+        d["rules"]["R1"]["domainsValidated"].append(
+            {"domain": "16.21/420", "contraRate": 0.0, "counterExamples": 0, "evidence": "x"}
+        )
+
+    def domain_without_rule(d: dict) -> None:
+        d["domains"]["16.21/440"] = {
+            "patch": "16.21",
+            "queueId": 440,
+            "catalogContext": "FULL_CANONICAL_V1",
+            "evidence": "x",
+            "activatedInVersion": VERSION,
+        }
+
+    def domain_repeats_patch_wide(d: dict) -> None:
+        d["rules"]["R5"]["patchesValidated"] = ["16.20"]
+
+    def pending_with_domain(d: dict) -> None:
+        _pending(d, "R2")["domainsValidated"] = [
+            {"domain": "16.20/420", "contraRate": 0.0, "counterExamples": 0, "evidence": "x"}
+        ]
+
+    def v3_without_domains(d: dict) -> None:
+        del d["domains"]
+
+    functions = [
+        wrong_key,
+        unknown_context,
+        bad_queue,
+        stale_domain_version,
+        undeclared_domain,
+        domain_without_rule,
+        domain_repeats_patch_wide,
+        pending_with_domain,
+        v3_without_domains,
+    ]
+    return [(fn.__name__, fn) for fn in functions]
+
+
+@pytest.mark.parametrize(
+    ("name", "mutate"), _domain_mutations(), ids=[n for n, _ in _domain_mutations()]
+)
+def test_invalid_domain_documents_are_rejected(name: str, mutate: callable) -> None:
+    document = _domains_document()
+    parse_empirical_rules(copy.deepcopy(document), reconstruction_version=VERSION)
+    mutate(document)
+    with pytest.raises(EmpiricalRulesConfigError) as caught:
+        parse_empirical_rules(document, reconstruction_version=VERSION)
+    assert caught.value.code == "EMPIRICAL_RULES_CONFIG_INVALID"
+
+
+def test_repository_registry_validates_cc802_domain_for_solo_only() -> None:
+    rules = load_empirical_rules(CONFIG, reconstruction_version=VERSION)
+    solo = rules.resolve("16.20", 420)
+    assert (solo.application, solo.source_queue, solo.catalog_context) == (
+        "VALIDATED",
+        420,
+        "FULL_CANONICAL_V1",
+    )
+    # R7x e R8t não passaram na confirmação própria; nada da fila 440 foi liberado.
+    assert {"R7x", "R8t"}.isdisjoint(solo.rule_ids)
+    assert rules.resolve("16.20", 440).application == "INHERITED"
+    assert rules.resolve("16.19", 420).rule_ids == rules.resolve("16.20", 440).rule_ids

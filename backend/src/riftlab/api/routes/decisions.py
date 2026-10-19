@@ -183,6 +183,7 @@ def _to_detail(detail: DecisionDetail) -> DecisionState:
             classification_version=versions.classification_version,
             reconstruction_rules=detail.rules_application,
             reconstruction_rules_patch=detail.rules_patch,
+            reconstruction_rules_queue=detail.rules_queue,
             reconstruction_rules_health=detail.health.get("status", "UNVERIFIED"),
             reconstruction_rules_verdict=detail.health.get("verdict"),
             reconstruction_rules_wilson_upper=detail.health.get("wilsonUpper"),

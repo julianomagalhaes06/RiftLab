@@ -87,9 +87,16 @@ function Level({ decision }: { decision: DecisionState }) {
   );
 }
 
-function rulesLabel(application: DecisionState["versions"]["reconstructionRules"], patch?: string | null): string {
-  if (application === "INHERITED") return `herdadas do patch ${patch ?? "anterior"} (sem confirmação própria)`;
-  if (application === "VALIDATED") return "confirmadas neste patch";
+const QUEUE_TEXT: Readonly<Record<number, string>> = { 420: "Solo/Duo", 440: "Flex" };
+
+function rulesLabel(
+  application: DecisionState["versions"]["reconstructionRules"],
+  patch?: string | null,
+  queue?: number | null,
+): string {
+  const where = queue ? ` na fila ${QUEUE_TEXT[queue] ?? queue}` : "";
+  if (application === "INHERITED") return `herdadas do patch ${patch ?? "anterior"}${where} (sem confirmação própria nesta fila)`;
+  if (application === "VALIDATED") return `confirmadas neste patch${where}`;
   return "nenhuma (reconstrução conservadora)";
 }
 
@@ -115,7 +122,7 @@ function InheritedRules({ decision, patch }: { decision: DecisionState; patch: s
   return (
     <p className="decision-inherited" role="note">
       O inventário foi reconstruído com as regras confirmadas no patch {source}, aplicadas por herança
-      {patch ? ` ao patch ${patch}` : ""}, que ainda não tem confirmação própria. Mudanças de itens ou de
+      {patch ? ` ao patch ${patch}` : ""}, sem confirmação própria nesta fila. Mudanças de itens ou de
       mecânica neste patch podem não estar refletidas.{" "}
       {health === "OK" ? `Conferido em ${n} participantes deste patch; isso não substitui confirmação própria.` : "Ainda sem amostra para conferir."}
     </p>
@@ -151,7 +158,7 @@ function TechnicalDetails({ decision }: { decision: DecisionState }) {
     ["Catálogo", versions.catalogId ?? "sem catálogo"],
     ["Regras de curadoria", versions.curationRulesVersion ?? "—"],
     ["Classificação de itens", versions.classificationVersion ?? "—"],
-    ["Regras de reconstrução", rulesLabel(versions.reconstructionRules, versions.reconstructionRulesPatch)],
+    ["Regras de reconstrução", rulesLabel(versions.reconstructionRules, versions.reconstructionRulesPatch, versions.reconstructionRulesQueue)],
   ];
   return (
     <details className="details">

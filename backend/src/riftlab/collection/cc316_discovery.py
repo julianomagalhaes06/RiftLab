@@ -267,9 +267,12 @@ class DiscoveryError(RuntimeError):
 class BudgetJournal:
     """Durable per-request cap; interrupted invocations cannot silently restart."""
 
-    def __init__(self, path: Path, *, limit: int = MAX_REQUESTS) -> None:
+    def __init__(
+        self, path: Path, *, limit: int = MAX_REQUESTS, binding: dict[str, object] | None = None
+    ) -> None:
         self.path = path
         self.limit = limit
+        self.binding = binding
         self._lock_handle: TextIO | None = None
         self._state: dict[str, object] = {}
         self._diagnostic_sequence = 0
@@ -293,12 +296,14 @@ class BudgetJournal:
             self._lock_handle = None
             raise DiscoveryError("jornal de orçamento já existe; revisão manual necessária")
         self._state = {
-            "schemaVersion": 3,
+            "schemaVersion": 4 if self.binding is not None else 3,
             "status": "IN_PROGRESS",
             "requestsReserved": 0,
             "startedAt": datetime.now(UTC).isoformat(),
             "diagnostics": [],
         }
+        if self.binding is not None:
+            self._state["campaignBinding"] = self.binding
         self._save()
         return self
 
@@ -462,6 +467,7 @@ class ProcessLifecycleJournal:
         boot_id: str | None = None,
         process_started_monotonic_ns: int | None = None,
         clock_ns: Callable[[], int] = time.monotonic_ns,
+        binding: dict[str, object] | None = None,
     ) -> None:
         self.path = path
         self.attempt_number = attempt_number
@@ -474,6 +480,7 @@ class ProcessLifecycleJournal:
         self.boot_id = str(uuid.UUID(boot_id)) if boot_id is not None else current_boot_id()
         self._process_started_monotonic_ns = process_started_monotonic_ns
         self._clock_ns = clock_ns
+        self.binding = binding
         self._state: dict[str, object] = {}
         self._created = False
 
@@ -505,6 +512,8 @@ class ProcessLifecycleJournal:
             "shutdownElapsedNs": None,
             "executorShutdownTimeoutNs": _ASYNCIO_EXECUTOR_SHUTDOWN_RESERVE_NS,
         }
+        if self.binding is not None:
+            self._state["campaignBinding"] = self.binding
         self._save(exclusive=True)
         self._created = True
         return self

@@ -272,7 +272,11 @@ async def import_real_match(
 
 
 def write_prepare_configs(
-    directory: Path, *, scope_patch: str, mapped_patches: tuple[str, ...]
+    directory: Path,
+    *,
+    scope_patch: str,
+    mapped_patches: tuple[str, ...],
+    queues: tuple[int, ...] = (420,),
 ) -> Settings:
     """Mapping e recorte próprios do teste (patch sintético). Sem `mapped_patches`
     contendo o patch da partida, a preparação REAL não pode tocar a rede."""
@@ -282,8 +286,10 @@ def write_prepare_configs(
     mapping = directory / "catalog-mappings.yaml"
     mapping.write_text(f"schemaVersion: v1\nmappingVersion: v1\nmappings:\n{entries}")
     scope = directory / "scope.yaml"
+    queue_yaml = f"queues: {list(queues)}\n" if len(queues) > 1 else f"queue: {queues[0]}\n"
     scope.write_text(
-        "schemaVersion: v1\nfrozenAt: '2026-09-19'\nqueue: 420\nmap: 11\nrole: UTILITY\n"
+        "schemaVersion: v3\nfrozenAt: '2026-09-19'\n"
+        f"{queue_yaml}map: 11\nrole: UTILITY\n"
         f"championIds: [89]\npatches:\n  - gamePatch: '{scope_patch}'\n"
     )
     return Settings(

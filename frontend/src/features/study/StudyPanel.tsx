@@ -39,7 +39,7 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
   INHERITED_RULES_SUSPENDED: "Herança suspensa por divergências no inventário final deste patch.",
   INHERITED_RULES_UNVERIFIED: "Ainda sem amostra suficiente para conferir as regras herdadas neste patch.",
   RECONSTRUCTION_RULES_INHERITED:
-    "O inventário usa regras de reconstrução confirmadas num patch anterior, herdadas porque este patch ainda não tem confirmação própria.",
+    "O inventário usa regras de reconstrução confirmadas num patch anterior, herdadas porque este patch ainda não tem confirmação própria nesta fila.",
   ITEM_RULES_INHERITED:
     "Os limites de itens (exclusividade) vêm do último patch revisado; itens que ele não cobre ficam fora das alternativas.",
   POPULARITY_INHERITED: "As contagens de referência foram herdadas de um patch anterior e filtradas pelo catálogo desta decisão.",

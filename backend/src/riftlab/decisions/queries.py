@@ -175,6 +175,8 @@ class DecisionDetail:
     # próprio patch), INHERITED (de `rules_patch`) ou NONE.
     rules_application: RulesApplication = "NONE"
     rules_patch: str | None = None
+    # Fila do domínio de origem quando a confirmação vale só para uma fila (v12).
+    rules_queue: Literal[420, 440] | None = None
     health: dict[str, Any] = field(default_factory=dict)
 
 
@@ -191,6 +193,17 @@ def rules_origin(provenance: list[dict[str, Any]]) -> tuple[RulesApplication, st
         "INHERITED" if first.get("application") == "INHERITED" else "VALIDATED"
     )
     return application, patch if isinstance(patch, str) else None
+
+
+def rules_queue(provenance: list[dict[str, Any]]) -> Literal[420, 440] | None:
+    """Fila do domínio de origem (v12); None para confirmação do patch inteiro."""
+    applied = [r for r in provenance if r.get("application") != "WITHHELD"]
+    queue = applied[0].get("appliedFromQueue") if applied else None
+    if queue == 420 and not isinstance(queue, bool):
+        return 420
+    if queue == 440 and not isinstance(queue, bool):
+        return 440
+    return None
 
 
 _read_only = read_only_unit_of_work  # transação READ ONLY compartilhada (shared/db.py)
@@ -276,9 +289,8 @@ async def get_decision_detail(
         if point is None:
             raise NotFoundError(f"decisão {decision_id} não encontrada")
         inventory, level = await decisions.get_pre_decision_context(point.decision_state_id)
-        application, rules_patch = rules_origin(
-            await decisions.get_rules_provenance(point.decision_state_id)
-        )
+        provenance = await decisions.get_rules_provenance(point.decision_state_id)
+        application, rules_patch = rules_origin(provenance)
         from riftlab.timeline.health import health_for_state
 
         match = await SqlAlchemyIngestionRepository(session).get_match(point.match_id)
@@ -287,7 +299,7 @@ async def get_decision_detail(
             session,
             match.patch,
             point.versions.reconstruction_version,
-            await decisions.get_rules_provenance(point.decision_state_id),
+            provenance,
         )
         item_names: dict[int, str | None] = {}
         catalog_id = point.versions.catalog_id
@@ -306,5 +318,6 @@ async def get_decision_detail(
         catalog.data_dragon_version if catalog else None,
         application,
         rules_patch,
-        health,
+        rules_queue=rules_queue(provenance),
+        health=health,
     )

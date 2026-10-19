@@ -192,6 +192,56 @@ async def test_429_respects_retry_after_and_succeeds_within_budget() -> None:
     assert len(calls) == 2
 
 
+@pytest.mark.parametrize("request_class", ["account", "match-list", "match", "timeline"])
+async def test_generic_campaign_profile_stops_on_first_429_with_retry_after(
+    request_class: str,
+) -> None:
+    calls: list[httpx.Request] = []
+    sleeps: list[float] = []
+    results: list[tuple[int, str, int | None]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(429, headers={"Retry-After": "37"})
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    transport = _transport(
+        handler,
+        budget=_budget(max_requests=1, stop_on_429=True),
+        sleep=fake_sleep,
+    )
+    reserved: list[str] = []
+
+    def reserve(kind: str) -> int:
+        reserved.append(kind)
+        return len(reserved)
+
+    transport.set_request_observer(reserve)
+    transport.set_request_result_observer(
+        lambda ordinal, result, status, _duration, _exception, _cause: results.append(
+            (ordinal, result, status)
+        )
+    )
+    with pytest.raises(SourceRateLimitedError) as excinfo:
+        if request_class == "account":
+            await transport.resolve_account_puuid("synthetic", "test")
+        elif request_class == "match-list":
+            await transport.list_match_ids_by_puuid("synthetic-puuid", queue=420, start=0, count=5)
+        elif request_class == "match":
+            await transport.fetch_match("BR1_1000000001")
+        else:
+            await transport.fetch_timeline("BR1_1000000001")
+    await transport.aclose()
+
+    assert len(calls) == 1
+    assert excinfo.value.retry_after_seconds == 37.0
+    assert reserved == [request_class]
+    assert sleeps == []  # Retry-After was observed, but v2 never sleeps and retries.
+    assert results and results[0][0] == 1 and results[0][1:] == ("HTTP_429", 429)
+
+
 async def test_request_observer_reserves_each_attempt_before_http_call() -> None:
     observed: list[tuple[int, str]] = []
     calls = 0

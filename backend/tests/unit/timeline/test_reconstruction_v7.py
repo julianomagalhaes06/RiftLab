@@ -94,10 +94,10 @@ def _all_codes(purchases: list[ReconstructedPurchase]) -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-def test_algorithm_version_is_eleven() -> None:
-    # v10: regras do CC-316 (CC-322) e do CC-324 validadas em 16.19 e herdadas pelos
-    # patches seguintes sem confirmação própria.
-    assert RECONSTRUCTION_ALGORITHM_VERSION == 11
+def test_algorithm_version_is_twelve() -> None:
+    # v12: regras do CC-316 (CC-322) e do CC-324 validadas em 16.19 e herdadas pelos
+    # patches seguintes sem confirmação própria; a do CC-802 vale para 16.20 na fila 420.
+    assert RECONSTRUCTION_ALGORITHM_VERSION == 12
 
 
 def test_rules_off_reproduce_the_v6_reducer_bit_for_bit() -> None:
@@ -427,7 +427,7 @@ def test_r6_releases_the_undo_gate_for_real_but_never_touches_demo() -> None:
 def test_state_records_empirical_rules_provenance() -> None:
     target = _reduce([buy(0, 1000, A)])[-1]
     default_state = _decision_state_from_purchase("M", CID, REAL, target)
-    assert default_state.state_version == 11 and default_state.quality["empiricalRules"] == []
+    assert default_state.state_version == 12 and default_state.quality["empiricalRules"] == []
     provenance = [{"ruleId": "R5", "ruleVersion": 1, "status": "EMPIRICALLY_SUPPORTED"}]
     state = _decision_state_from_purchase("M", CID, REAL, target, provenance)
     assert state.quality["empiricalRules"] == provenance

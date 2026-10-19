@@ -165,7 +165,7 @@ def test_later_decision_sees_the_composed_item_and_only_the_real_gate(origin: So
 def test_persisted_state_of_the_real_form_is_clean_before_the_transaction() -> None:
     target = _reduce(_real_form(), REAL)[-1]
     state = _decision_state_from_purchase("M", CID, REAL, target)
-    assert state.state_version == RECONSTRUCTION_ALGORITHM_VERSION == 11
+    assert state.state_version == RECONSTRUCTION_ALGORITHM_VERSION == 12
     assert state.snapshot["inventory"]["items"] == {str(B): 1, str(A): 1}
     assert state.quality["preDecisionQuality"] == {"uncertain": False, "reasons": []}
     claimed = state.quality["destroyOrderReconciliationHeuristic"]["claimedDestroySourceIndexes"]

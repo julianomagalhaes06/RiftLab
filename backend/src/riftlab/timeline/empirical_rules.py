@@ -20,6 +20,14 @@ as mesmas regras do último patch confirmado, mas a proveniência grava
 isso. Um patch com qualquer regra própria usa só as suas (nunca mistura), patches
 anteriores ao primeiro validado e patches não numéricos (DEMO) nunca herdam.
 
+Domínios (schema v3, reconstrução v12, CC-802): uma confirmação pode valer só para
+uma fila de um patch (`domains`, chave `patch/fila`). A resolução é por (patch,
+fila): regras validadas no patch inteiro (`patchesValidated`) ou no domínio da fila
+(`domainsValidated`). Uma fila sem confirmação própria herda do validado mais recente
+anterior que cubra essa fila; outra fila do mesmo patch nunca é fonte. Cada domínio
+declara o contexto de catálogo em que foi confirmado, e a reconstrução usa esse
+contexto para as partidas do domínio e para quem herda dele.
+
 Invariante de identidade (sem migração): ativar uma regra muda o RESULTADO computado,
 então exige uma nova versão de reconstrução. O carregador recusa uma regra
 `EMPIRICALLY_SUPPORTED` (ou uma herança ligada) cuja `activatedInVersion` não seja a
@@ -80,7 +88,12 @@ MID_LANE_QUEST_ITEM_ID = 1201
 
 STATUS_PENDING = "PENDING"
 STATUS_SUPPORTED = "EMPIRICALLY_SUPPORTED"
-SCHEMA_VERSION = "v2"
+SCHEMA_VERSION = "v3"
+_LEGACY_SCHEMA_VERSION = "v2"  # sem domínios; ainda aceito
+CONTEXT_CLOSURE = "EVENT_RECIPE_CLOSURE_V11"
+CONTEXT_FULL = "FULL_CANONICAL_V1"
+_CONTEXTS = frozenset({CONTEXT_CLOSURE, CONTEXT_FULL})
+_QUEUES = frozenset({420, 440})
 
 INHERITANCE_NONE = "NONE"
 INHERITANCE_LATEST_EARLIER = "LATEST_VALIDATED_EARLIER"
@@ -103,6 +116,14 @@ _RULE_KEYS = frozenset(
         "activatedInVersion",
     }
 )
+_DOMAIN_KEYS = frozenset({"patch", "queueId", "catalogContext", "evidence", "activatedInVersion"})
+_DOMAIN_RULE_KEYS = frozenset({"domain", "contraRate", "counterExamples", "evidence"})
+
+Domain = tuple[str, int]
+
+
+def domain_key(domain: Domain) -> str:
+    return f"{domain[0]}/{domain[1]}"
 
 
 class EmpiricalRulesConfigError(DomainError):
@@ -124,13 +145,20 @@ class RuleEntry:
     counter_examples: int | None = None
     evidence: str | None = None
     activated_in_version: int | None = None
+    # Confirmação restrita a (patch, fila): taxa, contraexemplos e evidência do domínio.
+    domains_validated: Mapping[Domain, tuple[float, int, str]] = field(default_factory=dict)
 
     def enabled_for(self, patch: str) -> bool:
         return self.status == STATUS_SUPPORTED and patch in self.patches_validated
 
-    def provenance(self) -> dict[str, Any]:
+    def enabled_in(self, patch: str, queue: int | None) -> bool:
+        return self.enabled_for(patch) or (
+            self.status == STATUS_SUPPORTED and (patch, queue) in self.domains_validated
+        )
+
+    def provenance(self, domain: Domain | None = None) -> dict[str, Any]:
         """Proveniência gravada em `quality.empiricalRules` (só das regras LIGADAS)."""
-        return {
+        payload = {
             "ruleId": self.rule_id,
             "ruleVersion": self.rule_version,
             "status": self.status,
@@ -140,16 +168,33 @@ class RuleEntry:
             "evidence": self.evidence,
             "activatedInVersion": self.activated_in_version,
         }
+        if self.domains_validated:
+            payload["domainsValidated"] = sorted(domain_key(d) for d in self.domains_validated)
+        if domain is not None and domain in self.domains_validated:
+            rate, examples, evidence = self.domains_validated[domain]
+            payload.update(contraRate=rate, counterExamples=examples, evidence=evidence)
+        return payload
+
+
+@dataclass(frozen=True, slots=True)
+class DomainEntry:
+    patch: str
+    queue: int
+    catalog_context: str
+    evidence: str
 
 
 @dataclass(frozen=True, slots=True)
 class RuleResolution:
-    """Regras ligadas num patch e de onde vêm: VALIDATED (confirmação do próprio patch),
-    INHERITED (do `source_patch`, o validado mais recente anterior) ou nada."""
+    """Regras ligadas num (patch, fila) e de onde vêm: VALIDATED (confirmação do próprio
+    patch ou domínio), INHERITED (do `source_patch`, o validado mais recente anterior que
+    cobre a fila) ou nada. `source_queue` só existe quando a origem é um domínio."""
 
     rule_ids: frozenset[str]
     application: str | None = None
     source_patch: str | None = None
+    source_queue: int | None = None
+    catalog_context: str = CONTEXT_CLOSURE
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,46 +202,83 @@ class EmpiricalRules:
     entries: Mapping[str, RuleEntry] = field(default_factory=dict)
     system_item_ids: frozenset[int] = frozenset()
     inheritance: str = INHERITANCE_NONE
+    domains: Mapping[Domain, DomainEntry] = field(default_factory=dict)
 
     @classmethod
     def disabled(cls) -> EmpiricalRules:
         """Nenhuma regra ligada em nenhum patch: o reducer se comporta exatamente como a v6."""
         return cls()
 
-    def validated_for(self, patch: str) -> frozenset[str]:
+    def validated_for(self, patch: str, queue: int | None = None) -> frozenset[str]:
         return frozenset(
-            rule_id for rule_id, entry in self.entries.items() if entry.enabled_for(patch)
+            rule_id for rule_id, entry in self.entries.items() if entry.enabled_in(patch, queue)
         )
 
-    def resolve(self, patch: str) -> RuleResolution:
-        own = self.validated_for(patch)
+    def _context(self, patch: str, queue: int | None) -> tuple[int | None, str]:
+        domain = self.domains.get((patch, queue)) if queue is not None else None
+        if domain is None or not any(
+            (patch, queue) in entry.domains_validated for entry in self.entries.values()
+        ):
+            return None, CONTEXT_CLOSURE
+        return queue, domain.catalog_context
+
+    def resolve(self, patch: str, queue: int | None = None) -> RuleResolution:
+        own = self.validated_for(patch, queue)
         if own:
-            return RuleResolution(own, APPLICATION_VALIDATED, patch)
+            source_queue, context = self._context(patch, queue)
+            return RuleResolution(own, APPLICATION_VALIDATED, patch, source_queue, context)
         key = patch_order_key(patch)
         if self.inheritance != INHERITANCE_LATEST_EARLIER or key is None:
             return RuleResolution(frozenset())
+        # Fontes: validação do patch inteiro ou do domínio da MESMA fila; outra fila do
+        # mesmo patch nunca é fonte. Domínio vence o patch inteiro no mesmo patch.
         earlier = [
-            (candidate_key, candidate)
+            (candidate_key, 0, candidate)
             for entry in self.entries.values()
             if entry.status == STATUS_SUPPORTED
             for candidate in entry.patches_validated
             if (candidate_key := patch_order_key(candidate)) is not None and candidate_key < key
+        ] + [
+            (candidate_key, 1, candidate)
+            for entry in self.entries.values()
+            if entry.status == STATUS_SUPPORTED
+            for candidate, candidate_queue in entry.domains_validated
+            if candidate_queue == queue
+            and (candidate_key := patch_order_key(candidate)) is not None
+            and candidate_key < key
         ]
         if not earlier:
             return RuleResolution(frozenset())
-        source = max(earlier)[1]
-        return RuleResolution(self.validated_for(source), APPLICATION_INHERITED, source)
+        source = max(earlier)[2]
+        source_queue, context = self._context(source, queue)
+        return RuleResolution(
+            self.validated_for(source, queue), APPLICATION_INHERITED, source, source_queue, context
+        )
 
-    def enabled_for(self, patch: str) -> frozenset[str]:
-        return self.resolve(patch).rule_ids
+    def enabled_for(self, patch: str, queue: int | None = None) -> frozenset[str]:
+        return self.resolve(patch, queue).rule_ids
 
-    def provenance_for(self, patch: str) -> list[dict[str, Any]]:
-        resolution = self.resolve(patch)
+    def provenance_for(self, patch: str, queue: int | None = None) -> list[dict[str, Any]]:
+        resolution = self.resolve(patch, queue)
+        domain = (
+            (resolution.source_patch, resolution.source_queue)
+            if resolution.source_patch is not None and resolution.source_queue is not None
+            else None
+        )
+        extra = (
+            {
+                "appliedFromQueue": resolution.source_queue,
+                "catalogContext": resolution.catalog_context,
+            }
+            if domain is not None
+            else {}
+        )
         return [
             {
-                **self.entries[rule_id].provenance(),
+                **self.entries[rule_id].provenance(domain),
                 "application": resolution.application,
                 "appliedFromPatch": resolution.source_patch,
+                **extra,
             }
             for rule_id in sorted(resolution.rule_ids)
         ]
@@ -212,9 +294,57 @@ def _int(value: Any, name: str) -> int:
     return value
 
 
-def _parse_entry(rule_id: str, raw: Any, reconstruction_version: int) -> RuleEntry:
-    if not isinstance(raw, dict) or set(raw) != _RULE_KEYS:
-        raise _fail(f"regra {rule_id}: chaves obrigatórias {sorted(_RULE_KEYS)}")
+def _rate(value: Any, name: str) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not 0.0 <= float(value) <= 1.0
+    ):
+        raise _fail(f"{name} deve estar em [0, 1]")
+    return float(value)
+
+
+def _parse_domain_rules(
+    rule_id: str, raw: Any, domains: Mapping[Domain, DomainEntry]
+) -> dict[Domain, tuple[float, int, str]]:
+    if not isinstance(raw, list):
+        raise _fail(f"regra {rule_id}: domainsValidated deve ser uma lista")
+    parsed: dict[Domain, tuple[float, int, str]] = {}
+    for item in raw:
+        if not isinstance(item, dict) or set(item) != _DOMAIN_RULE_KEYS:
+            raise _fail(f"regra {rule_id}: domínio exige {sorted(_DOMAIN_RULE_KEYS)}")
+        key = item["domain"]
+        domain = next((d for d in domains if domain_key(d) == key), None)
+        if domain is None:
+            raise _fail(f"regra {rule_id}: domínio {key!r} não declarado em domains")
+        if domain in parsed:
+            raise _fail(f"regra {rule_id}: domínio {key!r} repetido")
+        examples = _int(item["counterExamples"], f"regra {rule_id}: counterExamples do domínio")
+        evidence = item["evidence"]
+        if examples < 0 or not isinstance(evidence, str) or not evidence.strip():
+            raise _fail(f"regra {rule_id}: domínio {key!r} exige contraexemplos e evidência")
+        parsed[domain] = (
+            _rate(item["contraRate"], f"regra {rule_id}: contraRate"),
+            examples,
+            evidence,
+        )
+    return parsed
+
+
+def _parse_entry(
+    rule_id: str,
+    raw: Any,
+    reconstruction_version: int,
+    domains: Mapping[Domain, DomainEntry] | None = None,
+) -> RuleEntry:
+    keys = _RULE_KEYS if domains is None else _RULE_KEYS | {"domainsValidated"}
+    if not isinstance(raw, dict) or set(raw) != keys:
+        raise _fail(f"regra {rule_id}: chaves obrigatórias {sorted(keys)}")
+    domain_rules = (
+        _parse_domain_rules(rule_id, raw["domainsValidated"], domains)
+        if domains is not None
+        else {}
+    )
     status = raw["status"]
     if status not in (STATUS_PENDING, STATUS_SUPPORTED):
         raise _fail(f"regra {rule_id}: status deve ser {STATUS_PENDING} ou {STATUS_SUPPORTED}")
@@ -233,6 +363,7 @@ def _parse_entry(rule_id: str, raw: Any, reconstruction_version: int) -> RuleEnt
     if status == STATUS_PENDING:
         if (
             patches
+            or domain_rules
             or raw["contraRate"] is not None
             or raw["counterExamples"] is not None
             or raw["evidence"] is not None
@@ -243,19 +374,17 @@ def _parse_entry(rule_id: str, raw: Any, reconstruction_version: int) -> RuleEnt
             )
         return RuleEntry(rule_id, rule_version, description, status)
 
-    rate = raw["contraRate"]
-    if (
-        isinstance(rate, bool)
-        or not isinstance(rate, (int, float))
-        or not 0.0 <= float(rate) <= 1.0
-    ):
-        raise _fail(f"regra {rule_id}: contraRate deve estar em [0, 1]")
+    rate = _rate(raw["contraRate"], f"regra {rule_id}: contraRate")
     examples = _int(raw["counterExamples"], f"regra {rule_id}: counterExamples")
     if examples < 0:
         raise _fail(f"regra {rule_id}: counterExamples deve ser >= 0")
     evidence = raw["evidence"]
-    if not patches:
-        raise _fail(f"regra {rule_id}: EMPIRICALLY_SUPPORTED exige patchesValidated")
+    if not patches and not domain_rules:
+        raise _fail(
+            f"regra {rule_id}: EMPIRICALLY_SUPPORTED exige patchesValidated ou domainsValidated"
+        )
+    if any(patch in patches for patch, _ in domain_rules):
+        raise _fail(f"regra {rule_id}: domínio repete um patch já validado por inteiro")
     if not isinstance(evidence, str) or not evidence.strip():
         raise _fail(f"regra {rule_id}: EMPIRICALLY_SUPPORTED exige a referência da evidência")
     activated = _int(raw["activatedInVersion"], f"regra {rule_id}: activatedInVersion")
@@ -271,11 +400,43 @@ def _parse_entry(rule_id: str, raw: Any, reconstruction_version: int) -> RuleEnt
         description,
         status,
         frozenset(patches),
-        float(rate),
+        rate,
         examples,
         evidence,
         activated,
+        domain_rules,
     )
+
+
+def _parse_domains(raw: Any, reconstruction_version: int) -> dict[Domain, DomainEntry]:
+    if not isinstance(raw, dict):
+        raise _fail("domains deve ser um mapa patch/fila -> domínio")
+    domains: dict[Domain, DomainEntry] = {}
+    for key, item in raw.items():
+        if not isinstance(item, dict) or set(item) != _DOMAIN_KEYS:
+            raise _fail(f"domínio {key!r}: chaves obrigatórias {sorted(_DOMAIN_KEYS)}")
+        patch, queue = item["patch"], item["queueId"]
+        if not isinstance(patch, str) or patch_order_key(patch) is None:
+            raise _fail(f"domínio {key!r}: patch numérico obrigatório")
+        if isinstance(queue, bool) or queue not in _QUEUES:
+            raise _fail(f"domínio {key!r}: queueId deve ser 420 ou 440")
+        if key != domain_key((patch, queue)):
+            raise _fail(f"domínio {key!r}: chave deve ser {domain_key((patch, queue))!r}")
+        if item["catalogContext"] not in _CONTEXTS:
+            raise _fail(f"domínio {key!r}: catalogContext desconhecido")
+        if not isinstance(item["evidence"], str) or not item["evidence"].strip():
+            raise _fail(f"domínio {key!r}: evidence obrigatória")
+        if _int(item["activatedInVersion"], f"domínio {key!r}: activatedInVersion") != (
+            reconstruction_version
+        ):
+            raise _fail(
+                f"domínio {key!r}: activatedInVersion difere da versão de reconstrução corrente "
+                f"({reconstruction_version}); ativar um domínio exige nova versão"
+            )
+        domains[(patch, queue)] = DomainEntry(
+            patch, queue, item["catalogContext"], item["evidence"]
+        )
+    return domains
 
 
 def _parse_inheritance(raw: Any, reconstruction_version: int) -> str:
@@ -298,17 +459,21 @@ def _parse_inheritance(raw: Any, reconstruction_version: int) -> str:
 
 
 def parse_empirical_rules(document: Any, *, reconstruction_version: int) -> EmpiricalRules:
-    if not isinstance(document, dict) or set(document) != {
-        "schemaVersion",
-        "inheritance",
-        "systemItemIds",
-        "rules",
-    }:
+    base_keys = {"schemaVersion", "inheritance", "systemItemIds", "rules"}
+    version = document.get("schemaVersion") if isinstance(document, dict) else None
+    expected = base_keys | {"domains"} if version == SCHEMA_VERSION else base_keys
+    if not isinstance(document, dict) or set(document) != expected:
         raise _fail(
             "documento deve ter exatamente schemaVersion, inheritance, systemItemIds e rules"
+            " (e domains no schema v3)"
         )
-    if document["schemaVersion"] != SCHEMA_VERSION:
-        raise _fail(f"schemaVersion deve ser {SCHEMA_VERSION}")
+    if version not in (SCHEMA_VERSION, _LEGACY_SCHEMA_VERSION):
+        raise _fail(f"schemaVersion deve ser {SCHEMA_VERSION} ou {_LEGACY_SCHEMA_VERSION}")
+    domains = (
+        _parse_domains(document["domains"], reconstruction_version)
+        if version == SCHEMA_VERSION
+        else None
+    )
     inheritance = _parse_inheritance(document["inheritance"], reconstruction_version)
     system = document["systemItemIds"]
     if not isinstance(system, list):
@@ -320,12 +485,20 @@ def parse_empirical_rules(document: Any, *, reconstruction_version: int) -> Empi
     if not isinstance(raw_rules, dict) or set(raw_rules) != set(KNOWN_RULE_IDS):
         raise _fail(f"rules deve declarar exatamente {list(KNOWN_RULE_IDS)}")
     entries = {
-        rule_id: _parse_entry(rule_id, raw_rules[rule_id], reconstruction_version)
+        rule_id: _parse_entry(rule_id, raw_rules[rule_id], reconstruction_version, domains)
         for rule_id in KNOWN_RULE_IDS
     }
     if entries[RULE_R4S].status == STATUS_SUPPORTED and not ids:
         raise _fail("R4s EMPIRICALLY_SUPPORTED exige systemItemIds não vazio")
-    return EmpiricalRules(entries=entries, system_item_ids=frozenset(ids), inheritance=inheritance)
+    unused = set(domains or {}) - {d for e in entries.values() for d in e.domains_validated}
+    if unused:
+        raise _fail(f"domínios sem regra validada: {sorted(domain_key(d) for d in unused)}")
+    return EmpiricalRules(
+        entries=entries,
+        system_item_ids=frozenset(ids),
+        inheritance=inheritance,
+        domains=domains or {},
+    )
 
 
 def load_empirical_rules(path: Path, *, reconstruction_version: int) -> EmpiricalRules:
