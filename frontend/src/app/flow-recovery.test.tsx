@@ -389,6 +389,8 @@ describe("URL: deep link, recarregar e voltar/avançar", () => {
       mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008$/, () => json(200, matchDetail()));
       mock.on("GET", /decisions$/, () => json(200, { items: [], nextCursor: null }));
     });
+    // O Histórico abre na conta configurada; a partida de demonstração fica no filtro DEMO.
+    fireEvent.click(await screen.findByRole("button", { name: "DEMO" }));
     fireEvent.click(await screen.findByRole("link", { name: "Contexto da partida DEMO-0008" }));
     await screen.findByRole("heading", { name: /^Partida DEMO-0008/ });
     fireEvent.click(await screen.findByRole("link", { name: /Participante 2/ }));
