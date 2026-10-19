@@ -27,7 +27,7 @@ test.describe("Importação com falha recuperável (API simulada)", () => {
       "GET /api/v1/matches/:id": () => ok(matchDetail({ matchId: "BR1_3120345678" })),
     });
 
-    await page.goto("/");
+    await page.goto("/importar");
     await page.getByLabel(/ID da partida/).fill("BR1_3120345678");
     await page.getByRole("button", { name: "Analisar partida" }).click();
 
@@ -60,13 +60,13 @@ test.describe("Importação com falha recuperável (API simulada)", () => {
       },
     });
 
-    await page.goto("/");
+    await page.goto("/importar");
     await page.getByLabel(/ID da partida/).fill("BR1_3120345678");
     await page.getByRole("button", { name: "Analisar partida" }).click();
 
     await expect(page.getByRole("alert")).toContainText("este ambiente não tem chave da Riot configurada");
     await expect(page.locator("body")).not.toContainText(SERVER_DETAIL);
-    await expect(page).toHaveURL(/\/$/); // continua na entrada, sem job criado
+    await expect(page).toHaveURL(/\/importar$/); // continua na importação, sem job criado
 
     // recuperação: explorar a demonstração, que não precisa de chave
     await page.getByRole("button", { name: "Explorar demonstração" }).click();
@@ -122,14 +122,14 @@ test.describe("Importação com falha recuperável (API simulada)", () => {
     await expect(page.getByText(/Não encontramos o que você procurou/)).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/andamento/);
     await page.getByRole("link", { name: "Voltar ao início" }).click();
-    await expect(page.getByRole("heading", { name: "Analisar uma partida" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Entenda a partida. Evolua a decisão." })).toBeVisible();
   });
 
   test("API fora do ar ao importar: mensagem de rede e botão continua utilizável", async ({ page }) => {
     await mockApi(page);
     await page.route("**/api/v1/imports", (route) => route.abort("failed"));
 
-    await page.goto("/");
+    await page.goto("/importar");
     await page.getByRole("button", { name: "Explorar demonstração" }).click();
 
     await expect(page.getByText(/Não foi possível falar com a API do RiftLab/)).toBeVisible();

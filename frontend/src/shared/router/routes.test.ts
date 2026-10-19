@@ -5,8 +5,9 @@ const UUID = "688bd44d-39b7-4f7b-956b-0fd4a63cfafd";
 
 describe("parseRoute", () => {
   it("reconhece as quatro rotas da jornada e o protótipo", () => {
-    expect(parseRoute("/")).toEqual({ name: "home" });
+    expect(parseRoute("/")).toEqual({ name: "panel" });
     expect(parseRoute("/painel")).toEqual({ name: "panel" });
+    expect(parseRoute("/importar")).toEqual({ name: "importEntry" });
     expect(parseRoute("/campeoes")).toEqual({ name: "champions" });
     expect(parseRoute("/minha-posicao")).toEqual({ name: "position" });
     expect(parseRoute("/historico")).toEqual({ name: "history" });
@@ -63,7 +64,7 @@ describe("routeToPath", () => {
   it("faz o caminho inverso de parseRoute (ida e volta)", () => {
     const paths = [
       "/",
-      "/painel",
+      "/importar",
       "/campeoes",
       "/minha-posicao",
       "/historico",
@@ -78,6 +79,8 @@ describe("routeToPath", () => {
       const [pathname, search = ""] = path.split("?");
       expect(routeToPath(parseRoute(pathname, search ? `?${search}` : ""))).toBe(path);
     }
+    // Endereço antigo do Painel continua abrindo o Painel, com o endereço canônico "/".
+    expect(routeToPath(parseRoute("/painel"))).toBe("/");
   });
 });
 

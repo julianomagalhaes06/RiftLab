@@ -129,7 +129,7 @@ describe("importação: falha, nova tentativa e espera", () => {
     const polls = api.callsTo("GET", /imports\//).length;
 
     fireEvent.click(screen.getByRole("link", { name: "Voltar ao início" }));
-    await screen.findByRole("heading", { name: "Analisar uma partida" });
+    await screen.findByRole("heading", { name: "Entenda a partida. Evolua a decisão." });
     await advance(120_000);
 
     expect(api.callsTo("GET", /imports\//).length).toBe(polls);
@@ -380,16 +380,16 @@ describe("URL: deep link, recarregar e voltar/avançar", () => {
 
     expect(await screen.findByRole("heading", { name: "Página não encontrada" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Voltar ao início" }));
-    expect(await screen.findByRole("heading", { name: "Analisar uma partida" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Entenda a partida. Evolua a decisão." })).toBeInTheDocument();
   });
 
   it("voltar e avançar do navegador percorrem as telas", async () => {
-    setup("/", (mock) => {
+    setup("/historico", (mock) => {
       mock.on("GET", /^\/api\/v1\/matches$/, () => json(200, { items: [{ ...matchDetail(), participants: undefined, preparation: undefined }], nextCursor: null }));
       mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008$/, () => json(200, matchDetail()));
       mock.on("GET", /decisions$/, () => json(200, { items: [], nextCursor: null }));
     });
-    fireEvent.click(await screen.findByRole("link", { name: /DEMO-0008/ }));
+    fireEvent.click(await screen.findByRole("link", { name: "Contexto da partida DEMO-0008" }));
     await screen.findByRole("heading", { name: /^Partida DEMO-0008/ });
     fireEvent.click(await screen.findByRole("link", { name: /Participante 2/ }));
     await screen.findByRole("heading", { name: "Decisões de Campeão #9002" });
@@ -399,17 +399,17 @@ describe("URL: deep link, recarregar e voltar/avançar", () => {
     await screen.findByText("Selecione um participante no placar para ver as compras e decisões dele.");
 
     window.history.back();
-    await screen.findByRole("heading", { name: "Analisar uma partida" });
+    await screen.findByRole("heading", { name: "Partidas para estudar" });
 
     window.history.forward();
     await screen.findByRole("heading", { name: /^Partida DEMO-0008/ });
   });
 
   it("o protótipo do CC-102 fica fora da jornada principal e rotulado como ilustrativo", async () => {
-    setup("/");
+    setup("/importar");
 
     const button = await screen.findByRole("button", { name: "Abrir protótipo (dados ilustrativos)" });
-    expect(screen.getByText(/dados fictícios, sem relação com partidas reais/)).toBeInTheDocument();
+    expect(screen.getByText(/dados fictícios e sem relação com a API/)).toBeInTheDocument();
 
     fireEvent.click(button);
     expect(await screen.findByText(/dados ilustrativos, sem importação real/)).toBeInTheDocument();

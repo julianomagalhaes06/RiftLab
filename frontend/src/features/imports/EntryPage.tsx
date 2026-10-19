@@ -5,14 +5,16 @@ import { useAbortScope } from "../../shared/hooks/useAbortScope";
 import { useRouter } from "../../shared/router/context";
 import { isRealMatchId } from "../../shared/router/routes";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
-import { MatchList } from "./MatchList";
+import { Link } from "../../shared/router/Link";
+import { HealthStatus } from "../../app/HealthStatus";
+import { useDemoNotice } from "../../app/demoNotice";
 
 /** Partida sintética usada pela demonstração (fixture do backend). */
 export const DEMO_MATCH_ID = "DEMO-0008";
 const MATCH_ID_ERROR =
   "ID inválido. Use o formato BR1_ seguido de números, por exemplo BR1_1234567890.";
 
-/** Entrada: importar uma partida concluída, explorar a demonstração ou retomar uma já importada. */
+/** Importar uma partida concluída pelo ID ou abrir a demonstração (as importadas ficam no Histórico). */
 export function EntryPage() {
   const { navigate } = useRouter();
   const newController = useAbortScope();
@@ -22,6 +24,7 @@ export function EntryPage() {
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<unknown>(null);
   const [submitting, setSubmitting] = useState<ImportMode | null>(null);
+  useDemoNotice(true);
 
   async function startImport(id: string, mode: ImportMode) {
     setSubmitError(null);
@@ -50,72 +53,75 @@ export function EntryPage() {
   }
 
   return (
-    <>
-      <section className="section" aria-labelledby="analyze-heading">
-        <h2 id="analyze-heading">Analisar uma partida</h2>
-        <p className="notice notice--info" role="note">
-          Analise partidas concluídas. O RiftLab não acompanha jogos em andamento.
+    <div className="area-page import-page">
+      <div className="page-intro">
+        <p className="page-intro__kicker">Importar partida</p>
+        <h2>Trazer uma partida para o RiftLab</h2>
+        <p>
+          Suas partidas ranqueadas recentes chegam sozinhas ao abrir o{" "}
+          <Link to="/historico">Histórico</Link>. Aqui você importa outra partida concluída pelo ID ou
+          percorre a demonstração.
         </p>
-        <form onSubmit={handleSubmit} noValidate className="form">
-          <label htmlFor={inputId} className="form__label">
-            ID da partida (formato BR1_número)
-          </label>
-          <input
-            id={inputId}
-            name="matchId"
-            className="form__input"
-            type="text"
-            inputMode="text"
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            placeholder="BR1_1234567890"
-            value={matchId}
-            onChange={(event) => setMatchId(event.target.value)}
-            aria-invalid={fieldError !== null}
-            aria-describedby={fieldError ? errorId : undefined}
-          />
-          {fieldError ? (
-            <p id={errorId} className="form__error" role="alert">
-              {fieldError}
-            </p>
-          ) : null}
-          <button type="submit" className="button" disabled={submitting !== null}>
-            {submitting === "RIOT" ? "Enviando…" : "Analisar partida"}
-          </button>
-        </form>
-      </section>
+      </div>
+      <HealthStatus />
+      <div className="import-grid">
+        <section className="quiet-surface" aria-labelledby="analyze-heading">
+          <h3 id="analyze-heading">Analisar uma partida</h3>
+          <p>Analise partidas concluídas. O RiftLab não acompanha jogos em andamento.</p>
+          <form onSubmit={handleSubmit} noValidate className="form">
+            <label htmlFor={inputId} className="form__label">
+              ID da partida (formato BR1_número)
+            </label>
+            <input
+              id={inputId}
+              name="matchId"
+              className="form__input"
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              placeholder="BR1_1234567890"
+              value={matchId}
+              onChange={(event) => setMatchId(event.target.value)}
+              aria-invalid={fieldError !== null}
+              aria-describedby={fieldError ? errorId : undefined}
+            />
+            {fieldError ? (
+              <p id={errorId} className="form__error" role="alert">
+                {fieldError}
+              </p>
+            ) : null}
+            <button type="submit" className="button" disabled={submitting !== null}>
+              {submitting === "RIOT" ? "Enviando…" : "Analisar partida"}
+            </button>
+          </form>
+        </section>
 
-      <section className="section" aria-labelledby="demo-heading">
-        <h2 id="demo-heading">Explorar demonstração</h2>
-        <p className="muted">
-          No modo demonstração você percorre o fluxo completo com uma partida sintética,
-          sem usar a Riot nem chave de API.
-        </p>
-        <button
-          type="button"
-          className="button button--secondary"
-          onClick={() => void startImport(DEMO_MATCH_ID, "DEMO")}
-          disabled={submitting !== null}
-        >
-          {submitting === "DEMO" ? "Enviando…" : "Explorar demonstração"}
-        </button>
-      </section>
+        <section className="quiet-surface" aria-labelledby="demo-heading">
+          <h3 id="demo-heading">Explorar demonstração</h3>
+          <p>
+            Percorra o fluxo completo com uma partida sintética, sem usar a Riot nem chave de API.
+          </p>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={() => void startImport(DEMO_MATCH_ID, "DEMO")}
+            disabled={submitting !== null}
+          >
+            {submitting === "DEMO" ? "Enviando…" : "Explorar demonstração"}
+          </button>
+        </section>
+      </div>
 
       {submitError ? <ErrorNotice error={submitError} title="Não foi possível iniciar a importação" /> : null}
 
-      <MatchList />
-
-      <section className="section section--secondary" aria-labelledby="prototype-heading">
-        <h2 id="prototype-heading">Protótipo de jornadas</h2>
-        <p className="muted">
-          Protótipo navegável do CC-102 com dados fictícios, sem relação com partidas reais nem
-          com a API.
-        </p>
+      <p className="import-page__prototype muted">
+        Protótipo navegável do CC-102, com dados fictícios e sem relação com a API:{" "}
         <button type="button" className="button button--link" onClick={() => navigate("/prototipo")}>
           Abrir protótipo (dados ilustrativos)
         </button>
-      </section>
-    </>
+      </p>
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+import "../design/tokens.css";
 import { useEffect, useRef, type ReactNode } from "react";
 import { DecisionDetailPage } from "../features/matches/DecisionDetailPage";
 import { HistoryPage } from "../features/history/HistoryPage";
@@ -9,8 +10,8 @@ import "../features/review/review.css";
 import { useRouter } from "../shared/router/context";
 import { Link } from "../shared/router/Link";
 import { RouterProvider } from "../shared/router/RouterProvider";
+import { DemoNotice, DemoNoticeProvider } from "./DemoNotice";
 import type { Route } from "../shared/router/routes";
-import { HealthStatus } from "./HealthStatus";
 import { PanelPage, PositionPage } from "./AreaPages";
 import { ChampionsPage } from "../features/champions/ChampionsPage";
 import { MainNav } from "./MainNav";
@@ -18,7 +19,7 @@ import "./App.css";
 import "../design/concept-c.css";
 
 const TITLES: Record<Route["name"], string> = {
-  home: "RiftLab",
+  importEntry: "Importar partida — RiftLab",
   panel: "Painel — RiftLab",
   champions: "Campeões — RiftLab",
   position: "Minha posição — RiftLab",
@@ -33,13 +34,8 @@ const TITLES: Record<Route["name"], string> = {
 
 function renderPage(route: Route): ReactNode {
   switch (route.name) {
-    case "home":
-      return (
-        <>
-          <HealthStatus />
-          <EntryPage />
-        </>
-      );
+    case "importEntry":
+      return <EntryPage />;
     case "panel":
       return <PanelPage />;
     case "champions":
@@ -102,16 +98,14 @@ function AppShell() {
         <header>
           <div className="app__topbar">
             <h1>
-              <Link to="/painel" className="app__brand">
+              <Link to="/" className="app__brand">
                 <span className="app__mark" aria-hidden="true">R</span>RiftLab
               </Link>
             </h1>
             <MainNav route={route} />
-            <Link to="/" className="app__import-link">Importar partida</Link>
+            <Link to="/importar" className="app__import-link">Importar partida</Link>
           </div>
-          <div className="app__source-banner" role="note">
-            Partidas DEMO são sintéticas e identificadas. A posição da conta local vem de observações da Riot e não atribui resultados às partidas importadas.
-          </div>
+          <DemoNotice />
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className="app__main">
           {renderPage(route)}
@@ -136,7 +130,9 @@ function AppShell() {
 export default function App() {
   return (
     <RouterProvider>
-      <AppShell />
+      <DemoNoticeProvider>
+        <AppShell />
+      </DemoNoticeProvider>
     </RouterProvider>
   );
 }

@@ -1,12 +1,6 @@
 /* Tela da partida e da decisão: cabeçalho com resultado, placar, compras por volta à
-   loja, ordem de habilidades, gráfico de ouro e contexto da decisão. Cores de time
-   validadas contra a superfície escura (azul #4d8ef0, vermelho #e45a6e). */
-
-:root {
-  --team-blue: #4d8ef0;
-  --team-red: #e45a6e;
-  --chart-grid: #2a2e36;
-}
+   loja, ordem de habilidades, gráfico de ouro e contexto da decisão. Cores de time,
+   grade do gráfico e habilidades em design/tokens.css. */
 
 .match-back { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
 .match-back::before { content: "← " / ""; margin-right: 6px; }
@@ -16,11 +10,11 @@
 
 /* 1. Cabeçalho */
 .match-hero { --tone: var(--nline); --tone-bg: transparent; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 28px; align-items: center; margin: 8px 0 22px; padding: 20px 24px; border: 1px solid var(--nline); border-left: 4px solid var(--tone); background: linear-gradient(90deg, var(--tone-bg), var(--n1) 60%); }
-.match-hero--win { --tone: var(--win); --tone-bg: rgba(105, 223, 177, .12); }
-.match-hero--loss { --tone: var(--loss); --tone-bg: rgba(255, 120, 139, .12); }
+.match-hero--win { --tone: var(--win); --tone-bg: var(--win-tint); }
+.match-hero--loss { --tone: var(--loss); --tone-bg: var(--loss-tint); }
 .match-hero__main { display: flex; align-items: center; gap: 18px; min-width: 0; }
 .match-hero__portrait { border-radius: 50%; border: 2px solid var(--tone); }
-.match-hero h2 { margin: 0 0 6px; font: 600 1.7rem/1.15 'Chakra Petch', Inter, sans-serif; }
+.match-hero h2 { margin: 0 0 6px; font: 600 1.7rem/1.15 var(--font-display); }
 .match-hero--win .match-hero__result { color: var(--win); }
 .match-hero--loss .match-hero__result { color: var(--loss); }
 .match-hero__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; color: var(--ntext-muted); font-size: .88rem; }
@@ -29,11 +23,11 @@
 .match-hero__score { display: flex; align-items: flex-start; gap: 16px; }
 .match-hero__team { display: grid; justify-items: center; gap: 4px; min-width: 120px; }
 .match-hero__team-name { color: var(--ntext-muted); font-size: .78rem; }
-.match-hero__team strong { font: 600 2.1rem/1 'Chakra Petch', Inter, sans-serif; }
+.match-hero__team strong { font: 600 2.1rem/1 var(--font-display); }
 .match-hero__versus { color: var(--ntext-muted); font-size: 1.4rem; padding-top: 18px; }
 .match-hero__objectives { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; font-size: .72rem; color: var(--ntext-muted); max-width: 190px; }
 .match-hero__objectives li { display: inline-flex; gap: 4px; }
-.match-hero__objectives strong { font: 600 .74rem Inter, sans-serif; color: var(--ntext); }
+.match-hero__objectives strong { font: 600 .74rem var(--font-body); color: var(--ntext); }
 .match-hero__note { grid-column: 1 / -1; margin: 0; color: var(--ntext-muted); font-size: .82rem; }
 
 .match-panel { margin: 0 0 22px; padding: 18px 20px; border: 1px solid var(--nline); background: var(--n1); min-width: 0; }
@@ -54,13 +48,13 @@
 .scoreboard__result { font-weight: 700; font-size: .8rem; }
 .scoreboard__result--win { color: var(--win); }
 .scoreboard__result--loss { color: var(--loss); }
-.scoreboard__team thead th { color: var(--ntext-muted); font: 500 .72rem Inter, sans-serif; text-align: left; padding: 0 10px 6px; }
+.scoreboard__team thead th { color: var(--ntext-muted); font: 500 .72rem var(--font-body); text-align: left; padding: 0 10px 6px; }
 .scoreboard__team thead th:first-child { padding-left: 12px; }
 .scoreboard__team abbr { text-decoration: none; cursor: help; }
 .scoreboard__row td, .scoreboard__row th { padding: 6px 10px; border-top: 1px solid var(--nline); vertical-align: middle; text-align: left; font-weight: 500; }
 .scoreboard__team--blue .scoreboard__row th { box-shadow: inset 3px 0 0 var(--team-blue); }
 .scoreboard__team--red .scoreboard__row th { box-shadow: inset 3px 0 0 var(--team-red); }
-.scoreboard__row--selected { background: #22213a; }
+.scoreboard__row--selected { background: var(--accent-surface); }
 .scoreboard__team .scoreboard__row--selected th { box-shadow: inset 3px 0 0 var(--accent); }
 .scoreboard__row td small { display: block; color: var(--ntext-muted); font-size: .72rem; }
 .scoreboard__champion { width: 34%; }
@@ -70,9 +64,9 @@
 .scoreboard__name { display: grid; min-width: 0; }
 .scoreboard__name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scoreboard__name small { color: var(--ntext-muted); font-size: .72rem; display: flex; gap: 6px; align-items: center; }
-.scoreboard__you { padding: 0 6px; border-radius: 8px; background: var(--accent-strong); color: #fff; font-weight: 700; font-size: .64rem; }
+.scoreboard__you { padding: 0 6px; border-radius: 8px; background: var(--accent-strong); color: var(--on-color); font-weight: 700; font-size: .64rem; }
 .scoreboard__row--local th strong { color: var(--accent); }
-.scoreboard__kda { white-space: nowrap; font-family: 'Chakra Petch', Inter, sans-serif; }
+.scoreboard__kda { white-space: nowrap; font-family: var(--font-display); }
 .scoreboard__deaths { color: var(--loss); }
 .scoreboard__build { display: flex; gap: 3px; flex-wrap: wrap; }
 .scoreboard__build .item-icon, .scoreboard__build .item-icon img { width: 26px; height: 26px; }
@@ -81,7 +75,7 @@
 .build-path { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px 0; }
 .build-path__visit { position: relative; display: grid; align-content: start; gap: 6px; padding: 8px 12px; border-left: 1px solid var(--nline); }
 .build-path__visit:first-child { border-left: 0; padding-left: 0; }
-.build-path__time { color: var(--ntext-muted); font: 600 .72rem Inter, sans-serif; }
+.build-path__time { color: var(--ntext-muted); font: 600 .72rem var(--font-body); }
 .build-path__visit--key .build-path__time { color: var(--ntext); }
 .build-path__items { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; flex-wrap: wrap; max-width: 220px; }
 .build-item { position: relative; display: inline-flex; border-radius: 6px; }
@@ -108,15 +102,15 @@
 
 /* Ordem de habilidades */
 .skill-order__priority { margin: 0 0 8px; font-size: .84rem; color: var(--ntext-muted); }
-.skill-order kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 4px; background: var(--n2); border: 1px solid var(--nline); color: var(--ntext); font: 700 .74rem Inter, sans-serif; }
+.skill-order kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 4px; background: var(--n2); border: 1px solid var(--nline); color: var(--ntext); font: 700 .74rem var(--font-body); }
 .skill-order__grid { border-collapse: separate; border-spacing: 2px; font-size: .68rem; }
 .skill-order__grid th { color: var(--ntext-muted); font-weight: 600; width: 22px; text-align: center; }
 .skill-order__cell { width: 22px; height: 22px; background: var(--n2); border-radius: 3px; text-align: center; }
-.skill-order__cell span { font-weight: 700; color: #fff; }
-.skill-order__cell--q { background: #5b6ee1; }
-.skill-order__cell--w { background: #3a8f7a; }
-.skill-order__cell--e { background: #a06a2c; }
-.skill-order__cell--r { background: #9c4fb8; }
+.skill-order__cell span { font-weight: 700; color: var(--on-color); }
+.skill-order__cell--q { background: var(--skill-q); }
+.skill-order__cell--w { background: var(--skill-w); }
+.skill-order__cell--e { background: var(--skill-e); }
+.skill-order__cell--r { background: var(--skill-r); }
 .skill-order { overflow-x: auto; }
 
 /* 5. Gráfico de ouro */
@@ -130,7 +124,7 @@
 .gold-chart svg { display: block; max-width: 100%; touch-action: pan-y; }
 .gold-chart__grid { stroke: var(--chart-grid); stroke-width: 1; }
 .gold-chart__zero { stroke: var(--ntext-muted); stroke-width: 1; }
-.gold-chart__tick { fill: var(--ntext-muted); font: 500 11px Inter, sans-serif; font-variant-numeric: tabular-nums; }
+.gold-chart__tick { fill: var(--ntext-muted); font: 500 11px var(--font-body); font-variant-numeric: tabular-nums; }
 .gold-chart__area--blue { fill: var(--team-blue); fill-opacity: .14; }
 .gold-chart__area--red { fill: var(--team-red); fill-opacity: .14; }
 .gold-chart__line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
@@ -158,7 +152,7 @@
 /* 7–8. Decisão */
 .decision-hero { display: flex; align-items: center; gap: 16px; margin: 6px 0 14px; }
 .decision-hero__portrait { border-radius: 50%; border: 2px solid var(--accent); }
-.decision-hero h2 { margin: 0 0 4px; font: 600 1.5rem/1.2 'Chakra Petch', Inter, sans-serif; }
+.decision-hero h2 { margin: 0 0 4px; font: 600 1.5rem/1.2 var(--font-display); }
 .decision-hero__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; color: var(--ntext-muted); font-size: .88rem; }
 .decision-hero__meta strong { color: var(--ntext); }
 .decision-strip { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--nline); background: var(--n1); }
@@ -180,16 +174,16 @@
 .decision-grid__main { display: grid; gap: 16px; min-width: 0; }
 .decision-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .decision-stat, .decision-card { padding: 16px 18px; border: 1px solid var(--nline); background: var(--n1); min-width: 0; }
-.decision-stat h3, .decision-card h3 { margin: 0 0 8px; font: 500 .78rem Inter, sans-serif; color: var(--ntext-muted); }
+.decision-stat h3, .decision-card h3 { margin: 0 0 8px; font: 500 .78rem var(--font-body); color: var(--ntext-muted); }
 .decision-card h3 { font-size: .95rem; color: var(--ntext); font-weight: 600; }
-.decision-stat__value { margin: 0 0 4px; font: 600 1.3rem/1.2 'Chakra Petch', Inter, sans-serif; color: var(--ntext); }
-.decision-stat--gold .decision-stat__value { color: #f0ce8d; }
+.decision-stat__value { margin: 0 0 4px; font: 600 1.3rem/1.2 var(--font-display); color: var(--ntext); }
+.decision-stat--gold .decision-stat__value { color: var(--color-warning); }
 .decision-stat p.muted, .decision-stat__line { margin: 0; color: var(--ntext-muted); font-size: .8rem; }
 .inventory-grid__slots { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .inventory-grid__slot { position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 4px; min-height: 84px; border: 1px solid var(--nline); border-radius: 6px; background: var(--n0); text-align: center; }
 .inventory-grid__slot .item-icon, .inventory-grid__slot .item-icon img { width: 42px; height: 42px; }
 .inventory-grid__slot--empty { background: repeating-linear-gradient(135deg, var(--n0), var(--n0) 6px, var(--n1) 6px, var(--n1) 12px); }
-.inventory-grid__count { position: absolute; top: 4px; right: 6px; padding: 0 5px; border-radius: 8px; background: var(--n2); font: 700 .68rem Inter, sans-serif; }
+.inventory-grid__count { position: absolute; top: 4px; right: 6px; padding: 0 5px; border-radius: 8px; background: var(--n2); font: 700 .68rem var(--font-body); }
 .inventory-grid__name { font-size: .68rem; line-height: 1.2; color: var(--ntext-muted); overflow-wrap: anywhere; }
 .inventory-grid__trinket { margin: 0; color: var(--ntext-muted); font-size: .84rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .team-context { margin-top: 12px; }
@@ -199,7 +193,7 @@
 .team-context__member .champion-avatar { border-radius: 50%; }
 .team-context__member span { display: grid; }
 .team-context__member small { color: var(--ntext-muted); font-size: .72rem; }
-.team-context__member--self { background: #22213a; }
+.team-context__member--self { background: var(--accent-surface); }
 .team-context__member--self strong { color: var(--accent); }
 .decision-card .muted { font-size: .78rem; margin: 0; }
 

@@ -1,33 +1,10 @@
-:root {
-  color-scheme: light;
-  --color-bg: #0f172a;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f8fafc;
-  --color-text: #0f172a;
-  --color-muted: #475569;
-  --color-border: #cbd5e1;
-  --color-available: #14532d;
-  --color-available-bg: #dcfce7;
-  --color-degraded: #713f12;
-  --color-degraded-bg: #fef9c3;
-  --color-unavailable: #7f1d1d;
-  --color-unavailable-bg: #fee2e2;
-  --color-loading: #1e3a5f;
-  --color-loading-bg: #e0f2fe;
-  --color-warning: #713f12;
-  --color-warning-bg: #fef9c3;
-  --color-focus: #1d4ed8;
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --space-1: 0.5rem;
-  --space-2: 0.75rem;
-  --space-3: 1rem;
-  --space-4: 1.5rem;
+html {
+  scroll-padding-top: 5rem;
 }
 
 :focus-visible {
   outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 * {
@@ -38,26 +15,16 @@ body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family:
-    "Segoe UI",
-    system-ui,
-    -apple-system,
-    sans-serif;
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
 }
 
 .app {
-  max-width: 720px;
   margin: 0 auto;
-  padding: 1.25rem 1rem 3rem;
+  padding: 0;
   background: var(--color-surface);
-  min-height: 100vh;
+  min-height: 100dvh;
   overflow-wrap: anywhere;
-}
-
-@media (min-width: 640px) {
-  .app {
-    padding: 2rem 1.5rem 3rem;
-  }
 }
 
 .app h1 {
@@ -108,7 +75,7 @@ body {
   position: absolute;
   left: -999px;
   top: 0;
-  background: var(--color-surface);
+  background: var(--color-surface-alt);
   color: var(--color-text);
   padding: var(--space-1) var(--space-3);
   z-index: 10;
@@ -129,11 +96,11 @@ body {
 }
 
 .app a {
-  color: #1d4ed8;
+  color: var(--accent);
 }
 
 .section {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-border);
   padding-top: var(--space-3);
   margin-top: var(--space-3);
 }
@@ -168,10 +135,21 @@ body {
 .form__input {
   min-height: 2.75rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-muted);
   border-radius: var(--radius-sm);
   font: inherit;
   width: 100%;
+}
+
+.form__input,
+.history-controls input {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.form__input::placeholder,
+.history-controls input::placeholder {
+  color: var(--color-muted);
 }
 
 .form__input[aria-invalid="true"] {
@@ -183,15 +161,21 @@ body {
   margin: 0;
 }
 
+.button,
+.app a.button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
+}
+
 .button {
   min-height: 2.75rem;
   padding: 0.5rem 1rem;
-  border: 1px solid #1e3a8a;
+  border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
-  background: #1e3a8a;
-  color: #ffffff;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   text-align: center;
   text-decoration: none;
@@ -200,30 +184,44 @@ body {
   justify-content: center;
 }
 
+.button:hover,
+.app a.button:hover {
+  background: var(--accent-hover);
+}
+
 .button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.button--secondary {
-  background: var(--color-surface);
-  color: #1e3a8a;
+.button--secondary,
+.app a.button--secondary {
+  background: var(--color-surface-alt);
+  color: var(--accent);
+  border-color: var(--color-border);
 }
 
-.button--link {
+.button--secondary:hover,
+.app a.button--secondary:hover {
+  background: var(--n2);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* CC-902: botão com cara de link nunca herda o fundo do botão primário. */
+.button--link,
+.app a.button--link {
   background: transparent;
   border-color: transparent;
-  color: #1d4ed8;
+  color: var(--accent);
   text-decoration: underline;
 }
 
-.app a.button {
-  color: #ffffff;
-}
-
-.app a.button--secondary,
-.app a.button--link {
-  color: #1e3a8a;
+.button--link:hover,
+.app a.button--link:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent-hover);
 }
 
 .notice {
@@ -320,7 +318,7 @@ body {
 
 .list__link--selected {
   text-decoration: none;
-  border-bottom: 3px solid #1e3a8a;
+  border-bottom: 3px solid var(--accent);
 }
 
 .list__meta {
@@ -338,8 +336,8 @@ body {
 }
 
 .tag {
-  background: var(--color-loading-bg);
-  color: var(--color-loading);
+  background: var(--n2);
+  color: var(--color-text);
 }
 
 .badge--ready,
@@ -387,6 +385,7 @@ body {
 
 .details {
   margin-top: var(--space-3);
+  background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-1) var(--space-3);
@@ -437,7 +436,8 @@ body {
   flex: none;
   overflow: hidden;
   border-radius: 4px;
-  background: #e5e7eb;
+  background: var(--n2);
+  outline: 1px solid var(--portrait-outline);
 }
 
 .champion__portrait img {
@@ -453,11 +453,13 @@ body {
 }
 
 .app__footer {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px solid #d1d5db;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 22px 32px 34px;
+  border-top: 1px solid var(--color-border);
   font-size: 0.8125rem;
-  color: #4b5563;
+  color: var(--color-muted);
+  line-height: 1.5;
 }
 
 .app__footer p {

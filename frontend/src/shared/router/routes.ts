@@ -3,14 +3,15 @@
  * dependência nova: URL é a fonte da verdade (recarregar, voltar, avançar e deep
  * link funcionam).
  *
- *   /                                    entrada
+ *   / (e /painel)                        painel
+ *   /importar                            importar por ID ou abrir a demonstração
  *   /imports/:jobId                      progresso de uma importação
  *   /matches/:matchId?participant=N      partida (preparação, participantes, decisões)
  *   /decisions/:decisionId               detalhe de uma decisão
  *   /prototipo                           protótipo ilustrativo do CC-102 (dados fictícios)
  */
 export type Route =
-  | { name: "home" }
+  | { name: "importEntry" }
   | { name: "panel" }
   | { name: "champions" }
   | { name: "position" }
@@ -57,10 +58,9 @@ function parseParticipant(search: string): number | null {
 
 export function parseRoute(pathname: string, search = ""): Route {
   const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  if (trimmed === "/" || trimmed === "") {
-    return { name: "home" };
-  }
-  if (trimmed === "/painel") return { name: "panel" };
+  // CC-903: a entrada é o Painel; /painel continua valendo para links antigos.
+  if (trimmed === "/" || trimmed === "" || trimmed === "/painel") return { name: "panel" };
+  if (trimmed === "/importar") return { name: "importEntry" };
   if (trimmed === "/campeoes") return { name: "champions" };
   if (trimmed === "/minha-posicao") return { name: "position" };
   if (trimmed === "/historico") return { name: "history" };
@@ -96,10 +96,10 @@ function safeDecode(segment: string): string {
 
 export function routeToPath(route: Route): string {
   switch (route.name) {
-    case "home":
-      return "/";
+    case "importEntry":
+      return "/importar";
     case "panel":
-      return "/painel";
+      return "/";
     case "champions":
       return "/campeoes";
     case "position":

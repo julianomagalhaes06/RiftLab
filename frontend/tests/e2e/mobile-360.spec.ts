@@ -8,7 +8,6 @@ import {
   decisionSummary,
   job,
   matchDetail,
-  matchSummary,
   mockApi,
   ok,
   preparation,
@@ -59,30 +58,19 @@ async function expectInsideViewport(page: Page, name: string | RegExp, role: "bu
   expect(box!.x + box!.width).toBeLessThanOrEqual(360);
 }
 
-test("entrada: formulário, demonstração e lista de partidas cabem em 360 px", async ({ page }) => {
-  await mockApi(page, {
-    "GET /api/v1/matches": () =>
-      ok({
-        items: [
-          matchSummary({ matchId: LONG_MATCH_ID, patch: "16.17.1234.5678", preparationStatus: "READY" }),
-          matchSummary({ matchId: "DEMO-0008", preparationStatus: "RUNNING" }),
-          matchSummary({ matchId: "BR1_9", preparationStatus: "FAILED" }),
-        ],
-        nextCursor: "MAIS",
-      }),
-  });
+test("importar partida: formulário e demonstração cabem em 360 px", async ({ page }) => {
+  await mockApi(page);
 
-  await page.goto("/");
-  await expect(page.getByRole("link", { name: new RegExp(LONG_MATCH_ID) })).toBeVisible();
+  await page.goto("/importar");
+  await expect(page.getByRole("heading", { name: "Trazer uma partida para o RiftLab" })).toBeVisible();
 
-  await expectNoHorizontalOverflow(page, "entrada");
+  await expectNoHorizontalOverflow(page, "importar");
   await expectInsideViewport(page, "Analisar partida");
   await expectInsideViewport(page, "Explorar demonstração");
-  await expectInsideViewport(page, "Carregar mais partidas");
 
   await page.getByRole("button", { name: "Analisar partida" }).click(); // vazio: erro de validação
   await expect(page.getByRole("alert")).toBeVisible();
-  await expectNoHorizontalOverflow(page, "entrada com erro de validação");
+  await expectNoHorizontalOverflow(page, "importar com erro de validação");
 });
 
 test("progresso da importação (em andamento, falha e sucesso) cabe em 360 px", async ({ page }) => {

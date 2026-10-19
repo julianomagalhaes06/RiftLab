@@ -19,6 +19,8 @@ import { PurgePanel } from "./PurgePanel";
 import { Scoreboard } from "./Scoreboard";
 import "./match.css";
 import { count } from "../../shared/text/count";
+import { useDemoNotice } from "../../app/demoNotice";
+import { isDemoMatchId } from "../../shared/router/routes";
 
 /** Preparação em andamento (PENDING/RUNNING) é o único estado não terminal. */
 function preparationSettled(match: MatchDetail): boolean {
@@ -140,6 +142,7 @@ export function MatchPage({
 }) {
   const newController = useAbortScope();
   const [preparing, setPreparing] = useState(false);
+  useDemoNotice(isDemoMatchId(matchId));
   const [prepareError, setPrepareError] = useState<unknown>(null);
 
   const polling = usePolling<MatchDetail>({

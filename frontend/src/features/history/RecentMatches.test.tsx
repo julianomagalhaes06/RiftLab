@@ -58,7 +58,7 @@ describe("Painel com partidas importadas recentes", () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByText("Nenhuma partida importada")).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: "Partidas importadas recentes" })).getByRole("link", { name: "Importar ou abrir demonstração" })).toHaveAttribute("href", "/");
+    expect(within(screen.getByRole("region", { name: "Partidas importadas recentes" })).getByRole("link", { name: "Importar ou abrir demonstração" })).toHaveAttribute("href", "/importar");
     await waitFor(() => expect(api.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(2));
   });
 });

@@ -7,11 +7,13 @@ import { RecentMatches } from "../history/RecentMatches";
 import { matchDate, matchDuration } from "../history/presentation";
 import { count } from "../../shared/text/count";
 import "./dashboard.css";
+import { useDemoNotice } from "../../app/demoNotice";
 
 const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
 export function Dashboard() {
   const [origin, setOrigin] = useState<"REAL" | "DEMO">("REAL");
+  useDemoNotice(origin === "DEMO");
   const [windowSize, setWindowSize] = useState(20);
   const [retry, setRetry] = useState(0);
   const key = `${origin}:${windowSize}:${retry}`;
@@ -55,7 +57,7 @@ export function Dashboard() {
           </div> : data.status === "EMPTY" ? <div className="dashboard__empty">
             <strong>Nenhuma partida neste recorte</strong>
             <p>Importe partidas concluídas {origin === "REAL" ? "da conta configurada" : "da demonstração"} para ver as métricas.</p>
-            <Link to="/">Importar ou abrir demonstração</Link>
+            <Link to="/importar">Importar ou abrir demonstração</Link>
           </div> : <>
             <p>{data.sampledMatches} de até {count(data.window, "partida", "partidas")}, ordenadas pelo término. {count(data.totalMatches, "disponível", "disponíveis")} da conta nesta origem.</p>
             <dl className="dashboard__metrics">

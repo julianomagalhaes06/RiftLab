@@ -4,6 +4,7 @@ import { Link } from "../../shared/router/Link";
 import { isDemoMatchId } from "../../shared/router/routes";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { matchDate, matchDuration, matchOrigin, presentChampions } from "./presentation";
+import { useDemoNotice } from "../../app/demoNotice";
 
 function RecentRow({ match }: { match: MatchSummary }) {
   const champions = presentChampions(match);
@@ -34,6 +35,7 @@ export function RecentMatches() {
     resetKey: "panel-recent-imported",
     fetchPage: (_cursor, signal) => api.listMatches({ limit: 5 }, signal),
   });
+  useDemoNotice(list.items.some((match) => isDemoMatchId(match.matchId)));
   return (
     <section className="recent-matches" aria-labelledby="recent-matches-heading">
       <div className="recent-matches__heading">
@@ -54,7 +56,7 @@ export function RecentMatches() {
         </> : <div className="recent-matches__state recent-matches__state--empty">
           <strong>Nenhuma partida importada</strong>
           <p>Importe uma partida concluída ou abra a demonstração para iniciar o estudo.</p>
-          <Link to="/">Importar ou abrir demonstração</Link>
+          <Link to="/importar">Importar ou abrir demonstração</Link>
         </div>
       )}
     </section>

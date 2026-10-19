@@ -12,16 +12,16 @@ test("mostra disponibilidade quando live e ready respondem 200", async ({ page }
     }),
   );
 
-  await page.goto("/");
+  await page.goto("/importar");
 
-  await expect(page.getByRole("heading", { name: "RiftLab" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "RiftLab", exact: true })).toBeVisible();
   await expect(page.getByText("Serviço disponível")).toBeVisible();
 });
 
 test("mostra indisponibilidade quando a API nao responde", async ({ page }) => {
   await page.route("**/health/live", (route) => route.abort("failed"));
 
-  await page.goto("/");
+  await page.goto("/importar");
 
   await expect(page.getByText("Serviço indisponível")).toBeVisible();
 });
@@ -45,7 +45,7 @@ test("mostra suporte limitado quando o banco esta indisponivel", async ({ page }
     }),
   );
 
-  await page.goto("/");
+  await page.goto("/importar");
 
   await expect(page.getByText("Serviço com suporte limitado")).toBeVisible();
   await expect(page.getByText("banco indisponivel de teste e2e")).toBeVisible();

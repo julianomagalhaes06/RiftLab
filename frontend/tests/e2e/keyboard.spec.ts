@@ -10,7 +10,7 @@ import { mockApi } from "./support/mock-api";
  */
 test("skip link é o primeiro foco, aparece na tela e leva ao conteúdo", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/");
+  await page.goto("/importar");
   await expect(page.getByRole("heading", { name: "Analisar uma partida" })).toBeVisible();
 
   await page.keyboard.press("Tab");
@@ -24,7 +24,7 @@ test("skip link é o primeiro foco, aparece na tela e leva ao conteúdo", async 
 
 test("fluxo principal completo só com teclado", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/");
+  await page.goto("/importar");
   await expect(page.getByRole("heading", { name: "Analisar uma partida" })).toBeVisible();
 
   // Entrada: Espaço ativa o botão; foco visível nele.
@@ -74,7 +74,7 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
 
 test("formulário por teclado: erro de validação anunciado e ligado ao campo", async ({ page }) => {
   await mockApi(page);
-  await page.goto("/");
+  await page.goto("/importar");
   await expect(page.getByRole("heading", { name: "Analisar uma partida" })).toBeVisible();
 
   await tabTo(page, /^$/); // o primeiro foco depois do skip link/logo é o campo (label vazio de input)

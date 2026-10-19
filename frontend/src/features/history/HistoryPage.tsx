@@ -12,6 +12,7 @@ import { MatchCard } from "./MatchCard";
 import { dayKey, dayLabel, decimal, percent, record, summarizeLoaded } from "./presentation";
 import "./history.css";
 import { count } from "../../shared/text/count";
+import { useDemoNotice } from "../../app/demoNotice";
 
 const PAGE_SIZE = 20;
 
@@ -129,6 +130,7 @@ export function HistoryPage() {
   });
   const visible = filterLoadedMatches(list.items, query, origin, result, queue);
   const hasLocal = list.items.some((match) => match.localParticipantId != null);
+  useDemoNotice(list.items.some((match) => isDemoMatchId(match.matchId)));
 
   return (
     <div className="history-page">
@@ -178,7 +180,7 @@ export function HistoryPage() {
             <div className="empty-state">
               <h4>{list.items.length ? "Nenhuma partida neste filtro" : "Nenhuma partida importada"}</h4>
               <p>{list.items.length ? "Ajuste a busca ou carregue mais páginas." : "Importe uma partida concluída ou abra a demonstração para começar."}</p>
-              <Link to="/">Importar ou abrir demonstração</Link>
+              <Link to="/importar">Importar ou abrir demonstração</Link>
               {list.nextCursor !== null && <button className="button button--secondary" type="button" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? "Carregando…" : "Carregar mais partidas"}</button>}
             </div>
           )}

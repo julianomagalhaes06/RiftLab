@@ -2,7 +2,7 @@ import { Link } from "../shared/router/Link";
 import type { Route } from "../shared/router/routes";
 
 const entries = [
-  { name: "panel", href: "/painel", label: "Painel", icon: "panel" },
+  { name: "panel", href: "/", label: "Painel", icon: "panel" },
   { name: "champions", href: "/campeoes", label: "Campeões", icon: "champions" },
   { name: "position", href: "/minha-posicao", label: "Minha posição", icon: "position" },
   { name: "history", href: "/historico", label: "Histórico", icon: "history" },

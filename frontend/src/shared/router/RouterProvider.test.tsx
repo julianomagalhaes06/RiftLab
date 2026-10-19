@@ -58,7 +58,7 @@ describe("RouterProvider (History API)", () => {
     expect(screen.getByTestId("route")).toHaveTextContent("prototype");
 
     window.history.back();
-    await waitFor(() => expect(screen.getByTestId("route")).toHaveTextContent("home"));
+    await waitFor(() => expect(screen.getByTestId("route")).toHaveTextContent("panel"));
 
     window.history.forward();
     await waitFor(() => expect(screen.getByTestId("route")).toHaveTextContent("prototype"));
@@ -88,7 +88,7 @@ describe("RouterProvider (History API)", () => {
     fireEvent.click(screen.getByRole("button", { name: "fora" }));
 
     expect(window.location.hostname).not.toBe("evil.example");
-    expect(screen.getByTestId("route")).toHaveTextContent("home");
+    expect(screen.getByTestId("route")).toHaveTextContent("panel");
   });
 
   it("Link tem href real, navega em clique simples e respeita modificadores/target", () => {
@@ -112,7 +112,7 @@ describe("RouterProvider (History API)", () => {
       fireEvent.click(link, { ctrlKey: true }); // nova aba: o roteador não intercepta
       fireEvent.click(screen.getByRole("link", { name: "nova aba" }));
       expect(intercepted).toEqual([false, false]);
-      expect(screen.getByTestId("route")).toHaveTextContent("home");
+      expect(screen.getByTestId("route")).toHaveTextContent("panel");
 
       fireEvent.click(link);
       expect(intercepted[2]).toBe(true);

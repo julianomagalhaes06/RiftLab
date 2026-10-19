@@ -89,8 +89,8 @@ Rotas reais:
 
 | Rota | Tela |
 | --- | --- |
-| `/` | entrada: importar ou abrir a demonstração |
-| `/painel` | Painel |
+| `/` (e `/painel`) | Painel |
+| `/importar` | importar por ID ou abrir a demonstração; as partidas importadas ficam no Histórico |
 | `/campeoes` | Campeões (marcador; o guia por campeão do CC-307 não foi construído) |
 | `/minha-posicao` | Minha posição |
 | `/historico` | Histórico |
@@ -101,6 +101,9 @@ Rotas reais:
 | `/prototipo` | protótipo ilustrativo do CC-102 |
 
 Comportamento da interface:
+- Cores, espaços, raios e fontes vêm só de `frontend/src/design/tokens.css` (tema escuro único);
+  um teste falha se outra folha de estilo declarar cor literal (CC-903).
+- A faixa "Partidas DEMO são sintéticas" só aparece quando a tela mostra dados de demonstração.
 - Cada tela tem estados de carregando, vazio, sucesso, erro recuperável e incompatível.
 - O objetivo vem primeiro do formulário; o texto é alternativa e vale só depois de confirmado.
 - O score é relativo; o suporte é contagem descrita, nunca porcentagem de vitória.

@@ -19,6 +19,8 @@ import { DecisionExperience } from "../study/DecisionExperience";
 import { ItemNames } from "../../shared/ui/ItemNames";
 import { useItemName } from "../../shared/hooks/useItemName";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
+import { useDemoNotice } from "../../app/demoNotice";
+import { isDemoMatchId } from "../../shared/router/routes";
 
 const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
   NO_PRIOR_FRAME: "não há quadro anterior à decisão",
@@ -278,6 +280,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
   const load = useDecision(decisionId);
   const ready = load.status === "ready" ? load.decision : null;
   const context = useDecisionContext(ready?.matchId ?? null, ready?.participantId ?? null);
+  useDemoNotice(ready !== null && isDemoMatchId(ready.matchId));
 
   if (load.status === "loading") {
     return (

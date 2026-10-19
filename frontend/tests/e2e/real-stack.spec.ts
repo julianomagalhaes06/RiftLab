@@ -37,7 +37,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     });
 
     // Entrada
-    await page.goto("/");
+    await page.goto("/importar");
     await expect(page.getByText("Serviço disponível")).toBeVisible();
     await expect(
       page.getByText("Analise partidas concluídas. O RiftLab não acompanha jogos em andamento."),
@@ -152,11 +152,10 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
       page.getByText("Nenhuma decisão de compra foi encontrada para este participante nesta partida."),
     ).toBeVisible();
 
-    // Retomar pela lista da entrada
-    await page.goto("/");
-    const row = page.getByRole("link", { name: /DEMO-0008/ });
+    // Retomar pelo Histórico (a entrada não lista mais as partidas, CC-903)
+    await page.goto("/historico");
+    const row = page.getByRole("link", { name: "Contexto da partida DEMO-0008" }).first();
     await expect(row).toBeVisible();
-    await expect(page.getByText("Pronta", { exact: true }).first()).toBeVisible();
     await row.click();
     await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible();
 

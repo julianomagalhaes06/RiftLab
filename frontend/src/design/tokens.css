@@ -1,0 +1,123 @@
+/* Tokens visuais do RiftLab (CC-903): a única fonte de cores, espaços, raios e tipografia.
+   As folhas de estilo das telas só usam var(--…); cor literal fora daqui falha no teste
+   `tokens.test.ts`. Tema escuro único. */
+
+@font-face {
+  font-family: Inter;
+  src: url('/fonts/Inter-variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/fonts/ChakraPetch-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chakra Petch';
+  src: url('/fonts/ChakraPetch-SemiBold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Neutros: fundo, superfícies, linhas e texto. */
+  --n0: #0d0f13;
+  --n1: #171a20;
+  --n2: #20242b;
+  --nline: #3d424c;
+  --nline-soft: #242831;
+  --nline-strong: #656b76;
+  --ntext: #f4f5f7;
+  --ntext-muted: #b3bac6;
+  --on-color: #ffffff;
+  --portrait-outline: #ffffff22;
+
+  /* Destaque (roxo) e resultado. */
+  --accent: #b9a6ff;
+  --accent-strong: #8f6bff;
+  --accent-hover: #cbbdff;
+  --accent-surface: #22213a;
+  --accent-ring: rgb(185 166 255 / .18);
+  --on-accent: #181322;
+  --mark-ink: #161020;
+  --win: #69dfb1;
+  --loss: #ff788b;
+  --win-tint: rgba(105, 223, 177, .12);
+  --loss-tint: rgba(255, 120, 139, .12);
+  --win-tint-soft: rgba(105, 223, 177, .10);
+  --loss-tint-soft: rgba(255, 120, 139, .10);
+  --shadow-soft: rgb(0 0 0 / .16);
+
+  /* Estados semânticos. */
+  --color-bg: var(--n0);
+  --color-surface: var(--n0);
+  --color-surface-alt: var(--n1);
+  --color-text: var(--ntext);
+  --color-muted: var(--ntext-muted);
+  --color-border: var(--nline);
+  --color-focus: var(--accent);
+  --color-available: var(--win);
+  --color-available-bg: #163329;
+  --color-degraded: #f0ce8d;
+  --color-degraded-bg: #352b19;
+  --color-unavailable: var(--loss);
+  --color-unavailable-bg: #3a1d28;
+  --color-loading: #c3cef3;
+  --color-loading-bg: #242d43;
+  --color-warning: #f0ce8d;
+  --color-warning-bg: #352b19;
+
+  /* Partida: times (validados contra a superfície escura), gráfico e habilidades. */
+  --team-blue: #4d8ef0;
+  --team-red: #e45a6e;
+  --chart-grid: #2a2e36;
+  --skill-q: #5b6ee1;
+  --skill-w: #3a8f7a;
+  --skill-e: #a06a2c;
+  --skill-r: #9c4fb8;
+
+  /* Minha posição: barra de PDL e paleta por elo. */
+  --track-bg: #474b55;
+  --track-border: #777d88;
+  --tier-default-accent: #b9a6ff;
+  --tier-default-glow: #564185;
+  --tier-iron-accent: #c6c9d0;
+  --tier-iron-glow: #34383e;
+  --tier-bronze-accent: #ddaa83;
+  --tier-bronze-glow: #513323;
+  --tier-silver-accent: #d3dce8;
+  --tier-silver-glow: #39434d;
+  --tier-gold-accent: #f5cf85;
+  --tier-gold-glow: #54401f;
+  --tier-platinum-accent: #9ed8d8;
+  --tier-platinum-glow: #264546;
+  --tier-emerald-accent: #9fe2ba;
+  --tier-emerald-glow: #1d4b37;
+  --tier-diamond-accent: #afc9ff;
+  --tier-diamond-glow: #2f3e68;
+  --tier-master-accent: #d2b9fa;
+  --tier-master-glow: #45315b;
+  --tier-grandmaster-accent: #ffadae;
+  --tier-grandmaster-glow: #5b2b35;
+  --tier-challenger-accent: #f7dea6;
+  --tier-challenger-glow: #554022;
+
+  /* Espaço, raio e tipografia. */
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --font-body: Inter, sans-serif;
+  --font-display: 'Chakra Petch', Inter, sans-serif;
+}

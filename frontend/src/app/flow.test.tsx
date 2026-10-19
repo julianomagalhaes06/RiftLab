@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMockApi,
@@ -6,7 +6,6 @@ import {
   decisionSummary,
   json,
   matchDetail,
-  matchSummary,
   preparation,
   problem,
   type MockApi,
@@ -62,7 +61,7 @@ afterEach(() => {
 
 describe("fluxo principal: demonstração → importação → partida → decisão", () => {
   it("percorre a jornada inteira só pela interface, sem console", async () => {
-    setup("/", (mock) => {
+    setup("/importar", (mock) => {
       mock.on("POST", /^\/api\/v1\/imports$/, () =>
         json(202, { jobId: JOB_ID, status: "QUEUED", statusUrl: `/api/v1/imports/${JOB_ID}` }),
       );
@@ -185,9 +184,9 @@ describe("fluxo principal: demonstração → importação → partida → decis
   });
 });
 
-describe("entrada: formulário de partida real", () => {
+describe("importar partida: formulário de partida real", () => {
   it("valida o padrão BR1 no cliente antes de qualquer requisição", async () => {
-    setup("/");
+    setup("/importar");
     const input = await screen.findByLabelText(/ID da partida/);
 
     fireEvent.change(input, { target: { value: "DEMO-0001" } });
@@ -199,7 +198,7 @@ describe("entrada: formulário de partida real", () => {
   });
 
   it("envia o ID válido no modo RIOT e vai para o progresso", async () => {
-    setup("/", (mock) =>
+    setup("/importar", (mock) =>
       mock.on("POST", /^\/api\/v1\/imports$/, () =>
         json(202, { jobId: JOB_ID, status: "QUEUED", statusUrl: `/api/v1/imports/${JOB_ID}` }),
       ),
@@ -218,7 +217,7 @@ describe("entrada: formulário de partida real", () => {
   });
 
   it("422 do servidor no modo RIOT sem chave mostra o texto útil, sem corpo remoto", async () => {
-    setup("/", (mock) =>
+    setup("/importar", (mock) =>
       mock.on("POST", /^\/api\/v1\/imports$/, () => problem(422, "RIOT_KEY_MISSING", "RIOT mode indisponível sem chave")),
     );
     fireEvent.change(await screen.findByLabelText(/ID da partida/), {
@@ -235,7 +234,7 @@ describe("entrada: formulário de partida real", () => {
   });
 
   it("VALIDATION_ERROR do servidor também é tratado", async () => {
-    setup("/", (mock) =>
+    setup("/importar", (mock) =>
       mock.on("POST", /^\/api\/v1\/imports$/, () => problem(422, "VALIDATION_ERROR")),
     );
     fireEvent.change(await screen.findByLabelText(/ID da partida/), { target: { value: "BR1_1" } });
@@ -247,7 +246,7 @@ describe("entrada: formulário de partida real", () => {
   });
 
   it("API fora do ar ao enviar mostra a mensagem de rede", async () => {
-    setup("/", (mock) =>
+    setup("/importar", (mock) =>
       mock.on("POST", /^\/api\/v1\/imports$/, () => {
         throw new TypeError("Failed to fetch");
       }),
@@ -256,72 +255,6 @@ describe("entrada: formulário de partida real", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Explorar demonstração" }));
 
     expect(await screen.findByText(/Não foi possível falar com a API do RiftLab/)).toBeInTheDocument();
-  });
-});
-
-describe("entrada: partidas importadas (retomar)", () => {
-  it("lista as partidas com o estado da preparação e link para retomar", async () => {
-    setup("/", (mock) =>
-      mock.on("GET", /^\/api\/v1\/matches$/, () =>
-        json(200, {
-          items: [
-            matchSummary({ matchId: "DEMO-0008", preparationStatus: "READY" }),
-            matchSummary({ matchId: "BR1_3120345678", patch: "16.17", preparationStatus: "FAILED" }),
-            matchSummary({ matchId: "BR1_9", preparationStatus: "NOT_REQUESTED" }),
-            matchSummary({ matchId: "BR1_10", preparationStatus: "RUNNING" }),
-          ],
-          nextCursor: null,
-        }),
-      ),
-    );
-
-    const heading = await screen.findByRole("heading", { name: "Partidas importadas" });
-    const section = heading.closest("section") as HTMLElement;
-    await within(section).findByRole("link", { name: /DEMO-0008/ });
-
-    expect(within(section).getByText("Pronta")).toBeInTheDocument();
-    expect(within(section).getByText("Preparação falhou")).toBeInTheDocument();
-    expect(within(section).getByText("Não preparada")).toBeInTheDocument();
-    expect(within(section).getByText("Preparando")).toBeInTheDocument();
-    expect(within(section).getAllByText("Demonstração")).toHaveLength(1);
-    expect(within(section).getByRole("link", { name: /BR1_3120345678/ })).toHaveAttribute(
-      "href",
-      "/matches/BR1_3120345678",
-    );
-    expect(section).not.toHaveTextContent(/subject|hash|puuid/i);
-  });
-
-  it("lista vazia tem texto próprio e erro tem 'Recarregar lista'", async () => {
-    setup("/", (mock) =>
-      mock.on(
-        "GET",
-        /^\/api\/v1\/matches$/,
-        sequence(
-          () => problem(500, "INTERNAL_ERROR"),
-          () => json(200, { items: [], nextCursor: null }),
-        ),
-      ),
-    );
-
-    expect(await screen.findByText(/Ocorreu um erro interno no servidor/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Recarregar lista" }));
-
-    expect(await screen.findByText(/Nenhuma partida importada ainda/)).toBeInTheDocument();
-  });
-
-  it("carrega mais páginas de partidas pelo cursor", async () => {
-    setup("/", (mock) =>
-      mock.on("GET", /^\/api\/v1\/matches$/, (call) =>
-        call.search.get("cursor")
-          ? json(200, { items: [matchSummary({ matchId: "BR1_2" })], nextCursor: null })
-          : json(200, { items: [matchSummary({ matchId: "BR1_1" })], nextCursor: "P2" }),
-      ),
-    );
-
-    fireEvent.click(await screen.findByRole("button", { name: "Carregar mais partidas" }));
-
-    expect(await screen.findByRole("link", { name: /BR1_2/ })).toBeInTheDocument();
-    expect(api.callsTo("GET", /matches$/)[1].search.get("cursor")).toBe("P2");
   });
 });
 

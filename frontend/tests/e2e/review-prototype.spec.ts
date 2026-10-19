@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 async function openPrototype(page: import("@playwright/test").Page) {
-  await page.goto("/");
+  await page.goto("/importar");
   await page.getByRole("button", { name: "Abrir protótipo (dados ilustrativos)" }).click();
   await expect(page.locator("#entrada-heading")).toBeVisible();
 }
@@ -144,7 +144,7 @@ test.describe("Navegação por teclado", () => {
   test("percorre entrada → progresso → decisões → contexto → escolha → comparação só com teclado", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/importar");
 
     // Home -> abrir protótipo
     await page.getByRole("button", { name: "Abrir protótipo (dados ilustrativos)" }).focus();
