@@ -1,0 +1,77 @@
+{
+ "schemaVersion": "win_probability_model_v1",
+ "modelVersion": "win-probability-16.19-v1",
+ "card": "CC-1004",
+ "description": "Regressão logística L2 sobre diferenças azul − vermelho por minuto (ouro, XP, abates, torres, inibidores, dragões, Ancião, Barão, Arauto, Vastilarvas, Atakhan, minuto e interações). Correlação com o resultado, não causa.",
+ "training": {
+  "corpus": "16.19 Solo/Duo, treino (7.463 partidas, 225.509 minutos)",
+  "lambda": 1.0,
+  "blueWinRate": 0.487852
+ },
+ "featureNames": [
+  "intercept",
+  "minute",
+  "gold",
+  "xp",
+  "kills",
+  "towers",
+  "inhibitors",
+  "dragons",
+  "elder",
+  "barons",
+  "heralds",
+  "grubs",
+  "atakhan",
+  "goldXMinute",
+  "towersXMinute"
+ ],
+ "coefficients": [
+  -0.0292597,
+  0.00782535,
+  0.54332589,
+  0.11349673,
+  -0.02010096,
+  -0.22215586,
+  0.18081975,
+  0.27153047,
+  -0.14938641,
+  -0.08683542,
+  -0.01335047,
+  0.00956915,
+  0.0,
+  -0.38354316,
+  0.27619096
+ ],
+ "evaluation": {
+  "split": "validação (1.599 partidas, 47.685 minutos), avaliação única pré-registrada",
+  "brier": {
+   "B0": 0.25041,
+   "B1": 0.17151,
+   "M": 0.16611
+  },
+  "logLoss": {
+   "B0": 0.69397,
+   "B1": 0.50888,
+   "M": 0.49424
+  },
+  "ece": 0.01601,
+  "brierSkillVsConstant": {
+   "point": 0.3367,
+   "ci95": [
+    0.3135,
+    0.3591
+   ]
+  },
+  "brierDiffVsGoldOnly": {
+   "point": -0.0054,
+   "ci95": [
+    -0.00742,
+    -0.00334
+   ]
+  }
+ },
+ "gate": {
+  "passed": true,
+  "rule": "ECE(M) <= 0,05 e skill >= 0,20 com IC inferior >= 0,15"
+ }
+}
