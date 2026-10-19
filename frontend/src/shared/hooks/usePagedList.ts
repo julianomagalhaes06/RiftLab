@@ -32,6 +32,8 @@ export interface UsePagedListResult<T> {
   loadMoreError: unknown;
   loadMore(): void;
   reload(): void;
+  /** Rebusca a primeira página sem voltar a "carregando"; falha mantém a lista atual. */
+  refresh(): void;
 }
 
 function initial<T>(key: string): PagedState<T> {
@@ -60,6 +62,7 @@ export function usePagedList<T>(options: UsePagedListOptions<T>): UsePagedListRe
 
   const [state, setState] = useState<PagedState<T>>(() => initial<T>(resetKey));
   const [reloads, setReloads] = useState(0);
+  const quiet = useRef(false);
   const moreController = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -70,6 +73,7 @@ export function usePagedList<T>(options: UsePagedListOptions<T>): UsePagedListRe
     latest.current
       .fetchPage(null, controller.signal)
       .then((page) => {
+        quiet.current = false;
         setState({
           key: resetKey,
           items: page.items,
@@ -81,9 +85,14 @@ export function usePagedList<T>(options: UsePagedListOptions<T>): UsePagedListRe
         });
       })
       .catch((error: unknown) => {
-        if (!isAbortError(error)) {
-          setState({ ...initial<T>(resetKey), status: "error", error });
+        if (isAbortError(error)) {
+          return;
         }
+        if (quiet.current) {
+          quiet.current = false;
+          return;
+        }
+        setState({ ...initial<T>(resetKey), status: "error", error });
       });
     return () => {
       controller.abort();
@@ -131,5 +140,10 @@ export function usePagedList<T>(options: UsePagedListOptions<T>): UsePagedListRe
     setReloads((count) => count + 1);
   }, [resetKey]);
 
-  return { ...current, loadMore, reload };
+  const refresh = useCallback(() => {
+    quiet.current = true;
+    setReloads((count) => count + 1);
+  }, []);
+
+  return { ...current, loadMore, reload, refresh };
 }

@@ -7,6 +7,7 @@ import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { championName } from "../matches/format";
 import { ChampionAvatar } from "./ChampionAvatar";
 import { filterLoadedMatches, type OriginFilter, type QueueFilter, type ResultFilter } from "./filter";
+import { HistorySync } from "./HistorySync";
 import { MatchCard } from "./MatchCard";
 import { dayKey, dayLabel, decimal, percent, record, summarizeLoaded } from "./presentation";
 import "./history.css";
@@ -135,6 +136,8 @@ export function HistoryPage() {
         <h2>Partidas para estudar</h2>
         <p>Veja como foi cada partida e abra a análise das suas compras.</p>
       </div>
+
+      <HistorySync onNewMatches={list.refresh} />
 
       {list.status === "ready" && list.items.length > 0 && <LoadedSummary matches={list.items} />}
 

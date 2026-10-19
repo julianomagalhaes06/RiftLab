@@ -133,6 +133,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/history/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado da última sincronização do histórico
+         * @description Somente banco; nenhuma chamada à Riot.
+         */
+        get: operations["get_history_sync_api_v1_history_sync_get"];
+        put?: never;
+        /**
+         * Pede a sincronização do histórico da conta própria
+         * @description Cria uma execução para o worker (202) ou devolve a ativa, o intervalo mínimo ainda vigente ou a indisponibilidade (200). Nenhuma chamada à Riot dentro da requisição.
+         */
+        post: operations["post_history_sync_api_v1_history_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/imports": {
         parameters: {
             query?: never;
@@ -1116,6 +1140,47 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HistorySyncStatus
+         * @description `reason`: RIOT_KEY_MISSING, ACCOUNT_NOT_CONFIGURED, o código do erro da última execução
+         *     (ex.: RIOT_AUTH_FAILED, RIOT_RATE_LIMITED) ou COOLDOWN quando a última foi bem-sucedida e
+         *     o intervalo mínimo ainda vale. `nextAllowedAt` diz quando um novo pedido cria execução.
+         */
+        HistorySyncStatus: {
+            /**
+             * Alreadyknown
+             * @default 0
+             */
+            alreadyKnown: number;
+            /** Finishedat */
+            finishedAt?: string | null;
+            /**
+             * Listed
+             * @default 0
+             */
+            listed: number;
+            /**
+             * Newenqueued
+             * @default 0
+             */
+            newEnqueued: number;
+            /** Nextallowedat */
+            nextAllowedAt?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Requestedat */
+            requestedAt?: string | null;
+            /**
+             * Skippedpurged
+             * @default 0
+             */
+            skippedPurged: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "IDLE" | "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "UNAVAILABLE";
         };
         /**
          * ImportJobAccepted
@@ -2212,6 +2277,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_history_sync_api_v1_history_sync_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistorySyncStatus"];
+                };
+            };
+        };
+    };
+    post_history_sync_api_v1_history_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistorySyncStatus"];
                 };
             };
         };

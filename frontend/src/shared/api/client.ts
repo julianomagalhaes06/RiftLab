@@ -38,6 +38,7 @@ export type LearningAttempt = Schemas["LearningAttemptPublicState"];
 export type AnalysisResult = Schemas["AnalysisResult"];
 export type AnalysisCandidate = Schemas["AnalysisCandidate"];
 export type AnalysisReferenceSource = Schemas["AnalysisReferenceSource"];
+export type HistorySyncStatus = Schemas["HistorySyncStatus"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 export type ObjectiveForm = Schemas["ObjectiveForm"];
 export type ObjectiveInterpretation = Schemas["ObjectiveInterpretResult"];
@@ -61,6 +62,8 @@ export interface ApiClient {
   getDashboard(params: { origin: "REAL" | "DEMO"; window: number }, signal?: AbortSignal): Promise<Dashboard>;
   getChampionPatterns(params: { championId?: number; patch?: string; phase?: "first" | "second" | "sequence" }, signal?: AbortSignal): Promise<ChampionPatterns>;
   getRankedMe(signal?: AbortSignal, queue?: RankedQueue): Promise<RankedMe>;
+  getHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
+  requestHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   createImport(matchId: string, mode: ImportMode, signal?: AbortSignal): Promise<ImportJobAccepted>;
   getImport(jobId: string, signal?: AbortSignal): Promise<ImportJobStatus>;
   retryImport(jobId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
@@ -167,6 +170,9 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     getChampionPatterns: (params, signal) => request("GET", `/api/v1/champions/patterns${queryString(params)}`, { signal }),
     getDashboard: (params, signal) => request("GET", `/api/v1/dashboard?origin=${params.origin}&window=${params.window}`, { signal }),
     getRankedMe: (signal, queue) => request("GET", `/api/v1/ranked/me${queryString({ queue })}`, { signal }),
+    // CC-901: o POST só agenda; a rede com a Riot roda no worker.
+    getHistorySync: (signal) => request("GET", "/api/v1/history/sync", { signal }),
+    requestHistorySync: (signal) => request("POST", "/api/v1/history/sync", { signal }),
     // Modo RIOT sem chave no servidor: 422 com code=RIOT_KEY_MISSING (tabela de mensagens).
     createImport: (matchId, mode, signal) =>
       request("POST", "/api/v1/imports", { body: { matchId, mode }, signal }),

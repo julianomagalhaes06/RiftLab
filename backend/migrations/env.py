@@ -16,6 +16,7 @@ import riftlab.catalog.models  # noqa: F401
 import riftlab.catalog.patches  # noqa: F401
 import riftlab.champions.models  # noqa: F401
 import riftlab.decisions.models  # noqa: F401
+import riftlab.history_sync.models  # noqa: F401
 import riftlab.ingestion.models  # noqa: F401
 import riftlab.learning.models  # noqa: F401
 import riftlab.ml.models  # noqa: F401

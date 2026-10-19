@@ -156,6 +156,22 @@ export function decisionState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Estado da sincronização do histórico (CC-901). */
+export function historySync(overrides: Record<string, unknown> = {}) {
+  return {
+    state: "IDLE",
+    reason: null,
+    requestedAt: null,
+    finishedAt: null,
+    nextAllowedAt: null,
+    listed: 0,
+    newEnqueued: 0,
+    alreadyKnown: 0,
+    skippedPurged: 0,
+    ...overrides,
+  };
+}
+
 export type RouteKey =
   | "GET /api/v1/champions/patterns"
   | "POST /api/v1/imports"
@@ -169,6 +185,8 @@ export type RouteKey =
   | "GET /api/v1/decisions/:id"
   | "GET /api/v1/dashboard"
   | "GET /api/v1/ranked/me"
+  | "POST /api/v1/history/sync"
+  | "GET /api/v1/history/sync"
   | "GET /api/v1/matches/:id/purge-preview"
   | "DELETE /api/v1/matches/:id"
   | "POST /api/v1/objectives/interpret"
@@ -197,6 +215,8 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/decisions/:id", "GET", /^\/api\/v1\/decisions\/[^/]+$/],
   ["GET /api/v1/dashboard", "GET", /^\/api\/v1\/dashboard$/],
   ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
+  ["POST /api/v1/history/sync", "POST", /^\/api\/v1\/history\/sync$/],
+  ["GET /api/v1/history/sync", "GET", /^\/api\/v1\/history\/sync$/],
   ["POST /api/v1/objectives/interpret", "POST", /^\/api\/v1\/objectives\/interpret$/],
   ["GET /api/v1/learning-attempts/progress", "GET", /^\/api\/v1\/learning-attempts\/progress$/],
   ["POST /api/v1/learning-attempts", "POST", /^\/api\/v1\/learning-attempts$/],
@@ -371,6 +391,9 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "GET /api/v1/decisions/:id": () => ok(decisionState()),
   "GET /api/v1/dashboard": () => ok(dashboard({ status: "IDENTITY_UNAVAILABLE", totalMatches: 0, sampledMatches: 0, winSamples: 0, wins: 0, winRate: null, kdaSamples: 0, kda: null, distinctChampions: 0, champions: [], recentMatches: [], progress: { attempts: 0, revealed: 0, reflections: 0, matches: 0 } })),
   "GET /api/v1/ranked/me": () => ok({ status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }),
+  // CC-901: sem chave da Riot (como na demonstração), a aba Histórico não sincroniza.
+  "POST /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
+  "GET /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
   "GET /api/v1/matches/:id/purge-preview": () =>
     ok({
       matchId: "DEMO-0008",

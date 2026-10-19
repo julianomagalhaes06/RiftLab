@@ -8,6 +8,7 @@ from pathlib import Path
 
 from riftlab import db
 from riftlab.config import Settings, get_settings
+from riftlab.history_sync.application import process_next_history_sync
 from riftlab.ingestion.application import process_next_job
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.ingestion.purge import process_next_purge
@@ -88,7 +89,10 @@ async def run(settings: Settings | None = None, stop_event: asyncio.Event | None
             purged = await _run_step(
                 "expurgo", lambda: process_next_purge(session_factory, raw_store, settings)
             )
-            processed = imported or prepared or purged
+            synced = await _run_step(
+                "sincronizacao", lambda: process_next_history_sync(session_factory, settings)
+            )
+            processed = imported or prepared or purged or synced
             _touch_heartbeat(heartbeat_path)
             if not processed:
                 try:

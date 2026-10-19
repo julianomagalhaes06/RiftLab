@@ -1679,6 +1679,96 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HistorySyncStatus": {
+        "additionalProperties": false,
+        "description": "`reason`: RIOT_KEY_MISSING, ACCOUNT_NOT_CONFIGURED, o código do erro da última execução\n(ex.: RIOT_AUTH_FAILED, RIOT_RATE_LIMITED) ou COOLDOWN quando a última foi bem-sucedida e\no intervalo mínimo ainda vale. `nextAllowedAt` diz quando um novo pedido cria execução.",
+        "properties": {
+          "alreadyKnown": {
+            "default": 0,
+            "title": "Alreadyknown",
+            "type": "integer"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "listed": {
+            "default": 0,
+            "title": "Listed",
+            "type": "integer"
+          },
+          "newEnqueued": {
+            "default": 0,
+            "title": "Newenqueued",
+            "type": "integer"
+          },
+          "nextAllowedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextallowedat"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requestedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requestedat"
+          },
+          "skippedPurged": {
+            "default": 0,
+            "title": "Skippedpurged",
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "IDLE",
+              "QUEUED",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "UNAVAILABLE"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "HistorySyncStatus",
+        "type": "object"
+      },
       "ImportJobAccepted": {
         "additionalProperties": false,
         "description": "202 de POST /imports: job novo ou job ativo reaproveitado.",
@@ -4168,6 +4258,48 @@
         "summary": "Get Decision",
         "tags": [
           "decisions"
+        ]
+      }
+    },
+    "/api/v1/history/sync": {
+      "get": {
+        "description": "Somente banco; nenhuma chamada à Riot.",
+        "operationId": "get_history_sync_api_v1_history_sync_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorySyncStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Estado da última sincronização do histórico",
+        "tags": [
+          "history"
+        ]
+      },
+      "post": {
+        "description": "Cria uma execução para o worker (202) ou devolve a ativa, o intervalo mínimo ainda vigente ou a indisponibilidade (200). Nenhuma chamada à Riot dentro da requisição.",
+        "operationId": "post_history_sync_api_v1_history_sync_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorySyncStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Pede a sincronização do histórico da conta própria",
+        "tags": [
+          "history"
         ]
       }
     },

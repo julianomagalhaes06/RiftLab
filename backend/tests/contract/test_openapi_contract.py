@@ -26,7 +26,8 @@ def test_openapi_only_announces_real_routes() -> None:
     partida e detalhe) no CC-204; as de PARTIDAS (lista, detalhe e nova tentativa
     de preparação) no CC-205; análises (POST/GET) no CC-303; interpretação de
     objetivo no CC-504; feedback, relatório, reflexão e progresso no CC-505; prévia e
-    expurgo de partida (DELETE com confirmação) no CC-603."""
+    expurgo de partida (DELETE com confirmação) no CC-603; sincronização do histórico
+    (POST/GET) no CC-901."""
     schema = _current_schema()
     assert set(schema["paths"].keys()) == {
         "/health/live",
@@ -42,6 +43,7 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/matches/{match_id}/timeline",
         "/api/v1/decisions/{decision_id}",
         "/api/v1/ranked/me",
+        "/api/v1/history/sync",
         "/api/v1/dashboard",
         "/api/v1/champions/patterns",
         "/api/v1/analyses",

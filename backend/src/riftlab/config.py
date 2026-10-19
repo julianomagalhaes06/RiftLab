@@ -76,6 +76,13 @@ class Settings(BaseSettings):
     # uso: processar um job já toca o heartbeat, não é preciso um timer
     # separado (CC-201).
     worker_poll_interval_seconds: float = 2.0
+    # CC-901: sincronização do histórico da conta própria ao abrir a aba Histórico.
+    # Intervalo mínimo entre execuções, espera maior depois de chave rejeitada,
+    # janela da primeira listagem e teto de IDs por listagem (uma requisição).
+    history_sync_cooldown_seconds: float = 300.0
+    history_sync_auth_cooldown_seconds: float = 3600.0
+    history_sync_lookback_days: int = 14
+    history_sync_max_ids: int = 20
 
     @property
     def demo_mode(self) -> bool:
