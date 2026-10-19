@@ -329,6 +329,55 @@ O negativo vale para esta representação: composição estática e inventário 
 sem contexto tático/ameaças dinâmicas observáveis. Não demonstra inutilidade do
 estudo situacional, pertinência das compras populares ou efeitos na aprendizagem.
 
+## 9.3 Todos os participantes do 16.19 (CC-907, F0)
+
+Primeira fase da revisão de partida para todos os campeões. Mesmo caminho do produto
+(parser, reducer v12 com as regras do 16.19, seleção e candidatos), sem seleção de campeões:
+os 10 participantes de cada partida de treino e validação do corpus 16.19 v3 (9.062
+partidas), ordinais 1 a 5: 82.753 decisões prontas, de 172 campeões. Ordinais 1–2 seguem a
+elegibilidade do produto; 3–5, a regra da CC-701 (único motivo: ordinal além do 2º).
+Avaliação pré-registrada antes das métricas, idêntica à CC-804 (popularidade campeão ×
+ordinal ajustada só no treino de cada rota, uniforme exato, suporte ≥ 20, bootstrap pareado
+por partida, 2.000 réplicas, semente 401; positivo com cobertura ≥ 70%, ≥ 100 decisões de
+≥ 30 partidas e IC acima de zero). Só validação; o teste continua fechado; 25 comparações
+exploratórias, sem correção para comparações múltiplas.
+
+| Rota | Item | Prontos / pontos (val.) | Cobertura | MRR B0 | MRR uniforme | IC95% B0 − uniforme | Resultado |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| Topo | 1º | 2212/3140 | 95,3% | 0,764 | 0,070 | [0,680; 0,706] | positivo |
+| Topo | 2º | 1512/2796 | 92,8% | 0,638 | 0,115 | [0,504; 0,540] | positivo |
+| Topo | 3º | 889/1965 | 89,2% | 0,659 | 0,195 | [0,441; 0,486] | positivo |
+| Topo | 4º | 327/877 | 77,4% | 0,662 | 0,306 | [0,320; 0,393] | positivo |
+| Topo | 5º | 92/327 | 28,3% | 0,710 | 0,489 | [0,152; 0,288] | sem amostra |
+| Selva | 1º | 2368/3419 | 98,6% | 0,745 | 0,055 | [0,678; 0,703] | positivo |
+| Selva | 2º | 88/2789 | 37,5% | 0,590 | 0,078 | [0,432; 0,589] | sem amostra |
+| Selva | 3º | 0/2189 | — | — | — | — | sem amostra |
+| Selva | 4º | 0/1157 | — | — | — | — | sem amostra |
+| Selva | 5º | 0/497 | — | — | — | — | sem amostra |
+| Meio | 1º | 2036/3187 | 95,0% | 0,794 | 0,066 | [0,715; 0,740] | positivo |
+| Meio | 2º | 206/2935 | 48,5% | 0,670 | 0,110 | [0,513; 0,607] | negativo |
+| Meio | 3º | 55/2008 | 21,8% | 0,601 | 0,187 | [0,313; 0,516] | sem amostra |
+| Meio | 4º | 15/966 | 0,0% | 0,454 | 0,318 | [-0,030; 0,336] | sem amostra |
+| Meio | 5º | 3/354 | 0,0% | 0,556 | 0,719 | [-0,250; 0,000] | sem amostra |
+| Atirador | 1º | 2337/3150 | 98,1% | 0,766 | 0,059 | [0,695; 0,719] | positivo |
+| Atirador | 2º | 1190/3087 | 95,6% | 0,795 | 0,074 | [0,703; 0,738] | positivo |
+| Atirador | 3º | 645/2350 | 93,0% | 0,759 | 0,111 | [0,623; 0,673] | positivo |
+| Atirador | 4º | 286/1382 | 93,4% | 0,709 | 0,207 | [0,461; 0,541] | positivo |
+| Atirador | 5º | 113/623 | 80,5% | 0,661 | 0,341 | [0,267; 0,377] | positivo |
+| Suporte | 1º | 5/3127 | 0,0% | 0,617 | 0,049 | [0,173; 0,951] | sem amostra |
+| Suporte | 2º | 0/2524 | — | — | — | — | sem amostra |
+| Suporte | 3º | 0/1114 | — | — | — | — | sem amostra |
+| Suporte | 4º | 0/302 | — | — | — | — | sem amostra |
+| Suporte | 5º | 0/19 | — | — | — | — | sem amostra |
+
+Participações com pelo menos uma decisão pronta: Topo 70%, Selva 74%, Meio 64%, Atirador 74%, Suporte 0%. O que trava Selva, Meio e
+Suporte é inventário incerto, não falta de amostra: o pet da Selva some sem substituto
+entre 12 e 16 min; no Meio, a bota tier 2 comprada depois do fim da missão vira o sucessor
+no mesmo instante; no Suporte, a cadeia do item de missão (3865 → 3866 → 3867 → escolha
+final) quase nunca tem evento de compra; desfazer compra segue sem regra validada em todas
+as rotas. Propostas de regra foram registradas para confirmação futura; nenhuma regra,
+escopo ou produto mudou. Popularidade descreve imitação, não qualidade da compra.
+
 ## 10. Limitações e próximos passos
 
 - **Pertinência:** concluir a revisão de especialistas (CC-602) e reportar a concordância.
@@ -344,6 +393,9 @@ estudo situacional, pertinência das compras populares ou efeitos na aprendizage
   sinal de forma robusta. Qualquer nova experiência exige protocolo separado.
 - **Interpretador:** uma nova rodada de ajuste exigiria teste novo, mais exemplos de injeção,
   frases vagas e exclusões, e decodificação restrita com abstenção.
+- **Todos os campeões (F0, §9.3):** a referência já é sólida no Topo (1º–4º), no Atirador
+  (1º–5º, todos os campeões) e no 1º item de Selva e Meio; o resto depende de regras de
+  inventário novas (pet da Selva, bota do Meio, cadeia do Suporte, desfazer).
 - **Aprendizagem:** o piloto pedagógico com voluntários, se houver recursos e aprovação
   institucional.
 
