@@ -205,6 +205,7 @@ async def test_list_items_have_no_personal_field_and_report_not_requested_withou
             "supportReason": "PATCH_NOT_VALIDATED",
             "participants": [],
             "localParticipantId": None,
+            "reviewPurchases": None,
         }
     finally:
         await _delete_matches(session_factory, [match_id])

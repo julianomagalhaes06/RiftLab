@@ -425,6 +425,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/matches/{match_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Revisão da partida de um participante (F1)
+         * @description Compras do 1º ao 5º item principal rotuladas frente à referência do mesmo campeão, rota e etapa (comum, alternativa, incomum, sem referência), ordem de habilidades, fase de rotas contra o oponente direto e chance de vitória por minuto com momentos-chave. Popularidade não é qualidade e a chance é correlacional. Só leitura.
+         */
+        get: operations["match_review_api_v1_matches__match_id__review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/matches/{match_id}/timeline": {
         parameters: {
             query?: never;
@@ -1498,6 +1518,8 @@ export interface components {
             preparationStatus: components["schemas"]["PreparationStatus"];
             /** Queue */
             queue: number;
+            /** @description Revisão da partida (F1): compras do 1º ao 5º item principal da conta local e quantas estão prontas para comparar com a referência; null sem conta local ou sem decisões. */
+            reviewPurchases?: components["schemas"]["ReviewPurchaseCount"] | null;
             /**
              * Startat
              * Format: date-time
@@ -1572,6 +1594,33 @@ export interface components {
             retryAt?: string | null;
             status: components["schemas"]["PreparationStatus"];
         };
+        /** MatchReview */
+        MatchReview: {
+            /** Championid */
+            championId: number;
+            counts: components["schemas"]["ReviewCounts"];
+            lane: components["schemas"]["ReviewLane"] | null;
+            /** Matchid */
+            matchId: string;
+            /** Participantid */
+            participantId: number;
+            /** Patch */
+            patch: string;
+            /** Purchases */
+            purchases: components["schemas"]["ReviewPurchase"][];
+            /** Queue */
+            queue: number;
+            /** Referenceinherited */
+            referenceInherited: boolean;
+            /** Referenceversion */
+            referenceVersion: string | null;
+            /** Role */
+            role: string | null;
+            skills: components["schemas"]["ReviewSkills"] | null;
+            winProbability: components["schemas"]["ReviewWinProbability"] | null;
+            /** Winprobabilityunavailable */
+            winProbabilityUnavailable?: ("MODEL_UNAVAILABLE" | "MODEL_GATE_FAILED" | "FRAMES_WITHOUT_XP") | null;
+        };
         /**
          * MatchSummary
          * @description Item de GET /matches: sem PUUID, Riot ID ou hash de jogador.
@@ -1603,6 +1652,8 @@ export interface components {
             preparationStatus: components["schemas"]["PreparationStatus"];
             /** Queue */
             queue: number;
+            /** @description Revisão da partida (F1): compras do 1º ao 5º item principal da conta local e quantas estão prontas para comparar com a referência; null sem conta local ou sem decisões. */
+            reviewPurchases?: components["schemas"]["ReviewPurchaseCount"] | null;
             /**
              * Startat
              * Format: date-time
@@ -1873,6 +1924,147 @@ export interface components {
          * @enum {string}
          */
         ReportFormat: "json" | "html";
+        /** ReviewCounts */
+        ReviewCounts: {
+            /** Alternative */
+            alternative: number;
+            /** Common */
+            common: number;
+            /** Noreference */
+            noReference: number;
+            /** Purchases */
+            purchases: number;
+            /** Ready */
+            ready: number;
+            /** Uncommon */
+            uncommon: number;
+        };
+        /** ReviewKeyMoment */
+        ReviewKeyMoment: {
+            /** Delta */
+            delta: number;
+            /** Events */
+            events: components["schemas"]["ReviewMomentEvent"][];
+            /** Minute */
+            minute: number;
+            /** Probabilityafter */
+            probabilityAfter: number;
+        };
+        /** ReviewLane */
+        ReviewLane: {
+            /** Minutes */
+            minutes: components["schemas"]["ReviewLaneMinute"][];
+            /** Opponentid */
+            opponentId: number;
+        };
+        /** ReviewLaneMinute */
+        ReviewLaneMinute: {
+            /** Minute */
+            minute: number;
+            opponent: components["schemas"]["ReviewLaneStats"];
+            own: components["schemas"]["ReviewLaneStats"];
+        };
+        /** ReviewLaneStats */
+        ReviewLaneStats: {
+            /** Cs */
+            cs: number;
+            /** Gold */
+            gold: number;
+            /** Level */
+            level: number;
+            /** Xp */
+            xp: number;
+        };
+        /** ReviewMomentEvent */
+        ReviewMomentEvent: {
+            /** Involvesparticipant */
+            involvesParticipant: boolean;
+            /** Kind */
+            kind: string;
+            /** Team */
+            team?: number | null;
+        };
+        /** ReviewPurchase */
+        ReviewPurchase: {
+            /** Decisionid */
+            decisionId: string;
+            /** Itemid */
+            itemId: number;
+            /** Label */
+            label?: ("COMMON" | "ALTERNATIVE" | "UNCOMMON" | "NO_REFERENCE") | null;
+            /** Ordinal */
+            ordinal: number;
+            /** Rank */
+            rank?: number | null;
+            /** Referencetop */
+            referenceTop?: components["schemas"]["ReviewReferenceItem"][];
+            /** Share */
+            share?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "READY" | "NOT_READY";
+            /** Support */
+            support?: number | null;
+            /** Timestampms */
+            timestampMs: number;
+        };
+        /** ReviewPurchaseCount */
+        ReviewPurchaseCount: {
+            /** Ready */
+            ready: number;
+            /** Total */
+            total: number;
+        };
+        /** ReviewReferenceItem */
+        ReviewReferenceItem: {
+            /** Itemid */
+            itemId: number;
+            /** Share */
+            share: number;
+        };
+        /** ReviewSkillShare */
+        ReviewSkillShare: {
+            /** Priority */
+            priority: string;
+            /** Share */
+            share: number;
+        };
+        /** ReviewSkills */
+        ReviewSkills: {
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "MOST_COMMON" | "ALTERNATIVE" | "UNCOMMON" | "NO_REFERENCE";
+            /** Mostcommon */
+            mostCommon?: components["schemas"]["ReviewSkillShare"][];
+            /** Priority */
+            priority: string | null;
+            /** Share */
+            share?: number | null;
+            /** Support */
+            support: number;
+        };
+        /** ReviewWinPoint */
+        ReviewWinPoint: {
+            /** Probability */
+            probability: number;
+            /** Timestampms */
+            timestampMs: number;
+        };
+        /** ReviewWinProbability */
+        ReviewWinProbability: {
+            /** Keymoments */
+            keyMoments: components["schemas"]["ReviewKeyMoment"][];
+            /** Modelversion */
+            modelVersion: string;
+            /** Points */
+            points: components["schemas"]["ReviewWinPoint"][];
+            /** Team */
+            team: number;
+        };
         /** TimelineGoldFrame */
         TimelineGoldFrame: {
             /**
@@ -3041,6 +3233,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    match_review_api_v1_matches__match_id__review_get: {
+        parameters: {
+            query: {
+                participantId: number;
+            };
+            header?: never;
+            path: {
+                match_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchReview"];
+                };
+            };
+            /** @description Partida ou participante ausente. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

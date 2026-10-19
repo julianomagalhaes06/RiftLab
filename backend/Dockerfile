@@ -23,6 +23,8 @@ COPY configs/reconstruction-v10-legacy-context.json ./configs/reconstruction-v10
 COPY configs/feature-schema-v1.json ./configs/feature-schema-v1.json
 COPY configs/item-rules ./configs/item-rules
 COPY configs/ranking ./configs/ranking
+# Revisão da partida (F1, CC-1003/CC-1004): referência agregada e modelo de chance de vitória.
+COPY configs/match-review ./configs/match-review
 
 # ---- test: inclui dependencias de dev (pytest/ruff/mypy) e testes ----
 FROM base AS test

@@ -44,6 +44,8 @@ class MatchListItem:
     participants: tuple[MatchParticipantFactsView, ...] = ()
     champions: Mapping[int, ChampionAsset] = field(default_factory=dict)
     local_participant_id: int | None = None
+    # F1 (CC-1005): (compras prontas para a revisão, compras do 1º ao 5º item) da conta local.
+    review_purchases: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +185,12 @@ async def list_matches(
             ids = [p.participant_id for p, local in facts[m.match_id] if local]
         return ids[0] if len(ids) == 1 else None  # ambíguo ou ausente: nenhum
 
+    locals_by_match = {m.match_id: lid for m in page if (lid := local_id(m)) is not None}
+    async with read_only_unit_of_work(session_factory) as session:
+        from riftlab.match_review.application import review_purchase_counts
+
+        review = await review_purchase_counts(session, locals_by_match)
+
     items = [
         MatchListItem(
             m,
@@ -197,6 +205,7 @@ async def list_matches(
             ),
             assets_by_patch.get(m.patch, {}),
             local_id(m),
+            review.get(m.match_id),
         )
         for m in page
     ]

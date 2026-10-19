@@ -266,27 +266,46 @@ async def _prepare(
         await record_match_health(session_factory, match_id)
 
 
+_FRAME_FIELDS = {
+    "gold": ("totalGold",),
+    # CC-1003: XP, farm (tropas + selva) e nível para a fase de rotas e a chance de vitória.
+    "xp": ("xp",),
+    "cs": ("minionsKilled", "jungleMinionsKilled"),
+    "level": ("level",),
+}
+
+
 def frames_document(frames: Iterable[FrameLike]) -> list[dict[str, Any]]:
-    """Só o ouro total de cada participante por quadro; valor inválido fica de fora."""
+    """Ouro total, XP, farm e nível de cada participante por quadro; valor inválido fica de fora."""
     document: list[dict[str, Any]] = []
     for frame in frames:
-        gold: dict[str, int] = {}
-        for participant_id, data in frame.participant_frames.items():
-            value = data.get("totalGold") if isinstance(data, Mapping) else None
-            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
-                gold[str(int(participant_id))] = value
-        document.append({"t": frame.timestamp_ms, "gold": gold})
+        entry: dict[str, Any] = {"t": frame.timestamp_ms}
+        for name, keys in _FRAME_FIELDS.items():
+            values: dict[str, int] = {}
+            for participant_id, data in frame.participant_frames.items():
+                raw = [data.get(key) if isinstance(data, Mapping) else None for key in keys]
+                if all(isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in raw):
+                    values[str(int(participant_id))] = sum(raw)  # type: ignore[arg-type]
+            entry[name] = values
+        document.append(entry)
     return document
+
+
+def _frames_outdated(frames: Any) -> bool:
+    """Documento anterior à CC-1003 (só ouro): regravado quando o bruto existe."""
+    return isinstance(frames, list) and bool(frames) and "xp" not in frames[0]
 
 
 async def _ensure_frames(
     session_factory: SessionFactory, source: DemoMatchSource | LocalRawMatchSource, match_id: str
 ) -> None:
-    """Grava o ouro por quadro uma única vez (só a preparação lê o bruto). É acessório:
+    """Grava os quadros uma única vez (só a preparação lê o bruto); documento anterior à
+    CC-1003, só com ouro, é regravado com XP, farm e nível. É acessório:
     sem o bruto local (ex.: partida de corpus guardado fora do worker), a preparação
     termina normalmente e só o gráfico de ouro fica indisponível."""
     async with unit_of_work(session_factory) as session:
-        if await session.get(MatchFramesModel, match_id) is not None:
+        existing = await session.get(MatchFramesModel, match_id)
+        if existing is not None and not _frames_outdated(existing.frames):
             return
     try:
         result = await source.load_match(match_id)
@@ -296,8 +315,11 @@ async def _ensure_frames(
         )
         return
     async with unit_of_work(session_factory) as session:
-        if await session.get(MatchFramesModel, match_id) is None:
+        row = await session.get(MatchFramesModel, match_id)
+        if row is None:
             session.add(MatchFramesModel(match_id=match_id, frames=frames_document(result.frames)))
+        elif _frames_outdated(row.frames):
+            row.frames = frames_document(result.frames)
 
 
 async def _finalize(

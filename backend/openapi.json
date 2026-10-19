@@ -2487,6 +2487,17 @@
             "title": "Queue",
             "type": "integer"
           },
+          "reviewPurchases": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewPurchaseCount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revisão da partida (F1): compras do 1º ao 5º item principal da conta local e quantas estão prontas para comparar com a referência; null sem conta local ou sem decisões."
+          },
           "startAt": {
             "format": "date-time",
             "title": "Startat",
@@ -2727,6 +2738,132 @@
         "title": "MatchPreparation",
         "type": "object"
       },
+      "MatchReview": {
+        "additionalProperties": false,
+        "properties": {
+          "championId": {
+            "title": "Championid",
+            "type": "integer"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ReviewCounts"
+          },
+          "lane": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewLane"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "participantId": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Participantid",
+            "type": "integer"
+          },
+          "patch": {
+            "title": "Patch",
+            "type": "string"
+          },
+          "purchases": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewPurchase"
+            },
+            "title": "Purchases",
+            "type": "array"
+          },
+          "queue": {
+            "title": "Queue",
+            "type": "integer"
+          },
+          "referenceInherited": {
+            "title": "Referenceinherited",
+            "type": "boolean"
+          },
+          "referenceVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referenceversion"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "skills": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewSkills"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "winProbability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewWinProbability"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "winProbabilityUnavailable": {
+            "anyOf": [
+              {
+                "enum": [
+                  "MODEL_UNAVAILABLE",
+                  "MODEL_GATE_FAILED",
+                  "FRAMES_WITHOUT_XP"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winprobabilityunavailable"
+          }
+        },
+        "required": [
+          "matchId",
+          "participantId",
+          "championId",
+          "role",
+          "patch",
+          "queue",
+          "referenceVersion",
+          "referenceInherited",
+          "purchases",
+          "skills",
+          "lane",
+          "winProbability",
+          "counts"
+        ],
+        "title": "MatchReview",
+        "type": "object"
+      },
       "MatchSummary": {
         "additionalProperties": false,
         "description": "Item de GET /matches: sem PUUID, Riot ID ou hash de jogador.\n`champions_present` abrange qualquer participante. `local_participant_id` só\naponta a posição da conta local configurada (mesma regra do Painel) e é null\nquando ela não é conhecida ou não está na partida.",
@@ -2787,6 +2924,17 @@
             "minimum": 0.0,
             "title": "Queue",
             "type": "integer"
+          },
+          "reviewPurchases": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewPurchaseCount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revisão da partida (F1): compras do 1º ao 5º item principal da conta local e quantas estão prontas para comparar com a referência; null sem conta local ou sem decisões."
           },
           "startAt": {
             "format": "date-time",
@@ -3517,6 +3665,455 @@
         ],
         "title": "ReportFormat",
         "type": "string"
+      },
+      "ReviewCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "alternative": {
+            "title": "Alternative",
+            "type": "integer"
+          },
+          "common": {
+            "title": "Common",
+            "type": "integer"
+          },
+          "noReference": {
+            "title": "Noreference",
+            "type": "integer"
+          },
+          "purchases": {
+            "title": "Purchases",
+            "type": "integer"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "integer"
+          },
+          "uncommon": {
+            "title": "Uncommon",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "purchases",
+          "ready",
+          "common",
+          "alternative",
+          "uncommon",
+          "noReference"
+        ],
+        "title": "ReviewCounts",
+        "type": "object"
+      },
+      "ReviewKeyMoment": {
+        "additionalProperties": false,
+        "properties": {
+          "delta": {
+            "title": "Delta",
+            "type": "number"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewMomentEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "minute": {
+            "title": "Minute",
+            "type": "integer"
+          },
+          "probabilityAfter": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Probabilityafter",
+            "type": "number"
+          }
+        },
+        "required": [
+          "minute",
+          "delta",
+          "probabilityAfter",
+          "events"
+        ],
+        "title": "ReviewKeyMoment",
+        "type": "object"
+      },
+      "ReviewLane": {
+        "additionalProperties": false,
+        "properties": {
+          "minutes": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewLaneMinute"
+            },
+            "title": "Minutes",
+            "type": "array"
+          },
+          "opponentId": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Opponentid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "opponentId",
+          "minutes"
+        ],
+        "title": "ReviewLane",
+        "type": "object"
+      },
+      "ReviewLaneMinute": {
+        "additionalProperties": false,
+        "properties": {
+          "minute": {
+            "title": "Minute",
+            "type": "integer"
+          },
+          "opponent": {
+            "$ref": "#/components/schemas/ReviewLaneStats"
+          },
+          "own": {
+            "$ref": "#/components/schemas/ReviewLaneStats"
+          }
+        },
+        "required": [
+          "minute",
+          "own",
+          "opponent"
+        ],
+        "title": "ReviewLaneMinute",
+        "type": "object"
+      },
+      "ReviewLaneStats": {
+        "additionalProperties": false,
+        "properties": {
+          "cs": {
+            "title": "Cs",
+            "type": "integer"
+          },
+          "gold": {
+            "title": "Gold",
+            "type": "integer"
+          },
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "xp": {
+            "title": "Xp",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "gold",
+          "xp",
+          "cs",
+          "level"
+        ],
+        "title": "ReviewLaneStats",
+        "type": "object"
+      },
+      "ReviewMomentEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "involvesParticipant": {
+            "title": "Involvesparticipant",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "team": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team"
+          }
+        },
+        "required": [
+          "kind",
+          "involvesParticipant"
+        ],
+        "title": "ReviewMomentEvent",
+        "type": "object"
+      },
+      "ReviewPurchase": {
+        "additionalProperties": false,
+        "properties": {
+          "decisionId": {
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "itemId": {
+            "title": "Itemid",
+            "type": "integer"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "enum": [
+                  "COMMON",
+                  "ALTERNATIVE",
+                  "UNCOMMON",
+                  "NO_REFERENCE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "ordinal": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Ordinal",
+            "type": "integer"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "referenceTop": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewReferenceItem"
+            },
+            "title": "Referencetop",
+            "type": "array"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          },
+          "status": {
+            "enum": [
+              "READY",
+              "NOT_READY"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "support": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support"
+          },
+          "timestampMs": {
+            "title": "Timestampms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "decisionId",
+          "timestampMs",
+          "ordinal",
+          "itemId",
+          "status"
+        ],
+        "title": "ReviewPurchase",
+        "type": "object"
+      },
+      "ReviewPurchaseCount": {
+        "additionalProperties": false,
+        "properties": {
+          "ready": {
+            "minimum": 0.0,
+            "title": "Ready",
+            "type": "integer"
+          },
+          "total": {
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ready",
+          "total"
+        ],
+        "title": "ReviewPurchaseCount",
+        "type": "object"
+      },
+      "ReviewReferenceItem": {
+        "additionalProperties": false,
+        "properties": {
+          "itemId": {
+            "title": "Itemid",
+            "type": "integer"
+          },
+          "share": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Share",
+            "type": "number"
+          }
+        },
+        "required": [
+          "itemId",
+          "share"
+        ],
+        "title": "ReviewReferenceItem",
+        "type": "object"
+      },
+      "ReviewSkillShare": {
+        "additionalProperties": false,
+        "properties": {
+          "priority": {
+            "title": "Priority",
+            "type": "string"
+          },
+          "share": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Share",
+            "type": "number"
+          }
+        },
+        "required": [
+          "priority",
+          "share"
+        ],
+        "title": "ReviewSkillShare",
+        "type": "object"
+      },
+      "ReviewSkills": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "enum": [
+              "MOST_COMMON",
+              "ALTERNATIVE",
+              "UNCOMMON",
+              "NO_REFERENCE"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "mostCommon": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewSkillShare"
+            },
+            "title": "Mostcommon",
+            "type": "array"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          },
+          "support": {
+            "title": "Support",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "priority",
+          "label",
+          "support"
+        ],
+        "title": "ReviewSkills",
+        "type": "object"
+      },
+      "ReviewWinPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "probability": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Probability",
+            "type": "number"
+          },
+          "timestampMs": {
+            "title": "Timestampms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "timestampMs",
+          "probability"
+        ],
+        "title": "ReviewWinPoint",
+        "type": "object"
+      },
+      "ReviewWinProbability": {
+        "additionalProperties": false,
+        "properties": {
+          "keyMoments": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewKeyMoment"
+            },
+            "title": "Keymoments",
+            "type": "array"
+          },
+          "modelVersion": {
+            "title": "Modelversion",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewWinPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "team": {
+            "title": "Team",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "modelVersion",
+          "team",
+          "points",
+          "keyMoments"
+        ],
+        "title": "ReviewWinProbability",
+        "type": "object"
       },
       "TimelineGoldFrame": {
         "additionalProperties": false,
@@ -5000,6 +5597,24 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "description": "all: importadas; account: conta local; demo: sintéticas; account_and_demo: conta local e sintéticas. Filtro anterior à paginação; conta não identificada nunca inclui partidas reais de terceiros.",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "description": "all: importadas; account: conta local; demo: sintéticas; account_and_demo: conta local e sintéticas. Filtro anterior à paginação; conta não identificada nunca inclui partidas reais de terceiros.",
+              "enum": [
+                "all",
+                "account",
+                "demo",
+                "account_and_demo"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5195,24 +5810,6 @@
               "title": "Limit",
               "type": "integer"
             }
-          },
-          {
-            "description": "all: importadas; account: conta local; demo: sintéticas; account_and_demo: conta local e sintéticas. Filtro anterior à paginação; conta não identificada nunca inclui partidas reais de terceiros.",
-            "in": "query",
-            "name": "scope",
-            "required": false,
-            "schema": {
-              "default": "all",
-              "description": "all: importadas; account: conta local; demo: sintéticas; account_and_demo: conta local e sintéticas. Filtro anterior à paginação; conta não identificada nunca inclui partidas reais de terceiros.",
-              "enum": [
-                "all",
-                "account",
-                "demo",
-                "account_and_demo"
-              ],
-              "title": "Scope",
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -5363,6 +5960,70 @@
           }
         },
         "summary": "Prévia do expurgo de uma partida (nada é alterado)",
+        "tags": [
+          "matches"
+        ]
+      }
+    },
+    "/api/v1/matches/{match_id}/review": {
+      "get": {
+        "description": "Compras do 1º ao 5º item principal rotuladas frente à referência do mesmo campeão, rota e etapa (comum, alternativa, incomum, sem referência), ordem de habilidades, fase de rotas contra o oponente direto e chance de vitória por minuto com momentos-chave. Popularidade não é qualidade e a chance é correlacional. Só leitura.",
+        "operationId": "match_review_api_v1_matches__match_id__review_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "title": "Match Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "participantId",
+            "required": true,
+            "schema": {
+              "maximum": 10,
+              "minimum": 1,
+              "title": "Participantid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchReview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Partida ou participante ausente."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revisão da partida de um participante (F1)",
         "tags": [
           "matches"
         ]

@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     # Mesmo racional: caminho absoluto copiado pelo Dockerfile.
     empirical_rules_path: str = "/app/configs/empirical-rules.yaml"
 
+    # F1 (CC-1003/CC-1004): referência da revisão e modelo de chance de vitória, ambos
+    # agregados e versionados em configs/match-review (ausentes ⇒ a revisão sai sem eles).
+    match_review_reference_path: str = "/app/configs/match-review/reference-16.19-solo-v1.json"
+    win_probability_model_path: str = "/app/configs/match-review/win-probability-16.19-v1.json"
+
     # CC-504: interpretador de objetivo. "rules" (padrão, sem modelo) ou "local_model"
     # (sidecar em loopback, ml/objectives serve). Timeout abre o formulário (RNF03).
     objective_parser: str = "rules"

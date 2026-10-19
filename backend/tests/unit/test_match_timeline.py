@@ -75,14 +75,30 @@ class _Frame:
     participant_frames: dict[int, dict[str, Any]] = field(default_factory=dict)
 
 
-def test_frames_keep_only_valid_total_gold_and_round_trip() -> None:
+def test_frames_keep_only_valid_values_and_round_trip() -> None:
     document = frames_document(
         [
             _Frame(0, {1: {"totalGold": 500}, 2: {"totalGold": True}, 6: {}}),
-            _Frame(60_000, {1: {"totalGold": 820}, 6: {"totalGold": 900}}),
+            _Frame(
+                60_000,
+                {
+                    1: {"totalGold": 820, "xp": 300, "minionsKilled": 7, "jungleMinionsKilled": 1},
+                    6: {"totalGold": 900, "xp": -1, "minionsKilled": 5, "level": 2},
+                },
+            ),
         ]
     )
-    assert document == [{"t": 0, "gold": {"1": 500}}, {"t": 60_000, "gold": {"1": 820, "6": 900}}]
+    # CC-1003: farm = tropas + selva (só com os dois válidos); valor inválido fica de fora.
+    assert document == [
+        {"t": 0, "gold": {"1": 500}, "xp": {}, "cs": {}, "level": {}},
+        {
+            "t": 60_000,
+            "gold": {"1": 820, "6": 900},
+            "xp": {"1": 300},
+            "cs": {"1": 8},
+            "level": {"6": 2},
+        },
+    ]
     frames = parse_gold_frames(document + [{"t": "x"}, "lixo"])
     assert [(f.timestamp_ms, dict(f.gold)) for f in frames] == [
         (0, {1: 500}),

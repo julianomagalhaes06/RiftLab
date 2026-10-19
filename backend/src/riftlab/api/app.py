@@ -19,6 +19,7 @@ from riftlab.config import Settings, get_settings
 from riftlab.dashboard.api import router as dashboard_router
 from riftlab.errors import register_exception_handlers
 from riftlab.history_sync.api import router as history_sync_router
+from riftlab.match_review.api import router as match_review_router
 from riftlab.observability import RequestIdMiddleware, configure_logging
 from riftlab.ranked.api import router as ranked_router
 from riftlab.shared.db import build_session_factory
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(imports_router)
     app.include_router(matches_router)
     app.include_router(decisions_router)
+    app.include_router(match_review_router)
     app.include_router(ranked_router)
     app.include_router(history_sync_router)
     app.include_router(dashboard_router)

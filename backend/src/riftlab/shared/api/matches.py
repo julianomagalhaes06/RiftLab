@@ -61,6 +61,11 @@ class MatchParticipant(CamelModel):
     )
 
 
+class ReviewPurchaseCount(CamelModel):
+    ready: int = Field(ge=0)
+    total: int = Field(ge=0)
+
+
 class MatchSummary(CamelModel):
     """Item de GET /matches: sem PUUID, Riot ID ou hash de jogador.
     `champions_present` abrange qualquer participante. `local_participant_id` só
@@ -88,6 +93,13 @@ class MatchSummary(CamelModel):
         ge=1,
         le=10,
         description="Participante da conta local configurada (DEMO: 1); null se desconhecido.",
+    )
+    review_purchases: ReviewPurchaseCount | None = Field(
+        default=None,
+        description=(
+            "Revisão da partida (F1): compras do 1º ao 5º item principal da conta local e quantas "
+            "estão prontas para comparar com a referência; null sem conta local ou sem decisões."
+        ),
     )
 
 

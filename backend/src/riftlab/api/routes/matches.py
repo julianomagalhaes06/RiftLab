@@ -50,6 +50,7 @@ from riftlab.shared.api.matches import (
     MatchSummary,
     MatchTimeline,
     ParticipantTimeline,
+    ReviewPurchaseCount,
     TimelineGoldFrame,
     TimelineItemEvent,
     TimelineKill,
@@ -117,6 +118,13 @@ async def list_imported_matches(
                 update={
                     "participants": [_to_participant(p, item.champions) for p in item.participants],
                     "local_participant_id": item.local_participant_id,
+                    "review_purchases": (
+                        ReviewPurchaseCount(
+                            ready=item.review_purchases[0], total=item.review_purchases[1]
+                        )
+                        if item.review_purchases is not None
+                        else None
+                    ),
                 }
             )
             for item in page.items

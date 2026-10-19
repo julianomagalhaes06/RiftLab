@@ -30,7 +30,7 @@ backend/src/riftlab/
   api/ (rotas)  shared/ (contratos Pydantic, erros, db)  config.py  errors.py  cli/ (cc)
   ingestion/ (importação, armazenamento bruto, expurgo)  preparation/  timeline/  decisions/
   catalog/  champions/  candidates/  ranking/  analyses/  learning/  objectives/  reviews/
-  ranked/  matches/  collection/  dataset/  ml/ (features, ranker, clusters, suporte, registro,
+  ranked/  matches/  match_review/ (revisão da partida, F1)  collection/  dataset/  ml/ (features, ranker, clusters, suporte, registro,
   revisão de especialistas)  reports/  worker/
 backend/{migrations,tests/{unit,contract,integration}}
 frontend/src/{app,features/{imports,matches,history,ranked,study,objectives,reports,review},shared}
