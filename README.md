@@ -12,7 +12,8 @@ O público prioritário são iniciantes e jogadores de elos mais baixos. O objet
 
 Documentação de engenharia: [estado técnico](docs/estado-projeto.md),
 [requisitos](docs/requirements.md), [arquitetura](docs/architecture.md),
-[contratos](docs/contracts.md) e [versionamento/portabilidade](docs/versionamento.md).
+[contratos](docs/contracts.md), [padrão visual](docs/design-system.md) e
+[versionamento/portabilidade](docs/versionamento.md).
 Documentação, modelos, fontes Colab e retornos experimentais auditados acompanham o Git;
 credenciais, dados identificáveis de jogadores e volumes do banco continuam locais.
 

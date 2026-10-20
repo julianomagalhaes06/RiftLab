@@ -1,0 +1,99 @@
+/* Primitivas do padrão Arena sóbrio (docs/design-system.md). Telas e componentes novos montam a
+   interface com estas classes antes de criar estilo próprio; cores só por var(--…). */
+
+/* Superfície: fundo n1, borda nline de 1 px e chanfro nos cantos superior esquerdo e inferior
+   direito. A borda é o fundo do elemento recortado; o preenchimento é o ::before recortado 1 px
+   para dentro (o chanfro interno desconta 0,586 px para a diagonal também ter 1 px). */
+.surface {
+  --surface-cut: var(--cut);
+  --surface-fill: var(--n1);
+  --surface-line: var(--nline);
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  background: var(--surface-line);
+  clip-path: polygon(var(--surface-cut) 0, 100% 0, 100% calc(100% - var(--surface-cut)), calc(100% - var(--surface-cut)) 100%, 0 100%, 0 var(--surface-cut));
+}
+.surface::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  background: var(--surface-fill);
+  clip-path: polygon(calc(var(--surface-cut) - .586px) 0, 100% 0, 100% calc(100% - var(--surface-cut) + .586px), calc(100% - var(--surface-cut) + .586px) 100%, 0 100%, 0 calc(var(--surface-cut) - .586px));
+}
+.surface--rank { --surface-cut: var(--cut-rank); }
+.surface--raised { --surface-fill: var(--n2); }
+.surface--pad { padding: 24px 28px; }
+
+/* Colchetes de mira nos quatro cantos (card de elo): 12 px, traço de 1,5 px, 10 px para dentro. */
+.brackets { --bracket-color: var(--nline2); }
+.brackets::after {
+  --b: var(--bracket-color);
+  content: "";
+  position: absolute;
+  inset: 10px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--b), var(--b)) left top / 12px 1.5px no-repeat,
+    linear-gradient(var(--b), var(--b)) left top / 1.5px 12px no-repeat,
+    linear-gradient(var(--b), var(--b)) right top / 12px 1.5px no-repeat,
+    linear-gradient(var(--b), var(--b)) right top / 1.5px 12px no-repeat,
+    linear-gradient(var(--b), var(--b)) left bottom / 12px 1.5px no-repeat,
+    linear-gradient(var(--b), var(--b)) left bottom / 1.5px 12px no-repeat,
+    linear-gradient(var(--b), var(--b)) right bottom / 12px 1.5px no-repeat,
+    linear-gradient(var(--b), var(--b)) right bottom / 1.5px 12px no-repeat;
+}
+
+/* Cabeçalho de página: linha de contexto, título curto (Chakra Petch) e uma frase. */
+.page-head { margin: 0 0 32px; max-width: 980px; }
+.page-head__context { margin: 0 0 10px; color: var(--ntext-subtle); font-size: .8125rem; font-weight: 500; }
+.page-head h2 { margin: 0 0 10px; font: 600 clamp(1.5rem, 2.4vw, 1.875rem)/1.2 var(--font-display); letter-spacing: 0; }
+.page-head__lead { margin: 0; color: var(--ntext-muted); font-size: .9375rem; line-height: 1.5; }
+
+/* Título de seção com link opcional à direita ("Todos os guias →"). */
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin: 0 0 14px; }
+.section-head h3, .section-head h4 { margin: 0; font: 600 1rem/1.3 var(--font-body); color: var(--ntext); }
+.app .arrow-link { display: inline-flex; align-items: center; min-height: 44px; gap: 6px; color: var(--accent); font-size: .875rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.app .arrow-link::after { content: "→" / ""; }
+.app .arrow-link:hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 4px; }
+
+/* Lista numa superfície: linhas com separador recuado 16 px. */
+.row-list { list-style: none; margin: 0; padding: 0; }
+.row-list > li { position: relative; }
+.row-list > li + li::after { content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--nline); }
+
+/* Barra de resultado: 3 px à esquerda da linha, 14 px afastada do topo e da base. */
+.result-bar { position: relative; }
+.result-bar::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; background: var(--result-color, var(--nline2)); }
+[data-result="win"] { --result-color: var(--win); }
+[data-result="loss"] { --result-color: var(--loss); }
+.result-text--win { color: var(--win); }
+.result-text--loss { color: var(--loss); }
+
+/* Seleção (campeão em foco, linha escolhida): véu roxo de 9% e barra roxa. */
+.is-selected { background: var(--accent-select); --result-color: var(--accent-strong); }
+
+/* Retrato chanfrado com anel de 1 px. */
+.portrait { display: inline-block; flex: none; overflow: hidden; background: var(--n2); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); box-shadow: inset 0 0 0 1px var(--portrait-outline); }
+.portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* Selo pequeno (BR1, origem, estado). */
+.chip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); color: var(--ntext-muted); font-size: .75rem; font-weight: 600; line-height: 1; white-space: nowrap; }
+.chip--accent { border-color: var(--accent-strong); color: var(--accent); background: var(--accent-surface); }
+.chip--win { border-color: var(--win); color: var(--win); background: var(--win-surface); }
+
+/* Métrica principal e secundária. */
+.metric__label { margin: 0; color: var(--ntext-muted); font-size: .875rem; font-weight: 500; }
+.metric__value { margin: 6px 0 4px; color: var(--ntext); font: 600 2.75rem/1.05 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.metric__foot { margin: 0; color: var(--ntext-subtle); font-size: .8125rem; line-height: 1.4; }
+.metric__bar { height: 4px; margin-top: 14px; max-width: 300px; border-radius: 2px; background: var(--nline); overflow: hidden; }
+.metric__bar > span { display: block; height: 100%; background: var(--win); border-radius: 2px; }
+.metric-secondary { margin: 0; color: var(--ntext-subtle); font-size: .875rem; font-weight: 500; }
+.metric-secondary strong { color: var(--ntext); font-weight: 600; }
+
+/* Botões em grupo (filtros): seleção em roxo com marca que não depende só da cor. */
+.segmented { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmented > button { min-height: 40px; padding: 0 12px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); background: var(--n1); color: var(--ntext-muted); font: 500 .875rem var(--font-body); cursor: pointer; }
+.segmented > button:hover { color: var(--ntext); border-color: var(--nline-strong); }
+.segmented > button[aria-pressed="true"] { border-color: var(--accent-strong); background: var(--accent-surface); color: var(--ntext); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent-strong); }

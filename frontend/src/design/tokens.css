@@ -29,33 +29,48 @@
 :root {
   color-scheme: dark;
 
-  /* Neutros: fundo, superfícies, linhas e texto. */
-  --n0: #0d0f13;
-  --n1: #171a20;
-  --n2: #20242b;
-  --nline: #3d424c;
-  --nline-soft: #242831;
-  --nline-strong: #656b76;
-  --ntext: #f4f5f7;
-  --ntext-muted: #b3bac6;
-  --on-color: #ffffff;
-  --portrait-outline: #ffffff22;
+  /* Padrão Arena sóbrio (docs/design-system.md): base neutra, roxo só para ação e seleção,
+     verde/vermelho só para resultado e a cor do elo só na classificação. Valores do protótipo
+     docs/aps/prototipo-competitivo/direcao-c-arena (gerar.py, paleta C, chaves n*, accent*). */
 
-  /* Destaque (roxo) e resultado. */
-  --accent: #b9a6ff;
-  --accent-strong: #8f6bff;
+  /* Neutros: fundo (n0), superfície (n1), superfície elevada (n2), linhas e texto. */
+  --n0: #0f1013;
+  --n1: #16181d;
+  --n2: #1c1f25;
+  --nline: #262a32;
+  --nline2: #343944;
+  --nline-soft: #1f2228;
+  /* Borda de controle (campo, seleção, botão secundário): ≥ 3:1 sobre n0/n1 (WCAG 1.4.11). */
+  --nline-strong: #656b76;
+  --ntext: #ecedef;
+  --ntext-muted: #b4b8c1;
+  --ntext-subtle: #8c919b;
+  --on-color: #ffffff;
+  --portrait-outline: #343944;
+
+  /* Roxo de ação e seleção: accent2 (texto, link, foco), accent (preenchimento), accentd (fundo). */
+  --accent: #b8a6ff;
+  --accent-strong: #8b6cff;
   --accent-hover: #cbbdff;
-  --accent-surface: #22213a;
-  --accent-ring: rgb(185 166 255 / .18);
-  --on-accent: #181322;
-  --mark-ink: #161020;
-  --win: #69dfb1;
-  --loss: #ff788b;
-  --win-tint: rgba(105, 223, 177, .12);
-  --loss-tint: rgba(255, 120, 139, .12);
-  --win-tint-soft: rgba(105, 223, 177, .10);
-  --loss-tint-soft: rgba(255, 120, 139, .10);
+  --accent-fill-hover: #9d84ff;
+  --accent-surface: #221c3d;
+  --accent-select: rgb(139 108 255 / .09);
+  --accent-ring: rgb(184 166 255 / .18);
+  --on-accent: #0e0f13;
+  --mark-ink: #0e0f13;
+
+  /* Resultado. */
+  --win: #3dd68c;
+  --loss: #f2667a;
+  --win-surface: #0f2e26;
+  --win-tint: rgba(61, 214, 140, .12);
+  --loss-tint: rgba(242, 102, 122, .12);
+  --win-tint-soft: rgba(61, 214, 140, .10);
+  --loss-tint-soft: rgba(242, 102, 122, .10);
   --shadow-soft: rgb(0 0 0 / .16);
+  --sheen: rgb(255 255 255 / .38);
+  --sheen-soft: rgb(255 255 255 / .14);
+  --shade: rgb(0 0 0 / .35);
 
   /* Estados semânticos. */
   --color-bg: var(--n0);
@@ -66,15 +81,15 @@
   --color-border: var(--nline);
   --color-focus: var(--accent);
   --color-available: var(--win);
-  --color-available-bg: #163329;
+  --color-available-bg: #12302a;
   --color-degraded: #f0ce8d;
-  --color-degraded-bg: #352b19;
+  --color-degraded-bg: #33291a;
   --color-unavailable: var(--loss);
-  --color-unavailable-bg: #3a1d28;
+  --color-unavailable-bg: #351c24;
   --color-loading: #c3cef3;
-  --color-loading-bg: #242d43;
+  --color-loading-bg: #20283a;
   --color-warning: #f0ce8d;
-  --color-warning-bg: #352b19;
+  --color-warning-bg: #33291a;
 
   /* Partida: times (validados contra a superfície escura), gráfico e habilidades. */
   --team-blue: #4d8ef0;
@@ -85,39 +100,38 @@
   --skill-e: #a06a2c;
   --skill-r: #9c4fb8;
 
-  /* Minha posição: barra de PDL e paleta por elo. */
-  --track-bg: #474b55;
-  --track-border: #777d88;
-  --tier-default-accent: #b9a6ff;
-  --tier-default-glow: #564185;
-  --tier-iron-accent: #c6c9d0;
-  --tier-iron-glow: #34383e;
-  --tier-bronze-accent: #ddaa83;
-  --tier-bronze-glow: #513323;
-  --tier-silver-accent: #d3dce8;
-  --tier-silver-glow: #39434d;
-  --tier-gold-accent: #f5cf85;
-  --tier-gold-glow: #54401f;
-  --tier-platinum-accent: #9ed8d8;
-  --tier-platinum-glow: #264546;
-  --tier-emerald-accent: #9fe2ba;
-  --tier-emerald-glow: #1d4b37;
-  --tier-diamond-accent: #afc9ff;
-  --tier-diamond-glow: #2f3e68;
-  --tier-master-accent: #d2b9fa;
-  --tier-master-glow: #45315b;
-  --tier-grandmaster-accent: #ffadae;
-  --tier-grandmaster-glow: #5b2b35;
-  --tier-challenger-accent: #f7dea6;
-  --tier-challenger-glow: #554022;
+  /* Card de elo: cinco tons por elo (base = metal, light = reflexo, dark/deep = sombra,
+     text = leitura sobre o card), como TIER_STYLE do protótipo. Placas próximas e trilho. */
+  --tier-next-top: #1c2136;
+  --tier-next-bottom: #121526;
+  --tier-next-line: #2f3654;
+  --tier-next-ink: #a7aec8;
+  --track-bg: #0a0c14;
+  --track-border: #2a3150;
+  --track-tick: #3a4160;
+  --tier-iron-base: #8a7f7b; --tier-iron-light: #cfc6c2; --tier-iron-dark: #3b3432; --tier-iron-deep: #221e1d; --tier-iron-text: #c9bfbb;
+  --tier-bronze-base: #b0704f; --tier-bronze-light: #edb08f; --tier-bronze-dark: #4f2c1d; --tier-bronze-deep: #2a1811; --tier-bronze-text: #e4a07e;
+  --tier-silver-base: #98a6b4; --tier-silver-light: #e6edf4; --tier-silver-dark: #3d4652; --tier-silver-deep: #20252d; --tier-silver-text: #c9d3dd;
+  --tier-gold-base: #d09a3e; --tier-gold-light: #f8dc95; --tier-gold-dark: #5c4015; --tier-gold-deep: #2e210c; --tier-gold-text: #f2b84b;
+  --tier-platinum-base: #3fa9a2; --tier-platinum-light: #a5e8df; --tier-platinum-dark: #17433f; --tier-platinum-deep: #0d2624; --tier-platinum-text: #6fd3c8;
+  --tier-emerald-base: #2fb36e; --tier-emerald-light: #94edb8; --tier-emerald-dark: #114229; --tier-emerald-deep: #0a2718; --tier-emerald-text: #5cd795;
+  --tier-diamond-base: #6283e6; --tier-diamond-light: #c4d3ff; --tier-diamond-dark: #1f2c61; --tier-diamond-deep: #121a3b; --tier-diamond-text: #a3b8ff;
+  --tier-master-base: #a85fda; --tier-master-light: #e6c2f9; --tier-master-dark: #3f1c58; --tier-master-deep: #241034; --tier-master-text: #d19bf2;
+  --tier-grandmaster-base: #d45454; --tier-grandmaster-light: #f7b0b0; --tier-grandmaster-dark: #521818; --tier-grandmaster-deep: #300e0e; --tier-grandmaster-text: #f28a8a;
+  --tier-challenger-base: #48abf2; --tier-challenger-light: #f3dc96; --tier-challenger-dark: #173b59; --tier-challenger-deep: #0d2235; --tier-challenger-text: #93cefa;
+  /* Sem elo (não classificado ou indisponível): neutro. */
+  --tier-none-base: #7c8190; --tier-none-light: #b4b8c1; --tier-none-dark: #2b2f38; --tier-none-deep: #1c1f25; --tier-none-text: #b4b8c1;
 
-  /* Espaço, raio e tipografia. */
+  /* Espaço, chanfro, raio e tipografia. */
   --space-1: 0.5rem;
   --space-2: 0.75rem;
   --space-3: 1rem;
   --space-4: 1.5rem;
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
+  --cut: 8px;
+  --cut-chip: 6px;
+  --cut-rank: 14px;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.25rem;
   --font-body: Inter, sans-serif;
   --font-display: 'Chakra Petch', Inter, sans-serif;
 }

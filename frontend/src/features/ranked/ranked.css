@@ -1,14 +1,14 @@
-.my-rank { --tier-accent: var(--tier-default-accent); --tier-glow: var(--tier-default-glow); position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 184px; gap: 18px; min-width: 0; overflow: hidden; padding: clamp(22px, 3vw, 38px); border: 1px solid var(--nline); border-left: 3px solid var(--tier-accent); background: radial-gradient(circle at 95% 15%, var(--tier-glow), transparent 42%), var(--n1); }
-.my-rank[data-tier="IRON"] { --tier-accent: var(--tier-iron-accent); --tier-glow: var(--tier-iron-glow); }
-.my-rank[data-tier="BRONZE"] { --tier-accent: var(--tier-bronze-accent); --tier-glow: var(--tier-bronze-glow); }
-.my-rank[data-tier="SILVER"] { --tier-accent: var(--tier-silver-accent); --tier-glow: var(--tier-silver-glow); }
-.my-rank[data-tier="GOLD"] { --tier-accent: var(--tier-gold-accent); --tier-glow: var(--tier-gold-glow); }
-.my-rank[data-tier="PLATINUM"] { --tier-accent: var(--tier-platinum-accent); --tier-glow: var(--tier-platinum-glow); }
-.my-rank[data-tier="EMERALD"] { --tier-accent: var(--tier-emerald-accent); --tier-glow: var(--tier-emerald-glow); }
-.my-rank[data-tier="DIAMOND"] { --tier-accent: var(--tier-diamond-accent); --tier-glow: var(--tier-diamond-glow); }
-.my-rank[data-tier="MASTER"] { --tier-accent: var(--tier-master-accent); --tier-glow: var(--tier-master-glow); }
-.my-rank[data-tier="GRANDMASTER"] { --tier-accent: var(--tier-grandmaster-accent); --tier-glow: var(--tier-grandmaster-glow); }
-.my-rank[data-tier="CHALLENGER"] { --tier-accent: var(--tier-challenger-accent); --tier-glow: var(--tier-challenger-glow); }
+.my-rank { --tier-accent: var(--tier-none-text); --tier-glow: var(--tier-none-dark); position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 184px; gap: 18px; min-width: 0; overflow: hidden; padding: clamp(22px, 3vw, 38px); border: 1px solid var(--nline); border-left: 3px solid var(--tier-accent); background: radial-gradient(circle at 95% 15%, var(--tier-glow), transparent 42%), var(--n1); }
+.my-rank[data-tier="IRON"] { --tier-accent: var(--tier-iron-text); --tier-glow: var(--tier-iron-dark); }
+.my-rank[data-tier="BRONZE"] { --tier-accent: var(--tier-bronze-text); --tier-glow: var(--tier-bronze-dark); }
+.my-rank[data-tier="SILVER"] { --tier-accent: var(--tier-silver-text); --tier-glow: var(--tier-silver-dark); }
+.my-rank[data-tier="GOLD"] { --tier-accent: var(--tier-gold-text); --tier-glow: var(--tier-gold-dark); }
+.my-rank[data-tier="PLATINUM"] { --tier-accent: var(--tier-platinum-text); --tier-glow: var(--tier-platinum-dark); }
+.my-rank[data-tier="EMERALD"] { --tier-accent: var(--tier-emerald-text); --tier-glow: var(--tier-emerald-dark); }
+.my-rank[data-tier="DIAMOND"] { --tier-accent: var(--tier-diamond-text); --tier-glow: var(--tier-diamond-dark); }
+.my-rank[data-tier="MASTER"] { --tier-accent: var(--tier-master-text); --tier-glow: var(--tier-master-dark); }
+.my-rank[data-tier="GRANDMASTER"] { --tier-accent: var(--tier-grandmaster-text); --tier-glow: var(--tier-grandmaster-dark); }
+.my-rank[data-tier="CHALLENGER"] { --tier-accent: var(--tier-challenger-text); --tier-glow: var(--tier-challenger-dark); }
 .my-rank__copy { position: relative; z-index: 1; min-width: 0; }
 .my-rank__eyebrow { color: var(--tier-accent); font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; }
 .my-rank__queue { display: grid; gap: 8px; max-width: 330px; margin-bottom: 24px; color: var(--ntext-muted); font-size: .85rem; }

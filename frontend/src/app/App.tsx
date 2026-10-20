@@ -1,4 +1,5 @@
 import "../design/tokens.css";
+import "../design/arena.css";
 import { useEffect, useRef, type ReactNode } from "react";
 import { DecisionDetailPage } from "../features/matches/DecisionDetailPage";
 import { HistoryPage } from "../features/history/HistoryPage";
