@@ -43,6 +43,8 @@ export type AnalysisReferenceSource = Schemas["AnalysisReferenceSource"];
 /** Fila do Painel (CC-904): sem valor, o servidor usa a da partida própria mais recente. */
 export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
+export type PlayerProfile = Schemas["PlayerProfile"];
+export type PlayerRank = Schemas["PlayerRank"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 export type ObjectiveForm = Schemas["ObjectiveForm"];
 export type ObjectiveInterpretation = Schemas["ObjectiveInterpretResult"];
@@ -58,6 +60,8 @@ export interface PageParams {
 
 export interface MatchListParams extends PageParams {
   scope?: NonNullable<paths["/api/v1/matches"]["get"]["parameters"]["query"]>["scope"];
+  /** Perfil buscado por Riot ID (CC-1101): só as partidas dele. */
+  player?: string | null;
 }
 
 interface RequestOptions {
@@ -72,6 +76,9 @@ export interface ApiClient {
   getRankedMe(signal?: AbortSignal, queue?: RankedQueue): Promise<RankedMe>;
   getHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   requestHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
+  lookupPlayer(gameName: string, tagLine: string, refresh?: boolean, signal?: AbortSignal): Promise<PlayerProfile>;
+  getPlayerSync(playerId: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
+  requestPlayerSync(playerId: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
   createImport(matchId: string, mode: ImportMode, signal?: AbortSignal): Promise<ImportJobAccepted>;
   getImport(jobId: string, signal?: AbortSignal): Promise<ImportJobStatus>;
   retryImport(jobId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
@@ -183,6 +190,10 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     // CC-901: o POST só agenda; a rede com a Riot roda no worker.
     getHistorySync: (signal) => request("GET", "/api/v1/history/sync", { signal }),
     requestHistorySync: (signal) => request("POST", "/api/v1/history/sync", { signal }),
+    lookupPlayer: (gameName, tagLine, refresh = false, signal) =>
+      request("POST", "/api/v1/players/lookup", { body: { gameName, tagLine, refresh }, signal }),
+    getPlayerSync: (playerId, signal) => request("GET", `/api/v1/players/${enc(playerId)}/sync`, { signal }),
+    requestPlayerSync: (playerId, signal) => request("POST", `/api/v1/players/${enc(playerId)}/sync`, { signal }),
     // Modo RIOT sem chave no servidor: 422 com code=RIOT_KEY_MISSING (tabela de mensagens).
     createImport: (matchId, mode, signal) =>
       request("POST", "/api/v1/imports", { body: { matchId, mode }, signal }),
@@ -190,7 +201,7 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     retryImport: (jobId, signal) =>
       request("POST", `/api/v1/imports/${enc(jobId)}/retry`, { signal }),
     listMatches: (params = {}, signal) =>
-      request("GET", `/api/v1/matches${queryString({ cursor: params.cursor, limit: params.limit, scope: params.scope })}`, {
+      request("GET", `/api/v1/matches${queryString({ cursor: params.cursor, limit: params.limit, scope: params.scope, player: params.player })}`, {
         signal,
       }),
     getMatch: (matchId, signal) => request("GET", `/api/v1/matches/${enc(matchId)}`, { signal }),

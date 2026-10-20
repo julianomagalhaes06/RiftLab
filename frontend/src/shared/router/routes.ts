@@ -8,6 +8,7 @@
  *   /imports/:jobId                      progresso de uma importação
  *   /matches/:matchId?participant=N      partida (preparação, participantes, decisões)
  *   /decisions/:decisionId               detalhe de uma decisão
+ *   /jogador/:nome-:tag                  perfil de um jogador pelo Riot ID (CC-1102)
  *   /prototipo                           protótipo ilustrativo do CC-102 (dados fictícios)
  */
 export type Route =
@@ -20,6 +21,7 @@ export type Route =
   | { name: "import"; jobId: string }
   | { name: "match"; matchId: string; participantId: number | null }
   | { name: "decision"; decisionId: string }
+  | { name: "player"; gameName: string; tagLine: string }
   | { name: "prototype" }
   | { name: "notFound"; path: string };
 
@@ -28,6 +30,17 @@ const REAL_MATCH_ID_PATTERN = /^BR1_[0-9]{1,20}$/;
 const DEMO_MATCH_ID_PATTERN = /^DEMO-[0-9]{4}$/;
 
 export const MAX_PARTICIPANT_ID = 10;
+
+/** "Nome#TAG" digitado → partes; TAG de 3 a 5 letras ou números (Riot ID). */
+export function parseRiotId(value: string): { gameName: string; tagLine: string } | null {
+  const text = value.trim();
+  const hash = text.lastIndexOf("#");
+  if (hash <= 0) return null;
+  const gameName = text.slice(0, hash).trim();
+  const tagLine = text.slice(hash + 1).trim();
+  if (!gameName || gameName.length > 16 || !/^[\p{L}\p{N}]{3,5}$/u.test(tagLine)) return null;
+  return { gameName, tagLine };
+}
 
 export function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value);
@@ -76,6 +89,12 @@ export function parseRoute(pathname: string, search = ""): Route {
     if (head === "historico" && isMatchId(id)) {
       return { name: "historyMatch", matchId: id, participantId: parseParticipant(search) };
     }
+    if (head === "jogador") {
+      // Nome-TAG, como em sites de estatísticas: a TAG não tem hífen, então vale o último.
+      const dash = id.lastIndexOf("-");
+      const riotId = dash > 0 ? parseRiotId(`${id.slice(0, dash)}#${id.slice(dash + 1)}`) : null;
+      if (riotId) return { name: "player", ...riotId };
+    }
     if (head === "decisions" && isUuid(id)) {
       return { name: "decision", decisionId: id.toLowerCase() };
     }
@@ -118,6 +137,8 @@ export function routeToPath(route: Route): string {
     }
     case "decision":
       return `/decisions/${route.decisionId}`;
+    case "player":
+      return `/jogador/${encodeURIComponent(route.gameName)}-${encodeURIComponent(route.tagLine)}`;
     case "prototype":
       return "/prototipo";
     case "notFound":

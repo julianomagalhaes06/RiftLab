@@ -30,15 +30,15 @@ describe("Histórico com dados realmente disponíveis", () => {
     expect(api.callsTo("GET", /^\/api\/v1\/matches$/)[0].search.get("scope")).toBe("account");
     expect(screen.getByText("1 RIOT · 1 DEMO")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Contexto da partida BR1_123" })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "kai" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar campeão ou partida" }), { target: { value: "kai" } });
     expect(screen.getByRole("link", { name: "Contexto da partida BR1_123" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Contexto da partida DEMO-0008" })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "br1_12" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar campeão ou partida" }), { target: { value: "br1_12" } });
     expect(screen.getByRole("link", { name: "Contexto da partida BR1_123" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "DEMO" }));
     expect(await screen.findByText("Nenhuma partida neste filtro")).toBeInTheDocument();
     expect(api.callsTo("GET", /^\/api\/v1\/matches$/).at(-1)?.search.get("scope")).toBe("demo");
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar campeão ou partida" }), { target: { value: "" } });
     expect(screen.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Minha conta e DEMO" }));
     fireEvent.click(await screen.findByRole("button", { name: "Carregar mais partidas" }));

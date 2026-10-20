@@ -157,6 +157,25 @@ export function decisionState(overrides: Record<string, unknown> = {}) {
 }
 
 /** Estado da sincronização do histórico (CC-901). */
+export const PLAYER_ID = "7a5c3f1e-0000-4000-8000-000000000001";
+
+/** Perfil buscado por Riot ID (CC-1101): ícone, nível e elo sintéticos. */
+export function playerProfile(overrides: Record<string, unknown> = {}) {
+  return {
+    id: PLAYER_ID,
+    gameName: "Jogador Teste",
+    tagLine: "BR1",
+    profileIconId: 4567,
+    summonerLevel: 321,
+    refreshedAt: "2026-10-19T15:00:00Z",
+    dataDragonVersion: "16.20.1",
+    solo: { queue: "RANKED_SOLO_5x5", state: "READY", tier: "GOLD", division: "II", leaguePoints: 41, wins: 10, losses: 8, observedAt: "2026-10-19T15:00:00Z" },
+    flex: { queue: "RANKED_FLEX_SR", state: "UNRANKED", observedAt: "2026-10-19T15:00:00Z" },
+    staleReason: null,
+    ...overrides,
+  };
+}
+
 export function historySync(overrides: Record<string, unknown> = {}) {
   return {
     state: "IDLE",
@@ -211,6 +230,9 @@ export type RouteKey =
   | "GET /api/v1/ranked/me"
   | "POST /api/v1/history/sync"
   | "GET /api/v1/history/sync"
+  | "POST /api/v1/players/lookup"
+  | "POST /api/v1/players/:id/sync"
+  | "GET /api/v1/players/:id/sync"
   | "GET /api/v1/matches/:id/purge-preview"
   | "DELETE /api/v1/matches/:id"
   | "POST /api/v1/objectives/interpret"
@@ -242,6 +264,9 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
   ["POST /api/v1/history/sync", "POST", /^\/api\/v1\/history\/sync$/],
   ["GET /api/v1/history/sync", "GET", /^\/api\/v1\/history\/sync$/],
+  ["POST /api/v1/players/lookup", "POST", /^\/api\/v1\/players\/lookup$/],
+  ["POST /api/v1/players/:id/sync", "POST", /^\/api\/v1\/players\/[^/]+\/sync$/],
+  ["GET /api/v1/players/:id/sync", "GET", /^\/api\/v1\/players\/[^/]+\/sync$/],
   ["POST /api/v1/objectives/interpret", "POST", /^\/api\/v1\/objectives\/interpret$/],
   ["GET /api/v1/learning-attempts/progress", "GET", /^\/api\/v1\/learning-attempts\/progress$/],
   ["POST /api/v1/learning-attempts", "POST", /^\/api\/v1\/learning-attempts$/],
@@ -420,6 +445,9 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   // CC-901: sem chave da Riot (como na demonstração), a aba Histórico não sincroniza.
   "POST /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
   "GET /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
+  "POST /api/v1/players/lookup": () => ok(playerProfile()),
+  "POST /api/v1/players/:id/sync": () => ok(historySync({ state: "SUCCEEDED", finishedAt: "2026-10-19T15:00:00Z" })),
+  "GET /api/v1/players/:id/sync": () => ok(historySync({ state: "SUCCEEDED", finishedAt: "2026-10-19T15:00:00Z" })),
   "GET /api/v1/matches/:id/purge-preview": () =>
     ok({
       matchId: "DEMO-0008",

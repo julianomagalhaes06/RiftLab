@@ -86,7 +86,7 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
   );
 }
 
-function DayGroups({ matches }: { matches: MatchSummary[] }) {
+export function DayGroups({ matches }: { matches: MatchSummary[] }) {
   const now = new Date();
   const groups: { key: string; label: string; items: MatchSummary[] }[] = [];
   for (const match of matches) {

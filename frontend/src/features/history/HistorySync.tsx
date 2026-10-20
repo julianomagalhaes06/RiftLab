@@ -13,7 +13,19 @@ const ACTIVE_POLL_MS = 2000;
 const REFRESH_EVERY_MS = 5000;
 const REFRESH_TIMES = 12;
 
-export function HistorySync({ onNewMatches }: { onNewMatches: () => void }) {
+interface SyncCalls {
+  /** `manual`: pedido pelo botão Atualizar (não pela abertura da tela). */
+  request: (signal?: AbortSignal, manual?: boolean) => Promise<HistorySyncStatus>;
+  status: (signal?: AbortSignal) => Promise<HistorySyncStatus>;
+}
+
+const OWN_ACCOUNT: SyncCalls = {
+  request: (signal) => api.requestHistorySync(signal),
+  status: (signal) => api.getHistorySync(signal),
+};
+
+/** `calls` troca a conta configurada por outro alvo, como o perfil buscado (CC-1102). */
+export function HistorySync({ onNewMatches, calls = OWN_ACCOUNT }: { onNewMatches: () => void; calls?: SyncCalls }) {
   const [status, setStatus] = useState<HistorySyncStatus | null>(null);
   const [failedRequest, setFailedRequest] = useState(false);
   const [requesting, setRequesting] = useState(true);
@@ -24,9 +36,9 @@ export function HistorySync({ onNewMatches }: { onNewMatches: () => void }) {
     onNew.current = onNewMatches;
   });
 
-  const send = useCallback((signal?: AbortSignal) => {
-    api
-      .requestHistorySync(signal)
+  const send = useCallback((signal?: AbortSignal, manual = false) => {
+    calls
+      .request(signal, manual)
       .then((next) => {
         refreshes.current = 0;
         setNow(Date.now());
@@ -36,12 +48,12 @@ export function HistorySync({ onNewMatches }: { onNewMatches: () => void }) {
         if (!(error instanceof DOMException && error.name === "AbortError")) setFailedRequest(true);
       })
       .finally(() => setRequesting(false));
-  }, []);
+  }, [calls]);
 
   const ask = () => {
     setRequesting(true);
     setFailedRequest(false);
-    send();
+    send(undefined, true);
   };
 
   // Uma vez por visita à aba.
@@ -56,8 +68,8 @@ export function HistorySync({ onNewMatches }: { onNewMatches: () => void }) {
     if (!active(status)) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      api
-        .getHistorySync(controller.signal)
+      calls
+        .status(controller.signal)
         .then((next) => {
           setNow(Date.now());
           setStatus(next);
@@ -68,7 +80,7 @@ export function HistorySync({ onNewMatches }: { onNewMatches: () => void }) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [status]);
+  }, [status, calls]);
 
   // Partidas novas enfileiradas: recarrega a lista enquanto as importações terminam.
   useEffect(() => {

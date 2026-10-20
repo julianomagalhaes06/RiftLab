@@ -77,9 +77,12 @@ test("formulário por teclado: erro de validação anunciado e ligado ao campo",
   await page.goto("/importar");
   await expect(page.getByRole("heading", { name: "Analisar uma partida" })).toBeVisible();
 
-  await tabTo(page, /^$/); // o primeiro foco depois do skip link/logo é o campo (label vazio de input)
-  const isInput = await page.evaluate(() => document.activeElement?.tagName === "INPUT");
-  expect(isInput).toBe(true);
+  // Tab até o campo do ID (a busca de jogador no topo também é um campo, CC-1102).
+  const field = page.getByLabel(/ID da partida/);
+  for (let step = 0; step < 40 && !(await field.evaluate((el) => el === document.activeElement)); step += 1) {
+    await page.keyboard.press("Tab");
+  }
+  expect(await field.evaluate((el) => el === document.activeElement)).toBe(true);
   await expectFocusVisible(page);
   await page.keyboard.type("DEMO-0001");
   await page.keyboard.press("Enter"); // Enter no campo envia o formulário

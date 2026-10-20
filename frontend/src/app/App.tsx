@@ -15,6 +15,8 @@ import type { Route } from "../shared/router/routes";
 import { PanelPage, PositionPage } from "./AreaPages";
 import { ChampionsPage } from "../features/champions/ChampionsPage";
 import { MainNav } from "./MainNav";
+import { PlayerPage } from "../features/players/PlayerPage";
+import { PlayerSearch } from "../features/players/PlayerSearch";
 import "./App.css";
 import "../design/concept-c.css";
 
@@ -28,6 +30,7 @@ const TITLES: Record<Route["name"], string> = {
   import: "Importação — RiftLab",
   match: "Partida — RiftLab",
   decision: "Decisão — RiftLab",
+  player: "Jogador — RiftLab",
   prototype: "Protótipo (dados ilustrativos) — RiftLab",
   notFound: "Página não encontrada — RiftLab",
 };
@@ -52,6 +55,8 @@ function renderPage(route: Route): ReactNode {
       return <MatchPage key={route.matchId} matchId={route.matchId} participantId={route.participantId} />;
     case "decision":
       return <DecisionDetailPage key={route.decisionId} decisionId={route.decisionId} />;
+    case "player":
+      return <PlayerPage key={`${route.gameName}#${route.tagLine}`} gameName={route.gameName} tagLine={route.tagLine} />;
     case "notFound":
       return (
         <section className="section" aria-labelledby="not-found-heading">
@@ -103,6 +108,7 @@ function AppShell() {
               </Link>
             </h1>
             <MainNav route={route} />
+            <PlayerSearch />
             <Link to="/importar" className="app__import-link">Importar partida</Link>
           </div>
           <DemoNotice />

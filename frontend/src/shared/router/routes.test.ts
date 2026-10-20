@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDemoMatchId, isMatchId, isRealMatchId, parseRoute, routeToPath } from "./routes";
+import { isDemoMatchId, isMatchId, isRealMatchId, parseRiotId, parseRoute, routeToPath } from "./routes";
 
 const UUID = "688bd44d-39b7-4f7b-956b-0fd4a63cfafd";
 
@@ -93,5 +93,23 @@ describe("validadores de ID de partida", () => {
     expect(isDemoMatchId("DEMO-0008")).toBe(true);
     expect(isMatchId("DEMO-0008") && isMatchId("BR1_7")).toBe(true);
     expect(isMatchId("http://evil")).toBe(false);
+  });
+});
+
+describe("perfil de jogador por Riot ID (CC-1102)", () => {
+  it("lê Nome#TAG digitado, com espaço e acento no nome", () => {
+    expect(parseRiotId("  Pão de Queijo #BR1 ")).toEqual({ gameName: "Pão de Queijo", tagLine: "BR1" });
+    expect(parseRiotId("a#b#9999")).toEqual({ gameName: "a#b", tagLine: "9999" });
+    for (const invalid of ["SemTag", "#BR1", "Nome#B", "Nome#BR-1", "Nome#123456", `${"x".repeat(17)}#BR1`]) {
+      expect(parseRiotId(invalid)).toBeNull();
+    }
+  });
+
+  it("/jogador/Nome-TAG ida e volta, com o último hífen separando a TAG", () => {
+    const route = { name: "player" as const, gameName: "Meu-Nome Legal", tagLine: "BR1" };
+    const path = routeToPath(route);
+    expect(path).toBe("/jogador/Meu-Nome%20Legal-BR1");
+    expect(parseRoute(path)).toEqual(route);
+    expect(parseRoute("/jogador/SemTag").name).toBe("notFound");
   });
 });

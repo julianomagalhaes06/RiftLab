@@ -144,6 +144,15 @@ A navegação principal oferece Painel, Campeões, Minha posição e Histórico 
 
 **Revisão de design (CC-902/903).** O Painel é a entrada (`/`; `/painel` continua valendo) e a importação manual e a demonstração ficam em **Importar partida** (`/importar`); a lista de partidas importadas ficou só no Histórico. Cores, espaços, raios e fontes saem de um único arquivo de tokens (`frontend/src/design/tokens.css`), e um teste falha se outra folha declarar cor literal; a refatoração foi conferida pixel a pixel nas telas principais antes das mudanças visíveis. A faixa sobre partidas DEMO só aparece quando a tela mostra dados de demonstração. Títulos de decisão usam o campeão e a função ("Suas decisões — Graves (Selva)"), contagens concordam com o substantivo e todo botão visível tem contraste medido por E2E. O Painel escolhe sozinho a fila da partida mais recente (Solo/Duo ou Flex, com seletor), os avisos técnicos da decisão viram uma linha curta com a explicação recolhida, a composição dos times fica 5 × 5 com as ações logo abaixo e o cartão do Histórico mostra os itens finais (CC-904). No celular, o Painel abre pela posição ranqueada, com linhas compactas e o estudo recolhido, e a grade de habilidades rola dentro do próprio bloco (CC-905).
 
+**Perfil de jogador (CC-1101/CC-1102).** Como em sites de estatísticas, a busca "Nome#TAG" no topo abre o perfil de qualquer jogador do servidor BR em `/jogador/Nome-TAG`. A página mostra:
+
+- o ícone de invocador, do Data Dragon;
+- o nível;
+- o elo em Solo/Duo e Flex;
+- as partidas ranqueadas recentes do jogador, importadas sob demanda pelo mesmo caminho da atualização do Histórico.
+
+O botão **Atualizar** consulta a Riot de novo; perfis consultados há menos de 10 minutos vêm do banco. É identificação, não login: qualquer Riot ID pode ser consultado, e o PUUID nunca é gravado, só HMACs. Contrato em `docs/contracts.md` (CC-1101/CC-1102).
+
 **Revisão da partida (F1, CC-1003–CC-1005).** A partida tem uma seção **Revisão da partida** para o participante selecionado. Ela cobre:
 
 - **Compras:** cada compra do 1º ao 5º item principal aparece como comum, alternativa, incomum ou sem referência, frente a jogadores do mesmo campeão, rota e etapa, com a porcentagem e as escolhas mais comuns.
