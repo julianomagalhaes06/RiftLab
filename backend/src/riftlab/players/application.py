@@ -1,8 +1,10 @@
 """Perfil de jogador por Riot ID (CC-1101), como em sites de estatísticas: qualquer Riot ID pode
 ser consultado. Account-V1 dá o PUUID e o Riot ID canônico; Summoner-V4 (BR1), o ícone e o nível;
-League-V4 (BR1), o elo. O perfil fica guardado com o HMAC do Riot ID e o HMAC do PUUID; o PUUID
-nunca é gravado nem sai daqui. Consulta à Riot só quando o perfil não existe, está velho ou o
-usuário pede para atualizar.
+League-V4 (BR1), o elo. O perfil fica guardado só com o HMAC do Riot ID e o HMAC do PUUID: nem o
+Riot ID nem o PUUID são gravados (CC-1103). O Riot ID chega em cada pedido e volta na resposta.
+Consulta à Riot só quando o perfil não existe, está velho ou o usuário pede para atualizar.
+Perfis de terceiros saem do banco pela retenção (`player_profile_retention_days`) ou por
+`purge_player`.
 """
 
 from __future__ import annotations
@@ -12,11 +14,12 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riftlab.catalog.models import CatalogVersionModel
 from riftlab.config import Settings
+from riftlab.history_sync.models import HistorySyncRunModel as Run
 from riftlab.ingestion.infrastructure.riot_account import (
     ALLOWED_PLATFORM,
     ALLOWED_REGIONAL_ROUTING,
@@ -105,8 +108,12 @@ def _position(event: Observation | None) -> dict[str, Any] | None:
 
 
 async def _view(
-    session: AsyncSession, profile: Profile, stale_reason: str | None
+    session: AsyncSession,
+    profile: Profile,
+    riot_id: tuple[str, str],
+    stale_reason: str | None,
 ) -> dict[str, Any]:
+    """`riot_id`: o canônico da Riot quando acabou de ser consultado; senão o pedido."""
     ranked: dict[str, Any] = {}
     for queue in (SOLO_QUEUE, FLEX_QUEUE):
         latest = await session.scalar(
@@ -122,8 +129,8 @@ async def _view(
         ranked[queue] = _position(latest)
     return {
         "id": profile.id,
-        "gameName": profile.game_name,
-        "tagLine": profile.tag_line,
+        "gameName": riot_id[0],
+        "tagLine": riot_id[1],
         "profileIconId": profile.profile_icon_id,
         "summonerLevel": profile.summoner_level,
         "refreshedAt": profile.refreshed_at,
@@ -142,14 +149,6 @@ def _transport(settings: Settings) -> RiotHttpTransport:
         RiotFetchBudget(max_matches=0, max_requests=3, max_total_seconds=20.0, stop_on_429=True),
         rate_limiter=_LIMITER,
     )
-
-
-async def get_player(factory: SessionFactory, player_id: uuid.UUID) -> dict[str, Any]:
-    async with read_only_unit_of_work(factory) as session:
-        profile = await session.get(Profile, player_id)
-        if profile is None:
-            raise NotFoundError("jogador não encontrado")
-        return await _view(session, profile, None)
 
 
 async def lookup_player(
@@ -171,9 +170,9 @@ async def lookup_player(
     async with read_only_unit_of_work(factory) as session:
         stored = await session.scalar(select(Profile).where(Profile.account_key == key))
         if stored is not None and not settings.riot_api_key:
-            return await _view(session, stored, "RIOT_KEY_MISSING")
+            return await _view(session, stored, (name, tag), "RIOT_KEY_MISSING")
         if stored is not None and not refresh and now - stored.refreshed_at < CACHE_FOR:
-            return await _view(session, stored, None)
+            return await _view(session, stored, (name, tag), None)
     if not settings.riot_api_key:
         raise PlayerLookupError("RIOT_KEY_MISSING")
 
@@ -209,7 +208,6 @@ async def lookup_player(
         if profile is None:
             profile = Profile(account_key=key)
             session.add(profile)
-        profile.game_name, profile.tag_line = canonical_name, canonical_tag
         profile.subject_hash = subject
         profile.profile_icon_id, profile.summoner_level = icon, level
         profile.refreshed_at = now
@@ -232,18 +230,31 @@ async def lookup_player(
                 )
             )
         await session.flush()
-        return await _view(session, profile, None)
+        return await _view(session, profile, (canonical_name, canonical_tag), None)
 
 
-async def profile_account(factory: SessionFactory, player_id: uuid.UUID) -> RiotAccountConfig:
-    """Riot ID guardado do perfil, no formato da conta configurada (sincronização)."""
+async def profile_key(factory: SessionFactory, player_id: uuid.UUID) -> str:
+    """Chave HMAC do Riot ID do perfil (estado da sincronização, sem o Riot ID)."""
     async with read_only_unit_of_work(factory) as session:
         profile = await session.get(Profile, player_id)
         if profile is None:
             raise NotFoundError("jogador não encontrado")
-        return RiotAccountConfig(
-            profile.game_name, profile.tag_line, ALLOWED_PLATFORM, ALLOWED_REGIONAL_ROUTING
-        )
+        return profile.account_key
+
+
+async def profile_account(
+    factory: SessionFactory,
+    settings: Settings,
+    player_id: uuid.UUID,
+    game_name: str,
+    tag_line: str,
+) -> RiotAccountConfig:
+    """Riot ID do pedido, no formato da conta configurada, se for mesmo o do perfil. O banco não
+    guarda o Riot ID (CC-1103): ele só é conferido contra a chave HMAC do perfil."""
+    name, tag = normalize_riot_id(game_name, tag_line)
+    if await profile_key(factory, player_id) != _key(settings, name, tag):
+        raise NotFoundError("jogador não encontrado")
+    return RiotAccountConfig(name, tag, ALLOWED_PLATFORM, ALLOWED_REGIONAL_ROUTING)
 
 
 async def profile_subject(factory: SessionFactory, player_id: uuid.UUID) -> str:
@@ -252,3 +263,36 @@ async def profile_subject(factory: SessionFactory, player_id: uuid.UUID) -> str:
         if profile is None:
             raise NotFoundError("jogador não encontrado")
         return profile.subject_hash
+
+
+async def purge_player(
+    factory: SessionFactory,
+    settings: Settings,
+    game_name: str,
+    tag_line: str,
+    *,
+    execute: bool = False,
+) -> dict[str, Any]:
+    """Apaga, para um Riot ID, o perfil, as observações de elo e as execuções de sincronização
+    terminadas (uma execução ativa fica: o worker a encerra e apaga o Riot ID dela). Sem
+    `execute`, só conta. Nunca devolve identificadores. As partidas importadas seguem a
+    retenção e o expurgo por partida."""
+    name, tag = normalize_riot_id(game_name, tag_line)
+    key = _key(settings, name, tag)
+    finished = Run.state.not_in(("QUEUED", "RUNNING"))
+
+    async def count(session: AsyncSession, model: Any, *where: Any) -> int:
+        return int(await session.scalar(select(func.count()).select_from(model).where(*where)) or 0)
+
+    async with unit_of_work(factory) as session:
+        plan = {
+            "dryRun": not execute,
+            "playerProfiles": await count(session, Profile, Profile.account_key == key),
+            "rankObservations": await count(session, Observation, Observation.account_key == key),
+            "syncRuns": await count(session, Run, Run.account_key == key, finished),
+        }
+        if execute:
+            await session.execute(delete(Observation).where(Observation.account_key == key))
+            await session.execute(delete(Run).where(Run.account_key == key, finished))
+            await session.execute(delete(Profile).where(Profile.account_key == key))
+    return plan

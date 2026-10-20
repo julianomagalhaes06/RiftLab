@@ -33,7 +33,6 @@ from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, Rio
 from riftlab.ingestion.models import MatchModel
 from riftlab.ingestion.purge import is_purged
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
-from riftlab.players.models import PlayerProfileModel
 from riftlab.ranked.domain import account_key
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import SourceError, SourceRateLimitedError
@@ -59,25 +58,27 @@ def _account_key(settings: Settings, account: RiotAccountConfig | None = None) -
     return account_key(account, settings.subject_hash_secret)
 
 
-async def _account_for(
-    factory: SessionFactory, settings: Settings, key: str
+def configured_account_key(settings: Settings) -> str | None:
+    """Chave da conta configurada (retenção: a conta própria não expira, CC-1103)."""
+    return _account_key(settings)
+
+
+def _account_for(
+    settings: Settings, key: str, riot_id: tuple[str | None, str | None]
 ) -> RiotAccountConfig | None:
-    """Conta de uma execução: a configurada, se for a mesma chave; senão o perfil guardado."""
+    """Conta de uma execução: a configurada, se for a mesma chave; senão o Riot ID que veio no
+    pedido do jogador buscado (CC-1103), conferido contra a chave."""
     try:
         configured = load_riot_account(Path(settings.ranked_account_file))
     except (RiotAccountConfigError, OSError):
         configured = None
     if configured is not None and account_key(configured, settings.subject_hash_secret) == key:
         return configured
-    async with factory() as session:
-        profile = await session.scalar(
-            select(PlayerProfileModel).where(PlayerProfileModel.account_key == key)
-        )
-    if profile is None:
+    name, tag = riot_id
+    if name is None or tag is None:
         return None
-    return RiotAccountConfig(
-        profile.game_name, profile.tag_line, ALLOWED_PLATFORM, ALLOWED_REGIONAL_ROUTING
-    )
+    requested = RiotAccountConfig(name, tag, ALLOWED_PLATFORM, ALLOWED_REGIONAL_ROUTING)
+    return requested if account_key(requested, settings.subject_hash_secret) == key else None
 
 
 def next_allowed_at(run: Run, settings: Settings) -> datetime | None:
@@ -126,11 +127,12 @@ async def _latest(session: AsyncSession, key: str) -> Run | None:
 
 
 async def sync_status(
-    factory: SessionFactory, settings: Settings, *, account: RiotAccountConfig | None = None
+    factory: SessionFactory, settings: Settings, *, key: str | None = None
 ) -> dict[str, Any]:
+    """`key`: chave do perfil buscado (CC-1101); sem ela, a da conta configurada."""
     if not settings.riot_api_key:
         return _unavailable("RIOT_KEY_MISSING")
-    key = _account_key(settings, account)
+    key = key or _account_key(settings)
     if key is None:
         return _unavailable("ACCOUNT_NOT_CONFIGURED")
     async with factory() as session:
@@ -145,7 +147,8 @@ async def request_sync(
     account: RiotAccountConfig | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """Devolve (estado, criou?). Sem chave ou sem conta não cria nada. `account` é o perfil
-    buscado (CC-1101); sem ela, a conta configurada."""
+    buscado (CC-1101); sem ela, a conta configurada. O Riot ID do perfil buscado fica na execução
+    só até ela terminar (CC-1103)."""
     if not settings.riot_api_key:
         return _unavailable("RIOT_KEY_MISSING"), False
     key = _account_key(settings, account)
@@ -159,12 +162,19 @@ async def request_sync(
                 if (latest.started_at or latest.requested_at) > now - STALE_AFTER:
                     return _status(latest, settings), False
                 latest.state, latest.error_code, latest.finished_at = "FAILED", "SYNC_STALE", now
+                latest.game_name = latest.tag_line = None
                 await session.flush()
             elif latest is not None:
                 allowed = next_allowed_at(latest, settings)
                 if allowed is not None and allowed > now:
                     return _status(latest, settings, "COOLDOWN"), False
-            run = Run(account_key=key, state="QUEUED", requested_at=now)
+            run = Run(
+                account_key=key,
+                state="QUEUED",
+                requested_at=now,
+                game_name=account.game_name if account else None,
+                tag_line=account.tag_line if account else None,
+            )
             session.add(run)
             await session.flush()
             created = _status(run, settings)
@@ -192,6 +202,7 @@ async def _finish(factory: SessionFactory, run_id: Any, **fields: Any) -> None:
         for name, value in fields.items():
             setattr(run, name, value)
         run.finished_at = datetime.now(UTC)
+        run.game_name = run.tag_line = None  # o Riot ID não fica depois da execução (CC-1103)
 
 
 async def process_next_history_sync(
@@ -216,7 +227,7 @@ async def process_next_history_sync(
         if run is None:
             return False
         run.state, run.started_at = "RUNNING", now
-        run_id, key = run.id, run.account_key
+        run_id, key, riot_id = run.id, run.account_key, (run.game_name, run.tag_line)
         previous = (
             await session.scalars(
                 select(Run.started_at)
@@ -231,7 +242,7 @@ async def process_next_history_sync(
         else now - timedelta(days=settings.history_sync_lookback_days)
     )
     try:
-        account = await _account_for(factory, settings, key)
+        account = _account_for(settings, key, riot_id)
         if account is None or not settings.riot_api_key:
             await _finish(factory, run_id, state="FAILED", error_code="ACCOUNT_CHANGED")
             return True

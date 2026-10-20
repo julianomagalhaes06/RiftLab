@@ -80,6 +80,10 @@ describe("perfil de jogador por Riot ID", () => {
       expect(api.callsTo("POST", /\/players\/lookup$/).some((call) => (call.body as { refresh: boolean }).refresh)).toBe(true);
       expect(api.callsTo("POST", /\/players\/.+\/sync$/).length).toBeGreaterThanOrEqual(2);
     });
+    // O banco guarda só o HMAC do Riot ID: cada pedido de sincronização traz o Riot ID.
+    for (const call of api.callsTo("POST", /\/players\/.+\/sync$/)) {
+      expect(call.body).toEqual({ gameName: "Pão de Queijo", tagLine: "BR1" });
+    }
   });
 
   it.each([

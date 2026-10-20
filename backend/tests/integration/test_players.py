@@ -8,17 +8,25 @@ from pathlib import Path
 
 import httpx
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, inspect, select, text
+from sqlalchemy.exc import IntegrityError
 
 from riftlab.config import Settings
-from riftlab.history_sync.application import process_next_history_sync, request_sync
+from riftlab.history_sync.application import (
+    configured_account_key,
+    process_next_history_sync,
+    request_sync,
+)
 from riftlab.history_sync.models import HistorySyncRunModel as Run
+from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
 from riftlab.ingestion.models import ImportJobModel, MatchModel, ParticipantModel
+from riftlab.ingestion.purge import retention
 from riftlab.players import application
-from riftlab.players.application import lookup_player, profile_account
+from riftlab.players.application import lookup_player, profile_account, purge_player
 from riftlab.players.models import PlayerProfileModel as Profile
+from riftlab.ranked.domain import account_key
 from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import PlayerLookupError
@@ -121,9 +129,11 @@ async def test_lookup_saves_profile_rank_and_never_the_puuid(session_factory, tm
         profile = await session.scalar(select(Profile))
         assert profile is not None
         assert profile.subject_hash == compute_real_subject_hash(PUUID, SECRET)
-        assert PUUID not in json.dumps(
+        stored = json.dumps(
             {c.name: str(getattr(profile, c.name)) for c in Profile.__table__.columns}
         )
+        # Nem o PUUID nem o Riot ID ficam no banco (CC-1103).
+        assert PUUID not in stored and "Synthetic" not in stored and "XYZ" not in stored
 
     # Recente: sem rede. Pedido explícito: consulta de novo.
     cached, seen_again = _transport()
@@ -136,6 +146,8 @@ async def test_lookup_saves_profile_rank_and_never_the_puuid(session_factory, tm
         now=NOW + timedelta(minutes=5),
     )
     assert again["id"] == view["id"] and seen_again == []
+    # Sem consulta, o Riot ID da resposta é o do pedido (o banco não o guarda).
+    assert (again["gameName"], again["tagLine"]) == ("SYNTHETIC THIRD", "xyz")
     await lookup_player(
         session_factory,
         settings,
@@ -210,13 +222,22 @@ async def test_api_lookup_profile_sync_and_player_match_list(
     body = response.json()
     assert body["profileIconId"] == 4567 and "puuid" not in json.dumps(body).lower()
     player_id = body["id"]
-    assert (await app_client.get(f"/api/v1/players/{player_id}")).json()["gameName"] == (
-        "Synthetic Third"
-    )
+    # O perfil não é mais lido por id (o banco não tem o Riot ID para devolver).
+    assert (await app_client.get(f"/api/v1/players/{player_id}")).status_code in (404, 405)
 
-    # Sincronização do histórico do jogador: o worker usa o Riot ID guardado do perfil.
-    created = await app_client.post(f"/api/v1/players/{player_id}/sync")
+    # Sincronização do histórico do jogador: o pedido traz o Riot ID, conferido pelo HMAC.
+    riot_id = {"gameName": "Synthetic Third", "tagLine": "XYZ"}
+    other = await app_client.post(
+        f"/api/v1/players/{player_id}/sync", json={"gameName": "Outro", "tagLine": "XYZ"}
+    )
+    assert other.status_code == 404
+    assert (await app_client.post(f"/api/v1/players/{player_id}/sync")).status_code == 422
+    created = await app_client.post(f"/api/v1/players/{player_id}/sync", json=riot_id)
     assert created.status_code == 202 and created.json()["state"] == "QUEUED"
+    async with session_factory() as session:
+        queued = await session.scalar(select(Run).where(Run.state == "QUEUED"))
+        assert queued is not None
+        assert (queued.game_name, queued.tag_line) == ("Synthetic Third", "XYZ")
     worker_transport, _ = _transport(ids=[NEW_MATCH])
     assert await process_next_history_sync(session_factory, settings, transport=worker_transport)
     status = (await app_client.get(f"/api/v1/players/{player_id}/sync")).json()
@@ -225,12 +246,16 @@ async def test_api_lookup_profile_sync_and_player_match_list(
         assert await session.scalar(
             select(ImportJobModel).where(ImportJobModel.requested_match_id == NEW_MATCH)
         )
+        # Terminada, a execução não guarda mais o Riot ID.
+        finished = (await session.scalars(select(Run))).all()
+        assert finished and all(r.game_name is None and r.tag_line is None for r in finished)
     # A conta configurada continua com a própria sincronização (outra chave).
     own, own_created = await request_sync(session_factory, settings, now=NOW)
     assert own_created and own["state"] == "QUEUED"
-    assert (await profile_account(session_factory, body_id(player_id))).game_name == (
-        "Synthetic Third"
+    account = await profile_account(
+        session_factory, settings, body_id(player_id), "synthetic third", "xyz"
     )
+    assert account.game_name == "synthetic third"
 
     # Lista filtrada pelo jogador: nenhuma partida dele importada ainda; id desconhecido é 404.
     listing = await app_client.get("/api/v1/matches", params={"player": player_id})
@@ -293,8 +318,6 @@ async def test_player_match_list_marks_the_player_as_local(app_client, session_f
             session.add(
                 Profile(
                     account_key="k" * 64,
-                    game_name="Synthetic Third",
-                    tag_line="XYZ",
                     subject_hash=subject,
                     refreshed_at=NOW,
                 )
@@ -312,3 +335,138 @@ async def test_player_match_list_marks_the_player_as_local(app_client, session_f
                 delete(ParticipantModel).where(ParticipantModel.match_id.in_([mine, theirs]))
             )
             await session.execute(delete(MatchModel).where(MatchModel.match_id.in_([mine, theirs])))
+
+
+@pytest.mark.asyncio
+async def test_no_table_keeps_a_riot_id_at_rest(session_factory, clean):
+    """Guarda de esquema (CC-1103): só a execução ativa da sincronização tem Riot ID, e o banco
+    recusa uma execução terminada que ainda o tenha."""
+    async with session_factory() as session:
+        conn = await session.connection()
+        columns = await conn.run_sync(
+            lambda sync: {
+                table: {c["name"] for c in inspect(sync).get_columns(table)}
+                for table in inspect(sync).get_table_names()
+            }
+        )
+    holders = {t for t, cols in columns.items() if cols & {"game_name", "tag_line"}}
+    assert holders == {"history_sync_runs"}
+    with pytest.raises(IntegrityError):
+        async with unit_of_work(session_factory) as session:
+            session.add(
+                Run(
+                    account_key="r" * 64,
+                    state="SUCCEEDED",
+                    requested_at=NOW,
+                    finished_at=NOW,
+                    game_name="Synthetic Third",
+                    tag_line="XYZ",
+                )
+            )
+
+
+@pytest.mark.asyncio
+async def test_failed_player_sync_also_drops_the_riot_id(session_factory, tmp_path, clean):
+    settings = _settings(tmp_path)
+    third = application.RiotAccountConfig(
+        "Synthetic Third", "XYZ", application.ALLOWED_PLATFORM, application.ALLOWED_REGIONAL_ROUTING
+    )
+    _, created = await request_sync(session_factory, settings, now=NOW, account=third)
+    assert created
+    failing, _ = _transport(account=503)
+    assert await process_next_history_sync(session_factory, settings, transport=failing, now=NOW)
+    async with session_factory() as session:
+        run = await session.scalar(select(Run))
+        assert run is not None and run.state == "FAILED"
+        assert (run.game_name, run.tag_line) == (None, None)
+
+
+async def _seed_profile(factory, settings, name: str, tag: str, refreshed: datetime) -> str:
+    key = account_key(
+        application.RiotAccountConfig(
+            name, tag, application.ALLOWED_PLATFORM, application.ALLOWED_REGIONAL_ROUTING
+        ),
+        SECRET,
+    )
+    assert key is not None
+    async with unit_of_work(factory) as session:
+        session.add(Profile(account_key=key, subject_hash="s" * 64, refreshed_at=refreshed))
+        for days in (0, 1):  # duas observações: nenhuma é preservada para terceiros
+            session.add(
+                Observation(
+                    account_key=key,
+                    queue="RANKED_SOLO_5x5",
+                    season="2026",
+                    captured_at=refreshed - timedelta(days=days),
+                    state="UNRANKED",
+                    origin="RIOT_LEAGUE_V4",
+                )
+            )
+        session.add(
+            Run(account_key=key, state="SUCCEEDED", requested_at=refreshed, finished_at=refreshed)
+        )
+    return key
+
+
+async def _rows(factory, key: str) -> tuple[int, int, int]:
+    counts = []
+    async with factory() as session:
+        for model in (Profile, Observation, Run):
+            rows = await session.scalars(select(model).where(model.account_key == key))
+            counts.append(len(rows.all()))
+    return counts[0], counts[1], counts[2]
+
+
+@pytest.mark.asyncio
+async def test_retention_drops_old_third_party_profiles_and_keeps_the_own_account(
+    session_factory, tmp_path, clean
+):
+    settings = _settings(tmp_path)
+    own_key = configured_account_key(settings)
+    assert own_key is not None
+    old, recent = NOW - timedelta(days=30), NOW - timedelta(days=1)
+    stale = await _seed_profile(session_factory, settings, "Velho", "AAA", old)
+    fresh = await _seed_profile(session_factory, settings, "Novo", "BBB", recent)
+    own = await _seed_profile(session_factory, settings, "Synthetic Own", "BR1", old)
+    assert own == own_key
+    raw = DurableRawMatchStore(tmp_path / "raw")
+    common = {"match_days": 100000, "rank_days": 100000, "secret": SECRET, "now": NOW}
+    common |= {"profile_days": 7, "own_key": own_key}
+    try:
+        plan = await retention(session_factory, raw, **common)
+        assert (plan["playerProfiles"], plan["playerRankObservations"]) == (1, 2)
+        assert await _rows(session_factory, stale) == (1, 2, 1)  # só listou
+
+        done = await retention(session_factory, raw, execute=True, **common)
+        assert done["deletedPlayerProfiles"] == 1
+        assert await _rows(session_factory, stale) == (0, 0, 0)
+        assert await _rows(session_factory, fresh) == (1, 2, 1)
+        assert await _rows(session_factory, own) == (1, 2, 1)
+        assert "Velho" not in json.dumps(done) and stale not in json.dumps(done)
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(delete(Observation).where(Observation.account_key == own))
+
+
+@pytest.mark.asyncio
+async def test_purge_player_lists_then_deletes_one_riot_id(session_factory, tmp_path, clean):
+    settings = _settings(tmp_path)
+    target = await _seed_profile(session_factory, settings, "Alvo", "CCC", NOW)
+    other = await _seed_profile(session_factory, settings, "Outro", "DDD", NOW)
+    async with unit_of_work(session_factory) as session:
+        await session.execute(
+            text(
+                "INSERT INTO history_sync_runs (id, account_key, state, game_name, tag_line) "
+                "VALUES (gen_random_uuid(), :key, 'QUEUED', 'Alvo', 'CCC')"
+            ),
+            {"key": target},
+        )
+    plan = await purge_player(session_factory, settings, " alvo ", "#ccc")
+    assert plan == {"dryRun": True, "playerProfiles": 1, "rankObservations": 2, "syncRuns": 1}
+    assert await _rows(session_factory, target) == (1, 2, 2)
+    await purge_player(session_factory, settings, "Alvo", "CCC", execute=True)
+    # A execução ativa fica (o worker a encerra e apaga o Riot ID dela).
+    assert await _rows(session_factory, target) == (0, 0, 1)
+    assert await _rows(session_factory, other) == (1, 2, 1)
+    with pytest.raises(PlayerLookupError):
+        await purge_player(session_factory, settings, "Alvo", "C")

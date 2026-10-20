@@ -284,16 +284,21 @@ def retention_run(
     execute: bool = typer.Option(False, "--execute", help="Apaga de fato (padrão: só lista)."),
     match_days: int | None = typer.Option(None, help="Partidas importadas há mais de N dias."),
     rank_days: int | None = typer.Option(None, help="Observações de elo com mais de N dias."),
+    profile_days: int | None = typer.Option(
+        None, help="Perfis de terceiros consultados há mais de N dias (CC-1103)."
+    ),
 ) -> None:
-    """Lista (padrão) ou expurga partidas antigas e observações de elo antigas.
+    """Lista (padrão) ou expurga partidas antigas, observações de elo antigas e perfis de
+    terceiros antigos.
 
-    Preserva a observação de elo mais recente de cada fila e temporada. Só imprime
-    contagens, nunca ids de partida.
+    Preserva a observação de elo mais recente de cada fila e temporada da conta configurada;
+    perfis de terceiros saem com todo o elo. Só imprime contagens, nunca ids de partida.
     """
     import asyncio
     import json
 
     from riftlab.db import build_engine
+    from riftlab.history_sync.application import configured_account_key
     from riftlab.ingestion.purge import raw_store_for, retention
     from riftlab.shared.db import build_session_factory
 
@@ -307,6 +312,8 @@ def retention_run(
                 raw_store_for(settings),
                 match_days=match_days or settings.match_retention_days,
                 rank_days=rank_days or settings.rank_retention_days,
+                profile_days=profile_days or settings.player_profile_retention_days,
+                own_key=configured_account_key(settings),
                 secret=settings.subject_hash_secret,
                 execute=execute,
             )
@@ -314,6 +321,43 @@ def retention_run(
             await engine.dispose()
 
     typer.echo(json.dumps(asyncio.run(_run()), ensure_ascii=False, sort_keys=True))
+
+
+@retention_app.command("purge-player")
+def retention_purge_player(
+    game_name: str = typer.Option(..., "--game-name", help="Nome do Riot ID."),
+    tag_line: str = typer.Option(..., "--tag-line", help="TAG do Riot ID."),
+    execute: bool = typer.Option(False, "--execute", help="Apaga de fato (padrão: só lista)."),
+) -> None:
+    """Apaga perfil, elo e execuções de sincronização de um Riot ID (CC-1103).
+
+    Lista por padrão. Só imprime contagens; as partidas seguem `cc retention run`.
+    """
+    import asyncio
+    import json
+
+    from riftlab.db import build_engine
+    from riftlab.players.application import purge_player
+    from riftlab.shared.db import build_session_factory
+    from riftlab.shared.errors import PlayerLookupError
+
+    settings = get_settings()
+
+    async def _run() -> dict[str, object]:
+        engine = build_engine(settings.database_url)
+        try:
+            return await purge_player(
+                build_session_factory(engine), settings, game_name, tag_line, execute=execute
+            )
+        finally:
+            await engine.dispose()
+
+    try:
+        result = asyncio.run(_run())
+    except PlayerLookupError as exc:
+        typer.echo(json.dumps({"error": exc.code}), err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(json.dumps(result, ensure_ascii=False, sort_keys=True))
 
 
 _CC402 = _REPO_ROOT / ".private" / "validation" / "sprint-4" / "CC-402" / "catalog"

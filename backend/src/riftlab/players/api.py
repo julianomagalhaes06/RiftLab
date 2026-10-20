@@ -12,7 +12,7 @@ from pydantic import Field
 from riftlab.errors import ProblemDetail
 from riftlab.history_sync.api import HistorySyncStatus
 from riftlab.history_sync.application import request_sync, sync_status
-from riftlab.players.application import get_player, lookup_player, profile_account
+from riftlab.players.application import lookup_player, profile_account, profile_key
 from riftlab.shared.api.common import CamelModel
 
 router = APIRouter(prefix="/api/v1/players", tags=["players"])
@@ -22,6 +22,13 @@ class PlayerLookup(CamelModel):
     game_name: str = Field(min_length=1, max_length=32)
     tag_line: str = Field(min_length=1, max_length=8)
     refresh: bool = False
+
+
+class PlayerSyncRequest(CamelModel):
+    """Riot ID do perfil: o banco guarda só o HMAC dele (CC-1103), então o pedido o traz."""
+
+    game_name: str = Field(min_length=1, max_length=32)
+    tag_line: str = Field(min_length=1, max_length=8)
 
 
 class PlayerRank(CamelModel):
@@ -36,8 +43,10 @@ class PlayerRank(CamelModel):
 
 
 class PlayerProfile(CamelModel):
-    """Perfil público de um Riot ID (BR1). Sem PUUID nem chave interna. `staleReason` explica
-    quando o perfil guardado foi devolvido sem nova consulta (ex.: RIOT_KEY_MISSING)."""
+    """Perfil público de um Riot ID (BR1). Sem PUUID nem chave interna. `gameName`/`tagLine`:
+    os canônicos da Riot quando consultada agora; senão os do pedido, normalizados (o banco não
+    guarda o Riot ID). `staleReason` explica quando o perfil guardado foi devolvido sem nova
+    consulta (ex.: RIOT_KEY_MISSING)."""
 
     id: uuid.UUID
     game_name: str
@@ -87,37 +96,27 @@ async def post_player_lookup(body: PlayerLookup, request: Request) -> PlayerProf
     )
 
 
-@router.get(
-    "/{player_id}",
-    response_model=PlayerProfile,
-    summary="Perfil guardado de um jogador",
-    description="Somente banco; nenhuma chamada à Riot.",
-    responses={404: {"model": ProblemDetail, "description": "Jogador não buscado ainda."}},
-)
-async def get_player_profile(player_id: uuid.UUID, request: Request) -> PlayerProfile:
-    return PlayerProfile.model_validate(
-        await get_player(request.app.state.session_factory, player_id)
-    )
-
-
 @router.post(
     "/{player_id}/sync",
     response_model=HistorySyncStatus,
     status_code=202,
     summary="Pede a sincronização do histórico do jogador",
     description=(
-        "Mesmo fluxo de /api/v1/history/sync (CC-901) para o Riot ID guardado do perfil: o "
-        "worker lista as partidas ranqueadas recentes e importa as que faltam."
+        "Mesmo fluxo de /api/v1/history/sync (CC-901) para o Riot ID do corpo, que precisa "
+        "ser o do perfil: o worker lista as partidas ranqueadas recentes e importa as que "
+        "faltam. O Riot ID fica na execução só até ela terminar."
     ),
-    responses={404: {"model": ProblemDetail, "description": "Jogador não buscado ainda."}},
+    responses={
+        404: {"model": ProblemDetail, "description": "Jogador não buscado ou outro Riot ID."},
+        422: {"model": ProblemDetail, "description": "INVALID_RIOT_ID ou VALIDATION_ERROR."},
+    },
 )
 async def post_player_sync(
-    player_id: uuid.UUID, request: Request, response: Response
+    player_id: uuid.UUID, body: PlayerSyncRequest, request: Request, response: Response
 ) -> HistorySyncStatus:
-    factory = request.app.state.session_factory
-    status, created = await request_sync(
-        factory, request.app.state.settings, account=await profile_account(factory, player_id)
-    )
+    factory, settings = request.app.state.session_factory, request.app.state.settings
+    account = await profile_account(factory, settings, player_id, body.game_name, body.tag_line)
+    status, created = await request_sync(factory, settings, account=account)
     if not created:
         response.status_code = 200
     return HistorySyncStatus.model_validate(status)
@@ -134,6 +133,6 @@ async def get_player_sync(player_id: uuid.UUID, request: Request) -> HistorySync
     factory = request.app.state.session_factory
     return HistorySyncStatus.model_validate(
         await sync_status(
-            factory, request.app.state.settings, account=await profile_account(factory, player_id)
+            factory, request.app.state.settings, key=await profile_key(factory, player_id)
         )
     )

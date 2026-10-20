@@ -91,7 +91,7 @@ function PlayerMatches({ profile, onRefresh }: { profile: PlayerProfile; onRefre
       // Atualizar: elo e ícone de novo, depois as partidas recentes (o worker importa as novas).
       request: async (signal?: AbortSignal, manual = false) => {
         if (manual) onRefresh(await api.lookupPlayer(profile.gameName, profile.tagLine, true));
-        return api.requestPlayerSync(profile.id, signal);
+        return api.requestPlayerSync(profile.id, profile.gameName, profile.tagLine, signal);
       },
       status: (signal?: AbortSignal) => api.getPlayerSync(profile.id, signal),
     }),

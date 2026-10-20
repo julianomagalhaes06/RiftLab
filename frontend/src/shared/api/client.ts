@@ -78,7 +78,8 @@ export interface ApiClient {
   requestHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   lookupPlayer(gameName: string, tagLine: string, refresh?: boolean, signal?: AbortSignal): Promise<PlayerProfile>;
   getPlayerSync(playerId: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
-  requestPlayerSync(playerId: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
+  /** O banco guarda só o HMAC do Riot ID (CC-1103): o pedido traz o Riot ID do perfil. */
+  requestPlayerSync(playerId: string, gameName: string, tagLine: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
   createImport(matchId: string, mode: ImportMode, signal?: AbortSignal): Promise<ImportJobAccepted>;
   getImport(jobId: string, signal?: AbortSignal): Promise<ImportJobStatus>;
   retryImport(jobId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
@@ -193,7 +194,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     lookupPlayer: (gameName, tagLine, refresh = false, signal) =>
       request("POST", "/api/v1/players/lookup", { body: { gameName, tagLine, refresh }, signal }),
     getPlayerSync: (playerId, signal) => request("GET", `/api/v1/players/${enc(playerId)}/sync`, { signal }),
-    requestPlayerSync: (playerId, signal) => request("POST", `/api/v1/players/${enc(playerId)}/sync`, { signal }),
+    requestPlayerSync: (playerId, gameName, tagLine, signal) =>
+      request("POST", `/api/v1/players/${enc(playerId)}/sync`, { body: { gameName, tagLine }, signal }),
     // Modo RIOT sem chave no servidor: 422 com code=RIOT_KEY_MISSING (tabela de mensagens).
     createImport: (matchId, mode, signal) =>
       request("POST", "/api/v1/imports", { body: { matchId, mode }, signal }),

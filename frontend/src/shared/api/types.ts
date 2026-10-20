@@ -502,26 +502,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/players/{player_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Perfil guardado de um jogador
-         * @description Somente banco; nenhuma chamada à Riot.
-         */
-        get: operations["get_player_profile_api_v1_players__player_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/players/{player_id}/sync": {
         parameters: {
             query?: never;
@@ -537,7 +517,7 @@ export interface paths {
         put?: never;
         /**
          * Pede a sincronização do histórico do jogador
-         * @description Mesmo fluxo de /api/v1/history/sync (CC-901) para o Riot ID guardado do perfil: o worker lista as partidas ranqueadas recentes e importa as que faltam.
+         * @description Mesmo fluxo de /api/v1/history/sync (CC-901) para o Riot ID do corpo, que precisa ser o do perfil: o worker lista as partidas ranqueadas recentes e importa as que faltam. O Riot ID fica na execução só até ela terminar.
          */
         post: operations["post_player_sync_api_v1_players__player_id__sync_post"];
         delete?: never;
@@ -1852,8 +1832,10 @@ export interface components {
         };
         /**
          * PlayerProfile
-         * @description Perfil público de um Riot ID (BR1). Sem PUUID nem chave interna. `staleReason` explica
-         *     quando o perfil guardado foi devolvido sem nova consulta (ex.: RIOT_KEY_MISSING).
+         * @description Perfil público de um Riot ID (BR1). Sem PUUID nem chave interna. `gameName`/`tagLine`:
+         *     os canônicos da Riot quando consultada agora; senão os do pedido, normalizados (o banco não
+         *     guarda o Riot ID). `staleReason` explica quando o perfil guardado foi devolvido sem nova
+         *     consulta (ex.: RIOT_KEY_MISSING).
          */
         PlayerProfile: {
             /** Datadragonversion */
@@ -1908,6 +1890,16 @@ export interface components {
             tier?: string | null;
             /** Wins */
             wins?: number | null;
+        };
+        /**
+         * PlayerSyncRequest
+         * @description Riot ID do perfil: o banco guarda só o HMAC dele (CC-1103), então o pedido o traz.
+         */
+        PlayerSyncRequest: {
+            /** Gamename */
+            gameName: string;
+            /** Tagline */
+            tagLine: string;
         };
         /** Position */
         Position: {
@@ -3540,46 +3532,6 @@ export interface operations {
             };
         };
     };
-    get_player_profile_api_v1_players__player_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                player_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PlayerProfile"];
-                };
-            };
-            /** @description Jogador não buscado ainda. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_player_sync_api_v1_players__player_id__sync_get: {
         parameters: {
             query?: never;
@@ -3629,7 +3581,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayerSyncRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {
@@ -3640,7 +3596,7 @@ export interface operations {
                     "application/json": components["schemas"]["HistorySyncStatus"];
                 };
             };
-            /** @description Jogador não buscado ainda. */
+            /** @description Jogador não buscado ou outro Riot ID. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3649,13 +3605,13 @@ export interface operations {
                     "application/json": components["schemas"]["ProblemDetail"];
                 };
             };
-            /** @description Validation Error */
+            /** @description INVALID_RIOT_ID ou VALIDATION_ERROR. */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ProblemDetail"];
                 };
             };
         };

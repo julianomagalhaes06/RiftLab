@@ -21,6 +21,11 @@ class HistorySyncRunModel(Base):
             "listed >= 0 AND new_enqueued >= 0 AND already_known >= 0 AND skipped_purged >= 0",
             name="history_sync_counts",
         ),
+        # Riot ID do jogador buscado (CC-1103): só enquanto a execução está ativa.
+        CheckConstraint(
+            "state IN ('QUEUED','RUNNING') OR (game_name IS NULL AND tag_line IS NULL)",
+            name="history_sync_riot_id_active_only",
+        ),
         Index("ix_history_sync_account_requested", "account_key", "requested_at"),
         # Uma execução ativa por conta; a perdedora de uma corrida relê a vencedora.
         Index(
@@ -34,6 +39,8 @@ class HistorySyncRunModel(Base):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     account_key: Mapped[str] = mapped_column(String(64), nullable=False)
     state: Mapped[str] = mapped_column(String(12), nullable=False)
+    game_name: Mapped[str | None] = mapped_column(String(32))
+    tag_line: Mapped[str | None] = mapped_column(String(8))
     requested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.clock_timestamp()
     )

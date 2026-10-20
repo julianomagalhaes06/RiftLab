@@ -3296,7 +3296,7 @@
       },
       "PlayerProfile": {
         "additionalProperties": false,
-        "description": "Perfil público de um Riot ID (BR1). Sem PUUID nem chave interna. `staleReason` explica\nquando o perfil guardado foi devolvido sem nova consulta (ex.: RIOT_KEY_MISSING).",
+        "description": "Perfil público de um Riot ID (BR1). Sem PUUID nem chave interna. `gameName`/`tagLine`:\nos canônicos da Riot quando consultada agora; senão os do pedido, normalizados (o banco não\nguarda o Riot ID). `staleReason` explica quando o perfil guardado foi devolvido sem nova\nconsulta (ex.: RIOT_KEY_MISSING).",
         "properties": {
           "dataDragonVersion": {
             "anyOf": [
@@ -3476,6 +3476,30 @@
           "observedAt"
         ],
         "title": "PlayerRank",
+        "type": "object"
+      },
+      "PlayerSyncRequest": {
+        "additionalProperties": false,
+        "description": "Riot ID do perfil: o banco guarda só o HMAC dele (CC-1103), então o pedido o traz.",
+        "properties": {
+          "gameName": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Gamename",
+            "type": "string"
+          },
+          "tagLine": {
+            "maxLength": 8,
+            "minLength": 1,
+            "title": "Tagline",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gameName",
+          "tagLine"
+        ],
+        "title": "PlayerSyncRequest",
         "type": "object"
       },
       "Position": {
@@ -6416,60 +6440,6 @@
         ]
       }
     },
-    "/api/v1/players/{player_id}": {
-      "get": {
-        "description": "Somente banco; nenhuma chamada à Riot.",
-        "operationId": "get_player_profile_api_v1_players__player_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "player_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Player Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlayerProfile"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description": "Jogador não buscado ainda."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Perfil guardado de um jogador",
-        "tags": [
-          "players"
-        ]
-      }
-    },
     "/api/v1/players/{player_id}/sync": {
       "get": {
         "description": "Somente banco; nenhuma chamada à Riot.",
@@ -6524,7 +6494,7 @@
         ]
       },
       "post": {
-        "description": "Mesmo fluxo de /api/v1/history/sync (CC-901) para o Riot ID guardado do perfil: o worker lista as partidas ranqueadas recentes e importa as que faltam.",
+        "description": "Mesmo fluxo de /api/v1/history/sync (CC-901) para o Riot ID do corpo, que precisa ser o do perfil: o worker lista as partidas ranqueadas recentes e importa as que faltam. O Riot ID fica na execução só até ela terminar.",
         "operationId": "post_player_sync_api_v1_players__player_id__sync_post",
         "parameters": [
           {
@@ -6538,6 +6508,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerSyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "202": {
             "content": {
@@ -6557,17 +6537,17 @@
                 }
               }
             },
-            "description": "Jogador não buscado ainda."
+            "description": "Jogador não buscado ou outro Riot ID."
           },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ProblemDetail"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "INVALID_RIOT_ID ou VALIDATION_ERROR."
           }
         },
         "summary": "Pede a sincronização do histórico do jogador",

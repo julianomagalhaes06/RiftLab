@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     # como tal, gravado por `cc ranked demo-seed`; nunca consulta a Riot.
     demo_ranked: bool = False
     rank_retention_days: int = 365
+    # CC-1103: perfis de terceiros buscados por Riot ID (com o elo e as execuções de
+    # sincronização) saem depois disso sem nova consulta. A conta configurada não expira.
+    player_profile_retention_days: int = 7
 
     worker_heartbeat_path: str = "/tmp/riftlab-worker.heartbeat"
     # Toque do heartbeat: a cada ciclo do worker (reserva -> busca -> persiste

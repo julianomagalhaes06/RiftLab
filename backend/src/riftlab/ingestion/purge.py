@@ -37,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from riftlab.analyses.models import AnalysisModel
 from riftlab.config import Settings
 from riftlab.decisions.models import DecisionExtractionModel, DecisionPointModel
+from riftlab.history_sync.models import HistorySyncRunModel
 from riftlab.ingestion.domain import (
     ACTIVE_IMPORT_JOB_STATES,
     MAX_TRANSIENT_ATTEMPTS,
@@ -62,6 +63,7 @@ from riftlab.ml.models import (
     ModelVersionModel,
 )
 from riftlab.observability import safe_exception_description
+from riftlab.players.models import PlayerProfileModel
 from riftlab.ranked.models import RankedObservationModel
 from riftlab.reviews.models import AnalysisFeedbackModel
 from riftlab.shared.db import unit_of_work
@@ -505,17 +507,23 @@ async def retention(
     match_days: int,
     rank_days: int,
     secret: str | None,
+    profile_days: int = 7,
+    own_key: str | None = None,
     execute: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Partidas importadas antes do corte e observações de elo antigas.
+    """Partidas importadas antes do corte, observações de elo antigas e perfis de terceiros.
 
     Sem `execute`, só conta (dry-run). Com `execute`, expurga cada partida com motivo
     RETENTION e apaga observações de elo antigas, preservando a mais recente de cada fila e
-    temporada. Nunca devolve ids: só contagens.
+    temporada da conta configurada (`own_key`). Perfis de terceiros consultados antes de
+    `profile_days` saem inteiros: o perfil, todas as observações de elo e as execuções de
+    sincronização terminadas da conta (CC-1103). Elo sem perfil segue a regra geral. Nunca
+    devolve ids: só contagens.
     """
     now = now or datetime.now(UTC)
     match_cutoff, rank_cutoff = now - timedelta(days=match_days), now - timedelta(days=rank_days)
+    profile_cutoff = now - timedelta(days=profile_days)
     async with session_factory() as session:
         old = (
             await session.execute(
@@ -540,6 +548,17 @@ async def retention(
                 )
             )
         ).all()
+        profiles = (
+            await session.execute(
+                select(PlayerProfileModel.account_key, PlayerProfileModel.refreshed_at)
+            )
+        ).all()
+    # Terceiros: perfil buscado e não consultado de novo desde o corte (a conta própria fica).
+    expired = {
+        str(key) for key, refreshed in profiles if refreshed < profile_cutoff and key != own_key
+    }
+    third_rank = [oid for oid, account, *_ in observations if str(account) in expired]
+    observations = [row for row in observations if str(row[1]) not in expired]
     newest: dict[tuple[str, str, str], datetime] = {}
     for _, account, queue, season, captured in observations:
         key = (str(account), str(queue), str(season))
@@ -558,6 +577,9 @@ async def retention(
             sorted({mode: sum(1 for _, m in old if m == mode) for _, mode in old}.items())
         ),
         "rankObservations": len(stale_rank),
+        "profileDays": profile_days,
+        "playerProfiles": len(expired),
+        "playerRankObservations": len(third_rank),
     }
     if not execute:
         return plan
@@ -572,12 +594,31 @@ async def retention(
             secret=secret,
         )
         purged += 1
-    if stale_rank:
+    if stale_rank or third_rank:
         async with session_factory.begin() as session:
             await session.execute(
-                delete(RankedObservationModel).where(RankedObservationModel.id.in_(stale_rank))
+                delete(RankedObservationModel).where(
+                    RankedObservationModel.id.in_(stale_rank + third_rank)
+                )
             )
-    return {**plan, "purgedMatches": purged, "deletedRankObservations": len(stale_rank)}
+    if expired:
+        async with session_factory.begin() as session:
+            await session.execute(
+                delete(HistorySyncRunModel).where(
+                    HistorySyncRunModel.account_key.in_(expired),
+                    HistorySyncRunModel.state.not_in(("QUEUED", "RUNNING")),
+                )
+            )
+            await session.execute(
+                delete(PlayerProfileModel).where(PlayerProfileModel.account_key.in_(expired))
+            )
+    return {
+        **plan,
+        "purgedMatches": purged,
+        "deletedRankObservations": len(stale_rank),
+        "deletedPlayerProfiles": len(expired),
+        "deletedPlayerRankObservations": len(third_rank),
+    }
 
 
 def purge_summary_json(summary: dict[str, Any]) -> str:
