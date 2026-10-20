@@ -154,6 +154,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
 
     // Retomar pelo Histórico (a entrada não lista mais as partidas, CC-903)
     await page.goto("/historico");
+    await page.getByRole("button", { name: "DEMO", exact: true }).click();
     const row = page.getByRole("link", { name: "Contexto da partida DEMO-0008" }).first();
     await expect(row).toBeVisible();
     await row.click();

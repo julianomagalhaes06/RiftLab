@@ -85,6 +85,7 @@ for (const width of [360, 1280]) {
       const sync = page.getByRole("region", { name: "Atualização do histórico com a Riot" });
       await expect(sync.getByRole("status")).toHaveText(/o servidor está sem chave da Riot\. Importe partidas pelo ID\./);
       await expect(sync.getByRole("button")).toHaveCount(0);
+      await page.getByRole("button", { name: "DEMO", exact: true }).click();
       await expect(page.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toBeVisible();
       await noHorizontalScroll(page);
       await page.screenshot({ path: `${evidence}/sem-chave-${width}.png`, fullPage: true });

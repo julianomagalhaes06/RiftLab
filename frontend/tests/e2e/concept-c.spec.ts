@@ -7,11 +7,15 @@ for (const width of [1280, 1440, 360, 390]) {
   test(`conceito C em ${width}px: navegação, Histórico e layout`, async ({ page }) => {
     await page.setViewportSize({ width, height: width < 700 ? 780 : 900 });
     await mockApi(page, {
-      "GET /api/v1/matches": () => ok({
+      "GET /api/v1/matches": ({ url }) => ok({
         items: [
           matchSummary({ matchId: "BR1_123", patch: "16.17", championsPresent: [{ championId: 51, name: "Caitlyn" }] }),
           matchSummary({ matchId: "DEMO-0008" }),
-        ],
+        ].filter((match) => {
+          const scope = url.searchParams.get("scope");
+          const demo = match.matchId.startsWith("DEMO-");
+          return scope === "account" ? !demo : scope === "demo" ? demo : true;
+        }),
         nextCursor: null,
       }),
     });
@@ -38,6 +42,11 @@ for (const width of [1280, 1440, 360, 390]) {
       await expect(page.locator("#conteudo")).toBeFocused();
     }
 
+    await expect(page.getByText("1 partida carregada", { exact: true })).toBeVisible();
+    await expect(page.getByText("1 RIOT · 0 DEMO")).toBeVisible();
+    await expect(page.locator(".match-card")).toHaveCount(1);
+    await expect(page.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Minha conta e DEMO", exact: true }).click();
     await expect(page.getByText("2 partidas carregadas")).toBeVisible();
     await expect(page.getByText("1 RIOT · 1 DEMO")).toBeVisible();
     await expect(page.locator(".match-card")).toHaveCount(2);

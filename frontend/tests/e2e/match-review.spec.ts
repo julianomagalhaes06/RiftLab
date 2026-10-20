@@ -53,7 +53,7 @@ for (const width of [360, 1280]) {
 
     test("o Histórico mostra o selo com as compras analisadas", async ({ page }) => {
       await mockApi(page, {
-        "GET /api/v1/matches": () => ok({ items: [matchSummary({ localParticipantId: 1, reviewPurchases: { ready: 3, total: 4 } })], nextCursor: null }),
+        "GET /api/v1/matches": () => ok({ items: [matchSummary({ matchId: "BR1_10050001", patch: "16.19", localParticipantId: 1, reviewPurchases: { ready: 3, total: 4 } })], nextCursor: null }),
       });
       await page.goto("/historico");
       await expect(page.getByText("Revisão: 3 de 4 compras")).toBeVisible();

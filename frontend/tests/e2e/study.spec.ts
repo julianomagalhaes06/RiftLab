@@ -278,6 +278,7 @@ for (const width of [1280, 360]) {
     const nav = page.getByRole("navigation", { name: "Áreas principais" });
     await nav.getByRole("link", { name: /Histórico/ }).click();
     await expect(page.getByRole("heading", { name: "Partidas para estudar" })).toBeVisible();
+    await page.getByRole("button", { name: "DEMO", exact: true }).click();
     await page.getByRole("link", { name: "Contexto da partida DEMO-0008" }).click();
     await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible();
     await page.getByRole("link", { name: /^Participante 1 —/ }).click();

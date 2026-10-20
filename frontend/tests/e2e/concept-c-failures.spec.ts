@@ -86,6 +86,9 @@ for (const width of [1280, 360]) {
     await page.screenshot({ path: `${evidence}/historico-busca-vazia-${width}.png`, fullPage: true });
     await search.clear();
     await expect(page.getByRole("link", { name: "Contexto da partida BR1_123" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toHaveCount(0);
+    await page.getByRole("button", { name: "DEMO", exact: true }).click();
     await expect(page.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Contexto da partida BR1_123" })).toHaveCount(0);
   });
 }
