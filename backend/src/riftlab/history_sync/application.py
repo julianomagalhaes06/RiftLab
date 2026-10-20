@@ -21,12 +21,19 @@ from riftlab.config import Settings
 from riftlab.history_sync.models import HistorySyncRunModel as Run
 from riftlab.ingestion.application import request_import
 from riftlab.ingestion.domain import ImportJobState, ImportMode
-from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfigError, load_riot_account
+from riftlab.ingestion.infrastructure.riot_account import (
+    ALLOWED_PLATFORM,
+    ALLOWED_REGIONAL_ROUTING,
+    RiotAccountConfig,
+    RiotAccountConfigError,
+    load_riot_account,
+)
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.models import MatchModel
 from riftlab.ingestion.purge import is_purged
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.players.models import PlayerProfileModel
 from riftlab.ranked.domain import account_key
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import SourceError, SourceRateLimitedError
@@ -42,12 +49,35 @@ OVERLAP = timedelta(hours=1)
 PROCESS_STARTED_AT = datetime.now(UTC)
 
 
-def _account_key(settings: Settings) -> str | None:
-    try:
-        account = load_riot_account(Path(settings.ranked_account_file))
-    except (RiotAccountConfigError, OSError):
-        return None
+def _account_key(settings: Settings, account: RiotAccountConfig | None = None) -> str | None:
+    """Chave da conta pedida (perfil buscado, CC-1101) ou, sem ela, da conta configurada."""
+    if account is None:
+        try:
+            account = load_riot_account(Path(settings.ranked_account_file))
+        except (RiotAccountConfigError, OSError):
+            return None
     return account_key(account, settings.subject_hash_secret)
+
+
+async def _account_for(
+    factory: SessionFactory, settings: Settings, key: str
+) -> RiotAccountConfig | None:
+    """Conta de uma execução: a configurada, se for a mesma chave; senão o perfil guardado."""
+    try:
+        configured = load_riot_account(Path(settings.ranked_account_file))
+    except (RiotAccountConfigError, OSError):
+        configured = None
+    if configured is not None and account_key(configured, settings.subject_hash_secret) == key:
+        return configured
+    async with factory() as session:
+        profile = await session.scalar(
+            select(PlayerProfileModel).where(PlayerProfileModel.account_key == key)
+        )
+    if profile is None:
+        return None
+    return RiotAccountConfig(
+        profile.game_name, profile.tag_line, ALLOWED_PLATFORM, ALLOWED_REGIONAL_ROUTING
+    )
 
 
 def next_allowed_at(run: Run, settings: Settings) -> datetime | None:
@@ -95,10 +125,12 @@ async def _latest(session: AsyncSession, key: str) -> Run | None:
     ).first()
 
 
-async def sync_status(factory: SessionFactory, settings: Settings) -> dict[str, Any]:
+async def sync_status(
+    factory: SessionFactory, settings: Settings, *, account: RiotAccountConfig | None = None
+) -> dict[str, Any]:
     if not settings.riot_api_key:
         return _unavailable("RIOT_KEY_MISSING")
-    key = _account_key(settings)
+    key = _account_key(settings, account)
     if key is None:
         return _unavailable("ACCOUNT_NOT_CONFIGURED")
     async with factory() as session:
@@ -106,12 +138,17 @@ async def sync_status(factory: SessionFactory, settings: Settings) -> dict[str, 
 
 
 async def request_sync(
-    factory: SessionFactory, settings: Settings, *, now: datetime | None = None
+    factory: SessionFactory,
+    settings: Settings,
+    *,
+    now: datetime | None = None,
+    account: RiotAccountConfig | None = None,
 ) -> tuple[dict[str, Any], bool]:
-    """Devolve (estado, criou?). Sem chave ou sem conta configurada não cria nada."""
+    """Devolve (estado, criou?). Sem chave ou sem conta não cria nada. `account` é o perfil
+    buscado (CC-1101); sem ela, a conta configurada."""
     if not settings.riot_api_key:
         return _unavailable("RIOT_KEY_MISSING"), False
-    key = _account_key(settings)
+    key = _account_key(settings, account)
     if key is None:
         return _unavailable("ACCOUNT_NOT_CONFIGURED"), False
     now = now or datetime.now(UTC)
@@ -194,8 +231,8 @@ async def process_next_history_sync(
         else now - timedelta(days=settings.history_sync_lookback_days)
     )
     try:
-        account = load_riot_account(Path(settings.ranked_account_file))
-        if account_key(account, settings.subject_hash_secret) != key or not settings.riot_api_key:
+        account = await _account_for(factory, settings, key)
+        if account is None or not settings.riot_api_key:
             await _finish(factory, run_id, state="FAILED", error_code="ACCOUNT_CHANGED")
             return True
         own = transport is None

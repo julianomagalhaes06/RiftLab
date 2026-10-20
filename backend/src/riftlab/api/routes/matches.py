@@ -11,6 +11,7 @@ para uma partida já importada; nunca coleta a partida de novo."""
 from __future__ import annotations
 
 import re
+import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated
@@ -26,6 +27,7 @@ from riftlab.ingestion.domain import Match, MatchListScope
 from riftlab.ingestion.purge import purge_preview, request_purge
 from riftlab.matches.queries import MatchParticipantFactsView, get_match_detail, list_matches
 from riftlab.matches.timeline import get_match_timeline
+from riftlab.players.application import profile_subject
 from riftlab.preparation.application import (
     PreparationInfo,
     preparation_info,
@@ -99,18 +101,36 @@ async def list_imported_matches(
             "conta não identificada nunca inclui partidas reais de terceiros."
         ),
     ] = "all",
+    player: Annotated[
+        uuid.UUID | None,
+        Query(
+            description="Perfil buscado por Riot ID (CC-1101): só as partidas em que ele aparece, "
+            "com o participante dele como localParticipantId; ignora `scope`."
+        ),
+    ] = None,
 ) -> CursorPage[MatchSummary]:
     settings = request.app.state.settings
+    subject = (
+        await profile_subject(request.app.state.session_factory, player)
+        if player is not None
+        else None
+    )
+
+    async def selected_subject(session: AsyncSession) -> str | None:
+        if subject is not None:
+            return subject
+        return await local_subject_hash(session, settings)
+
     page = await list_matches(
         request.app.state.session_factory,
         limit=limit,
         cursor=cursor,
-        scope=scope,
+        scope="account" if subject is not None else scope,
         mapping=await _catalog_mapping_or_none(
             request.app.state.session_factory,
             Path(settings.catalog_mappings_path),
         ),
-        local_subject=lambda session: local_subject_hash(session, settings),
+        local_subject=selected_subject,
     )
     return CursorPage[MatchSummary](
         items=[

@@ -330,6 +330,52 @@ class RiotHttpTransport:
             )
         return puuid
 
+    async def resolve_account(self, game_name: str, tag_line: str) -> tuple[str, str, str]:
+        """Account-V1 by-riot-id com o Riot ID canônico: (puuid, gameName, tagLine). Mesma
+        codificação por segmento de `resolve_account_puuid`; nunca loga a identidade."""
+        path = (
+            "/riot/account/v1/accounts/by-riot-id/"
+            f"{quote(game_name, safe='')}/{quote(tag_line, safe='')}"
+        )
+        document = _parse_json_body("account", await self._request_raw("account", path))
+        if not isinstance(document, dict):
+            raise SourceSchemaError(
+                code="SCHEMA_UNSUPPORTED", detail="resposta de account sem identidade válida"
+            )
+        puuid, name, tag = (document.get(key) for key in ("puuid", "gameName", "tagLine"))
+        if not (
+            isinstance(puuid, str)
+            and puuid
+            and isinstance(name, str)
+            and name
+            and isinstance(tag, str)
+            and tag
+        ):
+            raise SourceSchemaError(
+                code="SCHEMA_UNSUPPORTED", detail="resposta de account sem identidade válida"
+            )
+        return puuid, name, tag
+
+    async def fetch_summoner_by_puuid(self, puuid: str) -> tuple[int, int]:
+        """Summoner-V4 por PUUID no host fixo BR1: (profileIconId, summonerLevel)."""
+        if not puuid or "/" in puuid or "?" in puuid:
+            raise SourceSchemaError(code="SCHEMA_UNSUPPORTED", detail="puuid inválido")
+        body = await self._request_raw(
+            "summoner",
+            f"/lol/summoner/v4/summoners/by-puuid/{quote(puuid, safe='')}",
+            host=BR1_HOST,
+        )
+        document = _parse_json_body("summoner", body)
+        icon = document.get("profileIconId") if isinstance(document, dict) else None
+        level = document.get("summonerLevel") if isinstance(document, dict) else None
+        if not all(
+            isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in (icon, level)
+        ):
+            raise SourceSchemaError(
+                code="SCHEMA_UNSUPPORTED", detail="resposta de summoner com formato inesperado"
+            )
+        return icon, level  # type: ignore[return-value]
+
     async def fetch_league_entries_by_puuid(self, puuid: str) -> list[Any]:
         """League-V4 por PUUID no host fixo BR1; nunca devolve URL/headers."""
         if not puuid or "/" in puuid or "?" in puuid:

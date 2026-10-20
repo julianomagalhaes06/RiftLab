@@ -20,6 +20,7 @@ import riftlab.history_sync.models  # noqa: F401
 import riftlab.ingestion.models  # noqa: F401
 import riftlab.learning.models  # noqa: F401
 import riftlab.ml.models  # noqa: F401
+import riftlab.players.models  # noqa: F401
 import riftlab.ranked.models  # noqa: F401
 import riftlab.reviews.models  # noqa: F401
 import riftlab.timeline.health  # noqa: F401

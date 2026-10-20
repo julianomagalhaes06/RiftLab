@@ -3266,6 +3266,218 @@
         "title": "ParticipantTimeline",
         "type": "object"
       },
+      "PlayerLookup": {
+        "additionalProperties": false,
+        "properties": {
+          "gameName": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Gamename",
+            "type": "string"
+          },
+          "refresh": {
+            "default": false,
+            "title": "Refresh",
+            "type": "boolean"
+          },
+          "tagLine": {
+            "maxLength": 8,
+            "minLength": 1,
+            "title": "Tagline",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gameName",
+          "tagLine"
+        ],
+        "title": "PlayerLookup",
+        "type": "object"
+      },
+      "PlayerProfile": {
+        "additionalProperties": false,
+        "description": "Perfil público de um Riot ID (BR1). Sem PUUID nem chave interna. `staleReason` explica\nquando o perfil guardado foi devolvido sem nova consulta (ex.: RIOT_KEY_MISSING).",
+        "properties": {
+          "dataDragonVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datadragonversion"
+          },
+          "flex": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlayerRank"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gameName": {
+            "title": "Gamename",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "profileIconId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profileiconid"
+          },
+          "refreshedAt": {
+            "format": "date-time",
+            "title": "Refreshedat",
+            "type": "string"
+          },
+          "solo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlayerRank"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "staleReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stalereason"
+          },
+          "summonerLevel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summonerlevel"
+          },
+          "tagLine": {
+            "title": "Tagline",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "gameName",
+          "tagLine",
+          "refreshedAt"
+        ],
+        "title": "PlayerProfile",
+        "type": "object"
+      },
+      "PlayerRank": {
+        "additionalProperties": false,
+        "properties": {
+          "division": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          },
+          "leaguePoints": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaguepoints"
+          },
+          "losses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Losses"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "title": "Observedat",
+            "type": "string"
+          },
+          "queue": {
+            "enum": [
+              "RANKED_SOLO_5x5",
+              "RANKED_FLEX_SR"
+            ],
+            "title": "Queue",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "READY",
+              "UNRANKED"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "wins": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wins"
+          }
+        },
+        "required": [
+          "queue",
+          "state",
+          "observedAt"
+        ],
+        "title": "PlayerRank",
+        "type": "object"
+      },
       "Position": {
         "properties": {
           "division": {
@@ -5615,6 +5827,25 @@
               "title": "Scope",
               "type": "string"
             }
+          },
+          {
+            "description": "Perfil buscado por Riot ID (CC-1101): só as partidas em que ele aparece, com o participante dele como localParticipantId; ignora `scope`.",
+            "in": "query",
+            "name": "player",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Perfil buscado por Riot ID (CC-1101): só as partidas em que ele aparece, com o participante dele como localParticipantId; ignora `scope`.",
+              "title": "Player"
+            }
           }
         ],
         "responses": {
@@ -6120,6 +6351,228 @@
         "summary": "Post Interpret",
         "tags": [
           "objectives"
+        ]
+      }
+    },
+    "/api/v1/players/lookup": {
+      "post": {
+        "description": "Como em sites de estatísticas, qualquer Riot ID do servidor BR pode ser consultado. Devolve o perfil guardado se tiver menos de 10 min (ou se o servidor estiver sem chave da Riot); senão consulta a Riot (conta, invocador e elo; 3 requisições) e guarda o perfil. `refresh` força a consulta.",
+        "operationId": "post_player_lookup_api_v1_players_lookup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerLookup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "INVALID_RIOT_ID ou VALIDATION_ERROR."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE."
+          }
+        },
+        "summary": "Busca um jogador pelo Riot ID (Nome#TAG)",
+        "tags": [
+          "players"
+        ]
+      }
+    },
+    "/api/v1/players/{player_id}": {
+      "get": {
+        "description": "Somente banco; nenhuma chamada à Riot.",
+        "operationId": "get_player_profile_api_v1_players__player_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Jogador não buscado ainda."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Perfil guardado de um jogador",
+        "tags": [
+          "players"
+        ]
+      }
+    },
+    "/api/v1/players/{player_id}/sync": {
+      "get": {
+        "description": "Somente banco; nenhuma chamada à Riot.",
+        "operationId": "get_player_sync_api_v1_players__player_id__sync_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorySyncStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Jogador não buscado ainda."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Estado da última sincronização do histórico do jogador",
+        "tags": [
+          "players"
+        ]
+      },
+      "post": {
+        "description": "Mesmo fluxo de /api/v1/history/sync (CC-901) para o Riot ID guardado do perfil: o worker lista as partidas ranqueadas recentes e importa as que faltam.",
+        "operationId": "post_player_sync_api_v1_players__player_id__sync_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistorySyncStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Jogador não buscado ainda."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pede a sincronização do histórico do jogador",
+        "tags": [
+          "players"
         ]
       }
     },

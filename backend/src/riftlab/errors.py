@@ -17,6 +17,7 @@ from riftlab.shared.errors import (
     InvalidCursorError,
     InvalidRequestError,
     NotFoundError,
+    PlayerLookupError,
     RiotKeyMissingError,
 )
 
@@ -62,6 +63,43 @@ _DEFAULT_HTTP_PROBLEM_DETAIL = "A requisicao nao pode ser atendida."
 # falha por chave). Se um schema futuro adicionar um dict de chave estrita,
 # revisar este conjunto.
 _CLIENT_CONTROLLED_LOC_ERROR_TYPES = frozenset({"extra_forbidden"})
+
+# CC-1101: busca de jogador por Riot ID. Status, título e detalhe por código, conjunto fechado;
+# nunca ecoa o Riot ID digitado nem resposta da Riot.
+_PLAYER_LOOKUP_PROBLEMS: dict[str, tuple[int, str, str]] = {
+    "INVALID_RIOT_ID": (
+        422,
+        "Riot ID invalido",
+        "Use o formato Nome#TAG (TAG com 3 a 5 letras ou numeros).",
+    ),
+    "PLAYER_NOT_FOUND": (404, "Jogador nao encontrado", "Nenhuma conta Riot com esse Riot ID."),
+    "PLAYER_NOT_ON_PLATFORM": (
+        404,
+        "Conta fora do servidor BR",
+        "A conta existe, mas nao joga League of Legends no servidor BR.",
+    ),
+    "RIOT_KEY_MISSING": (
+        503,
+        "Busca indisponivel",
+        "O servidor esta sem chave da Riot configurada.",
+    ),
+    "SECRET_MISSING": (
+        503,
+        "Busca indisponivel",
+        "O servidor esta sem o segredo local de identificacao.",
+    ),
+    "RIOT_AUTH_FAILED": (503, "Chave da Riot recusada", "A chave da Riot e invalida ou expirou."),
+    "RIOT_RATE_LIMITED": (
+        503,
+        "Limite da Riot",
+        "Muitas consultas a Riot agora; tente de novo em instantes.",
+    ),
+    "UPSTREAM_UNAVAILABLE": (
+        503,
+        "Riot indisponivel",
+        "A Riot nao respondeu; tente de novo em instantes.",
+    ),
+}
 _REDACTED_LOC_SEGMENT = "<campo-desconhecido>"
 
 
@@ -250,6 +288,21 @@ def register_exception_handlers(app: FastAPI) -> None:
             code=RIOT_KEY_MISSING,
             title="Modo RIOT indisponivel",
             detail="A importacao no modo RIOT exige uma chave da Riot configurada no servidor.",
+        )
+
+    @app.exception_handler(PlayerLookupError)
+    async def player_lookup_error_handler(request: Request, exc: PlayerLookupError) -> JSONResponse:
+        status, title, detail = _PLAYER_LOOKUP_PROBLEMS.get(
+            exc.code, _PLAYER_LOOKUP_PROBLEMS["UPSTREAM_UNAVAILABLE"]
+        )
+        retry = exc.retry_after_seconds
+        return problem_response(
+            request,
+            status_code=status,
+            code=exc.code if exc.code in _PLAYER_LOOKUP_PROBLEMS else "UPSTREAM_UNAVAILABLE",
+            title=title,
+            detail=detail,
+            headers={"Retry-After": str(max(1, round(retry)))} if retry else None,
         )
 
     @app.exception_handler(Exception)

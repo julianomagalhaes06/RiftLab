@@ -482,6 +482,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/players/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Busca um jogador pelo Riot ID (Nome#TAG)
+         * @description Como em sites de estatísticas, qualquer Riot ID do servidor BR pode ser consultado. Devolve o perfil guardado se tiver menos de 10 min (ou se o servidor estiver sem chave da Riot); senão consulta a Riot (conta, invocador e elo; 3 requisições) e guarda o perfil. `refresh` força a consulta.
+         */
+        post: operations["post_player_lookup_api_v1_players_lookup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/players/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Perfil guardado de um jogador
+         * @description Somente banco; nenhuma chamada à Riot.
+         */
+        get: operations["get_player_profile_api_v1_players__player_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/players/{player_id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado da última sincronização do histórico do jogador
+         * @description Somente banco; nenhuma chamada à Riot.
+         */
+        get: operations["get_player_sync_api_v1_players__player_id__sync_get"];
+        put?: never;
+        /**
+         * Pede a sincronização do histórico do jogador
+         * @description Mesmo fluxo de /api/v1/history/sync (CC-901) para o Riot ID guardado do perfil: o worker lista as partidas ranqueadas recentes e importa as que faltam.
+         */
+        post: operations["post_player_sync_api_v1_players__player_id__sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ranked/me": {
         parameters: {
             query?: never;
@@ -1774,6 +1838,77 @@ export interface components {
             /** Skills */
             skills?: components["schemas"]["TimelineSkillUp"][];
         };
+        /** PlayerLookup */
+        PlayerLookup: {
+            /** Gamename */
+            gameName: string;
+            /**
+             * Refresh
+             * @default false
+             */
+            refresh: boolean;
+            /** Tagline */
+            tagLine: string;
+        };
+        /**
+         * PlayerProfile
+         * @description Perfil público de um Riot ID (BR1). Sem PUUID nem chave interna. `staleReason` explica
+         *     quando o perfil guardado foi devolvido sem nova consulta (ex.: RIOT_KEY_MISSING).
+         */
+        PlayerProfile: {
+            /** Datadragonversion */
+            dataDragonVersion?: string | null;
+            flex?: components["schemas"]["PlayerRank"] | null;
+            /** Gamename */
+            gameName: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Profileiconid */
+            profileIconId?: number | null;
+            /**
+             * Refreshedat
+             * Format: date-time
+             */
+            refreshedAt: string;
+            solo?: components["schemas"]["PlayerRank"] | null;
+            /** Stalereason */
+            staleReason?: string | null;
+            /** Summonerlevel */
+            summonerLevel?: number | null;
+            /** Tagline */
+            tagLine: string;
+        };
+        /** PlayerRank */
+        PlayerRank: {
+            /** Division */
+            division?: string | null;
+            /** Leaguepoints */
+            leaguePoints?: number | null;
+            /** Losses */
+            losses?: number | null;
+            /**
+             * Observedat
+             * Format: date-time
+             */
+            observedAt: string;
+            /**
+             * Queue
+             * @enum {string}
+             */
+            queue: "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "READY" | "UNRANKED";
+            /** Tier */
+            tier?: string | null;
+            /** Wins */
+            wins?: number | null;
+        };
         /** Position */
         Position: {
             /** Division */
@@ -2995,6 +3130,8 @@ export interface operations {
                 limit?: number;
                 /** @description all: importadas; account: conta local; demo: sintéticas; account_and_demo: conta local e sintéticas. Filtro anterior à paginação; conta não identificada nunca inclui partidas reais de terceiros. */
                 scope?: "all" | "account" | "demo" | "account_and_demo";
+                /** @description Perfil buscado por Riot ID (CC-1101): só as partidas em que ele aparece, com o participante dele como localParticipantId; ignora `scope`. */
+                player?: string | null;
             };
             header?: never;
             path?: never;
@@ -3348,6 +3485,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_player_lookup_api_v1_players_lookup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayerLookup"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description INVALID_RIOT_ID ou VALIDATION_ERROR. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_player_profile_api_v1_players__player_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description Jogador não buscado ainda. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_player_sync_api_v1_players__player_id__sync_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistorySyncStatus"];
+                };
+            };
+            /** @description Jogador não buscado ainda. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_player_sync_api_v1_players__player_id__sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistorySyncStatus"];
+                };
+            };
+            /** @description Jogador não buscado ainda. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

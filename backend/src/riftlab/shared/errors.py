@@ -65,3 +65,13 @@ class SourceRateLimitedError(SourceError):
     def __init__(self, *, code: str, detail: str, retry_after_seconds: float | None = None) -> None:
         super().__init__(code=code, detail=detail)
         self.retry_after_seconds = retry_after_seconds
+
+
+class PlayerLookupError(DomainError):
+    """Busca de jogador por Riot ID (CC-1101) que não pôde ser atendida: código estável de um
+    conjunto fechado, sem ecoar o Riot ID nem resposta da Riot."""
+
+    def __init__(self, code: str, *, retry_after_seconds: float | None = None) -> None:
+        super().__init__(code)
+        self.code = code
+        self.retry_after_seconds = retry_after_seconds

@@ -27,7 +27,8 @@ def test_openapi_only_announces_real_routes() -> None:
     de preparação) no CC-205; análises (POST/GET) no CC-303; interpretação de
     objetivo no CC-504; feedback, relatório, reflexão e progresso no CC-505; prévia e
     expurgo de partida (DELETE com confirmação) no CC-603; sincronização do histórico
-    (POST/GET) no CC-901; revisão da partida (F1) no CC-1003."""
+    (POST/GET) no CC-901; revisão da partida (F1) no CC-1003; perfil de jogador por Riot ID
+    (busca, perfil e sincronização) no CC-1101."""
     schema = _current_schema()
     assert set(schema["paths"].keys()) == {
         "/health/live",
@@ -45,6 +46,9 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/decisions/{decision_id}",
         "/api/v1/ranked/me",
         "/api/v1/history/sync",
+        "/api/v1/players/lookup",
+        "/api/v1/players/{player_id}",
+        "/api/v1/players/{player_id}/sync",
         "/api/v1/dashboard",
         "/api/v1/champions/patterns",
         "/api/v1/analyses",
@@ -151,7 +155,7 @@ def test_match_routes_document_order_pagination_and_errors() -> None:
     assert set(detail["get"]["responses"]) == {"200", "404", "422"}
     assert set(prepare["post"]["responses"]) == {"202", "404", "422"}
     params = {p["name"]: p for p in listing["get"]["parameters"]}
-    assert set(params) == {"cursor", "limit", "scope"}
+    assert set(params) == {"cursor", "limit", "scope", "player"}
     assert params["scope"]["schema"]["default"] == "all"
     assert params["scope"]["schema"]["enum"] == ["all", "account", "demo", "account_and_demo"]
     assert (
