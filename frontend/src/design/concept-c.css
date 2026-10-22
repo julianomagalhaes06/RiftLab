@@ -32,7 +32,10 @@
 .app__topbar .player-search input { width: 200px; min-height: 36px; border-right: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); font-size: .875rem; }
 .player-search__submit { display: inline-grid; place-items: center; width: 40px; height: 36px; padding: 0; border: 1px solid var(--nline-strong); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--n1); color: var(--ntext-muted); cursor: pointer; }
 .player-search__submit:hover { color: var(--ntext); background: var(--n2); }
-/* O alvo de 36 px fica dentro de uma faixa de 44 px de altura útil no topo. */
+/* O alvo de 36 px fica dentro de uma faixa de 44 px de altura útil no topo. O botão precisa
+   ser o contêiner do ::after: sem isso a faixa se estendia pela busca inteira e cobria o campo,
+   e o clique no campo acionava "Buscar" (CC-1209). */
+.player-search__submit { position: relative; }
 .player-search__submit::after { content: ""; position: absolute; inset: -4px 0; }
 .player-search { position: relative; }
 

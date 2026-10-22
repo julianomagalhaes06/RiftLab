@@ -60,6 +60,24 @@ for (const width of [360, 1280]) {
       await expect(page).toHaveURL(/\/jogador\/Conta%20Pr%C3%B3pria-BR1$/);
     });
 
+    test("clique de mouse no campo foca e aceita texto; a lupa não cobre o campo (CC-1209)", async ({ page }) => {
+      await mockApi(page);
+      await page.goto("/historico");
+      const search = page.getByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
+      // Clique real (fill() foca sem clicar e não pegava a sobreposição).
+      await search.click();
+      await expect(search).toBeFocused();
+      await page.keyboard.type("Jogador");
+      await expect(search).toHaveValue("Jogador");
+      await expect(page.getByRole("search", { name: "Buscar jogador" }).getByRole("alert")).toHaveCount(0);
+      const box = await search.boundingBox();
+      if (!box) throw new Error("campo sem caixa");
+      for (const x of [box.x + 8, box.x + box.width / 2, box.x + box.width - 8]) {
+        const hit = await page.evaluate(([px, py]) => document.elementFromPoint(px, py)?.getAttribute("role"), [x, box.y + box.height / 2]);
+        expect(hit).toBe("combobox");
+      }
+    });
+
     test("sugestões: perfil já aberto aparece ao digitar parte do nome; sem # sugere BR1 (CC-1208)", async ({ page }) => {
       await mockApi(page);
       await page.goto("/jogador/Jogador%20Teste-BR1");

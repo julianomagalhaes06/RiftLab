@@ -61,7 +61,8 @@
 
 /* Sugestões da busca (CC-1208): buscas recentes deste navegador e "Nome#BR1". Superfície do
    padrão; opção ativa com o véu e a barra roxos (seleção). */
-.player-search__popup { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; display: grid; width: 360px; max-width: calc(100vw - 32px); padding: 8px 0; }
+/* Seletor com o pai: .surface também define position e não pode vencer pela ordem do CSS. */
+.player-search > .player-search__popup { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; display: grid; width: 360px; max-width: calc(100vw - 32px); padding: 8px 0; }
 .player-search__popup[hidden] { display: none; }
 .player-search__group { margin: 2px 16px 6px; color: var(--ntext-subtle); font-size: .75rem; font-weight: 600; }
 .player-search__options { list-style: none; margin: 0; padding: 0; }
@@ -80,7 +81,7 @@
 .player-search__clear:hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 4px; }
 
 @media (max-width: 960px) {
-  .player-search__popup { top: calc(100% - 4px); left: 0; right: 0; width: auto; max-width: none; }
+  .player-search > .player-search__popup { top: calc(100% - 4px); left: 0; right: 0; width: auto; max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .player-search__option { transition: none; }
