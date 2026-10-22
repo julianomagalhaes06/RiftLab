@@ -2413,6 +2413,334 @@
         "title": "LearningProgressCounts",
         "type": "object"
       },
+      "LiveBan": {
+        "additionalProperties": false,
+        "properties": {
+          "champion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChampionAsset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "championId": {
+            "title": "Championid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "championId"
+        ],
+        "title": "LiveBan",
+        "type": "object"
+      },
+      "LiveGame": {
+        "additionalProperties": false,
+        "description": "Partida ao vivo (CC-1211). Fora de partida, `state` NOT_IN_GAME e `game` nulo.",
+        "properties": {
+          "checkedAt": {
+            "format": "date-time",
+            "title": "Checkedat",
+            "type": "string"
+          },
+          "game": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LiveGameInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gameName": {
+            "title": "Gamename",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "IN_GAME",
+              "NOT_IN_GAME"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "tagLine": {
+            "title": "Tagline",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "gameName",
+          "tagLine",
+          "checkedAt"
+        ],
+        "title": "LiveGame",
+        "type": "object"
+      },
+      "LiveGameInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "dataDragonVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datadragonversion"
+          },
+          "gameMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamemode"
+          },
+          "lengthSeconds": {
+            "title": "Lengthseconds",
+            "type": "integer"
+          },
+          "mapId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapid"
+          },
+          "queueId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queueid"
+          },
+          "rankQueue": {
+            "enum": [
+              "RANKED_SOLO_5x5",
+              "RANKED_FLEX_SR"
+            ],
+            "title": "Rankqueue",
+            "type": "string"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/LiveTeam"
+            },
+            "title": "Teams",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rankQueue",
+          "lengthSeconds",
+          "teams"
+        ],
+        "title": "LiveGameInfo",
+        "type": "object"
+      },
+      "LiveParticipant": {
+        "additionalProperties": false,
+        "description": "Jogador da partida ao vivo. Riot ID como o jogo mostra na tela de carregamento (nulo para\nbot ou sem Riot ID); `rankState` UNAVAILABLE quando o elo não pôde ser consultado agora.",
+        "properties": {
+          "bot": {
+            "default": false,
+            "title": "Bot",
+            "type": "boolean"
+          },
+          "champion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChampionAsset"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "championId": {
+            "title": "Championid",
+            "type": "integer"
+          },
+          "gameName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamename"
+          },
+          "keystoneId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keystoneid"
+          },
+          "perkStyle": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Perkstyle"
+          },
+          "perkSubStyle": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Perksubstyle"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LivePlayerRank"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rankState": {
+            "enum": [
+              "READY",
+              "UNRANKED",
+              "UNAVAILABLE"
+            ],
+            "title": "Rankstate",
+            "type": "string"
+          },
+          "requested": {
+            "default": false,
+            "title": "Requested",
+            "type": "boolean"
+          },
+          "spell1Id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spell1Id"
+          },
+          "spell2Id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spell2Id"
+          },
+          "tagLine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline"
+          }
+        },
+        "required": [
+          "championId",
+          "rankState"
+        ],
+        "title": "LiveParticipant",
+        "type": "object"
+      },
+      "LivePlayerRank": {
+        "additionalProperties": false,
+        "properties": {
+          "division": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Division"
+          },
+          "leaguePoints": {
+            "title": "Leaguepoints",
+            "type": "integer"
+          },
+          "losses": {
+            "title": "Losses",
+            "type": "integer"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tier",
+          "leaguePoints",
+          "wins",
+          "losses"
+        ],
+        "title": "LivePlayerRank",
+        "type": "object"
+      },
       "LiveStatus": {
         "properties": {
           "status": {
@@ -2422,6 +2750,40 @@
           }
         },
         "title": "LiveStatus",
+        "type": "object"
+      },
+      "LiveTeam": {
+        "additionalProperties": false,
+        "properties": {
+          "bans": {
+            "items": {
+              "$ref": "#/components/schemas/LiveBan"
+            },
+            "title": "Bans",
+            "type": "array"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/LiveParticipant"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "teamId": {
+            "enum": [
+              100,
+              200
+            ],
+            "title": "Teamid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "teamId",
+          "bans",
+          "participants"
+        ],
+        "title": "LiveTeam",
         "type": "object"
       },
       "MatchChampion": {
@@ -6455,6 +6817,68 @@
         "summary": "Post Interpret",
         "tags": [
           "objectives"
+        ]
+      }
+    },
+    "/api/v1/players/live": {
+      "post": {
+        "description": "Como o \"Live Game\" de sites de estatísticas: Spectator-V5 (BR1) devolve a partida em andamento, depois da tela de carregamento, com os dez jogadores, campeões, feitiços, runa principal e banimentos; League-V4 dá o elo de cada um na fila da partida. Sem placar ao vivo. Até 12 requisições; o resultado fica 20 s em memória e nada é gravado. O Riot ID vai no corpo, fora dos logs de acesso. Fora de partida: `NOT_IN_GAME`.",
+        "operationId": "post_live_game_api_v1_players_live_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerSyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveGame"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "INVALID_RIOT_ID ou VALIDATION_ERROR."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE."
+          }
+        },
+        "summary": "Partida ao vivo de um Riot ID",
+        "tags": [
+          "players"
         ]
       }
     },

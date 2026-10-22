@@ -2,26 +2,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type MatchSummary, type PlayerProfile, type PlayerRank } from "../../shared/api/client";
 import { isAbortError, isApiError } from "../../shared/api/errors";
 import { usePagedList } from "../../shared/hooks/usePagedList";
+import { Link } from "../../shared/router/Link";
+import { routeToPath } from "../../shared/router/routes";
 import { count } from "../../shared/text/count";
 import { DayGroups } from "../history/HistoryPage";
 import { HistorySync } from "../history/HistorySync";
 import { clock } from "../history/syncMessage";
 import { RankCard } from "../ranked/RankCard";
 import { isTier, profileIconUrl } from "../ranked/tiers";
+import { LOOKUP_ERRORS } from "./lookupErrors";
 import { rememberPlayer } from "./recentPlayers";
 import "../history/history.css";
 import "./players.css";
 
 const PAGE_SIZE = 20;
-const LOOKUP_ERRORS: Record<string, string> = {
-  PLAYER_NOT_FOUND: "Nenhuma conta Riot com esse Riot ID. Confira o nome e a TAG.",
-  PLAYER_NOT_ON_PLATFORM: "A conta existe, mas não joga League of Legends no servidor BR.",
-  INVALID_RIOT_ID: "Use o formato Nome#TAG (a TAG tem de 3 a 5 letras ou números).",
-  RIOT_KEY_MISSING: "Busca indisponível: o servidor está sem chave da Riot.",
-  SECRET_MISSING: "Busca indisponível: o servidor está sem o segredo local de identificação.",
-  RIOT_AUTH_FAILED: "A chave da Riot foi recusada (a de desenvolvimento expira em 24 h).",
-  RIOT_RATE_LIMITED: "Muitas consultas à Riot agora. Tente de novo em instantes.",
-};
 
 /** Card de elo de uma fila do jogador (CC-1204): o mesmo do Painel e de Minha posição, sem
  * variação (a página do jogador guarda só a última observação). */
@@ -69,6 +63,10 @@ function ProfileHeader({ profile }: { profile: PlayerProfile }) {
             {profile.staleReason === "RIOT_KEY_MISSING" ? " (sem chave da Riot para atualizar)" : ""}
           </p>
         </div>
+        {/* CC-1211: partida em andamento, como o "Live Game" do op.gg. */}
+        <Link to={routeToPath({ name: "live", gameName: profile.gameName, tagLine: profile.tagLine })} className="button button--secondary player-header__live">
+          <span className="player-header__live-dot" aria-hidden="true" />Partida ao vivo
+        </Link>
       </div>
       <div className="player-ranks" role="group" aria-label="Elo">
         <QueueRank label="Solo/Duo" rank={profile.solo} />

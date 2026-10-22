@@ -1,0 +1,57 @@
+/* Partida ao vivo (CC-1211) no padrão Arena: dois times em superfícies, cor do time só no traço
+   do título, roxo só no jogador buscado e nos links, cor do elo só na classificação. */
+.live-head { max-width: none; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; }
+.live-head > div:first-child { max-width: 760px; }
+.live-head__tag { color: var(--ntext-subtle); font-weight: 500; }
+.live-head .page-head__lead strong { color: var(--ntext); font-weight: 600; }
+.live-head__actions { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+
+.live-state { margin: 0; padding: 24px 28px; display: grid; gap: 8px; color: var(--ntext-muted); line-height: 1.5; }
+.live-state p { margin: 0; }
+.live-state strong { color: var(--ntext); }
+
+.live-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.live-team .section-head h3 { position: relative; padding-left: 12px; }
+.live-team .section-head h3::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 3px; background: var(--team-color); }
+.live-team--blue { --team-color: var(--team-blue); }
+.live-team--red { --team-color: var(--team-red); }
+.live-team__bans { display: inline-flex; align-items: center; gap: 8px; color: var(--ntext-subtle); font-size: .75rem; font-weight: 500; }
+.live-team__ban-list { display: inline-flex; gap: 4px; }
+.live-team__ban .champion-avatar { filter: grayscale(1); opacity: .75; }
+.live-team .surface { padding: 0; }
+
+.live-player { display: grid; grid-template-columns: 40px auto minmax(0, 1fr) minmax(0, 168px); align-items: center; gap: 12px; min-height: 68px; padding: 10px 16px; }
+.live-player.is-selected { --result-color: var(--accent-strong); }
+.live-player__kit { display: grid; grid-template-columns: repeat(2, 20px); grid-template-rows: repeat(2, 20px); gap: 2px; }
+.live-icon { display: inline-grid; place-items: center; width: 20px; height: 20px; overflow: hidden; background: var(--n2); border-radius: 2px; }
+.live-icon img { width: 20px; height: 20px; display: block; }
+.live-icon--rune { background: transparent; }
+.live-icon--empty { visibility: hidden; }
+.live-icon__text { color: var(--ntext-subtle); font-size: .5625rem; font-weight: 700; }
+.live-player__who { display: grid; gap: 2px; min-width: 0; }
+.live-player__who strong { font-size: .9375rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app a.live-player__riot-id { display: inline-flex; align-items: baseline; min-height: 24px; width: fit-content; max-width: 100%; overflow: hidden; color: var(--accent); font-size: .8125rem; font-weight: 500; text-decoration: none; white-space: nowrap; text-overflow: ellipsis; }
+.app a.live-player__riot-id span { color: var(--ntext-subtle); }
+.app a.live-player__riot-id:hover { text-decoration: underline; text-underline-offset: 3px; }
+.app a.live-player__riot-id:focus-visible { outline-offset: 1px; }
+.live-player__hidden { color: var(--ntext-subtle); font-size: .8125rem; }
+.live-player__rank { display: grid; gap: 2px; justify-items: end; text-align: right; min-width: 0; }
+.live-player__tier { display: inline-flex; align-items: center; gap: 4px; color: var(--tier-text); font-size: .8125rem; font-weight: 600; white-space: nowrap; }
+.live-player__rank[data-tier="NONE"] .live-player__tier { color: var(--ntext-subtle); font-weight: 500; }
+.live-player__tier img { width: 20px; height: 20px; object-fit: contain; }
+.live-player__record { color: var(--ntext-subtle); font-size: .75rem; }
+.live-team .champion-avatar.portrait { border: 0; border-radius: 0; }
+
+.live-note { margin: 16px 0 0; color: var(--ntext-subtle); font-size: .8125rem; }
+
+@media (max-width: 1100px) {
+  .live-teams { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .live-player { grid-template-columns: 40px auto minmax(0, 1fr); grid-template-areas: "face kit who" "face kit rank"; row-gap: 4px; padding: 10px 12px; }
+  .live-player > .champion-avatar { grid-area: face; }
+  .live-player__kit { grid-area: kit; }
+  .live-player__who { grid-area: who; }
+  .live-player__rank { grid-area: rank; justify-items: start; text-align: left; }
+  .live-team .section-head { align-items: flex-start; flex-direction: column; }
+}

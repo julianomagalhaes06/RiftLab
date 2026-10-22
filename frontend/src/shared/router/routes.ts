@@ -9,6 +9,7 @@
  *   /matches/:matchId?participant=N      partida (preparação, participantes, decisões)
  *   /decisions/:decisionId               detalhe de uma decisão
  *   /jogador/:nome-:tag                  perfil de um jogador pelo Riot ID (CC-1102)
+ *   /jogador/:nome-:tag/ao-vivo          partida ao vivo do jogador (CC-1211)
  *   /prototipo                           protótipo ilustrativo do CC-102 (dados fictícios)
  */
 export type Route =
@@ -22,6 +23,7 @@ export type Route =
   | { name: "match"; matchId: string; participantId: number | null }
   | { name: "decision"; decisionId: string }
   | { name: "player"; gameName: string; tagLine: string }
+  | { name: "live"; gameName: string; tagLine: string }
   | { name: "prototype" }
   | { name: "notFound"; path: string };
 
@@ -99,6 +101,11 @@ export function parseRoute(pathname: string, search = ""): Route {
       return { name: "decision", decisionId: id.toLowerCase() };
     }
   }
+  if (head === "jogador" && id && rest.length === 1 && rest[0] === "ao-vivo") {
+    const dash = id.lastIndexOf("-");
+    const riotId = dash > 0 ? parseRiotId(`${id.slice(0, dash)}#${id.slice(dash + 1)}`) : null;
+    if (riotId) return { name: "live", ...riotId };
+  }
   if (head === "prototipo" && id === undefined) {
     return { name: "prototype" };
   }
@@ -139,6 +146,8 @@ export function routeToPath(route: Route): string {
       return `/decisions/${route.decisionId}`;
     case "player":
       return `/jogador/${encodeURIComponent(route.gameName)}-${encodeURIComponent(route.tagLine)}`;
+    case "live":
+      return `/jogador/${encodeURIComponent(route.gameName)}-${encodeURIComponent(route.tagLine)}/ao-vivo`;
     case "prototype":
       return "/prototipo";
     case "notFound":

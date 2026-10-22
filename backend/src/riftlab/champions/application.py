@@ -139,3 +139,40 @@ async def champion_assets(
         for row in rows
         if IMAGE_FILE_PATTERN.fullmatch(row.image_file)  # defesa em profundidade
     }
+
+
+def _version_key(version: str) -> tuple[int, ...]:
+    return (
+        tuple(int(part) for part in version.split("."))
+        if VERSION_PATTERN.fullmatch(version)
+        else ()
+    )
+
+
+async def latest_champion_assets(
+    session: AsyncSession, champion_ids: Iterable[int], *, locale: str = CHAMPION_LOCALE
+) -> dict[int, ChampionAsset]:
+    """Só banco. Nome e retrato pelo catálogo de campeões mais recente já sincronizado (partida
+    ao vivo, CC-1211, que não tem patch de partida importada). {} sem catálogo."""
+    ids = sorted(set(champion_ids))
+    rows = (
+        await session.execute(
+            select(ChampionCatalogModel.id, ChampionCatalogModel.data_dragon_version).where(
+                ChampionCatalogModel.locale == locale
+            )
+        )
+    ).all()
+    ranked = sorted(((_version_key(v), i, v) for i, v in rows if _version_key(v)), reverse=True)
+    if not ranked or not ids:
+        return {}
+    _, catalog_id, version = ranked[0]
+    champions = await session.scalars(
+        select(ChampionModel).where(
+            ChampionModel.catalog_id == catalog_id, ChampionModel.champion_key.in_(ids)
+        )
+    )
+    return {
+        row.champion_key: ChampionAsset(row.name, version, row.image_file)
+        for row in champions
+        if IMAGE_FILE_PATTERN.fullmatch(row.image_file)
+    }

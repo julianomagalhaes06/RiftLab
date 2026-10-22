@@ -224,6 +224,22 @@ Como em sites de estatísticas, qualquer Riot ID do servidor BR pode ser consult
 - **Retenção e remoção (CC-1103).** `cc retention run` apaga perfil, todas as observações de elo e as execuções terminadas de quem não foi consultado há `player_profile_retention_days` (7); a conta configurada fica de fora. `cc retention purge-player --game-name --tag-line [--execute]` faz o mesmo para um Riot ID; uma execução ativa fica até o worker terminá-la. As duas só imprimem contagens.
 - **Interface.** A busca "Nome#TAG" fica no topo de todas as telas e leva a `/jogador/Nome-TAG`; o último hífen separa a TAG. A página mostra perfil, elo, o botão Atualizar (elo, ícone e partidas) e o histórico do jogador com os cartões do Histórico.
 
+## CC-1211 — Partida ao vivo
+
+- **Rota.** `POST /api/v1/players/live` com `{gameName, tagLine}`. É POST para o Riot ID ficar fora da URL e dos logs de acesso. Com chave da Riot, chama:
+  - Account-V1, para o PUUID;
+  - Spectator-V5 por PUUID em BR1, para a partida em andamento (404 da Riot vira `state=NOT_IN_GAME`);
+  - League-V4 por PUUID para cada jogador humano, para o elo na fila da partida (Flex na fila 440; Solo/Duo nas demais).
+
+  São até 12 requisições, com o limitador único do processo. Um 429 no elo encerra as consultas de elo e a partida volta assim mesmo, com `rankState=UNAVAILABLE` nos jogadores que faltaram.
+- **Resposta.** `{state, gameName, tagLine, checkedAt, game}`. `game` traz `queueId`, `rankQueue`, `gameMode`, `mapId`, `startedAt` (nulo durante o carregamento), `lengthSeconds`, `dataDragonVersion` e dois times (`teamId` 100/200). Cada time tem:
+  - `bans`, com o campeão em ordem de escolha;
+  - `participants`, com o Riot ID como o jogo mostra na tela de carregamento (nulo para bot ou sem `#`), `requested` para o jogador buscado, campeão, `spell1Id`/`spell2Id`, `keystoneId`, `perkStyle`/`perkSubStyle`, `rankState` (`READY`, `UNRANKED`, `UNAVAILABLE`) e `rank`.
+
+  Nunca há PUUID na resposta. Erros como na busca: `INVALID_RIOT_ID`, `PLAYER_NOT_FOUND`, `RIOT_KEY_MISSING`, `RIOT_AUTH_FAILED`, `RIOT_RATE_LIMITED` e `UPSTREAM_UNAVAILABLE`.
+- **Nada gravado.** Nem banco nem disco. A resposta fica 20 s na memória do processo da API, por Riot ID, para "Verificar de novo" não repetir requisições.
+- **Interface.** O botão "Partida ao vivo" no cabeçalho de `/jogador/Nome-TAG` leva a `/jogador/Nome-TAG/ao-vivo`. A tela mostra os dois times lado a lado (empilhados até 1100 px), o jogador buscado em destaque, o Riot ID de cada um com link para o perfil e o tempo de jogo correndo. Os ícones de feitiço e de estilo de runa vêm do Data Dragon; sem rede, aparece o nome.
+
 ## CC-1202 — Moldura: perfil da conta e catálogo atual
 
 - **Perfil da conta.** `GET /api/v1/players/me` devolve o perfil da conta configurada no formato da busca, para o chip do topo. O Riot ID vem do arquivo da conta, nunca do banco. Com perfil guardado, responde só do banco, qualquer que seja a idade; o Atualizar da página do jogador renova. Sem perfil guardado, consulta a Riot uma vez, como a busca (3 requisições). A resposta é sempre 200 com `{profile, reason}`, como `/api/v1/ranked/me`: sem perfil, `profile` vem nulo e `reason` traz `ACCOUNT_NOT_CONFIGURED`, `SECRET_MISSING`, `RIOT_KEY_MISSING` ou o erro da consulta à Riot. Assim, uma instalação sem conta não registra erro no console a cada tela. A interface escolhe a melhor fila (elo, divisão e PDL) e, sem perfil, mostra só o selo BR1.

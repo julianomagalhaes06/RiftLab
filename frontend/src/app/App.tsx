@@ -18,6 +18,7 @@ import { PanelPage, PositionPage } from "./AreaPages";
 import { ChampionsPage } from "../features/champions/ChampionsPage";
 import { MainNav } from "./MainNav";
 import { PlayerPage } from "../features/players/PlayerPage";
+import { LivePage } from "../features/live/LivePage";
 import { PlayerSearch } from "../features/players/PlayerSearch";
 import { ProfileChip } from "../features/players/ProfileChip";
 import "./App.css";
@@ -34,6 +35,7 @@ const TITLES: Record<Route["name"], string> = {
   match: "Partida — RiftLab",
   decision: "Decisão — RiftLab",
   player: "Jogador — RiftLab",
+  live: "Partida ao vivo — RiftLab",
   prototype: "Protótipo (dados ilustrativos) — RiftLab",
   notFound: "Página não encontrada — RiftLab",
 };
@@ -60,6 +62,8 @@ function renderPage(route: Route): ReactNode {
       return <DecisionDetailPage key={route.decisionId} decisionId={route.decisionId} />;
     case "player":
       return <PlayerPage key={`${route.gameName}#${route.tagLine}`} gameName={route.gameName} tagLine={route.tagLine} />;
+    case "live":
+      return <LivePage key={`${route.gameName}#${route.tagLine}`} gameName={route.gameName} tagLine={route.tagLine} />;
     case "notFound":
       return (
         <section className="area-page" aria-labelledby="not-found-heading">
@@ -124,7 +128,7 @@ function AppShell() {
         <footer className="app__footer">
           <div className="app__footer-row">
             <p>RiftLab</p>
-            <p>Revisão de partidas concluídas; o RiftLab não acompanha partidas ao vivo.</p>
+            <p>Revisão de partidas concluídas e partida ao vivo sem placar (composição e elo).</p>
             <p>Retratos e ícones: Data Dragon · Emblemas: Ranked Emblems · © Riot Games</p>
           </div>
           <p lang="en" className="app__legal">

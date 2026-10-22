@@ -18,7 +18,9 @@ from riftlab.players.application import (
     profile_account,
     profile_key,
 )
+from riftlab.players.live import live_game
 from riftlab.shared.api.common import CamelModel
+from riftlab.shared.api.matches import ChampionAsset
 from riftlab.shared.errors import NotFoundError, PlayerLookupError
 
 router = APIRouter(prefix="/api/v1/players", tags=["players"])
@@ -102,6 +104,65 @@ async def post_player_lookup(body: PlayerLookup, request: Request) -> PlayerProf
     )
 
 
+class LivePlayerRank(CamelModel):
+    tier: str
+    division: str | None = None
+    league_points: int
+    wins: int
+    losses: int
+
+
+class LiveParticipant(CamelModel):
+    """Jogador da partida ao vivo. Riot ID como o jogo mostra na tela de carregamento (nulo para
+    bot ou sem Riot ID); `rankState` UNAVAILABLE quando o elo não pôde ser consultado agora."""
+
+    game_name: str | None = None
+    tag_line: str | None = None
+    bot: bool = False
+    requested: bool = False
+    champion_id: int
+    champion: ChampionAsset | None = None
+    spell1_id: int | None = None
+    spell2_id: int | None = None
+    keystone_id: int | None = None
+    perk_style: int | None = None
+    perk_sub_style: int | None = None
+    rank_state: Literal["READY", "UNRANKED", "UNAVAILABLE"]
+    rank: LivePlayerRank | None = None
+
+
+class LiveBan(CamelModel):
+    champion_id: int
+    champion: ChampionAsset | None = None
+
+
+class LiveTeam(CamelModel):
+    team_id: Literal[100, 200]
+    bans: list[LiveBan]
+    participants: list[LiveParticipant]
+
+
+class LiveGameInfo(CamelModel):
+    queue_id: int | None = None
+    rank_queue: Literal["RANKED_SOLO_5x5", "RANKED_FLEX_SR"]
+    game_mode: str | None = None
+    map_id: int | None = None
+    started_at: datetime | None = None
+    length_seconds: int
+    data_dragon_version: str | None = None
+    teams: list[LiveTeam]
+
+
+class LiveGame(CamelModel):
+    """Partida ao vivo (CC-1211). Fora de partida, `state` NOT_IN_GAME e `game` nulo."""
+
+    state: Literal["IN_GAME", "NOT_IN_GAME"]
+    game_name: str
+    tag_line: str
+    checked_at: datetime
+    game: LiveGameInfo | None = None
+
+
 class OwnPlayer(CamelModel):
     """Perfil da conta configurada (CC-1202). Sem perfil, `profile` vem nulo e `reason` diz por
     quê: ACCOUNT_NOT_CONFIGURED, SECRET_MISSING, RIOT_KEY_MISSING ou um erro da consulta à Riot
@@ -110,6 +171,30 @@ class OwnPlayer(CamelModel):
 
     profile: PlayerProfile | None = None
     reason: str | None = None
+
+
+@router.post(
+    "/live",
+    response_model=LiveGame,
+    summary="Partida ao vivo de um Riot ID",
+    description=(
+        'Como o "Live Game" de sites de estatísticas: Spectator-V5 (BR1) devolve a partida em '
+        "andamento, depois da tela de carregamento, com os dez jogadores, campeões, feitiços, "
+        "runa principal e banimentos; League-V4 dá o elo de cada um na fila da partida. Sem "
+        "placar ao vivo. Até 12 requisições; o resultado fica 20 s em memória e nada é gravado. "
+        "O Riot ID vai no corpo, fora dos logs de acesso. Fora de partida: `NOT_IN_GAME`."
+    ),
+    responses=_ERRORS,
+)
+async def post_live_game(body: PlayerSyncRequest, request: Request) -> LiveGame:
+    return LiveGame.model_validate(
+        await live_game(
+            request.app.state.session_factory,
+            request.app.state.settings,
+            body.game_name,
+            body.tag_line,
+        )
+    )
 
 
 @router.get(

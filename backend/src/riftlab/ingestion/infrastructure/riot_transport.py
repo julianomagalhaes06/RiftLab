@@ -390,6 +390,23 @@ class RiotHttpTransport:
             )
         return document
 
+    async def fetch_active_game_by_puuid(self, puuid: str) -> dict[str, Any]:
+        """Spectator-V5 por PUUID no host fixo BR1 (CC-1211): a partida em andamento, depois da
+        tela de carregamento. Fora de partida a Riot responde 404 (SourceNotFoundError)."""
+        if not puuid or "/" in puuid or "?" in puuid:
+            raise SourceSchemaError(code="SCHEMA_UNSUPPORTED", detail="puuid inválido")
+        body = await self._request_raw(
+            "spectator",
+            f"/lol/spectator/v5/active-games/by-summoner/{quote(puuid, safe='')}",
+            host=BR1_HOST,
+        )
+        document = _parse_json_body("spectator", body)
+        if not isinstance(document, dict) or not isinstance(document.get("participants"), list):
+            raise SourceSchemaError(
+                code="SCHEMA_UNSUPPORTED", detail="resposta de spectator com formato inesperado"
+            )
+        return document
+
     async def list_match_ids_by_puuid(
         self,
         puuid: str,

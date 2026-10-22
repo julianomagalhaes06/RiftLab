@@ -31,7 +31,7 @@ export function ContextStrip() {
         ) : (
           <p className="context-strip__note">
             <InfoIcon />
-            <span>Servidor BR1 · revisão de partidas concluídas, sem acompanhamento ao vivo.</span>
+            <span>Servidor BR1 · revisão de partidas concluídas e partida ao vivo sem placar.</span>
           </p>
         )}
         {catalog?.gamePatch ? (

@@ -502,6 +502,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/players/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Partida ao vivo de um Riot ID
+         * @description Como o "Live Game" de sites de estatísticas: Spectator-V5 (BR1) devolve a partida em andamento, depois da tela de carregamento, com os dez jogadores, campeões, feitiços, runa principal e banimentos; League-V4 dá o elo de cada um na fila da partida. Sem placar ao vivo. Até 12 requisições; o resultado fica 20 s em memória e nada é gravado. O Riot ID vai no corpo, fora dos logs de acesso. Fora de partida: `NOT_IN_GAME`.
+         */
+        post: operations["post_live_game_api_v1_players_live_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/players/lookup": {
         parameters: {
             query?: never;
@@ -1564,6 +1584,108 @@ export interface components {
             /** Usedhints */
             usedHints: number;
         };
+        /** LiveBan */
+        LiveBan: {
+            champion?: components["schemas"]["ChampionAsset"] | null;
+            /** Championid */
+            championId: number;
+        };
+        /**
+         * LiveGame
+         * @description Partida ao vivo (CC-1211). Fora de partida, `state` NOT_IN_GAME e `game` nulo.
+         */
+        LiveGame: {
+            /**
+             * Checkedat
+             * Format: date-time
+             */
+            checkedAt: string;
+            game?: components["schemas"]["LiveGameInfo"] | null;
+            /** Gamename */
+            gameName: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "IN_GAME" | "NOT_IN_GAME";
+            /** Tagline */
+            tagLine: string;
+        };
+        /** LiveGameInfo */
+        LiveGameInfo: {
+            /** Datadragonversion */
+            dataDragonVersion?: string | null;
+            /** Gamemode */
+            gameMode?: string | null;
+            /** Lengthseconds */
+            lengthSeconds: number;
+            /** Mapid */
+            mapId?: number | null;
+            /** Queueid */
+            queueId?: number | null;
+            /**
+             * Rankqueue
+             * @enum {string}
+             */
+            rankQueue: "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
+            /** Startedat */
+            startedAt?: string | null;
+            /** Teams */
+            teams: components["schemas"]["LiveTeam"][];
+        };
+        /**
+         * LiveParticipant
+         * @description Jogador da partida ao vivo. Riot ID como o jogo mostra na tela de carregamento (nulo para
+         *     bot ou sem Riot ID); `rankState` UNAVAILABLE quando o elo não pôde ser consultado agora.
+         */
+        LiveParticipant: {
+            /**
+             * Bot
+             * @default false
+             */
+            bot: boolean;
+            champion?: components["schemas"]["ChampionAsset"] | null;
+            /** Championid */
+            championId: number;
+            /** Gamename */
+            gameName?: string | null;
+            /** Keystoneid */
+            keystoneId?: number | null;
+            /** Perkstyle */
+            perkStyle?: number | null;
+            /** Perksubstyle */
+            perkSubStyle?: number | null;
+            rank?: components["schemas"]["LivePlayerRank"] | null;
+            /**
+             * Rankstate
+             * @enum {string}
+             */
+            rankState: "READY" | "UNRANKED" | "UNAVAILABLE";
+            /**
+             * Requested
+             * @default false
+             */
+            requested: boolean;
+            /** Spell1Id */
+            spell1Id?: number | null;
+            /** Spell2Id */
+            spell2Id?: number | null;
+            /** Tagline */
+            tagLine?: string | null;
+        };
+        /** LivePlayerRank */
+        LivePlayerRank: {
+            /** Division */
+            division?: string | null;
+            /** Leaguepoints */
+            leaguePoints: number;
+            /** Losses */
+            losses: number;
+            /** Tier */
+            tier: string;
+            /** Wins */
+            wins: number;
+        };
         /** LiveStatus */
         LiveStatus: {
             /**
@@ -1571,6 +1693,18 @@ export interface components {
              * @default UP
              */
             status: string;
+        };
+        /** LiveTeam */
+        LiveTeam: {
+            /** Bans */
+            bans: components["schemas"]["LiveBan"][];
+            /** Participants */
+            participants: components["schemas"]["LiveParticipant"][];
+            /**
+             * Teamid
+             * @enum {integer}
+             */
+            teamId: 100 | 200;
         };
         /**
          * MatchChampion
@@ -3551,6 +3685,57 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_live_game_api_v1_players_live_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayerSyncRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveGame"];
+                };
+            };
+            /** @description PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description INVALID_RIOT_ID ou VALIDATION_ERROR. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

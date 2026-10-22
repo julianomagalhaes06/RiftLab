@@ -46,6 +46,8 @@ export type HistorySyncStatus = Schemas["HistorySyncStatus"];
 export type PlayerProfile = Schemas["PlayerProfile"];
 export type CatalogCurrent = Schemas["CatalogCurrent"];
 export type OwnPlayer = Schemas["OwnPlayer"];
+export type LiveGame = Schemas["LiveGame"];
+export type LiveParticipant = Schemas["LiveParticipant"];
 export type PlayerRank = Schemas["PlayerRank"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 export type ObjectiveForm = Schemas["ObjectiveForm"];
@@ -82,6 +84,8 @@ export interface ApiClient {
   /** Perfil da conta configurada; sem perfil, `profile` nulo e o motivo (CC-1202). */
   getOwnPlayer(signal?: AbortSignal): Promise<OwnPlayer>;
   getCatalogCurrent(signal?: AbortSignal): Promise<CatalogCurrent>;
+  /** Partida ao vivo do Riot ID (CC-1211); o Riot ID vai no corpo, fora dos logs. */
+  getLiveGame(gameName: string, tagLine: string, signal?: AbortSignal): Promise<LiveGame>;
   getPlayerSync(playerId: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
   /** O banco guarda só o HMAC do Riot ID (CC-1103): o pedido traz o Riot ID do perfil. */
   requestPlayerSync(playerId: string, gameName: string, tagLine: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
@@ -200,6 +204,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
       request("POST", "/api/v1/players/lookup", { body: { gameName, tagLine, refresh }, signal }),
     getOwnPlayer: (signal) => request("GET", "/api/v1/players/me", { signal }),
     getCatalogCurrent: (signal) => request("GET", "/api/v1/catalog/current", { signal }),
+    getLiveGame: (gameName, tagLine, signal) =>
+      request("POST", "/api/v1/players/live", { body: { gameName, tagLine }, signal }),
     getPlayerSync: (playerId, signal) => request("GET", `/api/v1/players/${enc(playerId)}/sync`, { signal }),
     requestPlayerSync: (playerId, gameName, tagLine, signal) =>
       request("POST", `/api/v1/players/${enc(playerId)}/sync`, { body: { gameName, tagLine }, signal }),

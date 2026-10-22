@@ -112,4 +112,13 @@ describe("perfil de jogador por Riot ID (CC-1102)", () => {
     expect(parseRoute(path)).toEqual(route);
     expect(parseRoute("/jogador/SemTag").name).toBe("notFound");
   });
+
+  it("/jogador/Nome-TAG/ao-vivo ida e volta (CC-1211)", () => {
+    const route = { name: "live" as const, gameName: "Meu-Nome Legal", tagLine: "BR1" };
+    const path = routeToPath(route);
+    expect(path).toBe("/jogador/Meu-Nome%20Legal-BR1/ao-vivo");
+    expect(parseRoute(path)).toEqual(route);
+    expect(parseRoute("/jogador/SemTag/ao-vivo").name).toBe("notFound");
+    expect(parseRoute("/jogador/Nome-BR1/outra").name).toBe("notFound");
+  });
 });
