@@ -224,6 +224,13 @@ Como em sites de estatísticas, qualquer Riot ID do servidor BR pode ser consult
 - **Retenção e remoção (CC-1103).** `cc retention run` apaga perfil, todas as observações de elo e as execuções terminadas de quem não foi consultado há `player_profile_retention_days` (7); a conta configurada fica de fora. `cc retention purge-player --game-name --tag-line [--execute]` faz o mesmo para um Riot ID; uma execução ativa fica até o worker terminá-la. As duas só imprimem contagens.
 - **Interface.** A busca "Nome#TAG" fica no topo de todas as telas e leva a `/jogador/Nome-TAG`; o último hífen separa a TAG. A página mostra perfil, elo, o botão Atualizar (elo, ícone e partidas) e o histórico do jogador com os cartões do Histórico.
 
+## CC-1210 — Riot ID dos participantes na partida
+
+- `GET /api/v1/matches/{id}` traz `gameName` e `tagLine` em cada participante (`MatchDetailParticipant`), com o Riot ID como estava na partida. Os campos vêm do `info.participants[].riotIdGameName/riotIdTagline` da resposta bruta guardada pelo worker (`DurableRawMatchStore`), lida na hora do pedido. A API monta o volume `riftlab_raw_data` somente leitura e não grava nada.
+- Ficam nulos em DEMO, quando o bruto não existe (por exemplo, partida expurgada), quando ele está corrompido (hash divergente) ou quando falta o Riot ID (partida antiga só com `summonerName`). Nome ou TAG vazio, com `#`, com caractere de controle ou com mais de 32 caracteres também ficam de fora.
+- O PUUID do bruto nunca sai da API. A lista (`GET /api/v1/matches`), o Painel e o Histórico continuam sem Riot ID.
+- Interface: no placar da partida, o Nome#TAG aparece embaixo do campeão como link para `/jogador/Nome-TAG`. Uma nota avisa que é o Riot ID da época da partida.
+
 ## CC-1211 — Partida ao vivo
 
 - **Rota.** `POST /api/v1/players/live` com `{gameName, tagLine}`. É POST para o Riot ID ficar fora da URL e dos logs de acesso. Com chave da Riot, chama:

@@ -52,7 +52,9 @@ describe("tela da partida", () => {
           ? { ...participant, finalItems: [100001, 100001], finalTrinketItemId: null }
           : participant.participantId === 2
             ? { ...participant, finalItems: [], finalTrinketItemId: 3340 }
-            : participant),
+            : participant.participantId === 6
+              ? { ...participant, gameName: "Rival Ágil", tagLine: "BR1" }
+              : participant),
         localParticipantId: 2,
       }),
     );
@@ -75,6 +77,10 @@ describe("tela da partida", () => {
     const self = screen.getByRole("link", { name: "Participante 2 — Campeão #9002" });
     expect(self).toHaveAttribute("aria-current", "true"); // a conta local vem selecionada
     expect(within(self).getByText("Você")).toBeInTheDocument();
+    // CC-1210: Riot ID da partida embaixo do campeão, com link para o perfil; sem nome, nada.
+    expect(screen.getByRole("link", { name: "Perfil de Rival Ágil#BR1" })).toHaveAttribute("href", "/jogador/Rival%20%C3%81gil-BR1");
+    expect(screen.getAllByRole("link", { name: /^Perfil de / })).toHaveLength(1);
+    expect(screen.getByText(/Riot ID como estava na partida/)).toBeInTheDocument();
 
     expect(await screen.findByText("A decisão de compra desta partida não pode ser analisada.")).toBeInTheDocument();
     const officialBuilds = await screen.findAllByRole("group", { name: "Inventário final oficial" });

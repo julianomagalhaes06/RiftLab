@@ -66,6 +66,11 @@
 .scoreboard__name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scoreboard__name small { color: var(--ntext-muted); font-size: .72rem; display: flex; gap: 6px; align-items: center; }
 .scoreboard__you { padding: 0 6px; border-radius: var(--radius-sm); background: var(--accent-surface); border: 1px solid var(--accent-strong); color: var(--accent); font-weight: 700; font-size: .64rem; }
+/* CC-1210: Riot ID da partida embaixo do campeão, alinhado ao nome (retrato 34 + 10 de espaço). */
+.app a.scoreboard__riot-id { display: inline-flex; align-items: baseline; max-width: calc(100% - 44px); min-height: 24px; margin: -6px 0 0 44px; overflow: hidden; color: var(--accent); font-size: .75rem; font-weight: 500; text-decoration: none; white-space: nowrap; text-overflow: ellipsis; }
+.app a.scoreboard__riot-id span { color: var(--ntext-subtle); }
+.app a.scoreboard__riot-id:hover { text-decoration: underline; text-underline-offset: 3px; }
+.scoreboard__note { margin: 8px 0 0; color: var(--ntext-subtle); font-size: .75rem; }
 .scoreboard__row--local th strong { color: var(--accent); }
 .scoreboard__kda { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .scoreboard__build { display: flex; gap: 3px; flex-wrap: wrap; }

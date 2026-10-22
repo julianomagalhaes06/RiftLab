@@ -2817,7 +2817,7 @@
       },
       "MatchDetail": {
         "additionalProperties": false,
-        "description": "GET /matches/{id}: patch, queue, map, participantes (sem identificador\npessoal) e estado de preparação; 404 desconhecido.",
+        "description": "GET /matches/{id}: patch, queue, map, participantes (com o Riot ID da partida, CC-1210)\ne estado de preparação; 404 desconhecido.",
         "properties": {
           "championsPresent": {
             "items": {
@@ -2856,7 +2856,7 @@
           },
           "participants": {
             "items": {
-              "$ref": "#/components/schemas/MatchParticipant"
+              "$ref": "#/components/schemas/MatchDetailParticipant"
             },
             "title": "Participants",
             "type": "array"
@@ -2926,6 +2926,185 @@
           "preparation"
         ],
         "title": "MatchDetail",
+        "type": "object"
+      },
+      "MatchDetailParticipant": {
+        "additionalProperties": false,
+        "description": "Participante no detalhe da partida (CC-1210): o Riot ID como estava na partida, lido do\nbruto guardado; nulo em DEMO, sem bruto ou sem Riot ID. Nunca PUUID nem subject_hash.",
+        "properties": {
+          "assists": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assists"
+          },
+          "champion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChampionAsset"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null em partida DEMO, patch sem mapping, catálogo ainda não sincronizado ou campeão ausente do catálogo: a interface mostra o id numérico."
+          },
+          "championId": {
+            "minimum": 1.0,
+            "title": "Championid",
+            "type": "integer"
+          },
+          "deaths": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deaths"
+          },
+          "finalItems": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 6,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalitems"
+          },
+          "finalTrinketItemId": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finaltrinketitemid"
+          },
+          "gameName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamename"
+          },
+          "kills": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kills"
+          },
+          "neutralMinionsKilled": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Neutralminionskilled"
+          },
+          "participantId": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Participantid",
+            "type": "integer"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "tagLine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tagline"
+          },
+          "team": {
+            "minimum": 0.0,
+            "title": "Team",
+            "type": "integer"
+          },
+          "totalMinionsKilled": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totalminionskilled"
+          },
+          "win": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Vitória deste participante; null se não observada.",
+            "title": "Win"
+          }
+        },
+        "required": [
+          "participantId",
+          "championId",
+          "team"
+        ],
+        "title": "MatchDetailParticipant",
         "type": "object"
       },
       "MatchParticipant": {

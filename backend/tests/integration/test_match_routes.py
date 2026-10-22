@@ -46,6 +46,9 @@ from riftlab.timeline.models import MatchFramesModel
 
 _PROBLEM_KEYS = {"type", "title", "status", "code", "detail", "requestId"}
 _PERSONAL = ("subject", "hash", "puuid", "riotid", "gamename", "tagline")
+# CC-1210: o detalhe da partida mostra o Riot ID da época (gameName/tagLine) a pedido do usuário;
+# hash, PUUID e subject continuam proibidos ali, e a lista e a timeline seguem sem Riot ID.
+_DETAIL_PERSONAL = ("subject", "hash", "puuid", "riotid")
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -312,11 +315,15 @@ async def test_detail_shows_match_participants_and_preparation_without_personal_
             "assists",
             "totalMinionsKilled",
             "neutralMinionsKilled",
+            # CC-1210: Riot ID da partida, lido do bruto; DEMO não tem bruto da Riot.
+            "gameName",
+            "tagLine",
         }
+        assert participant["gameName"] is None and participant["tagLine"] is None
         assert participant["champion"] is None  # DEMO nunca recebe campeão real (CC-208)
         assert participant["finalItems"] is None
         assert participant["finalTrinketItemId"] is None
-    assert not any(word in key.lower() for key in _keys(body) for word in _PERSONAL)
+    assert not any(word in key.lower() for key in _keys(body) for word in _DETAIL_PERSONAL)
     assert not any(value in response.text for value in hashes)  # o hash nunca sai
 
     listing = await app_client.get("/api/v1/matches", params={"limit": 100})

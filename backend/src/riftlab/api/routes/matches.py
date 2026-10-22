@@ -10,6 +10,7 @@ para uma partida já importada; nunca coleta a partida de novo."""
 
 from __future__ import annotations
 
+import asyncio
 import re
 import uuid
 from collections.abc import Mapping
@@ -26,6 +27,7 @@ from riftlab.errors import ProblemDetail
 from riftlab.ingestion.domain import Match, MatchListScope
 from riftlab.ingestion.purge import purge_preview, request_purge
 from riftlab.matches.queries import MatchParticipantFactsView, get_match_detail, list_matches
+from riftlab.matches.riot_ids import participant_riot_ids
 from riftlab.matches.timeline import get_match_timeline
 from riftlab.players.application import profile_subject
 from riftlab.preparation.application import (
@@ -47,6 +49,7 @@ from riftlab.shared.api.matches import (
     ChampionAsset,
     MatchChampion,
     MatchDetail,
+    MatchDetailParticipant,
     MatchParticipant,
     MatchPreparation,
     MatchSummary,
@@ -181,10 +184,19 @@ async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail
             for p in detail.participants
         ),
     )
+    # CC-1210: Riot ID da partida lido do bruto (somente leitura, nada gravado).
+    riot_ids = await asyncio.to_thread(participant_riot_ids, settings.raw_storage_dir, match_id)
     return MatchDetail(
         **summary.model_dump(exclude={"participants", "local_participant_id"}),
         local_participant_id=detail.local_participant_id,
-        participants=[_to_participant(p, detail.champions) for p in detail.participants],
+        participants=[
+            MatchDetailParticipant(
+                **_to_participant(p, detail.champions).model_dump(),
+                game_name=riot_ids.get(p.participant_id, (None, None))[0],
+                tag_line=riot_ids.get(p.participant_id, (None, None))[1],
+            )
+            for p in detail.participants
+        ],
         preparation=_to_preparation(detail.preparation),
     )
 

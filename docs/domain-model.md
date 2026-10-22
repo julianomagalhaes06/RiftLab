@@ -140,7 +140,7 @@ Corpos brutos match+timeline ficam em `DurableRawMatchStore`
 `os.replace`, mesma partição), sidecar `.sha256` para detectar corrupção sem nunca
 sobrescrever sozinho, caminho controlado por `Settings.raw_storage_dir`
 (`/app/data/raw/imports` no runtime, corresponde ao volume nomeado `riftlab_raw_data`
-montado só no serviço `worker`). Explicitamente **não** é o `RawMatchStorage`/
+gravado só pelo serviço `worker`; a API o monta somente leitura para mostrar o Riot ID dos participantes na tela da partida, CC-1210). Explicitamente **não** é o `RawMatchStorage`/
 manifesto JSON do spike CC-105 (não seguro para acesso concorrente/durável), nunca
 alterado por este módulo. O worker verifica o armazenamento antes de qualquer
 requisição de rede: um `match_id` já baixado e íntegro é reaproveitado sem nova

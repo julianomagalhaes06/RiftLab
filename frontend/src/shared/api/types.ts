@@ -1718,8 +1718,8 @@ export interface components {
         };
         /**
          * MatchDetail
-         * @description GET /matches/{id}: patch, queue, map, participantes (sem identificador
-         *     pessoal) e estado de preparação; 404 desconhecido.
+         * @description GET /matches/{id}: patch, queue, map, participantes (com o Riot ID da partida, CC-1210)
+         *     e estado de preparação; 404 desconhecido.
          */
         MatchDetail: {
             /** Championspresent */
@@ -1736,7 +1736,7 @@ export interface components {
             /** Matchid */
             matchId: string;
             /** Participants */
-            participants: components["schemas"]["MatchParticipant"][];
+            participants: components["schemas"]["MatchDetailParticipant"][];
             /** Patch */
             patch: string;
             preparation: components["schemas"]["MatchPreparation"];
@@ -1761,6 +1761,46 @@ export interface components {
              * @enum {string}
              */
             supportReason: "PATCH_NOT_VALIDATED" | "DEMO_DATA";
+        };
+        /**
+         * MatchDetailParticipant
+         * @description Participante no detalhe da partida (CC-1210): o Riot ID como estava na partida, lido do
+         *     bruto guardado; nulo em DEMO, sem bruto ou sem Riot ID. Nunca PUUID nem subject_hash.
+         */
+        MatchDetailParticipant: {
+            /** Assists */
+            assists?: number | null;
+            /** @description null em partida DEMO, patch sem mapping, catálogo ainda não sincronizado ou campeão ausente do catálogo: a interface mostra o id numérico. */
+            champion?: components["schemas"]["ChampionAsset"] | null;
+            /** Championid */
+            championId: number;
+            /** Deaths */
+            deaths?: number | null;
+            /** Finalitems */
+            finalItems?: number[] | null;
+            /** Finaltrinketitemid */
+            finalTrinketItemId?: number | null;
+            /** Gamename */
+            gameName?: string | null;
+            /** Kills */
+            kills?: number | null;
+            /** Neutralminionskilled */
+            neutralMinionsKilled?: number | null;
+            /** Participantid */
+            participantId: number;
+            /** Role */
+            role?: string | null;
+            /** Tagline */
+            tagLine?: string | null;
+            /** Team */
+            team: number;
+            /** Totalminionskilled */
+            totalMinionsKilled?: number | null;
+            /**
+             * Win
+             * @description Vitória deste participante; null se não observada.
+             */
+            win?: boolean | null;
         };
         /**
          * MatchParticipant

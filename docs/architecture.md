@@ -237,7 +237,8 @@ passo 2.
 A retenção (`cc retention run`) só lista por padrão. Com `--execute`, expurga as partidas
 importadas há mais de `RIFTLAB_MATCH_RETENTION_DAYS` (90) e apaga observações de elo com mais
 de `RIFTLAB_RANK_RETENTION_DAYS` (365), preservando a mais recente de cada conta, fila e
-temporada. Imprime só contagens.
+temporada. Imprime só contagens. Rode-a no serviço `worker`, o único com escrita no
+armazenamento bruto; na API ele é montado só para leitura (CC-1210).
 
 ### Painel de conta e atividade local
 

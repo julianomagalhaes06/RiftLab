@@ -1,4 +1,5 @@
 import type { MatchDetail, MatchParticipant, MatchTimeline } from "../../shared/api/client";
+import { routeToPath } from "../../shared/router/routes";
 import { useItemName } from "../../shared/hooks/useItemName";
 import { Link } from "../../shared/router/Link";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
@@ -9,8 +10,10 @@ import { BLUE, completedBuild, teamTotals } from "./matchView";
 
 const ROLE_ORDER: Readonly<Record<string, number>> = { TOP: 0, JUNGLE: 1, MIDDLE: 2, BOTTOM: 3, UTILITY: 4 };
 
-function ordered(members: MatchParticipant[]): MatchParticipant[] {
-  const rank = (p: MatchParticipant) => (p.role && p.role in ROLE_ORDER ? ROLE_ORDER[p.role] : 9);
+type DetailParticipant = MatchDetail["participants"][number];
+
+function ordered(members: DetailParticipant[]): DetailParticipant[] {
+  const rank = (p: DetailParticipant) => (p.role && p.role in ROLE_ORDER ? ROLE_ORDER[p.role] : 9);
   return [...members].sort((a, b) => rank(a) - rank(b) || a.participantId - b.participantId);
 }
 
@@ -52,7 +55,7 @@ function Row({
   fromHistory,
 }: {
   match: MatchDetail;
-  participant: MatchParticipant;
+  participant: DetailParticipant;
   teamKills: number | null;
   timeline: MatchTimeline | null;
   selected: boolean;
@@ -86,6 +89,16 @@ function Row({
             </small>
           </span>
         </Link>
+        {/* CC-1210: Riot ID como estava na partida, com link para o perfil (busca só no clique). */}
+        {participant.gameName && participant.tagLine ? (
+          <Link
+            to={routeToPath({ name: "player", gameName: participant.gameName, tagLine: participant.tagLine })}
+            className="scoreboard__riot-id"
+            aria-label={`Perfil de ${participant.gameName}#${participant.tagLine}`}
+          >
+            {participant.gameName}<span>#{participant.tagLine}</span>
+          </Link>
+        ) : null}
       </th>
       <td className="scoreboard__kda">
         {scored ? <>{kills} / <span className="scoreboard__deaths">{deaths}</span> / {assists}</> : "—"}
@@ -159,6 +172,9 @@ export function Scoreboard({
           </table>
         );
       })}
+      {match.participants.some((p) => p.gameName) ? (
+        <p className="scoreboard__note">Riot ID como estava na partida; o jogador pode ter trocado de nome depois.</p>
+      ) : null}
     </div>
   );
 }

@@ -115,11 +115,20 @@ class MatchPreparation(CamelModel):
     attempts: int = Field(default=0, ge=0)
 
 
-class MatchDetail(MatchSummary):
-    """GET /matches/{id}: patch, queue, map, participantes (sem identificador
-    pessoal) e estado de preparação; 404 desconhecido."""
+class MatchDetailParticipant(MatchParticipant):
+    """Participante no detalhe da partida (CC-1210): o Riot ID como estava na partida, lido do
+    bruto guardado; nulo em DEMO, sem bruto ou sem Riot ID. Nunca PUUID nem subject_hash."""
 
-    participants: list[MatchParticipant]
+    game_name: str | None = None
+    tag_line: str | None = None
+
+
+class MatchDetail(MatchSummary):
+    """GET /matches/{id}: patch, queue, map, participantes (com o Riot ID da partida, CC-1210)
+    e estado de preparação; 404 desconhecido."""
+
+    # Estreita o campo do resumo: o pydantic aceita; o mypy reclama da invariância de list.
+    participants: list[MatchDetailParticipant]  # type: ignore[assignment]
     preparation: MatchPreparation
 
 

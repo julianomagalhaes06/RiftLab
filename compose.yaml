@@ -36,6 +36,10 @@ services:
       RIFTLAB_DEMO_RANKED: ${RIFTLAB_DEMO_RANKED:-false}
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      # Corpos brutos gravados pelo worker, só para leitura: a tela da partida mostra o Riot ID
+      # dos participantes lido daqui na hora (CC-1210), sem guardá-lo no banco.
+      - riftlab_raw_data:/app/data/raw:ro
     depends_on:
       db:
         condition: service_healthy
