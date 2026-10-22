@@ -233,6 +233,7 @@ export type RouteKey =
   | "POST /api/v1/players/lookup"
   | "GET /api/v1/players/me"
   | "POST /api/v1/players/live"
+  | "POST /api/v1/players/live/status"
   | "GET /api/v1/catalog/current"
   | "POST /api/v1/players/:id/sync"
   | "GET /api/v1/players/:id/sync"
@@ -270,6 +271,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["POST /api/v1/players/lookup", "POST", /^\/api\/v1\/players\/lookup$/],
   ["GET /api/v1/players/me", "GET", /^\/api\/v1\/players\/me$/],
   ["POST /api/v1/players/live", "POST", /^\/api\/v1\/players\/live$/],
+  ["POST /api/v1/players/live/status", "POST", /^\/api\/v1\/players\/live\/status$/],
   ["GET /api/v1/catalog/current", "GET", /^\/api\/v1\/catalog\/current$/],
   ["POST /api/v1/players/:id/sync", "POST", /^\/api\/v1\/players\/[^/]+\/sync$/],
   ["GET /api/v1/players/:id/sync", "GET", /^\/api\/v1\/players\/[^/]+\/sync$/],
@@ -457,6 +459,7 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "GET /api/v1/players/me": () => ok({ reason: null, profile: playerProfile({ id: "7a5c3f1e-0000-4000-8000-0000000000aa", gameName: "Conta Própria", profileIconId: null }) }),
   // CC-1211: por padrão o jogador não está em partida.
   "POST /api/v1/players/live": ({ body }) => ok({ state: "NOT_IN_GAME", gameName: (body as { gameName: string }).gameName, tagLine: (body as { tagLine: string }).tagLine, checkedAt: "2026-10-22T15:00:00Z", game: null }),
+  "POST /api/v1/players/live/status": ({ body }) => ok({ state: "NOT_IN_GAME", gameName: (body as { gameName: string }).gameName, tagLine: (body as { tagLine: string }).tagLine, checkedAt: "2026-10-22T15:00:00Z", queueId: null, gameMode: null, startedAt: null }),
   "GET /api/v1/catalog/current": () => ok({ gamePatch: "16.20", dataDragonVersion: "16.20.1" }),
   "POST /api/v1/players/:id/sync": () => ok(historySync({ state: "SUCCEEDED", finishedAt: "2026-10-19T15:00:00Z" })),
   "GET /api/v1/players/:id/sync": () => ok(historySync({ state: "SUCCEEDED", finishedAt: "2026-10-19T15:00:00Z" })),

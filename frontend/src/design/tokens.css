@@ -64,6 +64,9 @@
   --loss: #f2667a;
   --win-surface: #0f2e26;
   --loss-surface: #3a1520;
+  /* Ao vivo (CC-1213): ponto do botão "Partida ao vivo" quando o jogador está em partida. */
+  --live: #f2667a;
+  --live-glow: rgb(242 102 122 / .45);
   --win-tint: rgba(61, 214, 140, .12);
   --loss-tint: rgba(242, 102, 122, .12);
   --win-tint-soft: rgba(61, 214, 140, .10);

@@ -87,10 +87,16 @@
   .player-search__option { transition: none; }
 }
 
-/* CC-1211: acesso à partida ao vivo no cabeçalho do jogador. */
-.player-header__live { margin-left: auto; flex: none; gap: 8px; }
-.player-header__live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--loss); }
+/* CC-1211/CC-1213: botão da partida ao vivo no cabeçalho do jogador; acende em partida. */
+.live-button { margin-left: auto; flex: none; display: grid; justify-items: end; gap: 6px; max-width: 320px; }
+.app .live-button__link { gap: 8px; }
+.live-button__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--nline-strong); }
+.live-button--on .live-button__dot { width: 10px; height: 10px; border: 2px solid var(--on-accent); background: var(--live); box-shadow: 0 0 0 0 var(--live-glow); animation: live-pulse 1.6s ease-out infinite; }
+.live-button__status { margin: 0; color: var(--ntext-muted); font-size: .8125rem; line-height: 1.4; text-align: right; }
+@keyframes live-pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .live-button--on .live-button__dot { animation: none; } }
 @media (max-width: 700px) {
   .player-header { flex-wrap: wrap; }
-  .player-header__live { margin-left: 0; width: 100%; }
+  .live-button { margin-left: 0; width: 100%; max-width: none; justify-items: stretch; }
+  .live-button__status { text-align: left; }
 }

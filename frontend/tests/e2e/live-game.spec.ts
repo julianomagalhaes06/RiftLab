@@ -52,6 +52,26 @@ for (const width of [360, 1280]) {
       await expect(page).toHaveURL(/\/jogador\/Jogador%201-BR1$/);
     });
 
+    test("aviso de jogando agora no botão da página do jogador (CC-1213)", async ({ page }) => {
+      await mockApi(page, {
+        "POST /api/v1/players/live/status": () => ok({ state: "IN_GAME", gameName: "Jogador Teste", tagLine: "BR1", checkedAt: "2026-10-22T15:00:00Z",
+          queueId: 440, gameMode: "CLASSIC", startedAt: new Date(Date.now() - 300_000).toISOString() }),
+        "POST /api/v1/players/live": () => ok(inGame),
+      });
+      await page.goto("/jogador/Jogador%20Teste-BR1");
+      await expect(page.getByText(/Este jogador está em partida neste momento · Ranqueada Flex · \d+:\d\d de jogo/)).toBeVisible();
+      await noHorizontalScroll(page);
+      await page.getByRole("link", { name: "Ao vivo agora" }).click();
+      await expect(page.getByRole("region", { name: "Time azul" })).toBeVisible();
+    });
+
+    test("fora de partida, o botão fica neutro", async ({ page }) => {
+      await mockApi(page);
+      await page.goto("/jogador/Jogador%20Teste-BR1");
+      await expect(page.getByRole("link", { name: "Partida ao vivo" })).toBeVisible();
+      await expect(page.getByText(/em partida neste momento/)).toHaveCount(0);
+    });
+
     test("fora de partida explica e não quebra a página", async ({ page }) => {
       await mockApi(page);
       await page.goto("/jogador/Jogador%20Teste-BR1/ao-vivo");

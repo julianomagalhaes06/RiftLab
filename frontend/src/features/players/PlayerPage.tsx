@@ -2,14 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type MatchSummary, type PlayerProfile, type PlayerRank } from "../../shared/api/client";
 import { isAbortError, isApiError } from "../../shared/api/errors";
 import { usePagedList } from "../../shared/hooks/usePagedList";
-import { Link } from "../../shared/router/Link";
-import { routeToPath } from "../../shared/router/routes";
 import { count } from "../../shared/text/count";
 import { DayGroups } from "../history/HistoryPage";
 import { HistorySync } from "../history/HistorySync";
 import { clock } from "../history/syncMessage";
 import { RankCard } from "../ranked/RankCard";
 import { isTier, profileIconUrl } from "../ranked/tiers";
+import { LiveButton } from "../live/LiveButton";
 import { LOOKUP_ERRORS } from "./lookupErrors";
 import { rememberPlayer } from "./recentPlayers";
 import "../history/history.css";
@@ -63,10 +62,8 @@ function ProfileHeader({ profile }: { profile: PlayerProfile }) {
             {profile.staleReason === "RIOT_KEY_MISSING" ? " (sem chave da Riot para atualizar)" : ""}
           </p>
         </div>
-        {/* CC-1211: partida em andamento, como o "Live Game" do op.gg. */}
-        <Link to={routeToPath({ name: "live", gameName: profile.gameName, tagLine: profile.tagLine })} className="button button--secondary player-header__live">
-          <span className="player-header__live-dot" aria-hidden="true" />Partida ao vivo
-        </Link>
+        {/* CC-1211/CC-1213: partida ao vivo, com o aviso "jogando agora" como no op.gg. */}
+        <LiveButton gameName={profile.gameName} tagLine={profile.tagLine} />
       </div>
       <div className="player-ranks" role="group" aria-label="Elo">
         <QueueRank label="Solo/Duo" rank={profile.solo} />

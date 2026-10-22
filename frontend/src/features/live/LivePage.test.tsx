@@ -86,6 +86,28 @@ describe("partida ao vivo (CC-1211)", () => {
     vi.stubGlobal("fetch", api.fetch);
     render(<App />);
     expect(await screen.findByRole("link", { name: "Partida ao vivo" })).toHaveAttribute("href", "/jogador/Fulano-BR1/ao-vivo");
+    // Sem resposta do aviso (erro), o botão fica neutro e sem texto de "jogando agora".
+    expect(screen.queryByText(/em partida neste momento/)).not.toBeInTheDocument();
+  });
+
+  it("aviso do op.gg (CC-1213): em partida, o botão acende com fila e tempo de jogo", async () => {
+    window.history.replaceState(null, "", "/jogador/Fulano-BR1");
+    const api = createMockApi();
+    api.on("POST", /^\/api\/v1\/players\/lookup$/, () => json(200, {
+      id: "7a5c3f1e-0000-4000-8000-000000000001", gameName: "Fulano", tagLine: "BR1", profileIconId: null, summonerLevel: 30,
+      refreshedAt: "2026-10-22T15:00:00Z", dataDragonVersion: null, solo: null, flex: null, staleReason: null,
+    }));
+    api.on("POST", /^\/api\/v1\/players\/live\/status$/, () => json(200, {
+      state: "IN_GAME", gameName: "Fulano", tagLine: "BR1", checkedAt: "2026-10-22T15:00:00Z",
+      queueId: 420, gameMode: "CLASSIC", startedAt: new Date(Date.now() - 425_000).toISOString(),
+    }));
+    api.on("GET", /^\/api\/v1\/matches$/, () => json(200, { items: [], nextCursor: null }));
+    vi.stubGlobal("fetch", api.fetch);
+    render(<App />);
+    const button = await screen.findByRole("link", { name: "Ao vivo agora" });
+    expect(button).toHaveAttribute("href", "/jogador/Fulano-BR1/ao-vivo");
+    expect(screen.getByText(/Este jogador está em partida neste momento · Ranqueada Solo\/Duo · 7:0\d de jogo/)).toBeInTheDocument();
+    expect(api.callsTo("POST", /live\/status/)[0].body).toEqual({ gameName: "Fulano", tagLine: "BR1" });
   });
 });
 

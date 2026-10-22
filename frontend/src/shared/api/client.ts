@@ -48,6 +48,7 @@ export type CatalogCurrent = Schemas["CatalogCurrent"];
 export type OwnPlayer = Schemas["OwnPlayer"];
 export type LiveGame = Schemas["LiveGame"];
 export type LiveParticipant = Schemas["LiveParticipant"];
+export type PlayerLiveStatus = Schemas["PlayerLiveStatus"];
 export type PlayerRank = Schemas["PlayerRank"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 export type ObjectiveForm = Schemas["ObjectiveForm"];
@@ -86,6 +87,8 @@ export interface ApiClient {
   getCatalogCurrent(signal?: AbortSignal): Promise<CatalogCurrent>;
   /** Partida ao vivo do Riot ID (CC-1211); o Riot ID vai no corpo, fora dos logs. */
   getLiveGame(gameName: string, tagLine: string, signal?: AbortSignal): Promise<LiveGame>;
+  /** Está jogando agora? Só conta e partida, 2 requisições (CC-1213). */
+  getLiveStatus(gameName: string, tagLine: string, signal?: AbortSignal): Promise<PlayerLiveStatus>;
   getPlayerSync(playerId: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
   /** O banco guarda só o HMAC do Riot ID (CC-1103): o pedido traz o Riot ID do perfil. */
   requestPlayerSync(playerId: string, gameName: string, tagLine: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
@@ -206,6 +209,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     getCatalogCurrent: (signal) => request("GET", "/api/v1/catalog/current", { signal }),
     getLiveGame: (gameName, tagLine, signal) =>
       request("POST", "/api/v1/players/live", { body: { gameName, tagLine }, signal }),
+    getLiveStatus: (gameName, tagLine, signal) =>
+      request("POST", "/api/v1/players/live/status", { body: { gameName, tagLine }, signal }),
     getPlayerSync: (playerId, signal) => request("GET", `/api/v1/players/${enc(playerId)}/sync`, { signal }),
     requestPlayerSync: (playerId, gameName, tagLine, signal) =>
       request("POST", `/api/v1/players/${enc(playerId)}/sync`, { body: { gameName, tagLine }, signal }),

@@ -18,7 +18,7 @@ from riftlab.players.application import (
     profile_account,
     profile_key,
 )
-from riftlab.players.live import live_game
+from riftlab.players.live import live_game, live_status
 from riftlab.shared.api.common import CamelModel
 from riftlab.shared.api.matches import ChampionAsset
 from riftlab.shared.errors import NotFoundError, PlayerLookupError
@@ -163,6 +163,18 @@ class LiveGame(CamelModel):
     game: LiveGameInfo | None = None
 
 
+class PlayerLiveStatus(CamelModel):
+    """Está jogando agora? (CC-1213). Em partida, a fila, o modo e o início; fora, só o estado."""
+
+    state: Literal["IN_GAME", "NOT_IN_GAME"]
+    game_name: str
+    tag_line: str
+    checked_at: datetime
+    queue_id: int | None = None
+    game_mode: str | None = None
+    started_at: datetime | None = None
+
+
 class OwnPlayer(CamelModel):
     """Perfil da conta configurada (CC-1202). Sem perfil, `profile` vem nulo e `reason` diz por
     quê: ACCOUNT_NOT_CONFIGURED, SECRET_MISSING, RIOT_KEY_MISSING ou um erro da consulta à Riot
@@ -194,6 +206,23 @@ async def post_live_game(body: PlayerSyncRequest, request: Request) -> LiveGame:
             body.game_name,
             body.tag_line,
         )
+    )
+
+
+@router.post(
+    "/live/status",
+    response_model=PlayerLiveStatus,
+    summary="O jogador está em partida agora?",
+    description=(
+        'Aviso "jogando agora" da página do jogador, como o botão ao vivo do op.gg: só '
+        "Account-V1 e Spectator-V5 (2 requisições, sem elos), 60 s em memória; nada gravado. "
+        "O Riot ID vai no corpo, fora dos logs de acesso."
+    ),
+    responses=_ERRORS,
+)
+async def post_live_status(body: PlayerSyncRequest, request: Request) -> PlayerLiveStatus:
+    return PlayerLiveStatus.model_validate(
+        await live_status(request.app.state.settings, body.game_name, body.tag_line)
     )
 
 

@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from riftlab.config import Settings
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.players import live
-from riftlab.players.live import LIVE_MAX_REQUESTS, live_game
+from riftlab.players.live import LIVE_MAX_REQUESTS, live_game, live_status
 from riftlab.players.models import PlayerProfileModel as Profile
 from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.errors import PlayerLookupError
@@ -123,8 +123,10 @@ def _transport(*, account: int = 200, spectator: int = 200, league_429_after: in
 @pytest.fixture(autouse=True)
 def _empty_cache():
     live._CACHE.clear()  # noqa: SLF001 — cache por processo
+    live._STATUS_CACHE.clear()  # noqa: SLF001
     yield
     live._CACHE.clear()  # noqa: SLF001
+    live._STATUS_CACHE.clear()  # noqa: SLF001
 
 
 async def _counts(session_factory) -> tuple[int, int]:
@@ -240,3 +242,66 @@ async def test_api_live_game(app_client, tmp_path, monkeypatch):
     assert "puuid" not in response.text.lower()
     invalid = await app_client.post("/api/v1/players/live", json={"gameName": "x", "tagLine": "B"})
     assert invalid.status_code == 422 and invalid.json()["code"] == "INVALID_RIOT_ID"
+
+
+@pytest.mark.asyncio
+async def test_live_status_uses_two_requests_and_caches(session_factory, tmp_path):
+    """CC-1213: aviso "jogando agora" só com conta e partida; 60 s em memória."""
+    transport, seen = _transport()
+    status = await live_status(_settings(tmp_path), "Live One", "BR1", transport=transport, now=NOW)
+    assert status == {
+        "state": "IN_GAME",
+        "gameName": "Live One",
+        "tagLine": "BR1",
+        "checkedAt": NOW,
+        "queueId": 440,
+        "gameMode": "CLASSIC",
+        "startedAt": NOW - timedelta(minutes=10),
+    }
+    assert len(seen) == 2 and not any("/league/" in path for path in seen)
+
+    again, seen_again = _transport()
+    cached = await live_status(
+        _settings(tmp_path), "Live One", "BR1", transport=again, now=NOW + timedelta(seconds=50)
+    )
+    assert cached is status and seen_again == []
+
+    live._STATUS_CACHE.clear()  # noqa: SLF001
+    out, seen_out = _transport(spectator=404)
+    later = await live_status(
+        _settings(tmp_path), "Live One", "BR1", transport=out, now=NOW + timedelta(minutes=2)
+    )
+    assert later["state"] == "NOT_IN_GAME" and later["startedAt"] is None and len(seen_out) == 2
+
+
+@pytest.mark.asyncio
+async def test_live_status_reuses_the_full_live_game(session_factory, tmp_path):
+    full, _ = _transport()
+    await live_game(
+        session_factory, _settings(tmp_path), "Live One", "BR1", transport=full, now=NOW
+    )
+    unused, seen = _transport()
+    status = await live_status(
+        _settings(tmp_path), "Live One", "BR1", transport=unused, now=NOW + timedelta(seconds=5)
+    )
+    assert status["state"] == "IN_GAME" and status["queueId"] == 440 and seen == []
+    with pytest.raises(PlayerLookupError) as caught:
+        await live_status(_settings(tmp_path, key=None), "Outro", "BR1")
+    assert caught.value.code == "RIOT_KEY_MISSING"
+    missing, _ = _transport(account=404)
+    with pytest.raises(PlayerLookupError) as not_found:
+        await live_status(_settings(tmp_path), "Ninguém", "BR1", transport=missing)
+    assert not_found.value.code == "PLAYER_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_api_live_status(app_client, tmp_path, monkeypatch):
+    app = app_client._transport.app  # noqa: SLF001 — o teste troca a configuração da app
+    app.state.settings = _settings(tmp_path)
+    transport, _ = _transport()
+    monkeypatch.setattr(live, "_transport", lambda _settings, _max=2: transport)
+    response = await app_client.post(
+        "/api/v1/players/live/status", json={"gameName": "Live One", "tagLine": "BR1"}
+    )
+    assert response.status_code == 200
+    assert response.json()["state"] == "IN_GAME" and "puuid" not in response.text.lower()

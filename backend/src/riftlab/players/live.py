@@ -37,16 +37,20 @@ from riftlab.shared.errors import (
 LIVE_CACHE_FOR = timedelta(seconds=20)
 # Conta + partida + elo dos dez jogadores.
 LIVE_MAX_REQUESTS = 12
+# Aviso "jogando agora" da página do jogador (CC-1213): só conta + partida, 60 s em memória.
+STATUS_CACHE_FOR = timedelta(seconds=60)
+STATUS_MAX_REQUESTS = 2
 FLEX_QUEUE_ID = 440
 _CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
+_STATUS_CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
 
 
-def _transport(settings: Settings) -> RiotHttpTransport:
+def _transport(settings: Settings, max_requests: int = LIVE_MAX_REQUESTS) -> RiotHttpTransport:
     assert settings.riot_api_key is not None
     return RiotHttpTransport(
         settings.riot_api_key,
         RiotFetchBudget(
-            max_matches=0, max_requests=LIVE_MAX_REQUESTS, max_total_seconds=20.0, stop_on_429=True
+            max_matches=0, max_requests=max_requests, max_total_seconds=20.0, stop_on_429=True
         ),
         rate_limiter=_LIMITER,
     )
@@ -153,7 +157,91 @@ async def live_game(
     if game is not None:
         view["game"] = await _game_view(factory, game, puuid, ranks)
     _CACHE[key] = (now, view)
+    _STATUS_CACHE[key] = (now, _status_from(view))
     return view
+
+
+def _status_from(view: dict[str, Any]) -> dict[str, Any]:
+    game = view["game"]
+    return {
+        "state": view["state"],
+        "gameName": view["gameName"],
+        "tagLine": view["tagLine"],
+        "checkedAt": view["checkedAt"],
+        "queueId": game["queueId"] if game else None,
+        "gameMode": game["gameMode"] if game else None,
+        "startedAt": game["startedAt"] if game else None,
+    }
+
+
+def _game_summary(game: dict[str, Any] | None) -> tuple[int | None, str | None, datetime | None]:
+    if game is None:
+        return None, None, None
+    started = _int(game.get("gameStartTime"))
+    mode = game.get("gameMode")
+    return (
+        _int(game.get("gameQueueConfigId")),
+        mode if isinstance(mode, str) else None,
+        datetime.fromtimestamp(started / 1000, UTC) if started else None,
+    )
+
+
+async def live_status(
+    settings: Settings,
+    game_name: str,
+    tag_line: str,
+    *,
+    transport: RiotHttpTransport | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Está jogando agora? (CC-1213, o aviso do botão "ao vivo" do op.gg.) Só Account-V1 e
+    Spectator-V5, sem elos: 2 requisições, 60 s em memória; aproveita a partida completa
+    consultada há pouco. Nada é gravado e o PUUID não sai daqui."""
+    name, tag = normalize_riot_id(game_name, tag_line)
+    key = _key(settings, name, tag)
+    now = now or datetime.now(UTC)
+    full = _CACHE.get(key)
+    if full is not None and now - full[0] < LIVE_CACHE_FOR:
+        return _status_from(full[1])
+    cached = _STATUS_CACHE.get(key)
+    if cached is not None and now - cached[0] < STATUS_CACHE_FOR:
+        return cached[1]
+    if not settings.riot_api_key:
+        raise PlayerLookupError("RIOT_KEY_MISSING")
+    own = transport is None
+    client = transport or _transport(settings, STATUS_MAX_REQUESTS)
+    try:
+        try:
+            puuid, canonical_name, canonical_tag = await client.resolve_account(name, tag)
+        except SourceNotFoundError as exc:
+            raise PlayerLookupError("PLAYER_NOT_FOUND") from exc
+        try:
+            game = await client.fetch_active_game_by_puuid(puuid)
+        except SourceNotFoundError:
+            game = None
+    except SourceAuthError as exc:
+        raise PlayerLookupError("RIOT_AUTH_FAILED") from exc
+    except SourceRateLimitedError as exc:
+        raise PlayerLookupError(
+            "RIOT_RATE_LIMITED", retry_after_seconds=exc.retry_after_seconds
+        ) from exc
+    except SourceError as exc:
+        raise PlayerLookupError("UPSTREAM_UNAVAILABLE") from exc
+    finally:
+        if own:
+            await client.aclose()
+    queue_id, mode, started = _game_summary(game)
+    status = {
+        "state": "IN_GAME" if game is not None else "NOT_IN_GAME",
+        "gameName": canonical_name,
+        "tagLine": canonical_tag,
+        "checkedAt": now,
+        "queueId": queue_id,
+        "gameMode": mode,
+        "startedAt": started,
+    }
+    _STATUS_CACHE[key] = (now, status)
+    return status
 
 
 async def _game_view(

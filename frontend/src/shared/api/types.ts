@@ -522,6 +522,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/players/live/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * O jogador está em partida agora?
+         * @description Aviso "jogando agora" da página do jogador, como o botão ao vivo do op.gg: só Account-V1 e Spectator-V5 (2 requisições, sem elos), 60 s em memória; nada gravado. O Riot ID vai no corpo, fora dos logs de acesso.
+         */
+        post: operations["post_live_status_api_v1_players_live_status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/players/lookup": {
         parameters: {
             query?: never;
@@ -2050,6 +2070,32 @@ export interface components {
             participantId: number;
             /** Skills */
             skills?: components["schemas"]["TimelineSkillUp"][];
+        };
+        /**
+         * PlayerLiveStatus
+         * @description Está jogando agora? (CC-1213). Em partida, a fila, o modo e o início; fora, só o estado.
+         */
+        PlayerLiveStatus: {
+            /**
+             * Checkedat
+             * Format: date-time
+             */
+            checkedAt: string;
+            /** Gamemode */
+            gameMode?: string | null;
+            /** Gamename */
+            gameName: string;
+            /** Queueid */
+            queueId?: number | null;
+            /** Startedat */
+            startedAt?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "IN_GAME" | "NOT_IN_GAME";
+            /** Tagline */
+            tagLine: string;
         };
         /** PlayerLookup */
         PlayerLookup: {
@@ -3754,6 +3800,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveGame"];
+                };
+            };
+            /** @description PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description INVALID_RIOT_ID ou VALIDATION_ERROR. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_live_status_api_v1_players_live_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayerSyncRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerLiveStatus"];
                 };
             };
             /** @description PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM. */

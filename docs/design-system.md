@@ -41,6 +41,7 @@ No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitiv
 | Vitória / ganho | `--win` | `#3DD68C` |
 | Derrota / perda | `--loss` | `#F2667A` |
 | Fundo de ganho (faixa de variação) | `--win-surface` | `#0F2E26` |
+| Ao vivo (ponto do botão "Partida ao vivo" com o jogador em partida) | `--live` | `#F2667A` |
 
 Por elo há cinco tons, `--tier-<elo>-base|light|dark|deep|text` (`iron`, `bronze`, `silver`,
 `gold`, `platinum`, `emerald`, `diamond`, `master`, `grandmaster`, `challenger` e `none` para

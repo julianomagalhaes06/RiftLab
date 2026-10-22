@@ -3865,6 +3865,75 @@
         "title": "ParticipantTimeline",
         "type": "object"
       },
+      "PlayerLiveStatus": {
+        "additionalProperties": false,
+        "description": "Está jogando agora? (CC-1213). Em partida, a fila, o modo e o início; fora, só o estado.",
+        "properties": {
+          "checkedAt": {
+            "format": "date-time",
+            "title": "Checkedat",
+            "type": "string"
+          },
+          "gameMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamemode"
+          },
+          "gameName": {
+            "title": "Gamename",
+            "type": "string"
+          },
+          "queueId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queueid"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "state": {
+            "enum": [
+              "IN_GAME",
+              "NOT_IN_GAME"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "tagLine": {
+            "title": "Tagline",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "gameName",
+          "tagLine",
+          "checkedAt"
+        ],
+        "title": "PlayerLiveStatus",
+        "type": "object"
+      },
       "PlayerLookup": {
         "additionalProperties": false,
         "properties": {
@@ -7056,6 +7125,68 @@
           }
         },
         "summary": "Partida ao vivo de um Riot ID",
+        "tags": [
+          "players"
+        ]
+      }
+    },
+    "/api/v1/players/live/status": {
+      "post": {
+        "description": "Aviso \"jogando agora\" da página do jogador, como o botão ao vivo do op.gg: só Account-V1 e Spectator-V5 (2 requisições, sem elos), 60 s em memória; nada gravado. O Riot ID vai no corpo, fora dos logs de acesso.",
+        "operationId": "post_live_status_api_v1_players_live_status_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerSyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerLiveStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "INVALID_RIOT_ID ou VALIDATION_ERROR."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE."
+          }
+        },
+        "summary": "O jogador está em partida agora?",
         "tags": [
           "players"
         ]
