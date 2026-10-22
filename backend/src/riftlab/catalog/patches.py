@@ -13,8 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
 
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, MappingEntry
+from riftlab.catalog.models import CatalogVersionModel
 from riftlab.shared.db import Base, read_only_unit_of_work, unit_of_work
 from riftlab.shared.errors import SourceSchemaError
+from riftlab.shared.numeric import patch_order_key
 
 PATCH_PATTERN = re.compile(r"^[0-9]{1,3}\.[0-9]{1,3}$")
 VERSION_PATTERN = re.compile(r"^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$")
@@ -166,3 +168,22 @@ async def current_patch(session: AsyncSession) -> str | None:
 async def current_patch_window(session: AsyncSession) -> tuple[str, ...] | None:
     row = await session.get(CurrentPatchModel, "current")
     return tuple(row.adjacent_patches) if row else None
+
+
+async def latest_catalog(session: AsyncSession) -> tuple[str, str] | None:
+    """Patch e versão do Data Dragon do catálogo de patch real mais recente (faixa de contexto e
+    ícones de invocador). Patches fora do formato do jogo (`16.20`; sintéticos) ficam de fora."""
+    rows = (
+        await session.execute(
+            select(CatalogVersionModel.game_patch, CatalogVersionModel.data_dragon_version)
+        )
+    ).all()
+    ranked = sorted(
+        (
+            (key, patch, version)
+            for patch, version in rows
+            if PATCH_PATTERN.match(patch) and (key := patch_order_key(patch)) is not None
+        ),
+        reverse=True,
+    )
+    return (ranked[0][1], ranked[0][2]) if ranked else None

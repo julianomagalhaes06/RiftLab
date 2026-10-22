@@ -474,16 +474,34 @@ body {
   margin: 0 0 var(--space-2);
 }
 
+/* Rodapé (CC-1202): linha em cima, três colunas de 12 px e o aviso legal da Riot em inglês. */
 .app__footer {
-  max-width: 1360px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 22px 32px 34px;
-  border-top: 1px solid var(--color-border);
-  font-size: 0.8125rem;
-  color: var(--color-muted);
+  padding: 20px 40px 32px;
+  font-size: 0.75rem;
+  color: var(--ntext-subtle);
   line-height: 1.5;
 }
 
-.app__footer p {
-  margin: 0 0 var(--space-1);
+.app > .app__footer { border-top: 1px solid var(--nline); max-width: none; }
+
+.app__footer > * { max-width: 1360px; margin-left: auto; margin-right: auto; }
+
+.app__footer-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px 24px;
+  align-items: baseline;
+}
+
+.app__footer-row p { margin: 0; }
+.app__footer-row p:nth-child(2) { text-align: center; }
+.app__footer-row p:last-child { text-align: right; }
+
+.app__legal { margin-top: 12px; margin-bottom: 0; }
+
+@media (max-width: 700px) {
+  .app__footer-row { grid-template-columns: 1fr; }
+  .app__footer-row p:nth-child(2), .app__footer-row p:last-child { text-align: left; }
 }

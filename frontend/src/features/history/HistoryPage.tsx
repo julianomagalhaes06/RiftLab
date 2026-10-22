@@ -138,10 +138,14 @@ export function HistoryPage() {
 
   return (
     <div className="history-page">
-      <div className="page-intro">
-        <p className="page-intro__kicker">Histórico de partidas importadas</p>
-        <h2>Partidas para estudar</h2>
-        <p>Partidas da conta configurada. Veja como foi cada partida e abra a análise das suas compras.</p>
+      <div className="page-intro page-intro--with-action">
+        <div>
+          <p className="page-intro__kicker">Histórico de partidas importadas</p>
+          <h2>Partidas para estudar</h2>
+          <p>Partidas da conta configurada. Veja como foi cada partida e abra a análise das suas compras.</p>
+        </div>
+        {/* CC-1202: a importação manual saiu do topo e fica junto das partidas. */}
+        <Link to="/importar" className="arrow-link">Importar partida</Link>
       </div>
 
       <HistorySync onNewMatches={list.refresh} />

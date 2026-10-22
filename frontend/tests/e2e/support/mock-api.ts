@@ -231,6 +231,8 @@ export type RouteKey =
   | "POST /api/v1/history/sync"
   | "GET /api/v1/history/sync"
   | "POST /api/v1/players/lookup"
+  | "GET /api/v1/players/me"
+  | "GET /api/v1/catalog/current"
   | "POST /api/v1/players/:id/sync"
   | "GET /api/v1/players/:id/sync"
   | "GET /api/v1/matches/:id/purge-preview"
@@ -265,6 +267,8 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["POST /api/v1/history/sync", "POST", /^\/api\/v1\/history\/sync$/],
   ["GET /api/v1/history/sync", "GET", /^\/api\/v1\/history\/sync$/],
   ["POST /api/v1/players/lookup", "POST", /^\/api\/v1\/players\/lookup$/],
+  ["GET /api/v1/players/me", "GET", /^\/api\/v1\/players\/me$/],
+  ["GET /api/v1/catalog/current", "GET", /^\/api\/v1\/catalog\/current$/],
   ["POST /api/v1/players/:id/sync", "POST", /^\/api\/v1\/players\/[^/]+\/sync$/],
   ["GET /api/v1/players/:id/sync", "GET", /^\/api\/v1\/players\/[^/]+\/sync$/],
   ["POST /api/v1/objectives/interpret", "POST", /^\/api\/v1\/objectives\/interpret$/],
@@ -446,6 +450,10 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "POST /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
   "GET /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
   "POST /api/v1/players/lookup": () => ok(playerProfile()),
+  // CC-1202: chip do topo com o perfil da conta configurada e faixa com o catálogo.
+  // Sem ícone por padrão: as telas sem rede externa continuam sem pedir nada ao CDN.
+  "GET /api/v1/players/me": () => ok(playerProfile({ id: "7a5c3f1e-0000-4000-8000-0000000000aa", gameName: "Conta Própria", profileIconId: null })),
+  "GET /api/v1/catalog/current": () => ok({ gamePatch: "16.20", dataDragonVersion: "16.20.1" }),
   "POST /api/v1/players/:id/sync": () => ok(historySync({ state: "SUCCEEDED", finishedAt: "2026-10-19T15:00:00Z" })),
   "GET /api/v1/players/:id/sync": () => ok(historySync({ state: "SUCCEEDED", finishedAt: "2026-10-19T15:00:00Z" })),
   "GET /api/v1/matches/:id/purge-preview": () =>

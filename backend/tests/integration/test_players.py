@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import delete, inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
+from riftlab.catalog.models import CatalogVersionModel
 from riftlab.config import Settings
 from riftlab.history_sync.application import (
     configured_account_key,
@@ -24,12 +25,17 @@ from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_h
 from riftlab.ingestion.models import ImportJobModel, MatchModel, ParticipantModel
 from riftlab.ingestion.purge import retention
 from riftlab.players import application
-from riftlab.players.application import lookup_player, profile_account, purge_player
+from riftlab.players.application import (
+    lookup_player,
+    own_player,
+    profile_account,
+    purge_player,
+)
 from riftlab.players.models import PlayerProfileModel as Profile
 from riftlab.ranked.domain import account_key
 from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.db import unit_of_work
-from riftlab.shared.errors import PlayerLookupError
+from riftlab.shared.errors import NotFoundError, PlayerLookupError
 
 PUUID = "synthetic-player-puuid"
 SECRET = "synthetic-secret"
@@ -52,7 +58,14 @@ def _settings(tmp_path: Path, *, key: str | None = "k") -> Settings:
     return Settings(ranked_account_file=str(own), subject_hash_secret=SECRET, riot_api_key=key)
 
 
-def _transport(*, account: int = 200, summoner: int = 200, league: int = 200, ids=()):
+def _transport(
+    *,
+    account: int = 200,
+    summoner: int = 200,
+    league: int = 200,
+    ids=(),
+    riot_id=("Synthetic Third", "XYZ"),
+):
     seen: list[str] = []
 
     def responder(request: httpx.Request) -> httpx.Response:
@@ -62,7 +75,7 @@ def _transport(*, account: int = 200, summoner: int = 200, league: int = 200, id
             if account != 200:
                 return httpx.Response(account)
             return httpx.Response(
-                200, json={"puuid": PUUID, "gameName": "Synthetic Third", "tagLine": "XYZ"}
+                200, json={"puuid": PUUID, "gameName": riot_id[0], "tagLine": riot_id[1]}
             )
         if "/summoner/v4/" in path:
             assert request.url.host == "br1.api.riotgames.com"
@@ -470,3 +483,70 @@ async def test_purge_player_lists_then_deletes_one_riot_id(session_factory, tmp_
     assert await _rows(session_factory, other) == (1, 2, 1)
     with pytest.raises(PlayerLookupError):
         await purge_player(session_factory, settings, "Alvo", "C")
+
+
+@pytest.mark.asyncio
+async def test_own_player_looks_up_once_then_serves_the_stored_profile(
+    session_factory, tmp_path, clean
+):
+    """CC-1202: chip do topo. Sem perfil guardado, uma consulta; depois só o banco. O Riot ID
+    vem do arquivo da conta, nunca do banco (CC-1103)."""
+    with pytest.raises(PlayerLookupError) as caught:
+        await own_player(session_factory, _settings(tmp_path, key=None), now=NOW)
+    assert caught.value.code == "RIOT_KEY_MISSING"
+
+    settings = _settings(tmp_path)
+    first, seen = _transport(riot_id=("Synthetic Own", "BR1"))
+    view = await own_player(session_factory, settings, transport=first, now=NOW)
+    assert (view["gameName"], view["profileIconId"], len(seen)) == ("Synthetic Own", 4567, 3)
+
+    later, seen_later = _transport(riot_id=("Synthetic Own", "BR1"))
+    again = await own_player(
+        session_factory, settings, transport=later, now=NOW + timedelta(days=3)
+    )
+    assert again["id"] == view["id"] and seen_later == []
+    assert again["gameName"] == "Synthetic Own"
+    offline = await own_player(session_factory, _settings(tmp_path, key=None), now=NOW)
+    assert offline["id"] == view["id"]
+
+    missing = Settings(ranked_account_file=str(tmp_path / "nada.json"), subject_hash_secret=SECRET)
+    with pytest.raises(NotFoundError):
+        await own_player(session_factory, missing, now=NOW)
+
+
+@pytest.mark.asyncio
+async def test_api_own_player_and_current_catalog(app_client, session_factory, tmp_path, clean):
+    app = app_client._transport.app  # noqa: SLF001 — o teste troca a configuração da app
+    app.state.settings = _settings(tmp_path, key=None)
+    unavailable = await app_client.get("/api/v1/players/me")
+    assert unavailable.status_code == 503 and unavailable.json()["code"] == "RIOT_KEY_MISSING"
+
+    first, _ = _transport(riot_id=("Synthetic Own", "BR1"))
+    await own_player(session_factory, _settings(tmp_path), transport=first, now=NOW)
+    body = (await app_client.get("/api/v1/players/me")).json()
+    assert body["gameName"] == "Synthetic Own" and "puuid" not in json.dumps(body).lower()
+
+    # Patches fora do formato do jogo (sintéticos de outros testes) não contam.
+    rows = [("999.99", "999.99.1"), ("1234.5", "1234.5.1"), ("DEMO", "0.0.1")]
+    try:
+        async with unit_of_work(session_factory) as session:
+            for patch, version in rows:
+                session.add(
+                    CatalogVersionModel(
+                        game_patch=patch,
+                        data_dragon_version=version,
+                        sha256=f"synthetic-cc1202-{patch}",
+                        mapping_version="synthetic",
+                        raw_hash="synthetic",
+                        curation_rules_version="synthetic",
+                    )
+                )
+        current = (await app_client.get("/api/v1/catalog/current")).json()
+        assert current == {"gamePatch": "999.99", "dataDragonVersion": "999.99.1"}
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(
+                delete(CatalogVersionModel).where(
+                    CatalogVersionModel.sha256.in_([f"synthetic-cc1202-{p}" for p, _ in rows])
+                )
+            )

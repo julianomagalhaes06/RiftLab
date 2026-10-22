@@ -11,13 +11,15 @@ import "../features/review/review.css";
 import { useRouter } from "../shared/router/context";
 import { Link } from "../shared/router/Link";
 import { RouterProvider } from "../shared/router/RouterProvider";
-import { DemoNotice, DemoNoticeProvider } from "./DemoNotice";
+import { DemoNoticeProvider } from "./DemoNotice";
+import { ContextStrip } from "./ContextStrip";
 import type { Route } from "../shared/router/routes";
 import { PanelPage, PositionPage } from "./AreaPages";
 import { ChampionsPage } from "../features/champions/ChampionsPage";
 import { MainNav } from "./MainNav";
 import { PlayerPage } from "../features/players/PlayerPage";
 import { PlayerSearch } from "../features/players/PlayerSearch";
+import { ProfileChip } from "../features/players/ProfileChip";
 import "./App.css";
 import "../design/concept-c.css";
 
@@ -109,20 +111,23 @@ function AppShell() {
               </Link>
             </h1>
             <MainNav route={route} />
-            <PlayerSearch />
-            <Link to="/importar" className="app__import-link">Importar partida</Link>
+            <div className="app__tools">
+              <PlayerSearch />
+              <ProfileChip />
+            </div>
           </div>
-          <DemoNotice />
+          <ContextStrip />
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className="app__main">
           {renderPage(route)}
         </main>
         <footer className="app__footer">
-          <p>
-            Revisão de partidas concluídas; o RiftLab não acompanha partidas ao vivo. Nomes e
-            retratos de campeões: Data Dragon, da Riot Games. Emblemas de elo: pacote Ranked Emblems da Riot Games.
-          </p>
-          <p lang="en">
+          <div className="app__footer-row">
+            <p>RiftLab</p>
+            <p>Revisão de partidas concluídas; o RiftLab não acompanha partidas ao vivo.</p>
+            <p>Retratos e ícones: Data Dragon · Emblemas: Ranked Emblems · © Riot Games</p>
+          </div>
+          <p lang="en" className="app__legal">
             RiftLab isn&apos;t endorsed by Riot Games and doesn&apos;t reflect the views or
             opinions of Riot Games or anyone officially involved in producing or managing Riot
             Games properties. Riot Games, and all associated properties are trademarks or

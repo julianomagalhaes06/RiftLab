@@ -44,6 +44,7 @@ export type AnalysisReferenceSource = Schemas["AnalysisReferenceSource"];
 export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
 export type PlayerProfile = Schemas["PlayerProfile"];
+export type CatalogCurrent = Schemas["CatalogCurrent"];
 export type PlayerRank = Schemas["PlayerRank"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 export type ObjectiveForm = Schemas["ObjectiveForm"];
@@ -77,6 +78,8 @@ export interface ApiClient {
   getHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   requestHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   lookupPlayer(gameName: string, tagLine: string, refresh?: boolean, signal?: AbortSignal): Promise<PlayerProfile>;
+  getOwnPlayer(signal?: AbortSignal): Promise<PlayerProfile>;
+  getCatalogCurrent(signal?: AbortSignal): Promise<CatalogCurrent>;
   getPlayerSync(playerId: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
   /** O banco guarda só o HMAC do Riot ID (CC-1103): o pedido traz o Riot ID do perfil. */
   requestPlayerSync(playerId: string, gameName: string, tagLine: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
@@ -193,6 +196,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     requestHistorySync: (signal) => request("POST", "/api/v1/history/sync", { signal }),
     lookupPlayer: (gameName, tagLine, refresh = false, signal) =>
       request("POST", "/api/v1/players/lookup", { body: { gameName, tagLine, refresh }, signal }),
+    getOwnPlayer: (signal) => request("GET", "/api/v1/players/me", { signal }),
+    getCatalogCurrent: (signal) => request("GET", "/api/v1/catalog/current", { signal }),
     getPlayerSync: (playerId, signal) => request("GET", `/api/v1/players/${enc(playerId)}/sync`, { signal }),
     requestPlayerSync: (playerId, gameName, tagLine, signal) =>
       request("POST", `/api/v1/players/${enc(playerId)}/sync`, { body: { gameName, tagLine }, signal }),

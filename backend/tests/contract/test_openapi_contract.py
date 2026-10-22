@@ -28,7 +28,7 @@ def test_openapi_only_announces_real_routes() -> None:
     objetivo no CC-504; feedback, relatório, reflexão e progresso no CC-505; prévia e
     expurgo de partida (DELETE com confirmação) no CC-603; sincronização do histórico
     (POST/GET) no CC-901; revisão da partida (F1) no CC-1003; perfil de jogador por Riot ID
-    (busca, perfil e sincronização) no CC-1101."""
+    (busca, perfil e sincronização) no CC-1101; perfil da conta e catálogo atual no CC-1202."""
     schema = _current_schema()
     assert set(schema["paths"].keys()) == {
         "/health/live",
@@ -47,6 +47,8 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/ranked/me",
         "/api/v1/history/sync",
         "/api/v1/players/lookup",
+        "/api/v1/players/me",
+        "/api/v1/catalog/current",
         "/api/v1/players/{player_id}/sync",
         "/api/v1/dashboard",
         "/api/v1/champions/patterns",

@@ -1,4 +1,4 @@
-import { useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { DemoNoticeContext } from "./demoNotice";
 
 export function DemoNoticeProvider({ children }: { children: ReactNode }) {
@@ -14,14 +14,4 @@ export function DemoNoticeProvider({ children }: { children: ReactNode }) {
   }, []);
   const value = useMemo(() => ({ visible: keys.size > 0, set }), [keys, set]);
   return <DemoNoticeContext.Provider value={value}>{children}</DemoNoticeContext.Provider>;
-}
-
-export function DemoNotice() {
-  const { visible } = useContext(DemoNoticeContext);
-  if (!visible) return null;
-  return (
-    <div className="app__source-banner" role="note">
-      Partidas DEMO são sintéticas e identificadas: não vêm da Riot nem representam jogadores reais.
-    </div>
-  );
 }

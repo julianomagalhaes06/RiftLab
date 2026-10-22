@@ -79,6 +79,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Patch e versão do Data Dragon mais recentes do catálogo
+         * @description Somente banco. Sem catálogo importado, os dois campos vêm nulos.
+         */
+        get: operations["get_catalog_current_api_v1_catalog_current_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/champions/patterns": {
         parameters: {
             query?: never;
@@ -502,6 +522,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/players/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Perfil da conta configurada
+         * @description Perfil guardado da conta própria (chip do topo), sem nova consulta à Riot; o Riot ID vem do arquivo da conta. Só na primeira vez, sem perfil guardado, consulta a Riot como a busca (3 requisições).
+         */
+        get: operations["get_own_player_api_v1_players_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/players/{player_id}/sync": {
         parameters: {
             query?: never;
@@ -768,6 +808,13 @@ export interface components {
          * @enum {string}
          */
         BudgetSource: "UNKNOWN" | "FRAME_ESTIMATE" | "USER_PROVIDED";
+        /** CatalogCurrent */
+        CatalogCurrent: {
+            /** Datadragonversion */
+            dataDragonVersion?: string | null;
+            /** Gamepatch */
+            gamePatch?: string | null;
+        };
         /**
          * ChampionAsset
          * @description Nome e retrato oficiais (CC-208), resolvidos pelo `key` numérico no catálogo do
@@ -2512,6 +2559,26 @@ export interface operations {
             };
         };
     };
+    get_catalog_current_api_v1_catalog_current_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogCurrent"];
+                };
+            };
+        };
+    };
     get_champion_patterns_api_v1_champions_patterns_get: {
         parameters: {
             query?: {
@@ -3514,6 +3581,44 @@ export interface operations {
             };
             /** @description INVALID_RIOT_ID ou VALIDATION_ERROR. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_own_player_api_v1_players_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description Conta não configurada. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

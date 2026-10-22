@@ -224,6 +224,11 @@ Como em sites de estatísticas, qualquer Riot ID do servidor BR pode ser consult
 - **Retenção e remoção (CC-1103).** `cc retention run` apaga perfil, todas as observações de elo e as execuções terminadas de quem não foi consultado há `player_profile_retention_days` (7); a conta configurada fica de fora. `cc retention purge-player --game-name --tag-line [--execute]` faz o mesmo para um Riot ID; uma execução ativa fica até o worker terminá-la. As duas só imprimem contagens.
 - **Interface.** A busca "Nome#TAG" fica no topo de todas as telas e leva a `/jogador/Nome-TAG`; o último hífen separa a TAG. A página mostra perfil, elo, o botão Atualizar (elo, ícone e partidas) e o histórico do jogador com os cartões do Histórico.
 
+## CC-1202 — Moldura: perfil da conta e catálogo atual
+
+- **Perfil da conta.** `GET /api/v1/players/me` devolve o perfil da conta configurada no formato da busca, para o chip do topo. O Riot ID vem do arquivo da conta, nunca do banco. Com perfil guardado, responde só do banco, qualquer que seja a idade; o Atualizar da página do jogador renova. Sem perfil guardado, consulta a Riot uma vez, como a busca (3 requisições). Sem chave, dá 503 `RIOT_KEY_MISSING`; sem conta configurada, 404. A interface escolhe a melhor fila (elo, divisão e PDL) e, em erro, mostra só o selo BR1.
+- **Catálogo atual.** `GET /api/v1/catalog/current` devolve `{gamePatch, dataDragonVersion}` do catálogo de patch real mais recente (formato do jogo, como `16.20`), ou os dois nulos. É a faixa "Patch · Data Dragon" abaixo do topo e a versão dos ícones de invocador.
+
 ## CC-1003–CC-1005 — Revisão da partida
 
 `GET /api/v1/matches/{matchId}/review?participantId=N` é só leitura (transação READ ONLY). Usa as decisões da extração corrente, a linha do tempo, os quadros gravados na preparação e dois artefatos agregados e versionados em `configs/match-review/`:

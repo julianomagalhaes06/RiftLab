@@ -12,7 +12,12 @@ from pydantic import Field
 from riftlab.errors import ProblemDetail
 from riftlab.history_sync.api import HistorySyncStatus
 from riftlab.history_sync.application import request_sync, sync_status
-from riftlab.players.application import lookup_player, profile_account, profile_key
+from riftlab.players.application import (
+    lookup_player,
+    own_player,
+    profile_account,
+    profile_key,
+)
 from riftlab.shared.api.common import CamelModel
 
 router = APIRouter(prefix="/api/v1/players", tags=["players"])
@@ -93,6 +98,26 @@ async def post_player_lookup(body: PlayerLookup, request: Request) -> PlayerProf
             body.tag_line,
             refresh=body.refresh,
         )
+    )
+
+
+@router.get(
+    "/me",
+    response_model=PlayerProfile,
+    summary="Perfil da conta configurada",
+    description=(
+        "Perfil guardado da conta própria (chip do topo), sem nova consulta à Riot; o Riot ID "
+        "vem do arquivo da conta. Só na primeira vez, sem perfil guardado, consulta a Riot como "
+        "a busca (3 requisições)."
+    ),
+    responses={
+        404: {"model": ProblemDetail, "description": "Conta não configurada."},
+        503: _ERRORS[503],
+    },
+)
+async def get_own_player(request: Request) -> PlayerProfile:
+    return PlayerProfile.model_validate(
+        await own_player(request.app.state.session_factory, request.app.state.settings)
     )
 
 

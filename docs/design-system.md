@@ -69,8 +69,10 @@ Espaço e forma: chanfro `--cut` 8 px (superfícies), `--cut-chip` 6 px (retrato
   servidor e escopo nos demais casos), com ícone de informação; à direita "Patch · Data Dragon".
 - **Rodapé** (linha `nline` em cima, 12 px `ntext-subtle`, três colunas): "RiftLab" · o que o
   produto é · créditos de retratos e emblemas; abaixo, o aviso legal da Riot em inglês.
-- **Celular**: topo com marca, BR1 e retrato; busca em linha própria; abas fixas embaixo (68 px,
-  ícone 20 px, barra ativa no topo da aba).
+- **Larguras menores**: até 1360 px o topo perde respiro; até 1240 px o chip fica só com o selo e o
+  retrato (nome e elo seguem no rótulo acessível).
+- **Celular e tablet estreito (≤ 960 px)**: topo com marca, BR1 e retrato; busca em linha própria;
+  abas fixas embaixo (68 px, ícone 20 px, barra ativa no topo da aba).
 
 ## Primitivas (`arena.css`)
 

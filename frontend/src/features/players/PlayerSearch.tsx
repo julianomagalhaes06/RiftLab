@@ -28,7 +28,7 @@ export function PlayerSearch() {
         id={`${hintId}-input`}
         type="search"
         value={value}
-        placeholder="Nome#TAG"
+        placeholder="Buscar Nome#TAG"
         autoComplete="off"
         spellCheck={false}
         aria-invalid={invalid}
@@ -38,7 +38,11 @@ export function PlayerSearch() {
           if (invalid) setInvalid(false);
         }}
       />
-      <button type="submit" className="button button--secondary">Buscar</button>
+      <button type="submit" className="player-search__submit" aria-label="Buscar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+        </svg>
+      </button>
       {invalid ? (
         <p id={hintId} className="player-search__hint" role="alert">
           Use o formato Nome#TAG (a TAG tem de 3 a 5 letras ou números).

@@ -556,6 +556,35 @@
         "title": "BudgetSource",
         "type": "string"
       },
+      "CatalogCurrent": {
+        "additionalProperties": false,
+        "properties": {
+          "dataDragonVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datadragonversion"
+          },
+          "gamePatch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamepatch"
+          }
+        },
+        "title": "CatalogCurrent",
+        "type": "object"
+      },
       "ChampionAsset": {
         "additionalProperties": false,
         "description": "Nome e retrato oficiais (CC-208), resolvidos pelo `key` numérico no catálogo do\nData Dragon da versão FIXADA para o patch. O retrato é\n`https://ddragon.leagueoflegends.com/cdn/{dataDragonVersion}/img/champion/{imageFile}`;\nos dois campos são validados por padrão estrito (nunca caminho ou URL livre).",
@@ -4925,6 +4954,28 @@
         ]
       }
     },
+    "/api/v1/catalog/current": {
+      "get": {
+        "description": "Somente banco. Sem catálogo importado, os dois campos vêm nulos.",
+        "operationId": "get_catalog_current_api_v1_catalog_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogCurrent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Patch e versão do Data Dragon mais recentes do catálogo",
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
     "/api/v1/champions/patterns": {
       "get": {
         "operationId": "get_champion_patterns_api_v1_champions_patterns_get",
@@ -6435,6 +6486,48 @@
           }
         },
         "summary": "Busca um jogador pelo Riot ID (Nome#TAG)",
+        "tags": [
+          "players"
+        ]
+      }
+    },
+    "/api/v1/players/me": {
+      "get": {
+        "description": "Perfil guardado da conta própria (chip do topo), sem nova consulta à Riot; o Riot ID vem do arquivo da conta. Só na primeira vez, sem perfil guardado, consulta a Riot como a busca (3 requisições).",
+        "operationId": "get_own_player_api_v1_players_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conta não configurada."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE."
+          }
+        },
+        "summary": "Perfil da conta configurada",
         "tags": [
           "players"
         ]

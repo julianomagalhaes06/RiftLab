@@ -1,32 +1,62 @@
 
 
-.app > header { border-bottom: 1px solid var(--nline); }
+/* Moldura Arena (CC-1202): topo de 64 px, faixa de contexto de 32 px e conteúdo em 1440 px com
+   margem de 40 px, como `chrome` e `footer` do protótipo. */
+.app > header { background: var(--n0); border-bottom: 1px solid var(--nline); }
 .app__topbar {
-  max-width: 1360px;
-  min-height: 66px;
+  max-width: 1440px;
+  height: 64px;
   margin: auto;
-  padding: 0 32px;
+  padding: 0 40px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 24px;
 }
 .app__topbar h1 { margin: 0; font-size: 1.25rem; font-weight: 600; flex: none; }
-.app__brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); letter-spacing: .01em; }
-.app__mark { width: 27px; height: 29px; display: inline-grid; place-items: center; background: var(--accent-strong); color: var(--mark-ink); font: 600 16px var(--font-display); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.app__brand { display: inline-flex; align-items: center; gap: 12px; font: 600 1.25rem var(--font-display); letter-spacing: 0; }
+.app__mark { width: 28px; height: 30px; display: inline-grid; place-items: center; background: var(--accent-strong); color: var(--mark-ink); font: 700 15px var(--font-display); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
 .app a.app__brand { color: var(--ntext); }
-.app__import-link { white-space: nowrap; font-size: .9rem; font-weight: 600; }
+.app__tools { margin-left: auto; display: flex; align-items: center; gap: 20px; min-width: 0; }
 
-.main-nav { display: flex; align-self: stretch; align-items: stretch; gap: 10px; }
-.app .main-nav__link { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 48px; color: var(--ntext-muted); text-decoration: none; font-size: .9rem; font-weight: 500; white-space: nowrap; }
-.app .main-nav__link:hover, .app .main-nav__link--active { color: var(--ntext); }
-.main-nav__link--active { font-weight: 700 !important; }
-.main-nav__link--active::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 0; height: 3px; background: var(--accent); }
+.main-nav { display: flex; align-self: stretch; align-items: stretch; gap: 8px; margin-left: clamp(16px, 8vw, 150px); }
+.app .main-nav__link { position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 48px; color: var(--ntext-muted); text-decoration: none; font-size: .9375rem; font-weight: 500; white-space: nowrap; }
+.main-nav__link svg { width: 18px; height: 18px; color: var(--ntext-subtle); }
+.app .main-nav__link:hover { color: var(--ntext); }
+.app .main-nav__link--active { color: var(--ntext); font-weight: 600; }
+.main-nav__link--active::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; background: var(--accent-strong); }
 .main-nav__link--active svg { color: var(--accent); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
-.app__source-banner { border-top: 1px solid var(--nline-soft); background: var(--n1); color: var(--ntext-muted); padding: 9px max(32px, calc((100vw - 1296px) / 2)); font-size: .78rem; line-height: 1.5; }
-.app__main { max-width: 1360px; margin: 0 auto; min-height: 65vh; padding: 36px 32px 72px; }
+/* Busca Nome#TAG compacta: campo e botão de ícone na mesma moldura. */
+.app__topbar .player-search { gap: 0; }
+.app__topbar .player-search input { width: 200px; min-height: 36px; border-right: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); font-size: .875rem; }
+.player-search__submit { display: inline-grid; place-items: center; width: 40px; height: 36px; padding: 0; border: 1px solid var(--nline-strong); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--n1); color: var(--ntext-muted); cursor: pointer; }
+.player-search__submit:hover { color: var(--ntext); background: var(--n2); }
+/* O alvo de 36 px fica dentro de uma faixa de 44 px de altura útil no topo. */
+.player-search__submit::after { content: ""; position: absolute; inset: -4px 0; }
+.player-search { position: relative; }
+
+/* Chip do perfil da conta: selo BR1, ícone chanfrado de 32 px, Riot ID e elo na cor do elo. */
+.profile-chip { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.app a.profile-chip__link { display: flex; align-items: center; gap: 10px; min-height: 44px; min-width: 0; color: var(--ntext); text-decoration: none; }
+.profile-chip__icon { width: 32px; height: 32px; box-shadow: inset 0 0 0 1px var(--nline2); }
+.profile-chip__text { display: grid; gap: 2px; min-width: 0; }
+.profile-chip__name { font-size: .875rem; font-weight: 500; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.profile-chip__rank { display: inline-flex; align-items: center; gap: 4px; color: var(--tier-text); font-size: .75rem; font-weight: 600; line-height: 1.2; white-space: nowrap; }
+.profile-chip__rank[data-tier="NONE"] { color: var(--ntext-subtle); font-weight: 500; }
+.profile-chip__rank img { width: 16px; height: 16px; object-fit: contain; }
+.app a.profile-chip__link:hover .profile-chip__name { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Faixa de contexto: aviso à esquerda, patch e Data Dragon à direita. */
+.context-strip { border-top: 1px solid var(--nline); background: var(--n1); }
+.context-strip__inner { max-width: 1440px; min-height: 32px; margin: auto; padding: 6px 40px; display: flex; align-items: center; justify-content: space-between; gap: 6px 24px; flex-wrap: wrap; font-size: .8125rem; line-height: 1.4; }
+.context-strip p { margin: 0; }
+.context-strip__note { display: flex; align-items: flex-start; gap: 8px; color: var(--ntext-subtle); font-weight: 500; }
+.context-strip__note svg { flex: none; margin-top: 1px; color: var(--ntext-subtle); }
+.context-strip__note strong { color: var(--ntext-muted); font-weight: 600; }
+.context-strip__patch { color: var(--ntext-subtle); font-size: .75rem; white-space: nowrap; }
+
+.app__main { max-width: 1440px; margin: 0 auto; min-height: 65vh; padding: 40px 40px 72px; }
 
 .app__footer a { color: var(--accent); }
 
@@ -109,28 +139,48 @@
   .recent-row__time { grid-column: 1; grid-row: 2; }
   .recent-row__action { grid-column: 2; grid-row: 1 / 3; }
 }
+/* Topo em larguras menores: menos respiro, depois só o retrato no chip, depois abas sem ícone. */
+@media (max-width: 1360px) {
+  .main-nav { margin-left: 16px; gap: 0; }
+  .app .main-nav__link { padding: 0 10px; }
+  .app__topbar .player-search input { width: 160px; }
+  .profile-chip__name { max-width: 140px; }
+}
+@media (max-width: 1240px) {
+  .profile-chip__text { display: none; }
+}
+@media (max-width: 1100px) {
+  .main-nav { margin-left: 8px; }
+  .app .main-nav__link { padding: 0 8px; }
+  .app__topbar .player-search input { width: 130px; }
+}
+/* Até 960 px a moldura é a do celular (panel_mobile): marca, BR1 e retrato no topo; a busca na
+   própria linha; abas fixas embaixo. */
+@media (max-width: 960px) {
+  html { scroll-padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .app__topbar { height: auto; min-height: 56px; padding: 0 20px; flex-wrap: wrap; row-gap: 8px; }
+  .app__tools { display: contents; }
+  .profile-chip { margin-left: auto; gap: 10px; }
+  .app__topbar .player-search { order: 3; flex: 1 1 100%; padding-bottom: 10px; }
+  .app__topbar .player-search input { flex: 1 1 auto; width: auto; min-width: 0; }
+  .context-strip__inner { padding: 6px 20px; }
+  .app__main { padding: 32px 20px calc(120px + env(safe-area-inset-bottom)); }
+  .app__footer { padding: 20px 20px calc(120px + env(safe-area-inset-bottom)); }
+  .main-nav { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; margin: 0; height: calc(68px + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); background: var(--n0); border-top: 1px solid var(--nline); justify-content: space-around; }
+  .app .main-nav__link { flex: 1; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 0; min-width: 0; font-size: .75rem; text-align: center; }
+  .main-nav__link--active::after { bottom: auto; top: 0; left: 24px; right: 24px; }
+  .main-nav__link svg { width: 20px; height: 20px; }
+}
 @media (max-width: 900px) {
-  .app__topbar { padding: 0 20px; }
-  .main-nav { gap: 0; }
-  .app .main-nav__link { padding: 0 7px; gap: 5px; }
   .panel-layout { grid-template-columns: minmax(0, 1.4fr) minmax(220px, .8fr); grid-template-rows: auto auto; grid-template-areas: "rank import" "main main"; }
 }
 
 @media (max-width: 700px) {
-  html { scroll-padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
-  .app__topbar { min-height: 58px; padding: 0 16px; flex-wrap: wrap; row-gap: 8px; }
-  .app__import-link { font-size: .8rem; }
-  /* CC-1102: no celular a busca de jogador ocupa a própria linha, abaixo da marca. */
-  .app__topbar .player-search { order: 3; flex: 1 1 100%; padding-bottom: 10px; }
-  .app__topbar .player-search input { flex: 1 1 auto; width: auto; min-width: 0; }
-  .app__topbar .player-search .button { flex: none; }
-  .app__source-banner { padding: 9px 16px; }
+  .app__topbar { padding: 0 16px; }
+  .context-strip__inner { padding: 6px 16px; }
+  .context-strip__patch { display: none; }
   .app__main { padding: 26px 16px calc(120px + env(safe-area-inset-bottom)); }
   .app__footer { padding: 20px 16px calc(120px + env(safe-area-inset-bottom)); }
-  .main-nav { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; height: calc(72px + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); background: var(--n0); border-top: 1px solid var(--nline); justify-content: space-around; }
-  .app .main-nav__link { flex: 1; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 0; min-width: 0; font-size: .68rem; text-align: center; }
-  .main-nav__link--active::after { bottom: auto; top: 0; left: 10px; right: 10px; }
-  .main-nav__link svg { width: 19px; height: 19px; }
   .panel-layout { grid-template-columns: 1fr; grid-template-areas: "rank" "main" "import"; }
   .import-grid { grid-template-columns: 1fr; }
   .study-entry { align-items: flex-start; flex-direction: column; padding: 18px; }
@@ -143,10 +193,14 @@
 }
 
 @media (max-width: 380px) {
-  .app .main-nav__link { font-size: .61rem; }
-  .app__import-link { max-width: 102px; white-space: normal; text-align: right; }
+  .app .main-nav__link { font-size: .6875rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* Cabeçalho com ação à direita (Histórico → Importar partida). */
+.page-intro--with-action { max-width: none; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
+.page-intro--with-action > div { max-width: 760px; }
+.page-intro--with-action > div > p:last-child { color: var(--ntext-muted); line-height: 1.6; margin: 0; }

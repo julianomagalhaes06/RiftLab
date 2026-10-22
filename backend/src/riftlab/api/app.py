@@ -15,6 +15,7 @@ from riftlab.api.routes.imports import router as imports_router
 from riftlab.api.routes.learning import router as learning_router
 from riftlab.api.routes.matches import router as matches_router
 from riftlab.api.routes.objectives import router as objectives_router
+from riftlab.catalog.api import router as catalog_router
 from riftlab.config import Settings, get_settings
 from riftlab.dashboard.api import router as dashboard_router
 from riftlab.errors import register_exception_handlers
@@ -52,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(decisions_router)
     app.include_router(match_review_router)
     app.include_router(players_router)
+    app.include_router(catalog_router)
     app.include_router(ranked_router)
     app.include_router(history_sync_router)
     app.include_router(dashboard_router)

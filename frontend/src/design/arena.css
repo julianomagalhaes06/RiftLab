@@ -97,3 +97,17 @@
 .segmented > button { min-height: 40px; padding: 0 12px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); background: var(--n1); color: var(--ntext-muted); font: 500 .875rem var(--font-body); cursor: pointer; }
 .segmented > button:hover { color: var(--ntext); border-color: var(--nline-strong); }
 .segmented > button[aria-pressed="true"] { border-color: var(--accent-strong); background: var(--accent-surface); color: var(--ntext); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent-strong); }
+
+/* Escopo do elo: [data-tier] expõe os cinco tons do elo (--tier-base, -light, -dark, -deep,
+   -text) para o componente; fora da classificação não se usa cor de elo. */
+[data-tier] { --tier-base: var(--tier-none-base); --tier-light: var(--tier-none-light); --tier-dark: var(--tier-none-dark); --tier-deep: var(--tier-none-deep); --tier-text: var(--tier-none-text); }
+[data-tier="IRON"] { --tier-base: var(--tier-iron-base); --tier-light: var(--tier-iron-light); --tier-dark: var(--tier-iron-dark); --tier-deep: var(--tier-iron-deep); --tier-text: var(--tier-iron-text); }
+[data-tier="BRONZE"] { --tier-base: var(--tier-bronze-base); --tier-light: var(--tier-bronze-light); --tier-dark: var(--tier-bronze-dark); --tier-deep: var(--tier-bronze-deep); --tier-text: var(--tier-bronze-text); }
+[data-tier="SILVER"] { --tier-base: var(--tier-silver-base); --tier-light: var(--tier-silver-light); --tier-dark: var(--tier-silver-dark); --tier-deep: var(--tier-silver-deep); --tier-text: var(--tier-silver-text); }
+[data-tier="GOLD"] { --tier-base: var(--tier-gold-base); --tier-light: var(--tier-gold-light); --tier-dark: var(--tier-gold-dark); --tier-deep: var(--tier-gold-deep); --tier-text: var(--tier-gold-text); }
+[data-tier="PLATINUM"] { --tier-base: var(--tier-platinum-base); --tier-light: var(--tier-platinum-light); --tier-dark: var(--tier-platinum-dark); --tier-deep: var(--tier-platinum-deep); --tier-text: var(--tier-platinum-text); }
+[data-tier="EMERALD"] { --tier-base: var(--tier-emerald-base); --tier-light: var(--tier-emerald-light); --tier-dark: var(--tier-emerald-dark); --tier-deep: var(--tier-emerald-deep); --tier-text: var(--tier-emerald-text); }
+[data-tier="DIAMOND"] { --tier-base: var(--tier-diamond-base); --tier-light: var(--tier-diamond-light); --tier-dark: var(--tier-diamond-dark); --tier-deep: var(--tier-diamond-deep); --tier-text: var(--tier-diamond-text); }
+[data-tier="MASTER"] { --tier-base: var(--tier-master-base); --tier-light: var(--tier-master-light); --tier-dark: var(--tier-master-dark); --tier-deep: var(--tier-master-deep); --tier-text: var(--tier-master-text); }
+[data-tier="GRANDMASTER"] { --tier-base: var(--tier-grandmaster-base); --tier-light: var(--tier-grandmaster-light); --tier-dark: var(--tier-grandmaster-dark); --tier-deep: var(--tier-grandmaster-deep); --tier-text: var(--tier-grandmaster-text); }
+[data-tier="CHALLENGER"] { --tier-base: var(--tier-challenger-base); --tier-light: var(--tier-challenger-light); --tier-dark: var(--tier-challenger-dark); --tier-deep: var(--tier-challenger-deep); --tier-text: var(--tier-challenger-text); }

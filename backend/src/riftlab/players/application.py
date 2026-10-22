@@ -12,18 +12,21 @@ from __future__ import annotations
 import unicodedata
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from riftlab.catalog.models import CatalogVersionModel
+from riftlab.catalog.patches import latest_catalog
 from riftlab.config import Settings
 from riftlab.history_sync.models import HistorySyncRunModel as Run
 from riftlab.ingestion.infrastructure.riot_account import (
     ALLOWED_PLATFORM,
     ALLOWED_REGIONAL_ROUTING,
     RiotAccountConfig,
+    RiotAccountConfigError,
+    load_riot_account,
 )
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
@@ -40,7 +43,6 @@ from riftlab.shared.errors import (
     SourceNotFoundError,
     SourceRateLimitedError,
 )
-from riftlab.shared.numeric import patch_order_key
 
 SessionFactory = async_sessionmaker[AsyncSession]
 # Perfil consultado há menos disso é devolvido sem nova consulta (o botão Atualizar força).
@@ -80,16 +82,8 @@ def _key(settings: Settings, game_name: str, tag_line: str) -> str:
 
 async def _data_dragon_version(session: AsyncSession) -> str | None:
     """Versão do Data Dragon do patch real mais recente do catálogo (ícone de invocador)."""
-    rows = (
-        await session.execute(
-            select(CatalogVersionModel.game_patch, CatalogVersionModel.data_dragon_version)
-        )
-    ).all()
-    ranked = sorted(
-        ((key, version) for patch, version in rows if (key := patch_order_key(patch)) is not None),
-        reverse=True,
-    )
-    return ranked[0][1] if ranked else None
+    latest = await latest_catalog(session)
+    return latest[1] if latest else None
 
 
 def _position(event: Observation | None) -> dict[str, Any] | None:
@@ -231,6 +225,31 @@ async def lookup_player(
             )
         await session.flush()
         return await _view(session, profile, (canonical_name, canonical_tag), None)
+
+
+async def own_player(
+    factory: SessionFactory,
+    settings: Settings,
+    *,
+    transport: RiotHttpTransport | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Perfil da conta configurada (chip do topo, CC-1202). O Riot ID vem do arquivo da conta,
+    nunca do banco. Guardado: devolve sem consultar a Riot, qualquer que seja a idade (o
+    Atualizar da página do jogador renova). Sem perfil guardado: uma consulta, como a busca
+    (3 requisições); sem chave, RIOT_KEY_MISSING."""
+    try:
+        account = load_riot_account(Path(settings.ranked_account_file))
+    except (RiotAccountConfigError, OSError) as exc:
+        raise NotFoundError("conta não configurada") from exc
+    key = _key(settings, account.game_name, account.tag_line)
+    async with read_only_unit_of_work(factory) as session:
+        stored = await session.scalar(select(Profile).where(Profile.account_key == key))
+        if stored is not None:
+            return await _view(session, stored, (account.game_name, account.tag_line), None)
+    return await lookup_player(
+        factory, settings, account.game_name, account.tag_line, transport=transport, now=now
+    )
 
 
 async def profile_key(factory: SessionFactory, player_id: uuid.UUID) -> str:

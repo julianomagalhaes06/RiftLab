@@ -42,6 +42,19 @@ for (const width of [360, 1280]) {
       await noHorizontalScroll(page);
     });
 
+    test("topo: chip do perfil da conta leva à página dela; faixa mostra o patch (CC-1202)", async ({ page }) => {
+      await mockApi(page);
+      await page.goto("/");
+      const chip = page.getByRole("link", { name: "Seu perfil: Conta Própria#BR1, Ouro II · 41 PDL" });
+      await expect(chip).toBeVisible();
+      // No celular o chip fica só com o retrato (o nome e o elo vão para o rótulo acessível).
+      await expect(page.locator(".profile-chip__name")).toBeVisible({ visible: width > 700 });
+      if (width > 700) await expect(page.getByText("Patch 16.20 · Data Dragon 16.20.1")).toBeVisible();
+      await noHorizontalScroll(page);
+      await chip.click();
+      await expect(page).toHaveURL(/\/jogador\/Conta%20Pr%C3%B3pria-BR1$/);
+    });
+
     test("Riot ID inexistente explica e não quebra a página", async ({ page }) => {
       await mockApi(page, { "POST /api/v1/players/lookup": () => problem(404, "PLAYER_NOT_FOUND") });
       await page.goto("/jogador/Ninguem-000");
