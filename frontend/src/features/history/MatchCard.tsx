@@ -68,13 +68,15 @@ export function MatchCard({ match, now }: { match: MatchSummary; now?: Date }) {
   const title = local ? `${championName(local)} — ${queueLabel(match.queue)}` : queueLabel(match.queue);
 
   return (
-    <li className={`match-card match-card--${tone}`}>
-      <article aria-label={`${title}, ${matchDate(match.startAt)}`}>
+    // CC-1205: superfície chanfrada no item e barra de resultado de 3 px no artigo (as duas
+    // primitivas usam ::before, então ficam em elementos diferentes).
+    <li className={`match-card match-card--${tone} surface`}>
+      <article className="result-bar" data-result={tone === "neutral" ? undefined : tone} aria-label={`${title}, ${matchDate(match.startAt)}`}>
         <div className="match-card__meta">
           <strong className="match-card__queue">{queueLabel(match.queue)}</strong>
           <time dateTime={match.startAt} title={matchDate(match.startAt)}>{relativeTime(match.startAt, now)}</time>
           <span className="match-card__divider" aria-hidden="true" />
-          <span className="match-card__result">
+          <span className={`match-card__result${tone === "neutral" ? "" : ` result-text--${tone}`}`}>
             {performance?.result ? RESULT_TEXT[performance.result] : "Resultado não identificado"}
           </span>
           <span>{matchLength(match.durationSeconds)}</span>
@@ -83,7 +85,7 @@ export function MatchCard({ match, now }: { match: MatchSummary; now?: Date }) {
         {local && performance ? (
           <div className="match-card__hero">
             <span className="match-card__portrait">
-              <ChampionAvatar participant={local} size={56} />
+              <ChampionAvatar participant={local} size={56} className="portrait" />
               {role ? <span className="match-card__role">{role}</span> : null}
             </span>
             <div className="match-card__score">
@@ -122,10 +124,10 @@ export function MatchCard({ match, now }: { match: MatchSummary; now?: Date }) {
         ) : null}
 
         <div className="match-card__actions">
-          {demo ? <span className="origin-badge origin-badge--demo">DEMO</span> : null}
+          {demo ? <span className="chip origin-badge origin-badge--demo">DEMO</span> : null}
           {match.reviewPurchases && match.reviewPurchases.total > 0 ? (
             <span
-              className={match.reviewPurchases.ready > 0 ? "review-badge" : "review-badge review-badge--none"}
+              className={match.reviewPurchases.ready > 0 ? "chip chip--win review-badge" : "chip review-badge review-badge--none"}
               title="Compras do 1º ao 5º item comparadas com jogadores do mesmo campeão e rota"
             >
               {match.reviewPurchases.ready > 0

@@ -83,6 +83,11 @@ describe("Histórico com dados realmente disponíveis", () => {
     expect(within(overview).getByText("1D")).toBeInTheDocument();
     const winCard = screen.getByRole("article", { name: /^Smolder — Ranqueada Flex/ });
     expect(within(winCard).getByText("Vitória")).toBeInTheDocument();
+    // CC-1205: superfície chanfrada por partida e barra de resultado de 3 px, sem fundo tingido.
+    expect(winCard.closest("li")).toHaveClass("match-card", "surface");
+    expect(winCard).toHaveAttribute("data-result", "win");
+    expect(within(winCard).getByText("Vitória")).toHaveClass("result-text--win");
+    expect(within(overview).getByText("Taxa de vitória")).toBeInTheDocument();
     expect(within(winCard).getByLabelText("7 abates, 4 mortes, 6 assistências")).toBeInTheDocument();
     expect(within(winCard).getByText("3,25 KDA")).toBeInTheDocument();
     expect(within(winCard).getByText("68%")).toBeInTheDocument(); // (7 + 6) ÷ (7 + 4 × 3) abates do time

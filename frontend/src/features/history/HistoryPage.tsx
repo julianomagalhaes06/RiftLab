@@ -28,9 +28,9 @@ function FilterGroup<T extends string | number>({
   onChange(value: T): void;
 }) {
   return (
-    <div className="history-filter-group" role="group" aria-label={label}>
+    <div className="segmented" role="group" aria-label={label}>
       {options.map(([option, text]) => (
-        <button key={String(option)} type="button" className={value === option ? "filter-button filter-button--active" : "filter-button"} aria-pressed={value === option} onClick={() => onChange(option)}>
+        <button key={String(option)} type="button" aria-pressed={value === option} onClick={() => onChange(option)}>
           {text}
         </button>
       ))}
@@ -43,7 +43,7 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
   const demoCount = matches.filter((match) => isDemoMatchId(match.matchId)).length;
   if (!summary.games) {
     return (
-      <section className="history-summary" aria-label="Resumo das páginas carregadas">
+      <section className="history-summary surface surface--pad" aria-label="Resumo das páginas carregadas">
         <strong>{count(matches.length, "partida carregada", "partidas carregadas")}</strong>
         <span>{matches.length - demoCount} RIOT · {demoCount} DEMO</span>
         <p>Sua conta não foi identificada nas partidas carregadas; resultado e KDA dependem da observação de elo da conta configurada.</p>
@@ -51,37 +51,40 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
     );
   }
   const rate = summary.wins + summary.losses ? summary.wins / (summary.wins + summary.losses) : null;
+  // CC-1205: card de métricas do padrão (taxa de vitória e KDA lado a lado, campeões embaixo).
   return (
-    <section className="history-overview" aria-label="Resumo das suas partidas carregadas">
-      <div className="history-overview__record">
-        <span className="history-overview__label">Suas últimas {summary.games} {summary.games === 1 ? "partida" : "partidas"} carregadas</span>
-        <strong>
-          <span className="history-overview__wins">{summary.wins}V</span> <span className="history-overview__losses">{summary.losses}D</span>
-          {rate !== null ? <span className="history-overview__rate"> · {percent(rate)}</span> : null}
-        </strong>
-        {rate !== null ? (
-          <span className="history-overview__bar" aria-hidden="true"><span style={{ width: `${rate * 100}%` }} /></span>
-        ) : null}
+    <section className="history-overview surface" aria-label="Resumo das suas partidas carregadas">
+      <div className="history-overview__row">
+        <div className="metric">
+          <p className="metric__label">Taxa de vitória</p>
+          <p className="metric__value">{rate === null ? "—" : percent(rate)}</p>
+          <p className="metric__foot">
+            <span className="result-text--win">{summary.wins}V</span> <span className="result-text--loss">{summary.losses}D</span> nas suas últimas {count(summary.games, "partida carregada", "partidas carregadas")}
+          </p>
+          {rate !== null ? <div className="metric__bar" aria-hidden="true"><span style={{ width: `${rate * 100}%` }} /></div> : null}
+        </div>
+        <div className="metric">
+          <p className="metric__label">KDA</p>
+          <p className="metric__value">{summary.kda === null ? "—" : decimal(summary.kda, 2)}</p>
+          {summary.averages ? (
+            <p className="metric__foot">{decimal(summary.averages.kills)} / {decimal(summary.averages.deaths)} / {decimal(summary.averages.assists)} em média</p>
+          ) : null}
+        </div>
       </div>
-      <div className="history-overview__kda">
-        <span className="history-overview__label">KDA</span>
-        <strong>{summary.kda === null ? "–" : decimal(summary.kda, 2)}</strong>
-        {summary.averages ? (
-          <small>{decimal(summary.averages.kills)} / {decimal(summary.averages.deaths)} / {decimal(summary.averages.assists)} em média</small>
-        ) : null}
+      <div className="history-overview__secondary">
+        <ul className="history-overview__champions" aria-label="Campeões mais jogados nas partidas carregadas">
+          {summary.champions.map((champion) => (
+            <li key={champion.participant.championId}>
+              <ChampionAvatar participant={champion.participant} size={36} className="portrait" />
+              <span>
+                <strong>{championName(champion.participant)}</strong>
+                <small>{champion.wins}V {champion.losses}D · {count(champion.games, "jogo", "jogos")}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="history-overview__scope">Calculado só nas páginas carregadas ({count(matches.length, "partida", "partidas")}, {demoCount} DEMO).</p>
       </div>
-      <ul className="history-overview__champions" aria-label="Campeões mais jogados nas partidas carregadas">
-        {summary.champions.map((champion) => (
-          <li key={champion.participant.championId}>
-            <ChampionAvatar participant={champion.participant} size={36} />
-            <span>
-              <strong>{championName(champion.participant)}</strong>
-              <small>{champion.wins}V {champion.losses}D · {champion.games} {champion.games === 1 ? "jogo" : "jogos"}</small>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="history-overview__scope">Calculado só nas páginas carregadas ({count(matches.length, "partida", "partidas")}, {demoCount} DEMO).</p>
     </section>
   );
 }
@@ -138,15 +141,15 @@ export function HistoryPage() {
 
   return (
     <div className="history-page">
-      <div className="page-intro page-intro--with-action">
+      <header className="page-head history-head">
         <div>
-          <p className="page-intro__kicker">Histórico de partidas importadas</p>
+          <p className="page-head__context">Histórico de partidas importadas</p>
           <h2>Partidas para estudar</h2>
-          <p>Partidas da conta configurada. Veja como foi cada partida e abra a análise das suas compras.</p>
+          <p className="page-head__lead">Partidas da conta configurada. Veja como foi cada partida e abra a análise das suas compras.</p>
         </div>
         {/* CC-1202: a importação manual saiu do topo e fica junto das partidas. */}
         <Link to="/importar" className="arrow-link">Importar partida</Link>
-      </div>
+      </header>
 
       <HistorySync onNewMatches={list.refresh} />
 

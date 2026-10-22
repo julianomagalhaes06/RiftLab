@@ -103,7 +103,7 @@ export function HistorySync({ onNewMatches, calls = OWN_ACCOUNT }: { onNewMatche
   }, [next, now]);
   const unavailable = status?.state === "UNAVAILABLE";
   const disabled = requesting || active(status) || waiting || unavailable;
-  const tone = status?.state === "FAILED" || failedRequest ? "history-sync history-sync--warning" : "history-sync";
+  const tone = status?.state === "FAILED" || failedRequest ? "history-sync surface history-sync--warning" : "history-sync surface";
 
   return (
     <section className={tone} aria-label="Atualização do histórico com a Riot">
