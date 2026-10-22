@@ -23,6 +23,7 @@ from riftlab.players.application import (
     _key,
     normalize_riot_id,
 )
+from riftlab.players.positions import ROLES, assign_positions, champion_roles
 from riftlab.ranked.domain import FLEX_QUEUE, SOLO_QUEUE, RankEntry, parse_league_entries
 from riftlab.shared.db import read_only_unit_of_work
 from riftlab.shared.errors import (
@@ -41,6 +42,7 @@ LIVE_MAX_REQUESTS = 12
 STATUS_CACHE_FOR = timedelta(seconds=60)
 STATUS_MAX_REQUESTS = 2
 FLEX_QUEUE_ID = 440
+SUMMONERS_RIFT = 11
 _CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
 _STATUS_CACHE: dict[str, tuple[datetime, dict[str, Any]]] = {}
 
@@ -155,7 +157,9 @@ async def live_game(
         "game": None,
     }
     if game is not None:
-        view["game"] = await _game_view(factory, game, puuid, ranks)
+        view["game"] = await _game_view(
+            factory, game, puuid, ranks, settings.match_review_reference_path
+        )
     _CACHE[key] = (now, view)
     _STATUS_CACHE[key] = (now, _status_from(view))
     return view
@@ -245,7 +249,11 @@ async def live_status(
 
 
 async def _game_view(
-    factory: SessionFactory, game: dict[str, Any], puuid: str, ranks: dict[str, RankEntry | None]
+    factory: SessionFactory,
+    game: dict[str, Any],
+    puuid: str,
+    ranks: dict[str, RankEntry | None],
+    reference_path: str,
 ) -> dict[str, Any]:
     raw_participants = [p for p in game["participants"] if isinstance(p, dict)]
     bans = {team: _bans(game.get("bannedChampions"), team) for team in (100, 200)}
@@ -296,9 +304,27 @@ async def _game_view(
                 ),
             }
         )
+    # CC-1214: a Riot não informa a rota ao vivo; no Summoner's Rift, ela é estimada e os times
+    # saem na ordem topo, selva, meio, atirador e suporte.
+    estimated = _int(game.get("mapId")) == SUMMONERS_RIFT
+    role_counts = champion_roles(reference_path) if estimated else {}
+    for rows in teams.values():
+        found = (
+            assign_positions(
+                [(r["championId"], (r["spell1Id"], r["spell2Id"])) for r in rows], role_counts
+            )
+            if estimated
+            else None
+        )
+        positions: list[str | None] = list(found) if found else [None] * len(rows)
+        for row, position in zip(rows, positions, strict=True):
+            row["position"] = position
+        if found:
+            rows.sort(key=lambda r: ROLES.index(r["position"]))
     started = _int(game.get("gameStartTime"))
     queue_id = _int(game.get("gameQueueConfigId"))
     return {
+        "positionsEstimated": estimated and all(len(rows) == len(ROLES) for rows in teams.values()),
         "queueId": queue_id,
         "rankQueue": FLEX_QUEUE if queue_id == FLEX_QUEUE_ID else SOLO_QUEUE,
         "gameMode": game.get("gameMode") if isinstance(game.get("gameMode"), str) else None,

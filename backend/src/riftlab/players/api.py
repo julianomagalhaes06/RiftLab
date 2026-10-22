@@ -129,6 +129,8 @@ class LiveParticipant(CamelModel):
     perk_sub_style: int | None = None
     rank_state: Literal["READY", "UNRANKED", "UNAVAILABLE"]
     rank: LivePlayerRank | None = None
+    # CC-1214: rota estimada (a Riot não informa ao vivo); nula fora do Summoner's Rift.
+    position: Literal["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"] | None = None
 
 
 class LiveBan(CamelModel):
@@ -144,6 +146,7 @@ class LiveTeam(CamelModel):
 
 class LiveGameInfo(CamelModel):
     queue_id: int | None = None
+    positions_estimated: bool = False
     rank_queue: Literal["RANKED_SOLO_5x5", "RANKED_FLEX_SR"]
     game_mode: str | None = None
     map_id: int | None = None

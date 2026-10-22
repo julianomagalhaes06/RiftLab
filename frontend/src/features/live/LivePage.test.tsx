@@ -10,8 +10,11 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
+const LANES = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"];
+
 function player(n: number, overrides: Record<string, unknown> = {}) {
   return {
+    position: LANES[n % 5],
     gameName: `Jogador ${n}`, tagLine: "BR1", bot: false, requested: n === 0, championId: 51 + n,
     champion: null, spell1Id: 4, spell2Id: 14, keystoneId: 8010, perkStyle: 8000, perkSubStyle: 8400,
     rankState: "READY", rank: { tier: "GOLD", division: "II", leaguePoints: 41, wins: 10, losses: 8 },
@@ -23,7 +26,7 @@ export function liveGame(overrides: Record<string, unknown> = {}) {
   return {
     state: "IN_GAME", gameName: "Pão de Queijo", tagLine: "BR1", checkedAt: "2026-10-22T15:00:00Z",
     game: {
-      queueId: 440, rankQueue: "RANKED_FLEX_SR", gameMode: "CLASSIC", mapId: 11,
+      queueId: 440, rankQueue: "RANKED_FLEX_SR", gameMode: "CLASSIC", mapId: 11, positionsEstimated: true,
       startedAt: new Date(Date.now() - 754_000).toISOString(), lengthSeconds: 754, dataDragonVersion: "16.20.1",
       teams: [
         { teamId: 100, bans: [{ championId: 99, champion: null }], participants: [player(0), player(1, { rankState: "UNRANKED", rank: null }), player(2), player(3), player(4)] },
@@ -60,6 +63,9 @@ describe("partida ao vivo (CC-1211)", () => {
     expect(within(red).getAllByText("Bot").length).toBeGreaterThan(0);
     expect(within(blue).getAllByAltText("Flash")[0]).toHaveAttribute("src", "https://ddragon.leagueoflegends.com/cdn/16.20.1/img/spell/SummonerFlash.png");
     expect(within(blue).getByText("Banimentos")).toBeInTheDocument();
+    // CC-1214: rota estimada junto do campeão, na ordem topo → suporte, com a nota.
+    expect(within(blue).getAllByText(/· (Topo|Selva|Meio|Atirador|Suporte)/).map((el) => el.textContent?.replace(/^ · /, ""))).toEqual(["Topo", "Selva", "Meio", "Atirador", "Suporte"]);
+    expect(screen.getByText(/Rotas estimadas pelo campeão e pelos feitiços/)).toBeInTheDocument();
     // O Riot ID vai no corpo, fora da URL e dos logs de acesso.
     expect(api.callsTo("POST", /players\/live/)[0].body).toEqual({ gameName: "Pão de Queijo", tagLine: "BR1" });
   });

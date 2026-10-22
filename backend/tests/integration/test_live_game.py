@@ -60,14 +60,28 @@ GAME = {
 }
 
 
-def _settings(tmp_path: Path, *, key: str | None = "k") -> Settings:
+ROLES = ("TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY")
+
+
+def _settings(tmp_path: Path, *, key: str | None = "k", reverse: bool = False) -> Settings:
     own = tmp_path / "own.json"
     own.write_text(
         json.dumps(
             {"gameName": "Own", "tagLine": "BR1", "platform": "BR1", "regionalRouting": "AMERICAS"}
         )
     )
-    return Settings(ranked_account_file=str(own), subject_hash_secret=SECRET, riot_api_key=key)
+    # CC-1214: referência controlada; por padrão, a ordem da Riot já é topo → suporte.
+    roles = ROLES[::-1] if reverse else ROLES
+    reference = tmp_path / ("reference-reverse.json" if reverse else "reference.json")
+    reference.write_text(
+        json.dumps({"participations": {f"{51 + n}:{roles[n % 5]}": 1000 for n in range(10)}})
+    )
+    return Settings(
+        ranked_account_file=str(own),
+        subject_hash_secret=SECRET,
+        riot_api_key=key,
+        match_review_reference_path=str(reference),
+    )
 
 
 def _transport(*, account: int = 200, spectator: int = 200, league_429_after: int | None = None):
@@ -305,3 +319,29 @@ async def test_api_live_status(app_client, tmp_path, monkeypatch):
     )
     assert response.status_code == 200
     assert response.json()["state"] == "IN_GAME" and "puuid" not in response.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_live_teams_in_lane_order_with_estimated_positions(
+    session_factory, tmp_path, monkeypatch
+):
+    """CC-1214: a Riot não informa a rota ao vivo; no Summoner's Rift ela é estimada e os times
+    saem na ordem topo, selva, meio, atirador e suporte."""
+    transport, _ = _transport()
+    view = await live_game(
+        session_factory, _settings(tmp_path, reverse=True), "Live One", "BR1", transport=transport
+    )
+    game = view["game"]
+    assert game["positionsEstimated"] is True
+    blue = game["teams"][0]["participants"]
+    assert [p["championId"] for p in blue] == [55, 54, 53, 52, 51]
+    assert [p["position"] for p in blue] == list(ROLES)
+
+    live._CACHE.clear()  # noqa: SLF001
+    monkeypatch.setitem(GAME, "mapId", 12)  # ARAM: sem rotas, na ordem da Riot
+    aram, _ = _transport()
+    view = await live_game(session_factory, _settings(tmp_path), "Live One", "BR1", transport=aram)
+    assert view["game"]["positionsEstimated"] is False
+    blue = view["game"]["teams"][0]["participants"]
+    assert [p["championId"] for p in blue] == [51, 52, 53, 54, 55]
+    assert all(p["position"] is None for p in blue)

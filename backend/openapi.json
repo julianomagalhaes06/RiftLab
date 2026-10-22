@@ -2522,6 +2522,11 @@
             ],
             "title": "Mapid"
           },
+          "positionsEstimated": {
+            "default": false,
+            "title": "Positionsestimated",
+            "type": "boolean"
+          },
           "queueId": {
             "anyOf": [
               {
@@ -2635,6 +2640,24 @@
               }
             ],
             "title": "Perksubstyle"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "enum": [
+                  "TOP",
+                  "JUNGLE",
+                  "MIDDLE",
+                  "BOTTOM",
+                  "UTILITY"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
           },
           "rank": {
             "anyOf": [

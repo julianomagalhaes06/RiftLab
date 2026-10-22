@@ -5,6 +5,7 @@ import { Link } from "../../shared/router/Link";
 import { routeToPath } from "../../shared/router/routes";
 import { count } from "../../shared/text/count";
 import { ChampionAvatar } from "../history/ChampionAvatar";
+import { roleShort } from "../history/presentation";
 import { championName } from "../matches/format";
 import { LOOKUP_ERRORS } from "../players/lookupErrors";
 import { emblemSrc, isTier, rankTitle } from "../ranked/tiers";
@@ -61,7 +62,11 @@ function PlayerRow({ player, version, queueLabel }: { player: LiveParticipant; v
         <Icon icon={styleIcon(player.perkSubStyle)} className="live-icon live-icon--rune" />
       </span>
       <span className="live-player__who">
-        <strong>{name}{player.requested ? <span className="sr-only"> (jogador buscado)</span> : null}</strong>
+        <strong>
+          {name}
+          {player.position ? <span className="live-player__lane"> · {roleShort(player.position)}</span> : null}
+          {player.requested ? <span className="sr-only"> (jogador buscado)</span> : null}
+        </strong>
         {riotId ? (
           <Link to={routeToPath({ name: "player", ...riotId })} className="live-player__riot-id" aria-label={`${riotId.gameName}#${riotId.tagLine}`}>
             {riotId.gameName}<span>#{riotId.tagLine}</span>
@@ -174,7 +179,12 @@ export function LivePage({ gameName, tagLine }: { gameName: string; tagLine: str
           {game.teams.map((team) => <TeamPanel key={team.teamId} team={team} version={game.dataDragonVersion} queueLabel={queueLabel} />)}
         </div>
       ) : null}
-      {game ? <p className="live-note">Elo da fila {game.rankQueue === "RANKED_FLEX_SR" ? "Flex" : "Solo/Duo"} de cada jogador, consultado agora. A composição fica 20 s em memória e nada é gravado.</p> : null}
+      {game ? (
+        <p className="live-note">
+          {game.positionsEstimated ? "Rotas estimadas pelo campeão e pelos feitiços: a Riot não informa a rota na partida ao vivo. " : ""}
+          Elo da fila {game.rankQueue === "RANKED_FLEX_SR" ? "Flex" : "Solo/Duo"} de cada jogador, consultado agora. A composição fica 20 s em memória e nada é gravado.
+        </p>
+      ) : null}
     </section>
   );
 }

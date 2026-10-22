@@ -1641,6 +1641,11 @@ export interface components {
             lengthSeconds: number;
             /** Mapid */
             mapId?: number | null;
+            /**
+             * Positionsestimated
+             * @default false
+             */
+            positionsEstimated: boolean;
             /** Queueid */
             queueId?: number | null;
             /**
@@ -1675,6 +1680,8 @@ export interface components {
             perkStyle?: number | null;
             /** Perksubstyle */
             perkSubStyle?: number | null;
+            /** Position */
+            position?: ("TOP" | "JUNGLE" | "MIDDLE" | "BOTTOM" | "UTILITY") | null;
             rank?: components["schemas"]["LivePlayerRank"] | null;
             /**
              * Rankstate
