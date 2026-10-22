@@ -2,13 +2,10 @@ import { useEffect, useId, useState } from "react";
 import { api, type RankedMe, type RankedQueue } from "../../shared/api/client";
 import "./ranked.css";
 import { preferredQueue } from "./preferredQueue";
+import { RankCard, type RankCardChange } from "./RankCard";
+import { isTier } from "./tiers";
 import { count } from "../../shared/text/count";
 
-const tierNames: Record<string, string> = {
-  IRON: "Ferro", BRONZE: "Bronze", SILVER: "Prata", GOLD: "Ouro",
-  PLATINUM: "Platina", EMERALD: "Esmeralda", DIAMOND: "Diamante",
-  MASTER: "Mestre", GRANDMASTER: "Grão-mestre", CHALLENGER: "Desafiante",
-};
 const reasonNames: Record<string, string> = {
   ACCOUNT_OR_SECRET_MISSING: "Configure a conta local e o segredo de vínculo para consultar sua posição.",
   NO_OBSERVATION: "Ainda não há observação desta fila. Atualize pelo comando administrativo.",
@@ -19,17 +16,6 @@ const reasonNames: Record<string, string> = {
   SCHEMA_UNSUPPORTED: "A resposta da Riot não pôde ser validada. A posição anterior foi preservada.",
   UPSTREAM_UNAVAILABLE: "A Riot não respondeu. A posição anterior foi preservada.",
 };
-const divisionNames: Record<string, string> = { I: "I", II: "II", III: "III", IV: "IV" };
-const tierOrder = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER"];
-const divisionOrder = ["IV", "III", "II", "I"];
-function nextStep(tier: string, division: string | null): string {
-  if (!division) return "o próximo elo";
-  const index = divisionOrder.indexOf(division);
-  if (index >= 0 && index < 3) return `${tierNames[tier]} ${divisionOrder[index + 1]}`;
-  const nextTier = tierOrder[tierOrder.indexOf(tier) + 1];
-  return nextTier === "MASTER" ? "Mestre" : nextTier ? `${tierNames[nextTier]} IV` : "o próximo elo";
-}
-
 function ChangeLine({ data }: { data: RankedMe["change"] }) {
   if (!data) return <p>Uma segunda observação da mesma temporada permitirá comparar a evolução.</p>;
   const since = new Date(data.since).toLocaleString("pt-BR");
@@ -46,6 +32,21 @@ function ChangeLine({ data }: { data: RankedMe["change"] }) {
     : "A variação cobre o intervalo de atualizações, sem atribuição a uma partida.";
   return <div className="my-rank__change"><p>{text}</p><p>{association}</p><small>De {since} até {until}.</small></div>;
 }
+
+/** Faixa de variação do card (CC-1203): ganho, perda ou o motivo de não comparar. */
+function changeStrip(data: RankedMe["change"]): RankCardChange {
+  if (!data) return { tone: "neutral", text: "Uma segunda observação permitirá comparar" };
+  if (data.kind === "SAME_DIVISION") {
+    const value = data.leaguePointsDelta ?? 0;
+    if (value > 0) return { tone: "win", text: `+${value} PDL desde a observação anterior` };
+    if (value < 0) return { tone: "loss", text: `${value} PDL desde a observação anterior` };
+    return { tone: "neutral", text: "Sem variação de PDL desde a observação anterior" };
+  }
+  if (data.kind === "TRANSITION") return { tone: "neutral", text: "Mudou de elo ou divisão desde a observação anterior" };
+  return { tone: "neutral", text: "Variação não comparável com a observação anterior" };
+}
+
+const observedAt = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
 export function MyRank({ compact = false }: { compact?: boolean }) {
   const [selection, setSelection] = useState<RankedQueue | null>(null);
@@ -69,47 +70,43 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
   const error = results[queue]?.failed === true;
   const queueLabel = queue === "RANKED_SOLO_5x5" ? "Solo/Duo" : "Flex";
   const position = data?.position;
-  const tier = position?.tier && tierNames[position.tier] ? position.tier : null;
-  const apex = tier ? ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(tier) : false;
-  const title = tier ? `${tierNames[tier]}${position?.division ? ` ${divisionNames[position.division]}` : ""}` : "";
+  const tier = position?.state === "READY" && isTier(position.tier) ? position.tier : null;
+  const headingId = `my-rank-heading-${compact ? "panel" : "page"}`;
   return (
-    <section className={`my-rank ${compact ? "my-rank--compact" : ""}`} aria-labelledby={`my-rank-heading-${compact ? "panel" : "page"}`} data-tier={tier ?? "NONE"}>
-      <div className="my-rank__copy">
-        <p className="my-rank__eyebrow">Fila {queueLabel} · BR1</p>
-        <h3 id={`my-rank-heading-${compact ? "panel" : "page"}`}>Minha posição</h3>
-        <div className="my-rank__queue">
-          <label htmlFor={queueId}>Fila ranqueada</label>
-          <div className="my-rank__select-shell">
-            <svg className="my-rank__queue-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z" /><path d="m8 12 3 3 5-6" /></svg>
+    <div className={`my-rank ${compact ? "my-rank--compact" : ""}`}>
+      <RankCard
+        size={compact ? "compact" : "large"}
+        heading={<h3 id={headingId}>Minha posição</h3>}
+        controls={
+          <div className="rank-card__controls">
+            <label className="sr-only" htmlFor={queueId}>Fila ranqueada</label>
             <select id={queueId} aria-describedby={`${queueId}-hint`} value={queue} onChange={(event) => setSelection(event.target.value as RankedQueue)}>
               <option value="RANKED_SOLO_5x5">Solo/Duo</option>
               <option value="RANKED_FLEX_SR">Flex</option>
             </select>
-            <svg className="my-rank__queue-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+            <small id={`${queueId}-hint`}>{selection === null ? "Seleção automática · melhor classificação disponível" : "Seleção manual · válida nesta página"}</small>
           </div>
-          <small id={`${queueId}-hint`}>{selection === null ? "Seleção automática · melhor classificação disponível" : "Seleção manual · válida nesta página"}</small>
-        </div>
-        {!data && !error && <p role="status">Carregando posição observada…</p>}
-        {error && <p role="alert">Não foi possível consultar a posição armazenada.</p>}
-        {data?.status === "UNAVAILABLE" && <p role="status">{reasonNames[data.reason ?? ""] ?? "Posição indisponível para esta conta."}</p>}
-        {position?.state === "UNRANKED" && <p role="status">Não classificado na {queueLabel} nesta observação válida.</p>}
-        {position?.state === "READY" && <>
-          <p className="sr-only">Elo {title}, {position.leaguePoints}{apex ? "" : " de 100"} PDL</p>
-          <p className="my-rank__title" aria-hidden="true">{title} <strong>{position.leaguePoints} <span>PDL</span></strong></p>
-          <p className="my-rank__step">{apex ? "Sem divisões · PDL sem teto" : `Faltam ${Math.max(0, 100 - (position.leaguePoints ?? 0))} PDL para ${nextStep(tier ?? "", position.division)}`}</p>
-          {!apex && <div className="my-rank__track" role="img" aria-label={`${position.leaguePoints} de 100 pontos de liga para a próxima divisão`}>
-            <span style={{ width: `${Math.min(position.leaguePoints ?? 0, 100)}%` }} />
-          </div>}
-          {position.wins != null && position.losses != null && (
+        }
+        rank={tier && position ? { tier, division: position.division ?? null, leaguePoints: position.leaguePoints ?? 0 } : null}
+        caption={position ? `Fila ${queueLabel} · observado em ${observedAt(position.observedAt)}` : undefined}
+        change={tier ? changeStrip(data?.change ?? null) : null}
+      >
+        {!data && !error && <p className="rank-card__state" role="status">Carregando posição observada…</p>}
+        {error && <p className="rank-card__state" role="alert">Não foi possível consultar a posição armazenada.</p>}
+        {data?.status === "UNAVAILABLE" && <p className="rank-card__state" role="status">{reasonNames[data.reason ?? ""] ?? "Posição indisponível para esta conta."}</p>}
+        {position?.state === "UNRANKED" && <p className="rank-card__state" role="status">Não classificado na {queueLabel} nesta observação válida.</p>}
+        {data?.status === "STALE" && <p className="rank-card__note" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}
+        {position?.origin === "DEMO_FICTITIOUS" && <p className="rank-card__note" role="note">Elo fictício de demonstração: não foi consultado na Riot e não pertence a nenhuma conta.</p>}
+      </RankCard>
+      {!compact && position ? (
+        <div className="my-rank__details surface surface--pad">
+          {tier && position.wins != null && position.losses != null && (
             <p className="my-rank__record">{count(position.wins, "vitória", "vitórias")} · {count(position.losses, "derrota", "derrotas")} na fila</p>
           )}
-        </>}
-        {data?.status === "STALE" && <p className="my-rank__stale" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}
-        {position?.origin === "DEMO_FICTITIOUS" && <p className="my-rank__stale" role="note">Elo fictício de demonstração: não foi consultado na Riot e não pertence a nenhuma conta.</p>}
-        {position && <p className="my-rank__time">Temporada {position.season} · {position.origin === "DEMO_FICTITIOUS" ? "Demonstração (fictício)" : "Riot League-V4"} · Observado em {new Date(position.observedAt).toLocaleString("pt-BR")}</p>}
-        {position?.state === "READY" && <ChangeLine data={data?.change ?? null} />}
-      </div>
-      <div className="my-rank__emblem" aria-hidden="true">{tier ? <img src={`/ranked-emblems/${tier.toLowerCase()}.webp`} alt="" width="180" height="180" /> : <span>RL</span>}</div>
-    </section>
+          <p className="my-rank__time">Temporada {position.season} · {position.origin === "DEMO_FICTITIOUS" ? "Demonstração (fictício)" : "Riot League-V4"} · Observado em {new Date(position.observedAt).toLocaleString("pt-BR")}</p>
+          {tier && <ChangeLine data={data?.change ?? null} />}
+        </div>
+      ) : null}
+    </div>
   );
 }

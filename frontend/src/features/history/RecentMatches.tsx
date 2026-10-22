@@ -25,7 +25,7 @@ function RecentRow({ match }: { match: MatchSummary }) {
         to={{ name: "historyMatch", matchId: match.matchId, participantId: null }}
         className="recent-row__action"
         aria-label={`Contexto da partida ${match.matchId}`}
-      >Contexto <span aria-hidden="true">↗</span></Link>
+      >Contexto <span aria-hidden="true">→</span></Link>
     </li>
   );
 }
@@ -38,25 +38,23 @@ export function RecentMatches() {
   useDemoNotice(list.items.some((match) => isDemoMatchId(match.matchId)));
   return (
     <section className="recent-matches" aria-labelledby="recent-matches-heading">
-      <div className="recent-matches__heading">
-        <div>
-          <h3 id="recent-matches-heading">Partidas importadas recentes</h3>
-          <p>Registros disponíveis para estudo, de qualquer origem importada.</p>
-        </div>
+      <div className="section-head recent-matches__heading">
+        <h3 id="recent-matches-heading">Partidas importadas recentes</h3>
+        <p>Registros disponíveis para estudo, de qualquer origem importada.</p>
       </div>
-      {list.status === "loading" && <div className="recent-matches__state" role="status" aria-busy="true">Carregando partidas recentes…</div>}
-      {list.status === "error" && <div className="recent-matches__state"><ErrorNotice error={list.error} onRetry={list.reload} retryLabel="Tentar novamente" /></div>}
+      {list.status === "loading" && <div className="surface recent-matches__state" role="status" aria-busy="true">Carregando partidas recentes…</div>}
+      {list.status === "error" && <div className="surface recent-matches__state"><ErrorNotice error={list.error} onRetry={list.reload} retryLabel="Tentar novamente" /></div>}
       {list.status === "ready" && (
-        list.items.length ? <>
-          <ul className="recent-matches__list">{list.items.map((match) => <RecentRow key={match.matchId} match={match} />)}</ul>
+        list.items.length ? <div className="surface">
+          <ul className="row-list recent-matches__list">{list.items.map((match) => <RecentRow key={match.matchId} match={match} />)}</ul>
           <div className="recent-matches__footer">
             <span>Mostrando {list.items.length} {list.items.length === 1 ? "partida importada recente" : "partidas importadas recentes"}. Total no servidor não informado.</span>
-            <Link to="/historico">Abrir Histórico</Link>
+            <Link to="/historico" className="arrow-link">Abrir Histórico</Link>
           </div>
-        </> : <div className="recent-matches__state recent-matches__state--empty">
+        </div> : <div className="surface recent-matches__state recent-matches__state--empty">
           <strong>Nenhuma partida importada</strong>
           <p>Importe uma partida concluída ou abra a demonstração para iniciar o estudo.</p>
-          <Link to="/importar">Importar ou abrir demonstração</Link>
+          <Link to="/importar" className="arrow-link">Importar ou abrir demonstração</Link>
         </div>
       )}
     </section>

@@ -74,6 +74,7 @@ describe("contraste do padrão Arena", () => {
     ["on-accent", "accent-fill-hover", 4.5],
     ["accent", "accent-surface", 4.5],
     ["win", "win-surface", 4.5],
+    ["loss", "loss-surface", 4.5],
     ["tier-next-ink", "tier-next-top", 4.5],
     ["nline-strong", "n0", 3],
     ["nline-strong", "n1", 3],

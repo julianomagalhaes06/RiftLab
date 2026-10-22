@@ -56,6 +56,23 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   return date.toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** Linha de partida do Painel (CC-1203): "Hoje, 20:18", "Ontem, 22:04", "Há 3 dias"; depois de
+ * uma semana, "14 de out." (com o ano se não for o atual). */
+export function shortWhen(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Data não disponível";
+  const days = Math.round((startOfDay(now) - startOfDay(date)) / DAY_MS);
+  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  if (days <= 0) return `Hoje, ${time}`;
+  if (days === 1) return `Ontem, ${time}`;
+  if (days < 7) return `Há ${days} dias`;
+  return date.toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "short",
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
 /** Rótulo do grupo diário: "Hoje", "Ontem" ou "qua., 14 de out.". */
 export function dayLabel(iso: string, now: Date = new Date()): string {
   const date = new Date(iso);

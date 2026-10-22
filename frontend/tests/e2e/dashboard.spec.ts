@@ -20,7 +20,7 @@ for (const width of [360, 1280]) {
       await page.keyboard.press("Tab");
     }
     await expect(context).toBeFocused();
-    await expect(page.getByRole("link", { name: "Ver as 8 partidas da conta no Histórico geral" })).toHaveAttribute("href", "/historico");
+    await expect(page.getByRole("link", { name: "Ver as 8 partidas no Histórico" })).toHaveAttribute("href", "/historico");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/historico\/BR1_3090001\?participant=4/);
   });

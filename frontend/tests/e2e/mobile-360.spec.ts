@@ -202,27 +202,24 @@ test("página não encontrada e protótipo ilustrativo cabem em 360 px", async (
   await expectNoHorizontalOverflow(page, "protótipo (entrada)");
 });
 
-test("Painel em 360 px: posição ranqueada no topo e estudo recolhido (CC-905)", async ({ page }) => {
+test("Painel em 360 px: métricas → partidas → card de elo → campeões, como o protótipo (CC-1203)", async ({ page }) => {
   await mockApi(page, {
     "GET /api/v1/dashboard": () => ok(dashboard()),
     "GET /api/v1/ranked/me": () =>
       ok({
         status: "READY", reason: null, change: null,
-        position: { queue: "RANKED_SOLO_5x5", tier: "PLATINUM", division: "III", leaguePoints: 41, wins: 10, losses: 9,
-          season: "2026", capturedAt: "2026-10-16T12:00:00Z", origin: "RIOT_LEAGUE_V4" },
+        position: { queue: "RANKED_SOLO_5x5", state: "READY", tier: "PLATINUM", division: "III", leaguePoints: 41, wins: 10, losses: 9,
+          season: "2026", observedAt: "2026-10-16T12:00:00Z", origin: "RIOT_LEAGUE_V4" },
       }),
   });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Seu recorte de partidas" })).toBeVisible();
-  const rank = await page.locator(".panel-rank").boundingBox();
-  const main = await page.locator(".panel-main").boundingBox();
-  expect(rank && main && rank.y < main.y).toBe(true);
-  // Linha de base antes do CC-905, com estes mesmos dados simulados: 3.698 px.
+  await expect(page.getByRole("region", { name: "Seu recorte de partidas" })).toBeVisible();
+  const order = await Promise.all([".panel-metrics", ".panel-recent", ".rank-card", ".panel-champions"].map(async (selector) => (await page.locator(selector).boundingBox())?.y ?? -1));
+  expect(order.every((y, index) => y >= 0 && (index === 0 || y > order[index - 1]))).toBe(true);
+  // O estudo fica na faixa secundária das métricas, sem bloco recolhido.
+  await expect(page.getByText(/de 12 tentativas, 3 com reflexão/)).toBeVisible();
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
   expect(height).toBeLessThan(3000);
-  await expect(page.getByText("Tentativas reveladas de 12 iniciadas")).toBeHidden();
-  await page.getByText("Seu estudo nesta instalação").click();
-  await expect(page.getByText("Tentativas reveladas de 12 iniciadas")).toBeVisible();
   await expectNoHorizontalOverflow(page, "painel");
 });
 

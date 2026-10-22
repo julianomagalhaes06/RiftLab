@@ -39,7 +39,7 @@ describe("Minha posição por fila", () => {
     fireEvent.change(screen.getByLabelText("Fila ranqueada"), { target: { value: "RANKED_FLEX_SR" } });
     expect(screen.queryByText("Elo Ouro IV, 20 de 100 PDL")).not.toBeInTheDocument();
     await screen.findByText("Elo Platina IV, 75 de 100 PDL");
-    expect(screen.getByText("Fila Flex · BR1")).toBeInTheDocument();
+    expect(screen.getByText(/^Fila Flex · observado em/)).toBeInTheDocument();
     expect(mock.callsTo("GET", /^\/api\/v1\/ranked\/me$/).map((call) => call.search.get("queue")))
       .toEqual(["RANKED_SOLO_5x5", "RANKED_FLEX_SR"]);
   });
@@ -90,5 +90,37 @@ describe("Minha posição por fila", () => {
     expect(screen.queryByText("Elo Ouro IV, 20 de 100 PDL")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Fila ranqueada"), { target: { value: "RANKED_SOLO_5x5" } });
     await screen.findByText("Elo Ouro IV, 20 de 100 PDL");
+  });
+});
+
+describe("card de elo (CC-1203)", () => {
+  it("placas IV → I, barra de PDL, meta na divisão seguinte e ganho em verde", async () => {
+    mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, search.get("queue") === "RANKED_SOLO_5x5"
+      ? { ...rank(), position: { ...rank().position, division: "III", leaguePoints: 76 },
+        change: { since: "2026-10-15T12:00:00Z", until: "2026-10-16T12:00:00Z", kind: "SAME_DIVISION", leaguePointsDelta: 22, ownMatchAssociation: "ONE" } }
+      : { status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }));
+    const { container } = render(<MyRank compact />);
+    await screen.findByText("Elo Ouro III, 76 de 100 PDL");
+    expect(container.querySelector(".rank-card")).toHaveAttribute("data-tier", "GOLD");
+    expect([...container.querySelectorAll(".rank-plate")].map((plate) => plate.className)).toEqual([
+      "rank-plate rank-plate--done", "rank-plate rank-plate--now", "rank-plate rank-plate--next", "rank-plate rank-plate--next",
+    ]);
+    expect(screen.getByRole("img", { name: "76 de 100 pontos de liga na divisão" })).toBeInTheDocument();
+    expect(container.querySelector(".rank-card__goal")).toHaveTextContent("Faltam 24 PDL para Ouro II");
+    expect(screen.getByText(/Divisão III de IV a I; depois vem Platina/)).toBeInTheDocument();
+    expect(container.querySelector(".rank-card__change--win")).toHaveTextContent("+22 PDL desde a observação anterior");
+  });
+
+  it("elo do topo troca a trilha por PDL acumulado; Diamante I aponta para Mestre", async () => {
+    mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, search.get("queue") === "RANKED_SOLO_5x5"
+      ? { ...rank(), position: { ...rank().position, tier: "MASTER", division: "I", leaguePoints: 312 } }
+      : { ...rank("RANKED_FLEX_SR"), position: { ...rank("RANKED_FLEX_SR").position, tier: "DIAMOND", division: "I", leaguePoints: 90 } }));
+    const { container } = render(<MyRank compact />);
+    await screen.findByText("Elo Mestre, 312 PDL");
+    expect(container.querySelector(".rank-card__plates")).toBeNull();
+    expect(screen.getByText("Elos do topo não têm divisões.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Fila ranqueada"), { target: { value: "RANKED_FLEX_SR" } });
+    await screen.findByText("Elo Diamante I, 90 de 100 PDL");
+    expect(container.querySelector(".rank-card__goal")).toHaveTextContent("Faltam 10 PDL para Mestre");
   });
 });

@@ -63,6 +63,7 @@
   --win: #3dd68c;
   --loss: #f2667a;
   --win-surface: #0f2e26;
+  --loss-surface: #3a1520;
   --win-tint: rgba(61, 214, 140, .12);
   --loss-tint: rgba(242, 102, 122, .12);
   --win-tint-soft: rgba(61, 214, 140, .10);
@@ -71,6 +72,8 @@
   --sheen: rgb(255 255 255 / .38);
   --sheen-soft: rgb(255 255 255 / .14);
   --shade: rgb(0 0 0 / .35);
+  /* Textura escovada das placas e da barra de PDL do card de elo. */
+  --brush: rgb(255 255 255 / .09);
 
   /* Estados semânticos. */
   --color-bg: var(--n0);

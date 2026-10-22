@@ -110,6 +110,10 @@ sempre com contorno `accent` de 3 px.
   (fundo `win-surface` para ganho). Mestre, Grão-Mestre e Desafiante trocam a trilha por "Sem
   divisões · PDL sem teto" e mostram o PDL acumulado.
 
+No código: card de elo em `features/ranked/RankCard.tsx` (estilo em `rank-card.css`), elos e
+escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; moldura em
+`app/App.tsx`, `app/ContextStrip.tsx` e `features/players/ProfileChip.tsx`.
+
 ## Layout e responsivo
 
 - Conteúdo com largura máxima de 1360 px e margem de 40 px (32 px até 1280; 16 px no celular).

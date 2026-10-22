@@ -1,0 +1,85 @@
+/* Card de elo (CC-1203): `rank_panel`, `division_plate`, `division_track` e `lp_bar` do protótipo.
+   Os tons vêm de [data-tier] (design/arena.css): base, light, dark, deep e text do elo. */
+.rank-card { --bracket-color: var(--tier-dark); padding: 26px 28px 28px; display: grid; gap: 0; }
+.rank-card__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
+.rank-card__top h3, .rank-card__top h2 { margin: 0; font: 600 .9375rem/1.2 var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--ntext); }
+.rank-card__server { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; background: var(--tier-deep); color: var(--tier-text); font-size: .75rem; font-weight: 700; letter-spacing: .08em; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+
+.rank-card__emblem { position: relative; display: grid; place-items: center; height: 196px; margin: 8px 0 0; }
+.rank-card__emblem::before { content: ""; position: absolute; width: 190px; height: 190px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--tier-base) 32%, transparent), transparent 70%); }
+.rank-card__emblem img { position: relative; width: 170px; height: 170px; object-fit: contain; }
+.rank-card__title { margin: 4px 0 0; text-align: center; color: var(--tier-text); font: 700 1.875rem/1.1 var(--font-display); letter-spacing: .04em; text-transform: uppercase; }
+.rank-card__caption { margin: 8px 0 0; text-align: center; color: var(--ntext-subtle); font-size: .875rem; line-height: 1.4; }
+
+/* Trilha IV → I + próximo elo. */
+.rank-card__track { display: flex; align-items: flex-start; gap: 8px; margin-top: 22px; }
+.rank-card__plates { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; min-width: 0; }
+.rank-card__next { flex: none; min-width: 56px; display: flex; align-items: flex-start; gap: 4px; color: var(--ntext-subtle); }
+.rank-card__next svg { margin-top: 8px; flex: none; }
+.rank-card__next-emblem { display: grid; justify-items: center; gap: 2px; }
+.rank-card__next-emblem img { width: 40px; height: 32px; object-fit: contain; opacity: .9; }
+.rank-card__next-emblem span { color: var(--ntext-subtle); font-size: .625rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+
+/* Placa chanfrada: o fundo é a borda; a face fica 1 px para dentro. */
+.rank-plate { --plate-line: var(--tier-next-line); position: relative; display: block; height: 32px; background: var(--plate-line); clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); }
+.rank-plate__face { position: absolute; inset: 1px; display: grid; place-items: center; font: 700 .9375rem/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; clip-path: polygon(6.4px 0, 100% 0, 100% calc(100% - 6.4px), calc(100% - 6.4px) 100%, 0 100%, 0 6.4px); }
+.rank-plate--next .rank-plate__face { background: linear-gradient(180deg, var(--tier-next-top), var(--tier-next-bottom)); color: var(--tier-next-ink); }
+.rank-plate--done { --plate-line: var(--tier-base); opacity: .95; }
+.rank-plate--done .rank-plate__face { background: linear-gradient(180deg, var(--tier-dark), var(--tier-deep)); color: var(--tier-text); box-shadow: inset 0 1px 0 var(--sheen-soft), inset 0 -3px 0 -1px var(--tier-base); }
+.rank-plate--now { --plate-line: var(--tier-light); }
+/* Brilho e marcador ▼ ficam no encaixe: o recorte da placa cortaria os dois. */
+.rank-plate-slot { position: relative; display: block; min-width: 0; }
+.rank-plate-slot--now { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--tier-base) 55%, transparent)); }
+.rank-card__plates .rank-plate-slot--now::after { content: ""; position: absolute; left: 50%; bottom: -9px; width: 10px; height: 5px; margin-left: -5px; background: var(--tier-light); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.rank-plate-slot--wide { flex: 1; }
+.rank-plate-slot--wide .rank-plate__face { font-size: .8125rem; }
+.rank-plate--now .rank-plate__face { color: var(--mark-ink); background:
+  linear-gradient(180deg, var(--sheen), transparent 50%),
+  repeating-linear-gradient(-35deg, var(--brush) 0 1px, transparent 1px 6px),
+  linear-gradient(180deg, var(--tier-light), var(--tier-base) 55%, var(--tier-dark)); box-shadow: inset 0 -1px 0 var(--shade); }
+
+/* PDL. */
+.rank-card__lp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 26px; }
+.rank-card__lp-head > span { color: var(--ntext-subtle); font-size: .75rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.rank-card__lp-head strong { color: var(--ntext-subtle); font: 700 1.125rem/1 var(--font-display); }
+.rank-card__lp-value { color: var(--tier-text); }
+.lp-bar { position: relative; margin-top: 8px; padding-bottom: 8px; }
+.lp-bar__track { position: relative; height: 14px; background: var(--track-border); clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px); }
+.lp-bar__track::before { content: ""; position: absolute; inset: 1px; background: var(--track-bg); box-shadow: inset 0 1px 0 var(--shade); clip-path: polygon(3.4px 0, 100% 0, 100% calc(100% - 3.4px), calc(100% - 3.4px) 100%, 0 100%, 0 3.4px); }
+.lp-bar__fill { position: absolute; left: 1px; top: 1px; bottom: 1px; max-width: calc(100% - 2px); background:
+  linear-gradient(180deg, var(--sheen-soft), transparent 40%),
+  repeating-linear-gradient(-35deg, var(--brush) 0 1px, transparent 1px 6px),
+  linear-gradient(90deg, var(--tier-dark), var(--tier-base) 65%, var(--tier-light)); clip-path: polygon(3px 0, 100% 0, 100% 100%, 0 100%, 0 3px); }
+.lp-bar__tip { position: absolute; top: 0; width: 2px; height: 14px; margin-left: -1.5px; background: var(--tier-light); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--tier-light) 60%, transparent); }
+.lp-bar__ticks { position: absolute; left: 0; right: 0; top: 17px; height: 4px; background:
+  linear-gradient(var(--track-tick), var(--track-tick)) 25% 0 / 1px 4px no-repeat,
+  linear-gradient(var(--track-tick), var(--track-tick)) 50% 0 / 1px 4px no-repeat,
+  linear-gradient(var(--track-tick), var(--track-tick)) 75% 0 / 1px 4px no-repeat; }
+.rank-card__scale { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px; margin-top: 6px; color: var(--ntext-subtle); font-size: .75rem; font-weight: 600; }
+.rank-card__goal { margin: 0; text-align: center; color: var(--ntext-muted); font-size: .875rem; font-weight: 600; }
+.rank-card__goal-target { color: var(--tier-text); }
+
+/* Faixa de variação: ganho em verde, perda em vermelho, sem comparação em neutro. */
+.rank-card__change { margin: 20px 0 0; padding: 8px 12px; text-align: center; font-size: .875rem; font-weight: 600; line-height: 1.35; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.rank-card__change--win { background: var(--win-surface); color: var(--win); }
+.rank-card__change--loss { background: var(--loss-surface); color: var(--loss); }
+.rank-card__change--neutral { background: var(--n2); color: var(--ntext-muted); font-weight: 500; }
+
+/* Controles e estados dentro do card. */
+.rank-card__controls { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-top: 10px; }
+.rank-card__controls select { min-height: 44px; }
+.rank-card__controls small { color: var(--ntext-subtle); font-size: .75rem; }
+.rank-card__state { margin: 22px 0 0; color: var(--ntext-muted); line-height: 1.5; }
+.rank-card__note { margin: 14px 0 0; color: var(--ntext-subtle); font-size: .8125rem; line-height: 1.45; }
+
+.rank-card--large { padding: 32px 40px 36px; }
+.rank-card--large .rank-card__emblem { height: 230px; }
+.rank-card--large .rank-card__emblem::before { width: 230px; height: 230px; }
+.rank-card--large .rank-card__emblem img { width: 210px; height: 210px; }
+.rank-card--large .rank-card__title { font-size: 2.25rem; }
+
+@media (max-width: 700px) {
+  .rank-card { padding: 22px 18px 22px; }
+  .rank-card__next { min-width: 44px; }
+  .rank-card__next-emblem span { font-size: .5625rem; letter-spacing: .02em; }
+}

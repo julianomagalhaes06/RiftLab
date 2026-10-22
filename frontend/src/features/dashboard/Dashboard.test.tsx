@@ -26,8 +26,11 @@ describe("Painel da conta própria", () => {
     expect(screen.getByLabelText("Abates, mortes e assistências: 5 / 0 / 2")).toBeInTheDocument();
     expect(screen.getByText("30:00")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Contexto da partida BR1_3090001" })).toHaveAttribute("href", "/historico/BR1_3090001?participant=4");
-    expect(screen.getByText("Tentativas reveladas de 12 iniciadas")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Explorar campeão" })).toHaveAttribute("href", "/campeoes?champion=51");
+    // CC-1203: faixa secundária e campeões em foco como no protótipo.
+    expect(screen.getByText(/de 12 tentativas, 3 com reflexão/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver guia de Campeão #51" })).toHaveAttribute("href", "/campeoes?champion=51");
+    expect(screen.getByRole("link", { name: "Ver as 8 partidas no Histórico" })).toHaveAttribute("href", "/historico");
+    expect(screen.getByText("Painel · últimas 8 partidas · Solo/Duo · conta própria")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Partidas importadas recentes" })).not.toBeInTheDocument();
   });
 

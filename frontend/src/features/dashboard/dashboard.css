@@ -1,45 +1,91 @@
-.dashboard { min-width: 0; padding: 24px; background: var(--n1); border-radius: 12px; }
-.dashboard h3, .dashboard h4 { margin: 0 0 12px; }
-.dashboard p, .dashboard small { color: var(--ntext-muted); }
-.dashboard__heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 16px; }
-.dashboard__filters { display: flex; flex-wrap: wrap; gap: 12px; }
-.dashboard__filters label { display: grid; gap: 6px; font-size: .875rem; }
-.dashboard select { min-height: 44px; max-width: 100%; }
-.dashboard__source { padding-block: 12px; border-block: 1px solid var(--nline); }
-.dashboard__metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 24px; margin-block: 24px; }
-.dashboard__metrics dt { color: var(--ntext-muted); }
-.dashboard__metrics dd { margin: 8px 0; font: 600 2rem var(--font-display); }
-.dashboard__metrics small { display: block; font: 400 .875rem/1.6 var(--font-body); }
-.dashboard__champions, .dashboard__recent, .dashboard__progress { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--nline); }
-.dashboard ul { list-style: none; margin: 0; padding: 0; }
-.dashboard li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding-block: 16px; border-bottom: 1px solid var(--nline); }
-.dashboard li > div { display: grid; gap: 8px; min-width: 0; }
-.dashboard a { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
-.dashboard__empty { margin-block: 24px; }
-.dashboard__recent time { color: var(--ntext-muted); font-size: .875rem; }
-@media (max-width: 600px) { .dashboard { padding: 16px; } .dashboard__filters, .dashboard__filters label { width: 100%; } .dashboard li { align-items: start; } }
+/* Painel (CC-1203): `panel_desktop`/`panel_mobile` do protótipo. Coluna principal ≈ 880 px e
+   lateral ≈ 456 px com 24 px entre elas; 40 px entre blocos. */
+.panel-head { max-width: none; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; }
+.panel-head > div:first-child { max-width: 760px; }
+.panel-filters { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: flex-end; gap: 8px 10px; max-width: 520px; }
+.panel-filters label { display: grid; gap: 4px; color: var(--ntext-subtle); font-size: .75rem; font-weight: 500; }
+.panel-filters select { min-height: 36px; font-size: .8125rem; }
+.panel-filters__hint { flex-basis: 100%; margin: 0; color: var(--ntext-subtle); font-size: .75rem; line-height: 1.4; text-align: right; }
 
-.dashboard__progress summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; cursor: pointer; min-height: 44px; }
-.dashboard__progress summary h4 { display: inline; margin: 0; }
-.dashboard__progress summary span { color: var(--ntext-muted); font-size: .86rem; }
+.panel-grid { display: grid; grid-template-columns: minmax(0, 880fr) minmax(320px, 456fr); gap: 24px; align-items: start; }
+.panel-main, .panel-side { display: grid; gap: 40px; min-width: 0; }
 
-/* CC-905: linhas compactas nas partidas recentes e nos campeões em foco. */
-.dashboard__recent li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto; gap: 6px 16px; padding-block: 12px; }
-.dashboard li > .dashboard__recent-who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.dashboard li > .dashboard__recent-stats { display: flex; flex-wrap: wrap; gap: 2px 12px; color: var(--ntext-muted); font-size: .86rem; }
-.dashboard__recent-stats span:first-child { color: var(--ntext); font-weight: 600; }
-.dashboard__champions li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 16px; padding-block: 10px; }
-@media (max-width: 600px) {
-  .dashboard__metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-block: 16px; }
-  .dashboard__metrics dd { font-size: 1.45rem; margin: 4px 0; }
-  .dashboard__metrics small { font-size: .72rem; line-height: 1.4; }
-  .dashboard__recent li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who link" "stats stats"; }
-  .dashboard__recent-who { grid-area: who; }
-  .dashboard__recent-stats { grid-area: stats; }
-  .dashboard__recent li > a { grid-area: link; }
-  .dashboard__champions li { grid-template-columns: minmax(0, 1fr) auto; }
-  .dashboard__champions li > .dashboard__champion-count { grid-column: 1; grid-row: 2; color: var(--ntext-muted); font-size: .86rem; }
-  .dashboard__champions li > a { grid-column: 2; grid-row: 1 / span 2; }
-  .dashboard__filters { display: grid; grid-template-columns: 1fr 1fr; }
-  .dashboard__filters label:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+/* Card de métricas: duas principais com divisória e uma faixa secundária. */
+.panel-metrics { padding: 0; }
+.panel-metrics__row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.panel-metrics__row .metric { padding: 28px 28px 22px; min-width: 0; }
+.panel-metrics__row .metric + .metric { position: relative; }
+.panel-metrics__row .metric + .metric::before { content: ""; position: absolute; left: 0; top: 22px; bottom: 22px; width: 1px; background: var(--nline); }
+.panel-metrics__secondary { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: 8px 28px; padding: 18px 28px 20px; }
+.panel-metrics__secondary::before { content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--nline); }
+.panel-metrics__secondary .metric-secondary:only-child { grid-column: 1 / -1; }
+.panel-metrics__champions { display: flex; align-items: center; gap: 6px; }
+.panel-metrics__faces { display: inline-flex; gap: 4px; margin-left: 6px; }
+.panel-metrics__source { margin: 0; padding: 14px 28px 0; color: var(--ntext-subtle); font-size: .8125rem; }
+.panel-metrics__state { margin: 0; padding: 26px 28px 22px; display: grid; gap: 8px; justify-items: start; color: var(--ntext-muted); line-height: 1.5; }
+.panel-metrics__state p { margin: 0; }
+.panel-metrics__state strong { color: var(--ntext); }
+
+/* Partidas recentes: uma superfície, linhas de 72 px com colunas alinhadas. */
+.panel-recent .surface { padding: 0; }
+.panel-match { display: grid; grid-template-columns: 88px minmax(0, 268px) minmax(0, 180px) minmax(0, 1fr) auto; align-items: center; gap: 0; min-height: 72px; padding: 0 24px; }
+.panel-match__result { font-size: .875rem; font-weight: 600; }
+.panel-match__result:not(.result-text--win, .result-text--loss) { color: var(--ntext-muted); }
+.panel-match__who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.panel-match__name, .panel-match__when, .panel-match__score { display: grid; gap: 3px; min-width: 0; }
+.panel-match__name strong { font-size: .9375rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-match__name > span, .panel-match__when > span, .panel-match__score > span { color: var(--ntext-subtle); font-size: .8125rem; }
+.panel-match__score > span { font-size: .75rem; }
+.panel-match__when time { color: var(--ntext-muted); font-size: .875rem; font-weight: 500; }
+.panel-match__score strong { font-size: 1rem; font-weight: 600; }
+.panel-match__meta { display: none; }
+.app a.panel-match__action { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 0 0 12px; color: var(--accent); font-size: .875rem; font-weight: 600; text-decoration: none; }
+.app a.panel-match__action:hover span { text-decoration: underline; text-underline-offset: 4px; }
+/* O contorno de foco fica dentro da linha: a superfície recorta o que passa da borda. */
+.app a.panel-match__action:focus-visible { outline-offset: -3px; }
+.panel-recent__foot { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 4px 16px; flex-wrap: wrap; min-height: 52px; padding: 4px 24px; color: var(--ntext-subtle); font-size: .8125rem; }
+.panel-recent__foot::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--nline); }
+
+/* Campeões em foco. */
+.panel-champions .surface { padding: 0; }
+.panel-champion { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 68px; padding: 0 20px; }
+.panel-champion__text { display: grid; gap: 3px; min-width: 0; }
+.panel-champion__text strong { font-size: .9375rem; font-weight: 600; }
+.panel-champion__text span { color: var(--ntext-subtle); font-size: .8125rem; }
+.panel-champion .arrow-link:focus-visible { outline-offset: -3px; }
+
+/* Retratos do Painel: chanfro em vez do canto arredondado do Histórico. */
+.panel-grid .champion-avatar.portrait { border: 0; border-radius: 0; }
+
+@media (max-width: 1100px) {
+  .panel-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
+  .panel-match { grid-template-columns: 76px minmax(0, 1fr) minmax(0, 150px) minmax(0, 130px) auto; padding: 0 16px; }
+}
+
+/* Celular (panel_mobile): métricas → partidas → card de elo → campeões, linhas compactas. */
+@media (max-width: 900px) {
+  .panel-grid { grid-template-columns: 1fr; gap: 40px; }
+  .panel-filters { justify-content: flex-start; }
+  .panel-filters__hint { text-align: left; }
+}
+@media (max-width: 700px) {
+  .panel-main, .panel-side { gap: 32px; }
+  .panel-filters { display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: none; }
+  .panel-filters label:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .panel-filters select { width: 100%; }
+  .panel-filters__hint { grid-column: 1 / -1; }
+  .panel-metrics__row .metric { padding: 20px 18px 16px; }
+  .metric__value { font-size: 2rem; }
+  .panel-metrics__secondary { grid-template-columns: 1fr; padding: 14px 18px 16px; }
+  .panel-match { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who score" "who action"; min-height: 64px; padding: 8px 16px; row-gap: 0; }
+  .panel-match__who { grid-area: who; }
+  .panel-match__score { grid-area: score; justify-items: end; }
+  .panel-match__score > span { display: none; }
+  .app a.panel-match__action { grid-area: action; justify-self: end; min-height: 32px; font-size: .8125rem; }
+  .app a.panel-match__action svg { display: none; }
+  .app a.panel-match__action::after { content: "→" / ""; }
+  .panel-match__result, .panel-match__when, .panel-match__name > span:not(.panel-match__meta) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .panel-match__meta { display: block; }
+  .panel-recent__foot { padding: 4px 16px; }
+  .panel-champion { padding: 0 16px; min-height: 60px; }
 }

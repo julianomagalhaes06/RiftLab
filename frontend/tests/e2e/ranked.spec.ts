@@ -71,7 +71,11 @@ for (const width of [360, 390, 1280, 1440]) {
     await expect(page.getByText("Faltam 24 PDL para Ouro II")).toBeVisible();
     await expect(page.getByText("+12 PDL desde a observação anterior, na mesma divisão.")).toBeVisible();
     await expect(page.getByText(/sem atribuição a uma partida/)).toBeVisible();
-    await expect(page.locator(".my-rank__emblem img")).toHaveAttribute("src", "/ranked-emblems/gold.webp");
+    await expect(page.locator(".rank-card__emblem img")).toHaveAttribute("src", "/ranked-emblems/gold.webp");
+    // CC-1203: placas IV → I (IV concluída, III atual) e ganho na faixa verde.
+    await expect(page.locator(".rank-card .rank-plate--done")).toHaveCount(1);
+    await expect(page.locator(".rank-card .rank-plate--now")).toHaveText("III");
+    await expect(page.locator(".rank-card__change--win")).toContainText("+12 PDL desde a observação anterior");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.screenshot({ path: `${evidence}/posicao-${width}.png`, fullPage: true });
     const panelLink = page.getByRole("navigation", { name: "Áreas principais" }).getByRole("link", { name: /Painel/ });
@@ -111,18 +115,20 @@ test("todos os elos preservam rótulo e contraste AA", async ({ page }) => {
   for (const tier of ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"]) {
     currentTier = tier;
     await page.goto("/minha-posicao");
-    const card = page.locator(".my-rank");
+    const card = page.locator(".rank-card");
     await expect(card).toHaveAttribute("data-tier", tier);
-    await expect(card.locator(".my-rank__emblem img")).toHaveJSProperty("complete", true);
+    await expect(card.locator(".rank-card__emblem img")).toHaveJSProperty("complete", true);
+    // CC-1203: os cinco tons do elo vêm de [data-tier]; o texto do elo e o texto neutro leem bem
+    // sobre a superfície do card e o selo BR1 sobre o tom profundo do elo.
     const colors = await card.evaluate((element) => {
       const style = getComputedStyle(element);
-      return { accent: style.getPropertyValue("--tier-accent").trim(), glow: style.getPropertyValue("--tier-glow").trim() };
+      const read = (name: string) => style.getPropertyValue(name).trim();
+      return { text: read("--tier-text"), deep: read("--tier-deep"), surface: read("--n1"), ntext: read("--ntext"), muted: read("--ntext-muted") };
     });
-    for (const background of ["#171a20", colors.glow]) {
-      for (const foreground of [colors.accent, "#b3bac6", "#f4f5f7"]) {
-        expect(contrast(foreground, background), `${tier}: ${foreground} em ${background}`).toBeGreaterThanOrEqual(4.5);
-      }
+    for (const foreground of [colors.text, colors.ntext, colors.muted]) {
+      expect(contrast(foreground, colors.surface), `${tier}: ${foreground} em ${colors.surface}`).toBeGreaterThanOrEqual(4.5);
     }
+    expect(contrast(colors.text, colors.deep), `${tier}: selo BR1`).toBeGreaterThanOrEqual(4.5);
   }
 });
 
