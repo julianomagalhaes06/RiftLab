@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../../app/App";
 import { createMockApi, json, matchSummary } from "../../test/mockApi";
+import { readRecentPlayers, rememberPlayer } from "./recentPlayers";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -48,7 +49,7 @@ describe("perfil de jogador por Riot ID", () => {
         json(200, call.search.get("player") ? { items: [matchSummary({ matchId: "BR1_42", localParticipantId: 3 })], nextCursor: null } : { items: [], nextCursor: null }),
       );
     });
-    const search = await screen.findByRole("searchbox", { name: "Buscar jogador pelo Riot ID" });
+    const search = await screen.findByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
     fireEvent.change(search, { target: { value: "Nome sem tag" } });
     fireEvent.submit(search);
     const form = screen.getByRole("search", { name: "Buscar jogador" });
@@ -103,5 +104,52 @@ describe("perfil de jogador por Riot ID", () => {
     });
     expect(await screen.findByText(text, { exact: false })).toHaveAttribute("role", "alert");
     expect(screen.getByRole("heading", { name: /Ninguem #000/ })).toBeInTheDocument();
+  });
+
+  it("sugestões: parte do nome acha o perfil já aberto; setas e Enter abrem; Esc fecha (CC-1208)", async () => {
+    rememberPlayer(profile() as never);
+    rememberPlayer(profile({ gameName: "Outro Jogador", tagLine: "XYZ" }) as never);
+    setup("/", (mock) => {
+      mock.on("POST", /^\/api\/v1\/players\/lookup$/, () => json(200, profile()));
+    });
+    const search = await screen.findByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
+    fireEvent.focus(search);
+    expect(search).toHaveAttribute("aria-expanded", "true");
+    fireEvent.change(search, { target: { value: "queijo" } });
+    const list = screen.getByRole("listbox", { name: "Sugestões de jogadores" });
+    const options = within(list).getAllByRole("option");
+    // Recente que contém o texto e, sem "#", o mesmo texto com a TAG BR1.
+    expect(options.map((option) => option.textContent)).toEqual([
+      "Pão de Queijo #BR1Nível 321 · Ouro II",
+      "#Buscar queijo #BR1TAG mais comum no servidor BR",
+    ]);
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    expect(search).toHaveAttribute("aria-activedescendant", options[0].id);
+    expect(options[0]).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(search, { key: "Escape" });
+    expect(search).toHaveAttribute("aria-expanded", "false");
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    fireEvent.submit(search);
+    expect(window.location.pathname).toBe("/jogador/P%C3%A3o%20de%20Queijo-BR1");
+    expect(search).toHaveValue("");
+  });
+
+  it("sugestão de TAG abre Nome#BR1; Limpar apaga as buscas recentes (CC-1208)", async () => {
+    rememberPlayer(profile() as never);
+    setup("/", (mock) => {
+      mock.on("POST", /^\/api\/v1\/players\/lookup$/, () => json(200, profile({ gameName: "Novo Nome" })));
+    });
+    const search = await screen.findByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
+    fireEvent.focus(search);
+    fireEvent.click(screen.getByRole("button", { name: "Limpar buscas recentes" }));
+    expect(readRecentPlayers()).toEqual([]);
+    expect(screen.queryByRole("option", { name: /Pão de Queijo/ })).not.toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "Novo Nome" } });
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    fireEvent.submit(search);
+    expect(window.location.pathname).toBe("/jogador/Novo%20Nome-BR1");
+    // Abrir o perfil o guarda de novo, com o nome que a Riot devolveu.
+    await screen.findByText(/Nível 321/);
+    expect(readRecentPlayers().map((player) => player.gameName)).toEqual(["Novo Nome"]);
   });
 });

@@ -8,6 +8,7 @@ import { HistorySync } from "../history/HistorySync";
 import { clock } from "../history/syncMessage";
 import { RankCard } from "../ranked/RankCard";
 import { isTier, profileIconUrl } from "../ranked/tiers";
+import { rememberPlayer } from "./recentPlayers";
 import "../history/history.css";
 import "./players.css";
 
@@ -126,7 +127,10 @@ export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: s
     const controller = new AbortController();
     api
       .lookupPlayer(gameName, tagLine, false, controller.signal)
-      .then((profile) => setState({ profile, error: null }))
+      .then((profile) => {
+        rememberPlayer(profile); // buscas recentes, só neste navegador (CC-1208)
+        setState({ profile, error: null });
+      })
       .catch((error: unknown) => {
         if (isAbortError(error)) return;
         const message = isApiError(error) ? LOOKUP_ERRORS[error.code] : undefined;
@@ -134,7 +138,10 @@ export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: s
       });
     return () => controller.abort();
   }, [gameName, tagLine]);
-  const onRefresh = useCallback((profile: PlayerProfile) => setState({ profile, error: null }), []);
+  const onRefresh = useCallback((profile: PlayerProfile) => {
+    rememberPlayer(profile);
+    setState({ profile, error: null });
+  }, []);
 
   return (
     <section className="area-page player" aria-labelledby="player-heading" aria-busy={!state.profile && !state.error}>

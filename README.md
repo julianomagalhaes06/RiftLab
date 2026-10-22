@@ -154,6 +154,8 @@ A navegação principal oferece Painel, Campeões, Minha posição e Histórico 
 
 O botão **Atualizar** consulta a Riot de novo; perfis consultados há menos de 10 minutos vêm do banco. É identificação, não login: qualquer Riot ID pode ser consultado. Contrato em `docs/contracts.md` (CC-1101/CC-1102).
 
+**Sugestões na busca (CC-1208).** Ao digitar, a busca sugere perfis já abertos neste navegador cujo `Nome#TAG` contém o texto, com ícone, nível e elo da última visita. Sem `#`, sugere o mesmo nome com a TAG `BR1`. A API da Riot não busca por parte do nome, e o servidor não guarda Riot IDs de terceiros, então não há sugestão de quem nunca foi buscado. As buscas recentes (até 8) ficam só no `localStorage` do navegador, nunca no servidor, e saem com "Limpar buscas recentes". Funciona pelo teclado: setas escolhem, Enter abre e Esc fecha.
+
 **Dados de terceiros (CC-1103).** Nem o Riot ID nem o PUUID de quem foi buscado ficam no banco:
 
 - **O que fica:** o perfil guarda só dois HMACs (do Riot ID e do PUUID), o ícone, o nível e o horário da consulta; o elo fica nas observações ligadas ao HMAC do Riot ID.

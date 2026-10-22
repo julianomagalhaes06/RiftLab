@@ -26,7 +26,7 @@ for (const width of [360, 1280]) {
         },
       });
       await page.goto("/historico");
-      const search = page.getByRole("searchbox", { name: "Buscar jogador pelo Riot ID" });
+      const search = page.getByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
       await search.fill("Jogador Teste");
       await search.press("Enter");
       await expect(page.getByRole("search", { name: "Buscar jogador" }).getByRole("alert")).toContainText("Nome#TAG");
@@ -58,6 +58,27 @@ for (const width of [360, 1280]) {
       await noHorizontalScroll(page);
       await chip.click();
       await expect(page).toHaveURL(/\/jogador\/Conta%20Pr%C3%B3pria-BR1$/);
+    });
+
+    test("sugestões: perfil já aberto aparece ao digitar parte do nome; sem # sugere BR1 (CC-1208)", async ({ page }) => {
+      await mockApi(page);
+      await page.goto("/jogador/Jogador%20Teste-BR1");
+      await expect(page.getByText(/Nível 321/)).toBeVisible();
+      await page.goto("/historico");
+      const search = page.getByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
+      await search.fill("teste");
+      const list = page.getByRole("listbox", { name: "Sugestões de jogadores" });
+      await expect(list.getByRole("option")).toHaveCount(2);
+      await expect(list.getByRole("option").first()).toContainText("Jogador Teste #BR1");
+      await expect(list.getByRole("option").nth(1)).toContainText("Buscar teste #BR1");
+      await expect(page.getByText("Guardadas só neste navegador.")).toBeVisible();
+      await noHorizontalScroll(page);
+      await page.screenshot({ path: `test-results/sugestoes-${width}.png` });
+      await search.press("Escape");
+      await expect(list).toBeHidden();
+      await search.press("ArrowDown");
+      await search.press("Enter");
+      await expect(page).toHaveURL(/\/jogador\/Jogador%20Teste-BR1$/);
     });
 
     test("Riot ID inexistente explica e não quebra a página", async ({ page }) => {
