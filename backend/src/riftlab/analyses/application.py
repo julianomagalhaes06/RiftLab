@@ -29,6 +29,7 @@ from riftlab.candidates.domain import (
 from riftlab.candidates.rules import resolve_catalog_item_rules
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.dataset.rows import RowsError, _catalog
+from riftlab.decisions.domain import IncompatibleStateError
 from riftlab.decisions.features import build_pre_decision_view
 from riftlab.decisions.models import DecisionPointModel
 from riftlab.ingestion.models import MatchModel
@@ -200,6 +201,12 @@ async def _compute(
         return _empty(
             decision_id, objective, "INSUFFICIENT_EVIDENCE", ["INVALID_STATE"], catalog_label
         )
+    try:
+        view = build_pre_decision_view(state)
+    except IncompatibleStateError as exc:
+        # Estado de outra versão da reconstrução (partida preparada antes de a versão mudar) ou
+        # malformado: análise sem alternativas e com o motivo, nunca erro 500 (CC-1207).
+        return _empty(decision_id, objective, "INSUFFICIENT_EVIDENCE", [exc.code], catalog_label)
     provenance = state.quality.get("empiricalRules") or []
     match = await session.get(MatchModel, point.match_id)
     queue = match.queue if match is not None else None
@@ -216,7 +223,7 @@ async def _compute(
     budget = body.get("budget")
     try:
         result = enumerate_candidates(
-            CandidateContext(build_pre_decision_view(state), patch, 11, champion),
+            CandidateContext(view, patch, 11, champion),
             bundle.catalog,
             bundle.items,
             bundle.classification,

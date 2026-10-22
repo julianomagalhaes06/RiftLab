@@ -10,6 +10,7 @@ from pipeline_helpers import DEMO_1_MAPPING, import_demo_match, sync_demo_catalo
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
+from riftlab.decisions import features
 from riftlab.decisions.application import extract_decisions
 from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
 from riftlab.shared.db import unit_of_work
@@ -208,3 +209,35 @@ async def test_text_objective_feeds_the_same_ranking_and_keeps_the_parser_versio
     assert from_text.json()["objective"]["parserVersion"] == "rules_v1"
     assert from_form.json()["objective"].get("parserVersion") is None
     assert from_text.json()["candidates"] == from_form.json()["candidates"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("_demo_match", ["DEMO-0008"], indirect=True)
+async def test_decision_prepared_with_an_older_reconstruction_gets_a_reason_not_500(
+    app_client, session_factory, tmp_path, _demo_match, monkeypatch
+) -> None:
+    """CC-1207: a versão da reconstrução sobe depois da extração. A análise e a prática dessa
+    decisão antiga respondem sem alternativas e com o motivo, em vez de erro 500."""
+    decision = (await _decisions(app_client, session_factory, tmp_path, _demo_match))[-1]
+    assert decision["eligible"]
+    monkeypatch.setattr(
+        features, "RECONSTRUCTION_ALGORITHM_VERSION", features.RECONSTRUCTION_ALGORITHM_VERSION + 1
+    )
+    body = {"decisionId": decision["decisionId"], "objective": {"priority": "BALANCED"}}
+
+    analysis = await app_client.post(
+        "/api/v1/analyses", json=body, headers={"Idempotency-Key": f"test-{uuid.uuid4()}"}
+    )
+    assert analysis.status_code == 201
+    result = analysis.json()
+    assert (result["status"], result["candidates"]) == ("INSUFFICIENT_EVIDENCE", [])
+    assert result["support"]["reasonCodes"] == ["STATE_VERSION_INCOMPATIBLE"]
+
+    attempt = await app_client.post(
+        "/api/v1/learning-attempts",
+        json={**body, "mode": "STUDY"},
+        headers={"Idempotency-Key": f"test-{uuid.uuid4()}"},
+    )
+    assert attempt.status_code == 201
+    assert attempt.json()["options"] == []
+    assert attempt.json()["reasonCodes"] == ["STATE_VERSION_INCOMPATIBLE"]

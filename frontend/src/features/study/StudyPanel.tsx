@@ -34,6 +34,9 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
   PATCH_UNSUPPORTED: "Não há regras de itens para o patch desta partida.",
   NO_LEGAL_CANDIDATES: "Nenhum item principal legal estava disponível neste momento.",
   INVALID_STATE: "O estado antes da compra não pôde ser reconstruído com segurança.",
+  STATE_VERSION_INCOMPATIBLE:
+    "Esta decisão foi preparada com uma versão anterior da reconstrução. Prepare a partida de novo para analisá-la.",
+  STATE_MALFORMED: "O estado antes da compra está incompleto ou inválido e não pôde ser lido.",
   INVENTORY_UNCERTAIN: "O inventário antes desta compra é incerto.",
   OUT_OF_SCOPE: "Esta decisão está fora do recorte analisado.",
   NO_POPULARITY_FOR_CELL: "Não há decisões de referência deste campeão nesta etapa; a ordem vem das regras explícitas.",

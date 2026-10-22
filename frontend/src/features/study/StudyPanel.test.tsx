@@ -201,6 +201,16 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
     expect(screen.getByText(/Não há regras de itens para o patch/)).toBeInTheDocument();
   });
 
+  it("decisão preparada com versão antiga da reconstrução pede nova preparação (CC-1207)", async () => {
+    mock.on("POST", /^\/api\/v1\/learning-attempts$/, () =>
+      json(201, attempt({ options: [], reasonCodes: ["STATE_VERSION_INCOMPATIBLE"] })),
+    );
+    render(<StudyPanel decisionId={DECISION} />);
+    fireEvent.click(screen.getByRole("button", { name: /Confirmar objetivo/ }));
+    await screen.findByText(/Não há alternativas para estudar/);
+    expect(screen.getByText(/versão anterior da reconstrução\. Prepare a partida de novo/)).toBeInTheDocument();
+  });
+
   it("menos de três alternativas é dito explicitamente na comparação", async () => {
     const one = { ...COMPARISON, candidates: [COMPARISON.candidates[0]] };
     mock.on("POST", /^\/api\/v1\/learning-attempts$/, () => json(201, attempt()));
