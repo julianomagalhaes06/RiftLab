@@ -45,6 +45,7 @@ export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
 export type PlayerProfile = Schemas["PlayerProfile"];
 export type CatalogCurrent = Schemas["CatalogCurrent"];
+export type OwnPlayer = Schemas["OwnPlayer"];
 export type PlayerRank = Schemas["PlayerRank"];
 export type ObjectivePriority = Schemas["ObjectiveForm"]["priority"];
 export type ObjectiveForm = Schemas["ObjectiveForm"];
@@ -78,7 +79,8 @@ export interface ApiClient {
   getHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   requestHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   lookupPlayer(gameName: string, tagLine: string, refresh?: boolean, signal?: AbortSignal): Promise<PlayerProfile>;
-  getOwnPlayer(signal?: AbortSignal): Promise<PlayerProfile>;
+  /** Perfil da conta configurada; sem perfil, `profile` nulo e o motivo (CC-1202). */
+  getOwnPlayer(signal?: AbortSignal): Promise<OwnPlayer>;
   getCatalogCurrent(signal?: AbortSignal): Promise<CatalogCurrent>;
   getPlayerSync(playerId: string, signal?: AbortSignal): Promise<HistorySyncStatus>;
   /** O banco guarda só o HMAC do Riot ID (CC-1103): o pedido traz o Riot ID do perfil. */

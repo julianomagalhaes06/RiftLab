@@ -19,6 +19,7 @@ from riftlab.players.application import (
     profile_key,
 )
 from riftlab.shared.api.common import CamelModel
+from riftlab.shared.errors import NotFoundError, PlayerLookupError
 
 router = APIRouter(prefix="/api/v1/players", tags=["players"])
 
@@ -101,24 +102,34 @@ async def post_player_lookup(body: PlayerLookup, request: Request) -> PlayerProf
     )
 
 
+class OwnPlayer(CamelModel):
+    """Perfil da conta configurada (CC-1202). Sem perfil, `profile` vem nulo e `reason` diz por
+    quê: ACCOUNT_NOT_CONFIGURED, SECRET_MISSING, RIOT_KEY_MISSING ou um erro da consulta à Riot
+    (PLAYER_NOT_FOUND, PLAYER_NOT_ON_PLATFORM, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED,
+    UPSTREAM_UNAVAILABLE). Responde 200 nos dois casos, como /api/v1/ranked/me."""
+
+    profile: PlayerProfile | None = None
+    reason: str | None = None
+
+
 @router.get(
     "/me",
-    response_model=PlayerProfile,
+    response_model=OwnPlayer,
     summary="Perfil da conta configurada",
     description=(
         "Perfil guardado da conta própria (chip do topo), sem nova consulta à Riot; o Riot ID "
         "vem do arquivo da conta. Só na primeira vez, sem perfil guardado, consulta a Riot como "
-        "a busca (3 requisições)."
+        "a busca (3 requisições). Sem perfil, `profile` nulo com o motivo em `reason`."
     ),
-    responses={
-        404: {"model": ProblemDetail, "description": "Conta não configurada."},
-        503: _ERRORS[503],
-    },
 )
-async def get_own_player(request: Request) -> PlayerProfile:
-    return PlayerProfile.model_validate(
-        await own_player(request.app.state.session_factory, request.app.state.settings)
-    )
+async def get_own_player(request: Request) -> OwnPlayer:
+    try:
+        profile = await own_player(request.app.state.session_factory, request.app.state.settings)
+    except NotFoundError:
+        return OwnPlayer(reason="ACCOUNT_NOT_CONFIGURED")
+    except PlayerLookupError as exc:
+        return OwnPlayer(reason=exc.code)
+    return OwnPlayer(profile=PlayerProfile.model_validate(profile))
 
 
 @router.post(

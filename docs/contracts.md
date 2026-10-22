@@ -226,7 +226,7 @@ Como em sites de estatísticas, qualquer Riot ID do servidor BR pode ser consult
 
 ## CC-1202 — Moldura: perfil da conta e catálogo atual
 
-- **Perfil da conta.** `GET /api/v1/players/me` devolve o perfil da conta configurada no formato da busca, para o chip do topo. O Riot ID vem do arquivo da conta, nunca do banco. Com perfil guardado, responde só do banco, qualquer que seja a idade; o Atualizar da página do jogador renova. Sem perfil guardado, consulta a Riot uma vez, como a busca (3 requisições). Sem chave, dá 503 `RIOT_KEY_MISSING`; sem conta configurada, 404. A interface escolhe a melhor fila (elo, divisão e PDL) e, em erro, mostra só o selo BR1.
+- **Perfil da conta.** `GET /api/v1/players/me` devolve o perfil da conta configurada no formato da busca, para o chip do topo. O Riot ID vem do arquivo da conta, nunca do banco. Com perfil guardado, responde só do banco, qualquer que seja a idade; o Atualizar da página do jogador renova. Sem perfil guardado, consulta a Riot uma vez, como a busca (3 requisições). A resposta é sempre 200 com `{profile, reason}`, como `/api/v1/ranked/me`: sem perfil, `profile` vem nulo e `reason` traz `ACCOUNT_NOT_CONFIGURED`, `SECRET_MISSING`, `RIOT_KEY_MISSING` ou o erro da consulta à Riot. Assim, uma instalação sem conta não registra erro no console a cada tela. A interface escolhe a melhor fila (elo, divisão e PDL) e, sem perfil, mostra só o selo BR1.
 - **Catálogo atual.** `GET /api/v1/catalog/current` devolve `{gamePatch, dataDragonVersion}` do catálogo de patch real mais recente (formato do jogo, como `16.20`), ou os dois nulos. É a faixa "Patch · Data Dragon" abaixo do topo e a versão dos ícones de invocador.
 
 ## CC-1003–CC-1005 — Revisão da partida

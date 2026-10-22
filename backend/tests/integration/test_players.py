@@ -518,13 +518,22 @@ async def test_own_player_looks_up_once_then_serves_the_stored_profile(
 async def test_api_own_player_and_current_catalog(app_client, session_factory, tmp_path, clean):
     app = app_client._transport.app  # noqa: SLF001 — o teste troca a configuração da app
     app.state.settings = _settings(tmp_path, key=None)
+    # Sem perfil: 200 com o motivo (o navegador não registra erro no console a cada tela).
     unavailable = await app_client.get("/api/v1/players/me")
-    assert unavailable.status_code == 503 and unavailable.json()["code"] == "RIOT_KEY_MISSING"
+    assert unavailable.status_code == 200
+    assert unavailable.json() == {"profile": None, "reason": "RIOT_KEY_MISSING"}
+    app.state.settings = Settings(
+        ranked_account_file=str(tmp_path / "nada.json"), subject_hash_secret=SECRET
+    )
+    missing = (await app_client.get("/api/v1/players/me")).json()
+    assert missing == {"profile": None, "reason": "ACCOUNT_NOT_CONFIGURED"}
+    app.state.settings = _settings(tmp_path, key=None)
 
     first, _ = _transport(riot_id=("Synthetic Own", "BR1"))
     await own_player(session_factory, _settings(tmp_path), transport=first, now=NOW)
     body = (await app_client.get("/api/v1/players/me")).json()
-    assert body["gameName"] == "Synthetic Own" and "puuid" not in json.dumps(body).lower()
+    assert body["reason"] is None and body["profile"]["gameName"] == "Synthetic Own"
+    assert "puuid" not in json.dumps(body).lower()
 
     # Patches fora do formato do jogo (sintéticos de outros testes) não contam.
     rows = [("999.99", "999.99.1"), ("1234.5", "1234.5.1"), ("DEMO", "0.0.1")]

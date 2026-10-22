@@ -531,7 +531,7 @@ export interface paths {
         };
         /**
          * Perfil da conta configurada
-         * @description Perfil guardado da conta própria (chip do topo), sem nova consulta à Riot; o Riot ID vem do arquivo da conta. Só na primeira vez, sem perfil guardado, consulta a Riot como a busca (3 requisições).
+         * @description Perfil guardado da conta própria (chip do topo), sem nova consulta à Riot; o Riot ID vem do arquivo da conta. Só na primeira vez, sem perfil guardado, consulta a Riot como a busca (3 requisições). Sem perfil, `profile` nulo com o motivo em `reason`.
          */
         get: operations["get_own_player_api_v1_players_me_get"];
         put?: never;
@@ -1855,6 +1855,18 @@ export interface components {
             denominator: number;
             /** Items */
             items: components["schemas"]["ObservedItem"][];
+        };
+        /**
+         * OwnPlayer
+         * @description Perfil da conta configurada (CC-1202). Sem perfil, `profile` vem nulo e `reason` diz por
+         *     quê: ACCOUNT_NOT_CONFIGURED, SECRET_MISSING, RIOT_KEY_MISSING ou um erro da consulta à Riot
+         *     (PLAYER_NOT_FOUND, PLAYER_NOT_ON_PLATFORM, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED,
+         *     UPSTREAM_UNAVAILABLE). Responde 200 nos dois casos, como /api/v1/ranked/me.
+         */
+        OwnPlayer: {
+            profile?: components["schemas"]["PlayerProfile"] | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** ParticipantTimeline */
         ParticipantTimeline: {
@@ -3614,25 +3626,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PlayerProfile"];
-                };
-            };
-            /** @description Conta não configurada. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProblemDetail"];
+                    "application/json": components["schemas"]["OwnPlayer"];
                 };
             };
         };

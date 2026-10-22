@@ -11,7 +11,7 @@ export function ProfileChip() {
   const [broken, setBroken] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
-    api.getOwnPlayer(controller.signal).then(setProfile).catch(() => undefined);
+    api.getOwnPlayer(controller.signal).then((own) => setProfile(own.profile ?? null)).catch(() => undefined);
     return () => controller.abort();
   }, []);
   const rank = profile ? betterRank(profile.solo, profile.flex) : null;

@@ -64,7 +64,7 @@ describe("App: entrada", () => {
     expect(screen.getByRole("link", { name: /Painel/, current: "page" })).toHaveAttribute("href", "/");
     expect(screen.queryByText(/Partidas DEMO são sintéticas/)).not.toBeInTheDocument();
     // CC-1202: sem perfil da conta (erro), o topo mostra só o selo do servidor.
-    expect(screen.getByText("BR1")).toBeInTheDocument();
+    expect(document.querySelector(".profile-chip__server")).toHaveTextContent("Servidor BR1");
     expect(screen.queryByRole("link", { name: /Seu perfil/ })).not.toBeInTheDocument();
   });
 });
@@ -78,13 +78,13 @@ describe("App: moldura (CC-1202)", () => {
     stubApi((api) => {
       api.on("GET", /^\/api\/v1\/dashboard$/, () => jsonResponse(503, {}));
       api.on("GET", /^\/api\/v1\/ranked\/me$/, () => jsonResponse(503, {}));
-      api.on("GET", /^\/api\/v1\/players\/me$/, () => jsonResponse(200, {
+      api.on("GET", /^\/api\/v1\/players\/me$/, () => jsonResponse(200, { reason: null, profile: {
         id: "00000000-0000-4000-8000-000000000001", gameName: "Conta Sintética", tagLine: "BR1",
         profileIconId: 29, summonerLevel: 120, refreshedAt: "2026-10-20T00:00:00Z", dataDragonVersion: "16.20.1",
         solo: rank("RANKED_SOLO_5x5", "UNRANKED", null, null, null),
         flex: rank("RANKED_FLEX_SR", "READY", "GOLD", "III", 76),
         staleReason: null,
-      }));
+      } }));
       api.on("GET", /^\/api\/v1\/catalog\/current$/, () => jsonResponse(200, { gamePatch: "16.20", dataDragonVersion: "16.20.1" }));
     });
 

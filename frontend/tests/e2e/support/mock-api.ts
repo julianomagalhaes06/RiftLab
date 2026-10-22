@@ -452,7 +452,7 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "POST /api/v1/players/lookup": () => ok(playerProfile()),
   // CC-1202: chip do topo com o perfil da conta configurada e faixa com o catálogo.
   // Sem ícone por padrão: as telas sem rede externa continuam sem pedir nada ao CDN.
-  "GET /api/v1/players/me": () => ok(playerProfile({ id: "7a5c3f1e-0000-4000-8000-0000000000aa", gameName: "Conta Própria", profileIconId: null })),
+  "GET /api/v1/players/me": () => ok({ reason: null, profile: playerProfile({ id: "7a5c3f1e-0000-4000-8000-0000000000aa", gameName: "Conta Própria", profileIconId: null }) }),
   "GET /api/v1/catalog/current": () => ok({ gamePatch: "16.20", dataDragonVersion: "16.20.1" }),
   "POST /api/v1/players/:id/sync": () => ok(historySync({ state: "SUCCEEDED", finishedAt: "2026-10-19T15:00:00Z" })),
   "GET /api/v1/players/:id/sync": () => ok(historySync({ state: "SUCCEEDED", finishedAt: "2026-10-19T15:00:00Z" })),
