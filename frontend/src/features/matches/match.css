@@ -82,16 +82,21 @@
 .build-path__visit:first-child { border-left: 0; padding-left: 0; }
 .build-path__time { color: var(--ntext-muted); font: 600 .72rem var(--font-body); }
 .build-path__visit--key .build-path__time { color: var(--ntext); }
-.build-path__items { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; flex-wrap: wrap; max-width: 220px; }
-.build-item { position: relative; display: inline-flex; border-radius: 6px; }
+.build-path__items { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; max-width: 220px; }
+/* Itens do trajeto no padrão Arena: canto chanfrado e anel colado ao ícone (por cima da imagem).
+   O item completo fica um pouco maior, no centro da linha, com anel neutro claro; roxo é só
+   para ação, e o ícone não é clicável (a ação é o selo da decisão). */
+.build-item { --item-cut: 4px; --item-ring: var(--nline2); --item-ring-width: 1px; position: relative; display: inline-flex; }
+.build-item .item-icon { border-radius: 0; clip-path: polygon(var(--item-cut) 0, 100% 0, 100% calc(100% - var(--item-cut)), calc(100% - var(--item-cut)) 100%, 0 100%, 0 var(--item-cut)); }
+.build-item::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; box-shadow: inset 0 0 0 var(--item-ring-width) var(--item-ring); clip-path: polygon(var(--item-cut) 0, 100% 0, 100% calc(100% - var(--item-cut)), calc(100% - var(--item-cut)) 100%, 0 100%, 0 var(--item-cut)); }
 .build-item .item-icon, .build-item .item-icon img { width: 30px; height: 30px; }
-.build-item--completed .item-icon, .build-item--completed .item-icon img { width: 40px; height: 40px; }
-.build-item--completed { outline: 2px solid var(--accent); outline-offset: 1px; }
+.build-item--completed { --item-cut: 5px; --item-ring: var(--ntext-muted); --item-ring-width: 1.5px; }
+.build-item--completed .item-icon, .build-item--completed .item-icon img { width: 36px; height: 36px; }
 .build-item--sold { opacity: .45; }
 .build-item--sold::after { content: ""; position: absolute; left: -2px; right: -2px; top: 50%; height: 2px; background: var(--loss); transform: rotate(-35deg); }
 .build-path__decisions, .build-path__orphans { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .build-path__orphans { margin-top: 12px; }
-.app .decision-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border: 1px solid var(--nline); border-radius: 999px; font-size: .74rem; color: var(--ntext); text-decoration: none; background: var(--n0); }
+.app .decision-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); font-size: .75rem; color: var(--ntext); text-decoration: none; background: var(--n1); }
 .app .decision-chip:hover { border-color: var(--accent); }
 .decision-chip__state { font-weight: 700; }
 .decision-chip__time { color: var(--ntext-muted); font-variant-numeric: tabular-nums; }
