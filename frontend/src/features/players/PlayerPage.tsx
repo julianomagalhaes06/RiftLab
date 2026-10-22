@@ -6,15 +6,12 @@ import { count } from "../../shared/text/count";
 import { DayGroups } from "../history/HistoryPage";
 import { HistorySync } from "../history/HistorySync";
 import { clock } from "../history/syncMessage";
+import { RankCard } from "../ranked/RankCard";
+import { isTier, profileIconUrl } from "../ranked/tiers";
 import "../history/history.css";
 import "./players.css";
 
 const PAGE_SIZE = 20;
-const TIER_NAMES: Record<string, string> = {
-  IRON: "Ferro", BRONZE: "Bronze", SILVER: "Prata", GOLD: "Ouro",
-  PLATINUM: "Platina", EMERALD: "Esmeralda", DIAMOND: "Diamante",
-  MASTER: "Mestre", GRANDMASTER: "Grão-mestre", CHALLENGER: "Desafiante",
-};
 const LOOKUP_ERRORS: Record<string, string> = {
   PLAYER_NOT_FOUND: "Nenhuma conta Riot com esse Riot ID. Confira o nome e a TAG.",
   PLAYER_NOT_ON_PLATFORM: "A conta existe, mas não joga League of Legends no servidor BR.",
@@ -25,59 +22,58 @@ const LOOKUP_ERRORS: Record<string, string> = {
   RIOT_RATE_LIMITED: "Muitas consultas à Riot agora. Tente de novo em instantes.",
 };
 
-function iconUrl(profile: PlayerProfile): string | null {
-  if (profile.profileIconId == null || !profile.dataDragonVersion) return null;
-  return `https://ddragon.leagueoflegends.com/cdn/${profile.dataDragonVersion}/img/profileicon/${profile.profileIconId}.png`;
-}
-
-function RankLine({ label, rank }: { label: string; rank: PlayerRank | null | undefined }) {
-  if (!rank) return <li><span>{label}</span> <span className="muted">sem observação</span></li>;
-  if (rank.state === "UNRANKED" || !rank.tier) return <li><span>{label}</span> <span className="muted">Sem classificação</span></li>;
-  const tier = TIER_NAMES[rank.tier] ?? rank.tier;
-  const games = (rank.wins ?? 0) + (rank.losses ?? 0);
+/** Card de elo de uma fila do jogador (CC-1204): o mesmo do Painel e de Minha posição, sem
+ * variação (a página do jogador guarda só a última observação). */
+function QueueRank({ label, rank }: { label: string; rank: PlayerRank | null | undefined }) {
+  const tier = rank?.state === "READY" && isTier(rank.tier) ? rank.tier : null;
+  const games = (rank?.wins ?? 0) + (rank?.losses ?? 0);
+  const record = tier && games
+    ? `${count(rank?.wins ?? 0, "vitória", "vitórias")} · ${count(rank?.losses ?? 0, "derrota", "derrotas")} · ${Math.round(((rank?.wins ?? 0) / games) * 100)}%`
+    : undefined;
   return (
-    <li>
-      <span>{label}</span>
-      <img src={`/ranked-emblems/${rank.tier.toLowerCase()}.webp`} alt="" width="28" height="28" />
-      <strong>{tier}{rank.division && !["MASTER", "GRANDMASTER", "CHALLENGER"].includes(rank.tier) ? ` ${rank.division}` : ""}</strong>
-      <span>{rank.leaguePoints ?? 0} PDL</span>
-      {games ? (
-        <span className="muted">
-          {rank.wins}V {rank.losses}D · {Math.round(((rank.wins ?? 0) / games) * 100)}%
-        </span>
-      ) : null}
-    </li>
+    <RankCard
+      heading={<h3>{label}</h3>}
+      rank={tier && rank ? { tier, division: rank.division ?? null, leaguePoints: rank.leaguePoints ?? 0 } : null}
+      caption={record}
+    >
+      {!rank ? <p className="rank-card__state">Sem observação</p> : null}
+      {rank && !tier ? <p className="rank-card__state">Sem classificação</p> : null}
+    </RankCard>
   );
 }
 
 function ProfileHeader({ profile }: { profile: PlayerProfile }) {
   const [broken, setBroken] = useState(false);
-  const src = iconUrl(profile);
+  const src = profileIconUrl(profile);
   return (
-    <div className="player-header">
-      <span className="player-header__icon">
-        {src && !broken ? (
-          <img src={src} alt="" width="88" height="88" onError={() => setBroken(true)} />
-        ) : (
-          <span aria-hidden="true">{profile.gameName.slice(0, 1).toUpperCase()}</span>
-        )}
-        {profile.summonerLevel != null ? <span className="player-header__level">{profile.summonerLevel}</span> : null}
-      </span>
-      <div className="player-header__who">
-        <h2 id="player-heading">
-          {profile.gameName} <span className="player-header__tag">#{profile.tagLine}</span>
-        </h2>
-        <p className="muted">
-          {profile.summonerLevel != null ? `Nível ${profile.summonerLevel} · ` : ""}
-          Atualizado às {clock(profile.refreshedAt) ?? "–"}
-          {profile.staleReason === "RIOT_KEY_MISSING" ? " (sem chave da Riot para atualizar)" : ""}
-        </p>
-        <ul className="player-header__ranks" aria-label="Elo">
-          <RankLine label="Solo/Duo" rank={profile.solo} />
-          <RankLine label="Flex" rank={profile.flex} />
-        </ul>
+    <>
+      <div className="player-header surface surface--pad">
+        <span className="player-header__icon">
+          <span className="portrait">
+            {src && !broken ? (
+              <img src={src} alt="" width="88" height="88" onError={() => setBroken(true)} />
+            ) : (
+              <span className="player-header__initial" aria-hidden="true">{profile.gameName.slice(0, 1).toUpperCase()}</span>
+            )}
+          </span>
+          {profile.summonerLevel != null ? <span className="player-header__level" aria-hidden="true">{profile.summonerLevel}</span> : null}
+        </span>
+        <div className="player-header__who">
+          <h2 id="player-heading">
+            {profile.gameName} <span className="player-header__tag">#{profile.tagLine}</span>
+          </h2>
+          <p className="player-header__meta">
+            {profile.summonerLevel != null ? `Nível ${profile.summonerLevel} · ` : ""}
+            Atualizado às {clock(profile.refreshedAt) ?? "–"}
+            {profile.staleReason === "RIOT_KEY_MISSING" ? " (sem chave da Riot para atualizar)" : ""}
+          </p>
+        </div>
       </div>
-    </div>
+      <div className="player-ranks" role="group" aria-label="Elo">
+        <QueueRank label="Solo/Duo" rank={profile.solo} />
+        <QueueRank label="Flex" rank={profile.flex} />
+      </div>
+    </>
   );
 }
 
@@ -141,7 +137,7 @@ export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: s
   const onRefresh = useCallback((profile: PlayerProfile) => setState({ profile, error: null }), []);
 
   return (
-    <section className="section player" aria-labelledby="player-heading" aria-busy={!state.profile && !state.error}>
+    <section className="area-page player" aria-labelledby="player-heading" aria-busy={!state.profile && !state.error}>
       {state.profile ? (
         <>
           <ProfileHeader profile={state.profile} />

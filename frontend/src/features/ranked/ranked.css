@@ -1,10 +1,33 @@
-/* Minha posição (CC-310): o card de elo vem de rank-card.css; aqui só o encaixe e os detalhes da
-   observação na página. */
+/* Minha posição (CC-310, CC-1204): o card de elo vem de rank-card.css; aqui a grade da página
+   (card grande à esquerda, observação, variação e regras do PDL à direita) e essas superfícies. */
 .my-rank { display: grid; gap: 16px; min-width: 0; }
-.my-rank__details { display: grid; gap: 10px; color: var(--ntext-muted); line-height: 1.5; }
-.my-rank__details p { margin: 0; }
-.my-rank__record { color: var(--ntext); font-weight: 600; }
-.my-rank__time { color: var(--ntext-subtle); font-size: .8125rem; }
-.my-rank__change { display: grid; gap: 4px; }
+.my-rank:not(.my-rank--compact) { grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.my-rank__side { display: grid; gap: 16px; min-width: 0; }
+.my-rank__aside h3 { margin: 0 0 14px; font: 600 1rem/1.3 var(--font-body); color: var(--ntext); }
+.my-rank__facts { display: grid; gap: 10px; margin: 0; }
+.my-rank__facts > div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 12px; }
+.my-rank__facts dt { color: var(--ntext-subtle); font-size: .8125rem; }
+.my-rank__facts dd { margin: 0; color: var(--ntext); font-size: .9375rem; font-variant-numeric: tabular-nums; }
+.my-rank__record { font-weight: 600; }
+.my-rank__change { display: grid; gap: 6px; color: var(--ntext-muted); line-height: 1.5; }
 .my-rank__change p { margin: 0; }
+.my-rank__delta { color: var(--ntext); font-weight: 600; }
 .my-rank__change small { color: var(--ntext-subtle); font-size: .75rem; }
+.my-rank__rules { display: grid; gap: 8px; margin: 0 0 20px; padding-left: 18px; color: var(--ntext-muted); font-size: .875rem; line-height: 1.5; }
+
+/* Escada de elos: emblema e nome; o elo atual ganha a linha do elo e o rótulo "seu elo". */
+.tier-ladder { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.tier-ladder__step { display: grid; justify-items: center; align-content: start; gap: 4px; padding: 8px 4px; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--ntext-subtle); font-size: .75rem; text-align: center; }
+.tier-ladder__step img { width: 44px; height: 44px; object-fit: contain; }
+.tier-ladder__step.is-current { border-color: var(--tier-base); background: var(--tier-deep); color: var(--tier-text); font-weight: 600; }
+.tier-ladder__step small { font-size: .6875rem; font-weight: 700; }
+
+@media (max-width: 900px) {
+  .my-rank:not(.my-rank--compact) { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  .my-rank__facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .tier-ladder { gap: 4px; }
+  .tier-ladder__step { padding: 6px 0; font-size: .6875rem; }
+  .tier-ladder__step img { width: 30px; height: 30px; }
+}

@@ -111,7 +111,9 @@ sempre com contorno `accent` de 3 px.
   divisões · PDL sem teto" e mostram o PDL acumulado.
 
 No código: card de elo em `features/ranked/RankCard.tsx` (estilo em `rank-card.css`), elos e
-escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; moldura em
+escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; Minha posição
+(card grande, observação, variação e escada de elos) em `features/ranked/MyRank.tsx`; página do
+jogador (cabeçalho e um card de elo por fila) em `features/players/PlayerPage.tsx`; moldura em
 `app/App.tsx`, `app/ContextStrip.tsx` e `features/players/ProfileChip.tsx`.
 
 ## Layout e responsivo

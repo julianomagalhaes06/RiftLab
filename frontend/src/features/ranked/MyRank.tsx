@@ -3,7 +3,7 @@ import { api, type RankedMe, type RankedQueue } from "../../shared/api/client";
 import "./ranked.css";
 import { preferredQueue } from "./preferredQueue";
 import { RankCard, type RankCardChange } from "./RankCard";
-import { isTier } from "./tiers";
+import { TIER_NAMES, TIER_ORDER, emblemSrc, isTier, type Tier } from "./tiers";
 import { count } from "../../shared/text/count";
 
 const reasonNames: Record<string, string> = {
@@ -30,7 +30,32 @@ function ChangeLine({ data }: { data: RankedMe["change"] }) {
   const association = data.ownMatchAssociation === "ONE"
     ? "Uma partida própria concluída da fila foi encontrada nesse intervalo; a variação não é atribuída à partida."
     : "A variação cobre o intervalo de atualizações, sem atribuição a uma partida.";
-  return <div className="my-rank__change"><p>{text}</p><p>{association}</p><small>De {since} até {until}.</small></div>;
+  return <div className="my-rank__change"><p className="my-rank__delta">{text}</p><p>{association}</p><small>De {since} até {until}.</small></div>;
+}
+
+/** Regras do PDL e a escada de elos, com o elo atual marcado (texto, não só cor). */
+function LpRules({ current }: { current: Tier | null }) {
+  return (
+    <section className="my-rank__aside surface surface--pad" aria-labelledby="my-rank-rules">
+      <h3 id="my-rank-rules">Como funciona o PDL</h3>
+      <ul className="my-rank__rules">
+        <li>De Ferro a Diamante, cada divisão vai de 0 a 100 PDL, de IV a I.</li>
+        <li>Ao chegar a 100 PDL, a promoção acontece e o excedente segue para a divisão seguinte.</li>
+        <li>Mestre, Grão-Mestre e Desafiante não têm divisões, e o PDL não tem teto.</li>
+        <li>A posição muda quando o comando administrativo de atualização é executado.</li>
+        <li>A variação entre observações não é atribuída a uma partida importada.</li>
+      </ul>
+      <ol className="tier-ladder" aria-label="Elos, do menor ao maior">
+        {TIER_ORDER.map((tier) => (
+          <li key={tier} className={tier === current ? "tier-ladder__step is-current" : "tier-ladder__step"} data-tier={tier === current ? tier : undefined} aria-current={tier === current ? "true" : undefined}>
+            <img src={emblemSrc(tier)} alt="" width="44" height="44" />
+            <span>{TIER_NAMES[tier]}</span>
+            {tier === current ? <small>seu elo</small> : null}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
 }
 
 /** Faixa de variação do card (CC-1203): ganho, perda ou o motivo de não comparar. */
@@ -98,13 +123,29 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
         {data?.status === "STALE" && <p className="rank-card__note" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}
         {position?.origin === "DEMO_FICTITIOUS" && <p className="rank-card__note" role="note">Elo fictício de demonstração: não foi consultado na Riot e não pertence a nenhuma conta.</p>}
       </RankCard>
-      {!compact && position ? (
-        <div className="my-rank__details surface surface--pad">
-          {tier && position.wins != null && position.losses != null && (
-            <p className="my-rank__record">{count(position.wins, "vitória", "vitórias")} · {count(position.losses, "derrota", "derrotas")} na fila</p>
-          )}
-          <p className="my-rank__time">Temporada {position.season} · {position.origin === "DEMO_FICTITIOUS" ? "Demonstração (fictício)" : "Riot League-V4"} · Observado em {new Date(position.observedAt).toLocaleString("pt-BR")}</p>
-          {tier && <ChangeLine data={data?.change ?? null} />}
+      {!compact ? (
+        <div className="my-rank__side">
+          {position ? (
+            <section className="my-rank__aside surface surface--pad" aria-labelledby="my-rank-observation">
+              <h3 id="my-rank-observation">Observação</h3>
+              <dl className="my-rank__facts">
+                <div><dt>Fila</dt><dd>{queueLabel}</dd></div>
+                <div><dt>Temporada</dt><dd>{position.season}</dd></div>
+                <div><dt>Origem</dt><dd>{position.origin === "DEMO_FICTITIOUS" ? "Demonstração (fictício)" : "Riot League-V4"}</dd></div>
+                <div><dt>Horário</dt><dd>{new Date(position.observedAt).toLocaleString("pt-BR")}</dd></div>
+                {tier && position.wins != null && position.losses != null ? (
+                  <div><dt>Partidas</dt><dd className="my-rank__record">{count(position.wins, "vitória", "vitórias")} · {count(position.losses, "derrota", "derrotas")} na fila</dd></div>
+                ) : null}
+              </dl>
+            </section>
+          ) : null}
+          {tier ? (
+            <section className="my-rank__aside surface surface--pad" aria-labelledby="my-rank-change">
+              <h3 id="my-rank-change">Variação</h3>
+              <ChangeLine data={data?.change ?? null} />
+            </section>
+          ) : null}
+          <LpRules current={tier} />
         </div>
       ) : null}
     </div>

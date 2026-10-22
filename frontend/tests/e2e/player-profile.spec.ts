@@ -35,7 +35,12 @@ for (const width of [360, 1280]) {
       await expect(page).toHaveURL(/\/jogador\/Jogador%20Teste-BR1$/);
       await expect(page.getByText(/Nível 321/)).toBeVisible();
       await expect(page.getByRole("heading", { name: /Jogador Teste #BR1/ })).toBeVisible();
-      await expect(page.getByRole("list", { name: "Elo" })).toContainText("Ouro II");
+      // CC-1204: cards de elo Solo/Duo e Flex lado a lado (empilhados no celular).
+      const ranks = page.getByRole("group", { name: "Elo" });
+      await expect(ranks.locator(".rank-card")).toHaveCount(2);
+      await expect(ranks.locator(".rank-card").first()).toContainText("Elo Ouro II, 41 de 100 PDL");
+      const [solo, flex] = await ranks.locator(".rank-card").evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().top));
+      expect(width > 900 ? solo === flex : flex > solo).toBe(true);
       await expect(page.getByRole("link", { name: "Contexto da partida BR1_42" })).toBeVisible();
       expect(player).toBe(PLAYER_ID);
       await expect(page.locator(".player-header__icon img")).toHaveCount(0); // ícone sem rede: inicial

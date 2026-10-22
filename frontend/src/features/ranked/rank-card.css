@@ -1,6 +1,6 @@
 /* Card de elo (CC-1203): `rank_panel`, `division_plate`, `division_track` e `lp_bar` do protótipo.
    Os tons vêm de [data-tier] (design/arena.css): base, light, dark, deep e text do elo. */
-.rank-card { --bracket-color: var(--tier-dark); padding: 26px 28px 28px; display: grid; gap: 0; }
+.rank-card { --bracket-color: var(--tier-dark); padding: 26px 28px 28px; display: grid; gap: 0; align-content: start; }
 .rank-card__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
 .rank-card__top h3, .rank-card__top h2 { margin: 0; font: 600 .9375rem/1.2 var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--ntext); }
 .rank-card__server { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; background: var(--tier-deep); color: var(--tier-text); font-size: .75rem; font-weight: 700; letter-spacing: .08em; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }

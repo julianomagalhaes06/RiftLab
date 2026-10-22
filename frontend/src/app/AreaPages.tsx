@@ -11,14 +11,16 @@ export function PanelPage() {
   );
 }
 
+/** Minha posição (CC-1204): card de elo grande à esquerda; observação, variação e regras do PDL à
+ * direita. No celular, uma coluna nessa ordem. */
 export function PositionPage() {
   return (
-    <div className="area-page">
-      <div className="page-intro">
-        <p className="page-intro__kicker">Minha posição</p>
+    <div className="area-page position-page">
+      <header className="page-head">
+        <p className="page-head__context">Minha posição</p>
         <h2>Classificação da conta própria</h2>
-        <p>Observações das filas Solo/Duo e Flex da conta configurada localmente, com histórico e PDL separados por fila. Nas divisões até Diamante, a promoção ocorre ao alcançar 100 PDL; pontos excedentes podem seguir para a próxima divisão. Atualizações exigem o comando administrativo de refresh. A variação de PDL não é atribuída a uma partida importada.</p>
-      </div>
+        <p className="page-head__lead">Solo/Duo e Flex da conta configurada, com observações e PDL separados por fila.</p>
+      </header>
       <MyRank />
     </div>
   );
