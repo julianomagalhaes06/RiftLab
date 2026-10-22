@@ -19,7 +19,7 @@ function DirectAnalysis({ decisionId }: { decisionId: string }) {
       .catch((caught: unknown) => { if (!controller.signal.aborted) setError(caught); });
     return () => controller.abort();
   }, [decisionId, requestKey, retry]);
-  return <section className="section" aria-labelledby="direct-analysis-heading">
+  return <section className="surface match-panel study-panel" aria-labelledby="direct-analysis-heading">
     <h3 id="direct-analysis-heading">Análise da decisão</h3>
     <p>Compare as alternativas diretamente, sem responder a um exercício. Objetivo inicial: equilíbrio.</p>
     <p className="notice notice--info" role="note">A ordem usa o critério de referência disponível, não uma garantia do melhor item. Popularidade e compra histórica não são gabaritos.</p>

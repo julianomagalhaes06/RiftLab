@@ -377,7 +377,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
 
   if (attempt === null) {
     return (
-      <section className="section" aria-labelledby="study-heading">
+      <section className="surface match-panel study-panel" aria-labelledby="study-heading">
         <h3 id="study-heading">Estudar esta decisão</h3>
         <p className="muted">Escolha o que você queria priorizar antes de ver as alternativas.</p>
         {!transfer ? <GlossaryDisclosure /> : null}
@@ -413,7 +413,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
   const revealed = attempt.status === "REVEALED";
   const answered = attempt.status !== "OPEN";
   return (
-    <section className="section" aria-labelledby="study-heading">
+    <section className="surface match-panel study-panel" aria-labelledby="study-heading">
       <h3 id="study-heading" ref={studyHeading} tabIndex={-1}>
         Estudar esta decisão
       </h3>

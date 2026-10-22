@@ -64,7 +64,12 @@ describe("tela da partida", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: /^Partida BR1_1:\s*Vitória\s*·\s*Ranqueada Flex$/ })).toBeInTheDocument();
-    expect(screen.getByText("Patch sem avaliação própria")).toBeInTheDocument();
+    expect(screen.getByText("Patch sem avaliação própria")).toHaveClass("chip");
+    // CC-1206: cabeçalho como superfície com barra de resultado, sem a borda antiga .section.
+    const hero = document.querySelector(".match-hero");
+    expect(hero).toHaveClass("surface");
+    expect(hero).toHaveAttribute("data-result", "win");
+    expect(document.querySelector("section.section")).toBeNull();
     expect(screen.getByRole("status")).toHaveTextContent(/Partida pronta/);
 
     const self = screen.getByRole("link", { name: "Participante 2 — Campeão #9002" });

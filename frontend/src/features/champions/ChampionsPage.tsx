@@ -60,17 +60,17 @@ export function ChampionsPage() {
     navigate(`/campeoes?${next.toString()}`);
   }
   return <div className="area-page champions-page">
-    <div className="page-intro">
-      <p className="page-intro__kicker">Campeões · estudo pós-partida</p>
+    <header className="page-head">
+      <p className="page-head__context">Campeões · estudo pós-partida</p>
       <h2>Padrões de compra por campeão</h2>
-      <p>Explore trajetos observados nas partidas importadas e volte ao momento da decisão para estudar suas alternativas.</p>
-    </div>
-    {failed ? <section className="quiet-surface" role="alert">
+      <p className="page-head__lead">Trajetos observados nas partidas importadas e o caminho de volta ao momento da decisão.</p>
+    </header>
+    {failed ? <section className="surface surface--pad" role="alert">
       <h3>Não foi possível carregar os campeões</h3>
       <p>Confira a conexão com o servidor e tente novamente.</p>
       <button type="button" onClick={() => { setErrorKey(null); setRetry(retry + 1); }}>Tentar novamente</button>
     </section> : !data ? <p role="status">Carregando campeões e amostra local…</p> : <>
-      <div className="champions-filters" aria-label="Filtros dos padrões observados">
+      <div className="champions-filters surface surface--pad" aria-label="Filtros dos padrões observados">
         <label>Patch<select value={patch ?? data.patch ?? ""} onChange={(event) => update("patch", event.target.value)}>
           {data.patches.map((value) => <option key={value}>{value}</option>)}
           {data.patch && !data.patches.includes(data.patch) && <option>{data.patch}</option>}
@@ -82,30 +82,37 @@ export function ChampionsPage() {
         <p>Origem: partidas reais importadas. Até {data.sampleLimit} participações recentes por campeão. O guia cobre hoje os atiradores da rota inferior.</p>
       </div>
       <div className="champions-layout">
-        <nav className="champions-roster" aria-label="Selecionar campeão">
-          {roster.map((champion) => <button key={champion.championId} type="button"
-            aria-pressed={champion.championId === (championId ?? data.championId)}
-            onClick={() => update("champion", String(champion.championId))}>
-            <ChampionBadge participant={champion} size={40} />
-            <small>{loading ? "Carregando…" : champion.matches ? count(champion.matches, "partida", "partidas") : "Sem partidas"}</small>
-          </button>)}
+        {/* CC-1206: lista como "Campeões em foco" do Painel; escolhido com véu e barra roxos. */}
+        <nav className="champions-roster" aria-labelledby="champions-roster-heading">
+          <div className="section-head"><h3 id="champions-roster-heading">Campeões em foco</h3></div>
+          <ul className="row-list surface">
+            {roster.map((champion) => {
+              const pressed = champion.championId === (championId ?? data.championId);
+              return <li key={champion.championId} className={pressed ? "result-bar is-selected" : undefined}>
+                <button type="button" aria-pressed={pressed} onClick={() => update("champion", String(champion.championId))}>
+                  <ChampionBadge participant={champion} size={36} />
+                  <small>{loading ? "Carregando…" : champion.matches ? count(champion.matches, "partida", "partidas") : "Sem partidas"}</small>
+                </button>
+              </li>;
+            })}
+          </ul>
           {/* CC-904: campeões sem partida no filtro saem da lista e viram uma linha. */}
           {absent.length ? <p className="champions-roster__absent">Sem partidas neste patch: {absent.map((c) => championName(c)).join(", ")}.</p> : null}
         </nav>
         <div className="champions-content" aria-live="polite" aria-busy={loading}>
           {loading ? <p role="status">Carregando padrões deste filtro…</p> : <>
-          <section className="champion-overview quiet-surface">
-            <p className="page-intro__kicker">BOTTOM · patch {data.patch ?? "não detectado"}</p>
+          <section className="champion-overview surface surface--pad">
+            <p className="champion-overview__context">BOTTOM · patch {data.patch ?? "não detectado"}</p>
             <h3>{chosen ? <ChampionBadge participant={chosen} size={56} /> : "Campeão fora do recorte"}</h3>
             <dl className="champion-stats">
-              <div><dt>Participações examinadas</dt><dd>{data.sampledParticipations} de {data.totalParticipations}</dd></div>
-              <div><dt>Decisões elegíveis na etapa</dt><dd>{data.eligibleDecisions} de {data.observedDecisions}</dd></div>
-              <div><dt>Trajetos completos na etapa</dt><dd>{data.patternDenominator}</dd></div>
+              <div><dt className="metric__label">Participações examinadas</dt><dd>{data.sampledParticipations} de {data.totalParticipations}</dd></div>
+              <div><dt className="metric__label">Decisões elegíveis na etapa</dt><dd>{data.eligibleDecisions} de {data.observedDecisions}</dd></div>
+              <div><dt className="metric__label">Trajetos completos na etapa</dt><dd>{data.patternDenominator}</dd></div>
             </dl>
-            <p className="muted">Cobertura sobre compras principais reconstruídas na etapa selecionada. Ausência de dados não significa ausência de compras.</p>
+            <p className="metric__foot">Cobertura sobre compras principais reconstruídas na etapa selecionada. Ausência de dados não significa ausência de compras.</p>
           </section>
-          <section className="quiet-surface champion-patterns" aria-labelledby="patterns-heading">
-            <div className="champion-section-heading"><h3 id="patterns-heading">Trajeto de itens</h3><span className="champion-label">Padrão observado</span></div>
+          <section className="surface surface--pad champion-patterns" aria-labelledby="patterns-heading">
+            <div className="section-head"><h3 id="patterns-heading">Trajeto de itens</h3><span className="chip">Padrão observado</span></div>
             <p>Frequência descreve o que aconteceu. Não é uma build ideal nem uma avaliação da qualidade da decisão.</p>
             <p className="muted">Até seis trajetos mais frequentes; as demais sequências permanecem no denominador.</p>
             {data.status === "AVAILABLE" ? <ol className="pattern-list" aria-label="Trajetos observados">
@@ -122,8 +129,8 @@ export function ChampionsPage() {
             </div>}
             <p className="champion-limit">Sem ranking de itens validado para este guia. O baseline de popularidade usado no estudo é separado desta amostra local.</p>
           </section>
-          <section className="quiet-surface" aria-labelledby="champion-study-heading">
-            <h3 id="champion-study-heading">Do padrão à sua decisão</h3>
+          <section className="surface surface--pad champion-study" aria-labelledby="champion-study-heading">
+            <div className="section-head"><h3 id="champion-study-heading">Do padrão à sua decisão</h3></div>
             <p>Antes de revelar a comparação, observe o inventário, o ouro aproximado e os adversários naquela situação.</p>
             <ul className="champion-questions">
               <li>Quais componentes já estavam no inventário e quais alternativas os aproveitam?</li>
@@ -134,11 +141,11 @@ export function ChampionsPage() {
               {(data.situations ?? []).map((situation) => <li key={situation.decisionId}>
                 <div><strong>{situation.matchId}</strong><span>Participante {situation.participantId} · {Math.floor(situation.timestampMs / 60000)} min</span></div>
                 <div className="champion-situation-actions">
-                  <Link to={`/decisions/${situation.decisionId}`}>Analisar decisão</Link>
-                  <Link to={`/historico/${situation.matchId}?participant=${situation.participantId}`}>Abrir contexto</Link>
+                  <Link className="arrow-link" to={`/decisions/${situation.decisionId}`}>Analisar decisão</Link>
+                  <Link className="arrow-link" to={`/historico/${situation.matchId}?participant=${situation.participantId}`}>Abrir contexto</Link>
                 </div>
               </li>)}
-            </ul> : <Link to="/historico">Examinar partidas no Histórico</Link>}
+            </ul> : <Link className="arrow-link" to="/historico">Examinar partidas no Histórico</Link>}
           </section>
           </>}
         </div>

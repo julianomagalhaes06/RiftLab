@@ -34,7 +34,7 @@ function Inventory({ decision }: { decision: DecisionState }) {
   const uncertain = (decision.reasons ?? []).some((reason) => reason.code === "INVENTORY_UNCERTAIN");
   const slots = items.slice(0, 6);
   return (
-    <section aria-labelledby="inventory-heading" className="decision-card">
+    <section aria-labelledby="inventory-heading" className="surface decision-card">
       <h3 id="inventory-heading">Inventário antes da decisão</h3>
       {uncertain ? (
         <p className="notice notice--warning" role="note">
@@ -66,7 +66,7 @@ function Inventory({ decision }: { decision: DecisionState }) {
 function Budget({ decision }: { decision: DecisionState }) {
   const budget = describeBudget(decision.budget);
   return (
-    <div className="decision-stat decision-stat--gold" aria-labelledby="budget-heading">
+    <div className="surface decision-stat decision-stat--gold" aria-labelledby="budget-heading">
       <h3 id="budget-heading">Orçamento</h3>
       <p className={`decision-stat__value budget budget--${budget.tone}`}>{budget.headline}</p>
       {budget.notes.map((note) => (
@@ -256,7 +256,7 @@ function TeamContext({ match, participantId }: { match: MatchDetail; participant
   if (!self) return null;
   const teams = [...new Set(match.participants.map((p) => p.team))].sort((a, b) => (a === self.team ? -1 : b === self.team ? 1 : a - b));
   return (
-    <section aria-labelledby="context-heading" className="decision-card">
+    <section aria-labelledby="context-heading" className="surface decision-card">
       <h3 id="context-heading">Composição dos times</h3>
       <p className="muted">Só campeões e funções, conhecidos desde a seleção; nenhum resultado posterior à compra.</p>
       {/* CC-904: os dois times lado a lado, em linhas compactas. */}
@@ -294,7 +294,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
 
   if (load.status === "loading") {
     return (
-      <section className="section" aria-labelledby="decision-heading">
+      <section className="area-page decision-page" aria-labelledby="decision-heading">
         <h2 id="decision-heading">Decisão</h2>
         <p className="muted" aria-busy="true">
           Carregando a decisão…
@@ -304,7 +304,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
   }
   if (load.status === "error") {
     return (
-      <section className="section" aria-labelledby="decision-heading">
+      <section className="area-page decision-page" aria-labelledby="decision-heading">
         <h2 id="decision-heading">Decisão</h2>
         <ErrorNotice error={load.error} onRetry={load.reload} retryLabel="Tentar novamente" />
         <p>
@@ -320,7 +320,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
   const match = context?.match ?? null;
   const participant = match?.participants.find((p) => p.participantId === decision.participantId) ?? null;
   return (
-    <section className="section decision-page" aria-labelledby="decision-heading">
+    <section className="area-page decision-page" aria-labelledby="decision-heading">
       <Link
         to={{ name: "match", matchId: decision.matchId, participantId: decision.participantId }}
         className="match-back"
@@ -328,7 +328,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         Voltar às decisões da partida {decision.matchId}
       </Link>
       <header className="decision-hero">
-        {participant ? <ChampionAvatar participant={participant} size={56} className="decision-hero__portrait" /> : null}
+        {participant ? <ChampionAvatar participant={participant} size={56} className="portrait decision-hero__portrait" /> : null}
         <div>
           <h2 id="decision-heading">
             {participant && match?.localParticipantId === decision.participantId
@@ -341,7 +341,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
             {participant ? <strong>{championName(participant)}</strong> : null}
             {participant?.role ? <span>{roleShort(participant.role)}</span> : null}
             {ordinal ? <span>{ordinal}</span> : null}
-            <span className={`badge ${decision.eligible ? "badge--eligible" : "badge--ineligible"}`}>
+            <span className={`chip badge ${decision.eligible ? "badge--eligible" : "badge--ineligible"}`}>
               {decision.versions.reconstructionRulesHealth === "SUSPENDED" ? "Análise bloqueada" : decision.eligible ? "Elegível para análise" : "Inelegível para análise"}
             </span>
           </p>
@@ -366,7 +366,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         <div className="decision-grid">
           <div className="decision-grid__main">
             <div className="decision-stats">
-              <div className="decision-stat">
+              <div className="surface decision-stat">
                 <h3>Momento</h3>
                 <p className="decision-stat__value">{formatGameTime(decision.timestampMs)}</p>
                 <Level decision={decision} />

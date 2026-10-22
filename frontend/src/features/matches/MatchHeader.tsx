@@ -37,9 +37,10 @@ export function MatchHeader({ match, timeline, localId }: { match: MatchDetail; 
   const red = teamTotals(match.participants, RED);
   const demo = isDemoMatchId(match.matchId);
   return (
-    <header className={`match-hero match-hero--${tone}`}>
+    // CC-1206: superfície do padrão; barra de resultado de 3 px no ::after (o ::before é o fundo).
+    <header className={`match-hero match-hero--${tone} surface`} data-result={tone === "neutral" ? undefined : tone}>
       <div className="match-hero__main">
-        {local ? <ChampionAvatar participant={local} size={64} className="match-hero__portrait" /> : null}
+        {local ? <ChampionAvatar participant={local} size={64} className="portrait match-hero__portrait" /> : null}
         <div>
           <h2 id="match-heading">
             <span className="sr-only">Partida {match.matchId}: </span>
@@ -52,9 +53,9 @@ export function MatchHeader({ match, timeline, localId }: { match: MatchDetail; 
             <time dateTime={match.startAt} title={matchDate(match.startAt)}>{relativeTime(match.startAt)}</time>
             <span>{matchLength(match.durationSeconds)}</span>
             <span>Patch {match.patch}</span>
-            {demo ? <span className="tag">Demonstração</span> : null}
+            {demo ? <span className="chip">Demonstração</span> : null}
             {match.supportLevel === "LIMITED" ? (
-              <span className="match-hero__pill" title="Ainda não há avaliação de ranking própria neste patch. Nenhuma recomendação é gerada.">
+              <span className="chip match-hero__pill" title="Ainda não há avaliação de ranking própria neste patch. Nenhuma recomendação é gerada.">
                 Patch sem avaliação própria
               </span>
             ) : null}

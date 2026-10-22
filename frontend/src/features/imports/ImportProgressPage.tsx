@@ -70,7 +70,7 @@ export function ImportProgressPage({ jobId }: { jobId: string }) {
   const retryAtText = job?.retryAt ? formatClock(job.retryAt) : null;
 
   return (
-    <section className="section" aria-labelledby="import-heading">
+    <section className="area-page import-progress" aria-labelledby="import-heading">
       <h2 id="import-heading">Importação da partida</h2>
 
       <div className="progress" role="status" aria-live="polite">

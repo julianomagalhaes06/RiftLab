@@ -62,7 +62,7 @@ function renderPage(route: Route): ReactNode {
       return <PlayerPage key={`${route.gameName}#${route.tagLine}`} gameName={route.gameName} tagLine={route.tagLine} />;
     case "notFound":
       return (
-        <section className="section" aria-labelledby="not-found-heading">
+        <section className="area-page" aria-labelledby="not-found-heading">
           <h2 id="not-found-heading">Página não encontrada</h2>
           <p className="muted">O endereço não corresponde a nenhuma tela do RiftLab.</p>
           <p>

@@ -75,6 +75,8 @@
 .import-page .status-banner { margin: 0 0 22px; }
 .import-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; }
 .import-grid .form { margin-top: 4px; }
+.import-grid .surface h3 { margin: 0 0 8px; font: 600 1rem/1.3 var(--font-body); }
+.import-grid .surface p { color: var(--ntext-muted); line-height: 1.5; }
 .import-page__prototype { margin: 28px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; }
 .import-page__prototype .button--link { min-height: 44px; padding: 0; }
 .recent-matches__heading { flex-direction: column; align-items: flex-start; gap: 4px; }

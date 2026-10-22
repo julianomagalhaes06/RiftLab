@@ -99,7 +99,7 @@ export function PurgePanel({ matchId }: { matchId: string }) {
   }
 
   return (
-    <section className="section" aria-labelledby="purge-heading">
+    <section className="match-subsection" aria-labelledby="purge-heading">
       <h3 id="purge-heading">Remover esta partida</h3>
       <p className="muted">
         Apaga a partida deste computador, com tudo que deriva dela: estados, decisões, análises,

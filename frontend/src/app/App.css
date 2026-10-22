@@ -36,35 +36,24 @@ body {
   margin-top: 0;
 }
 
+/* Estado do serviço (CC-1206): linha discreta com o rótulo na cor do estado, sem faixa colorida. */
 .status-banner {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 10px 16px;
   margin: 1.5rem 0;
-  font-weight: 600;
+  border: 1px solid var(--nline);
+  background: var(--n1);
+  color: var(--ntext-muted);
+  font-size: .875rem;
 }
-
-.status-banner--loading {
-  color: var(--color-loading);
-  background: var(--color-loading-bg);
-}
-
-.status-banner--available {
-  color: var(--color-available);
-  background: var(--color-available-bg);
-}
-
-.status-banner--degraded {
-  color: var(--color-degraded);
-  background: var(--color-degraded-bg);
-}
-
-.status-banner--unavailable {
-  color: var(--color-unavailable);
-  background: var(--color-unavailable-bg);
-}
+.status-banner__label { font-weight: 600; }
+.status-banner--loading .status-banner__label { color: var(--color-loading); }
+.status-banner--available .status-banner__label { color: var(--color-available); }
+.status-banner--degraded .status-banner__label { color: var(--color-degraded); }
+.status-banner--unavailable .status-banner__label { color: var(--color-unavailable); }
 
 .status-banner__detail {
   font-weight: 400;
@@ -347,14 +336,18 @@ body {
   flex-basis: 100%;
 }
 
+/* Selos antigos com a forma do .chip do padrão (CC-1206). */
 .badge,
 .tag {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid var(--nline2);
 }
 
 .tag {

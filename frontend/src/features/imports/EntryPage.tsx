@@ -54,18 +54,18 @@ export function EntryPage() {
 
   return (
     <div className="area-page import-page">
-      <div className="page-intro">
-        <p className="page-intro__kicker">Importar partida</p>
+      <header className="page-head">
+        <p className="page-head__context">Importar partida</p>
         <h2>Trazer uma partida para o RiftLab</h2>
-        <p>
+        <p className="page-head__lead">
           Suas partidas ranqueadas recentes chegam sozinhas ao abrir o{" "}
           <Link to="/historico">Histórico</Link>. Aqui você importa outra partida concluída pelo ID ou
           percorre a demonstração.
         </p>
-      </div>
+      </header>
       <HealthStatus />
       <div className="import-grid">
-        <section className="quiet-surface" aria-labelledby="analyze-heading">
+        <section className="surface surface--pad" aria-labelledby="analyze-heading">
           <h3 id="analyze-heading">Analisar uma partida</h3>
           <p>Analise partidas concluídas. O RiftLab não acompanha jogos em andamento.</p>
           <form onSubmit={handleSubmit} noValidate className="form">
@@ -98,7 +98,7 @@ export function EntryPage() {
           </form>
         </section>
 
-        <section className="quiet-surface" aria-labelledby="demo-heading">
+        <section className="surface surface--pad" aria-labelledby="demo-heading">
           <h3 id="demo-heading">Explorar demonstração</h3>
           <p>
             Percorra o fluxo completo com uma partida sintética, sem usar a Riot nem chave de API.

@@ -166,7 +166,7 @@ export function MatchReviewPanel({
   const state = useReview(matchId, participant.participantId);
   if (state === null) {
     return (
-      <section className="match-panel review" aria-busy="true" aria-labelledby="review-heading">
+      <section className="surface match-panel review" aria-busy="true" aria-labelledby="review-heading">
         <h3 id="review-heading">Revisão da partida</h3>
         <p className="muted">Carregando a revisão…</p>
       </section>
@@ -174,7 +174,7 @@ export function MatchReviewPanel({
   }
   if (state.failed || state.review === null) {
     return (
-      <section className="match-panel review" aria-labelledby="review-heading">
+      <section className="surface match-panel review" aria-labelledby="review-heading">
         <h3 id="review-heading">Revisão da partida</h3>
         <p className="muted">A revisão não pôde ser carregada agora.</p>
       </section>
@@ -184,7 +184,7 @@ export function MatchReviewPanel({
   const opponent = review.lane ? participants.find((p) => p.participantId === review.lane?.opponentId) : null;
   const { counts } = review;
   return (
-    <section className="match-panel review" aria-labelledby="review-heading">
+    <section className="surface match-panel review" aria-labelledby="review-heading">
       <h3 id="review-heading">Revisão da partida</h3>
       <p className="review__lead">
         {championName(participant)} ({roleLabel(review.role)}) comparado com jogadores do mesmo campeão e rota.

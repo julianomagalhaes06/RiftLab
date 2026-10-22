@@ -48,7 +48,7 @@ export function PreparationPanel({ preparation, busy, onPrepare, requestError }:
     return <p className="sr-only" role="status" aria-live="polite">{status}</p>;
   }
   return (
-    <section className="section" aria-labelledby="preparation-heading">
+    <section className="surface match-panel" aria-labelledby="preparation-heading">
       <h3 id="preparation-heading">Preparação</h3>
       <div className="progress" role="status" aria-live="polite">
         <p className={`progress__state progress__state--${preparation.status.toLowerCase()}`}>

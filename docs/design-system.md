@@ -115,7 +115,12 @@ escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.ts
 (card grande, observação, variação e escada de elos) em `features/ranked/MyRank.tsx`; página do
 jogador (cabeçalho e um card de elo por fila) em `features/players/PlayerPage.tsx`; Histórico
 (card de métricas, filtros `.segmented` e uma superfície por partida com `.result-bar` no artigo)
-em `features/history/`; moldura em
+em `features/history/`; Campeões (lista como "Campeões em foco", escolhido com `.is-selected`) em
+`features/champions/`; partida, decisão e importação em `features/matches/` e
+`features/imports/`, com `.surface` nos painéis e barra de resultado no `::after` do cabeçalho
+da partida (o `::before` da superfície é o fundo). Os selos antigos `.badge`/`.tag` têm a forma
+do `.chip`; a classe antiga `.section` (borda no topo) só fica como divisória entre blocos dentro
+de uma superfície (estudo, comparação e reflexão da decisão); moldura em
 `app/App.tsx`, `app/ContextStrip.tsx` e `features/players/ProfileChip.tsx`.
 
 ## Layout e responsivo

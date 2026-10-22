@@ -98,7 +98,7 @@ function ParticipantSection({
   const ownTimeline = timeline?.participants.find((p) => p.participantId === participantId) ?? null;
   const owner = championWithRole(championName(participant), participant.role);
   return (
-    <section aria-labelledby="decisions-heading" className="match-panel">
+    <section aria-labelledby="decisions-heading" className="surface match-panel">
       <div className="match-panel__heading">
         <ChampionAvatar participant={participant} size={40} />
         <div>
@@ -187,7 +187,7 @@ export function MatchPage({
   const timelineState = useMatchTimeline(matchId, match?.preparation.status ?? "loading");
 
   return (
-    <section className="section" aria-labelledby="match-heading">
+    <section className="area-page match-page" aria-labelledby="match-heading">
       {fromHistory ? <Link to="/historico" className="match-back">Voltar ao Histórico</Link> : null}
       {match === null ? <h2 id="match-heading">Partida {matchId}</h2> : null}
 
@@ -233,7 +233,7 @@ export function MatchPage({
 
           {match.preparation.status === "READY" ? (
             <>
-              <section aria-labelledby="participants-heading" className="match-panel">
+              <section aria-labelledby="participants-heading" className="surface match-panel">
                 <h3 id="participants-heading">Placar</h3>
                 <Scoreboard
                   match={match}
@@ -267,7 +267,7 @@ export function MatchPage({
                 </>
               )}
               {timelineState?.timeline ? (
-                <section aria-labelledby="gold-heading" className="match-panel">
+                <section aria-labelledby="gold-heading" className="surface match-panel">
                   <h3 id="gold-heading">Ouro ao longo da partida</h3>
                   <GoldChart timeline={timelineState.timeline} participants={match.participants} />
                   {timelineState.timeline.goldFrames == null ? (
@@ -282,7 +282,7 @@ export function MatchPage({
             </>
           ) : null}
 
-          <details className="match-more">
+          <details className="surface match-more">
             <summary>Remover esta partida do RiftLab</summary>
             <PurgePanel key={match.matchId} matchId={match.matchId} />
           </details>

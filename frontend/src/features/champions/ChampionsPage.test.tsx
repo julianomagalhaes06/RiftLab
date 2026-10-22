@@ -31,6 +31,11 @@ describe("Campeões com padrões observados", () => {
     expect(screen.getByText("Sem partidas neste patch: Miss Fortune.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Jinx/ }));
     expect(await screen.findByText("Ainda não há trajetos elegíveis neste filtro")).toBeInTheDocument();
+    // CC-1206: lista como "Campeões em foco"; só o escolhido tem véu e barra roxos.
+    const jinx = screen.getByRole("button", { name: /Jinx/ });
+    expect(jinx).toHaveAttribute("aria-pressed", "true");
+    expect(jinx.closest("li")).toHaveClass("result-bar", "is-selected");
+    expect(document.querySelectorAll(".champions-roster .is-selected")).toHaveLength(1);
     expect(screen.queryByText("Infinity Edge")).not.toBeInTheDocument();
     expect(window.location.search).toContain("champion=222");
     expect(window.location.search).toContain("phase=first");
