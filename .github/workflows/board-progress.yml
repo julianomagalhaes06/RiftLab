@@ -1,0 +1,32 @@
+name: Board
+
+# Commit com "refs #N" leva o card N do board para "Em andamento". Fechar continua pelo
+# "Closes #N", que fecha a issue; a automação do próprio board leva o card para "Concluído".
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  em-andamento:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Mover cards citados com refs #N
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PROJECT_OWNER: julianomagalhaes06
+          PROJECT_NUMBER: "2"
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "Secret PROJECT_TOKEN ausente; nada a fazer."
+            exit 0
+          fi
+          jq -r '.commits[]?.message' "$GITHUB_EVENT_PATH" > "$RUNNER_TEMP/messages.txt"
+          bash .github/scripts/board-progress.sh "$RUNNER_TEMP/messages.txt"
