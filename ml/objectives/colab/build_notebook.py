@@ -27,7 +27,8 @@ EMBED = [
     "corpus/train-v1.jsonl",
     "corpus/val-v1.jsonl",
 ]
-PINS = "transformers==4.46.3 peft==0.13.2 accelerate==1.15.0 huggingface-hub==0.36.2 pyyaml"
+# CC-1301: mesmas versões do uv.lock local, todas sem CVE conhecido em 26/10/2026.
+PINS = "transformers==5.19.0 peft==0.21.2 accelerate==1.15.0 huggingface-hub==1.33.0 pyyaml"
 MODELS = {
     "1.5b": ("Qwen/Qwen2.5-1.5B-Instruct", "989aa7980e4cf806f80c7fef2b1adb7bc71aa306"),
     "0.5b": ("Qwen/Qwen2.5-0.5B-Instruct", "7ae557604adf67be50417f59c2c2f167def9a775"),
@@ -98,8 +99,12 @@ print("torch", torch.__version__, "CUDA", torch.version.cuda, "GPU", torch.cuda.
 # 2) Bibliotecas fixadas (as mesmas versões do ambiente local, exceto o torch do Colab)
 !pip install -q {PINS}
 import importlib.metadata as md
+from packaging.version import Version
 for name in ["torch", "transformers", "peft", "accelerate", "tokenizers", "huggingface-hub"]:
     print(name, md.version(name))
+# torch < 2.6 tem o CVE do torch.load (weights_only); o do Colab costuma ser mais novo.
+assert Version(md.version("torch").split("+")[0]) >= Version("2.6"), (
+    "torch do Colab anterior a 2.6: rode `!pip install -q torch==2.14.1` e Executar tudo de novo.")
 """),
         code(
             "# 3) Recria código e corpus com conferência de hash (não edite)\n"

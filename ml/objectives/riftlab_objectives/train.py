@@ -98,7 +98,7 @@ def main() -> None:
     device = ("cuda" if torch.cuda.is_available() else "cpu") if wanted == "auto" else wanted
     tokenizer = AutoTokenizer.from_pretrained(config["model"], revision=config["revision"])
     model = AutoModelForCausalLM.from_pretrained(
-        config["model"], revision=config["revision"], torch_dtype=torch.float32)
+        config["model"], revision=config["revision"], dtype=torch.float32)
     lora = config["lora"]
     model.config.use_cache = False
     if config.get("gradientCheckpointing", True):

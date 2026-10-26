@@ -31,7 +31,7 @@ def load(config: dict):
     torch.set_num_threads(config.get("threads", 4))
     tokenizer = AutoTokenizer.from_pretrained(config["model"], revision=config["revision"])
     model = AutoModelForCausalLM.from_pretrained(
-        config["model"], revision=config["revision"], torch_dtype=torch.float32
+        config["model"], revision=config["revision"], dtype=torch.float32
     )
     if config.get("adapter"):
         from peft import PeftModel

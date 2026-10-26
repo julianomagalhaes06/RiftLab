@@ -1,14 +1,14 @@
 [project]
 name = "riftlab-objectives"
 version = "0.1.0"
-description = "RiftLab — corpus, ajuste LoRA em CPU e avaliacao do interpretador de objetivo (CC-501/503)"
+description = "RiftLab — corpus, ajuste LoRA em CPU e avaliacao do interpretador de objetivo (CC-501/503, pilha CC-1301)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-  "torch==2.5.1",
-  "transformers>=4.46,<4.47",
-  "peft>=0.13,<0.14",
+  "torch==2.14.1",
+  "transformers>=5.19,<5.20",
+  "peft>=0.21,<0.22",
   "accelerate>=1.1,<2",
-  "huggingface-hub>=0.26,<1",
+  "huggingface-hub>=1.31,<2",  # 2.x troca httpx por httpx2 (e dependências novas)
   "pyyaml>=6.0,<7",
 ]
 

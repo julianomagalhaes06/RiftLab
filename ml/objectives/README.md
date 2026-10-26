@@ -38,6 +38,14 @@ Os resultados vão para `artifacts/objectives/<run>/`, fora do Git: adaptadores,
 com hashes dos dados e do adaptador, predições e resumo. A config de avaliação confere
 `adapterSha256` antes de carregar.
 
+## Pilha (CC-1301)
+
+torch 2.14.1 (CPU), transformers 5.19, peft 0.21 e huggingface-hub 1.33, sem CVE conhecido pelo
+`pip-audit` em 26/10/2026 (a pilha do v1, torch 2.5.1 e transformers 4.46.3, tinha 65). O hub fica
+na 1.x porque a 2.x troca o `httpx` por dependências novas. Conferência: o adaptador 0.5B v1 deu
+as mesmas 161 saídas brutas na validação com a pilha nova e com a antiga. O notebook do Colab usa
+as mesmas versões e recusa torch anterior a 2.6.
+
 ## Resultado (teste reservado, 100 frases, CPU i3-7020U, execução única)
 
 O gate foi registrado antes de consultar o teste. Exige JSON válido ≥ 0,95, macro-F1 ≥ 0,90 e
