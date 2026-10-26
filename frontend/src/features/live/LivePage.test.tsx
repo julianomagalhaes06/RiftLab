@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../../app/App";
+import { IN_APP_STATE } from "../../shared/router/intent";
 import { createMockApi, json, problem } from "../../test/mockApi";
 import { elapsed, queueName, spellIcon, styleIcon } from "./liveAssets";
 
@@ -37,8 +38,8 @@ export function liveGame(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function setup(path: string, live: () => Response) {
-  window.history.replaceState(null, "", path);
+function setup(path: string, live: () => Response, fromApp = true) {
+  window.history.replaceState(fromApp ? IN_APP_STATE : null, "", path);
   const api = createMockApi();
   api.on("POST", /^\/api\/v1\/players\/live$/, live);
   vi.stubGlobal("fetch", api.fetch);
@@ -81,8 +82,22 @@ describe("partida ao vivo (CC-1211)", () => {
     await waitFor(() => expect(calls).toBe(2));
   });
 
+  it("aberta de fora do RiftLab, só procura a partida depois do clique (CC-1218)", async () => {
+    const api = setup("/jogador/Fulano-BR1/ao-vivo", () => json(200, liveGame({ gameName: "Fulano" })), false);
+    const confirm = await screen.findByRole("button", { name: "Buscar Fulano#BR1 na Riot" });
+    expect(screen.queryByRole("button", { name: "Verificar de novo" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Procurando partida em andamento…")).not.toBeInTheDocument();
+    expect(api.callsTo("POST", /^\/api\/v1\/players\/live$/)).toEqual([]);
+
+    fireEvent.click(confirm);
+    expect(await screen.findByRole("button", { name: "Verificar de novo" })).toBeInTheDocument();
+    await waitFor(() => expect(api.callsTo("POST", /^\/api\/v1\/players\/live$/)).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: "Buscar Fulano#BR1 na Riot" })).not.toBeInTheDocument();
+    expect(window.history.state).toEqual(IN_APP_STATE);
+  });
+
   it("página do jogador leva à partida ao vivo", async () => {
-    window.history.replaceState(null, "", "/jogador/Fulano-BR1");
+    window.history.replaceState(IN_APP_STATE, "", "/jogador/Fulano-BR1");
     const api = createMockApi();
     api.on("POST", /^\/api\/v1\/players\/lookup$/, () => json(200, {
       id: "7a5c3f1e-0000-4000-8000-000000000001", gameName: "Fulano", tagLine: "BR1", profileIconId: null, summonerLevel: 30,
@@ -97,7 +112,7 @@ describe("partida ao vivo (CC-1211)", () => {
   });
 
   it("aviso do op.gg (CC-1213): em partida, o botão acende com fila e tempo de jogo", async () => {
-    window.history.replaceState(null, "", "/jogador/Fulano-BR1");
+    window.history.replaceState(IN_APP_STATE, "", "/jogador/Fulano-BR1");
     const api = createMockApi();
     api.on("POST", /^\/api\/v1\/players\/lookup$/, () => json(200, {
       id: "7a5c3f1e-0000-4000-8000-000000000001", gameName: "Fulano", tagLine: "BR1", profileIconId: null, summonerLevel: 30,

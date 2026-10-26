@@ -8,9 +8,11 @@ import { HistorySync } from "../history/HistorySync";
 import { clock } from "../history/syncMessage";
 import { RankCard } from "../ranked/RankCard";
 import { isTier, profileIconUrl } from "../ranked/tiers";
+import { useRiotIntent } from "../../shared/router/intent";
 import { LiveButton } from "../live/LiveButton";
 import { LOOKUP_ERRORS } from "./lookupErrors";
 import { rememberPlayer } from "./recentPlayers";
+import { RiotConfirm } from "./RiotConfirm";
 import "../history/history.css";
 import "./players.css";
 
@@ -117,7 +119,9 @@ function PlayerMatches({ profile, onRefresh }: { profile: PlayerProfile; onRefre
 
 export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: string }) {
   const [state, setState] = useState<{ profile: PlayerProfile | null; error: string | null }>({ profile: null, error: null });
+  const [confirmed, confirm] = useRiotIntent();
   useEffect(() => {
+    if (!confirmed) return;
     // A página é remontada (key) a cada Riot ID: o estado inicial já é "buscando".
     const controller = new AbortController();
     api
@@ -132,14 +136,14 @@ export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: s
         setState({ profile: null, error: message ?? "Não foi possível buscar o jogador agora." });
       });
     return () => controller.abort();
-  }, [gameName, tagLine]);
+  }, [gameName, tagLine, confirmed]);
   const onRefresh = useCallback((profile: PlayerProfile) => {
     rememberPlayer(profile);
     setState({ profile, error: null });
   }, []);
 
   return (
-    <section className="area-page player" aria-labelledby="player-heading" aria-busy={!state.profile && !state.error}>
+    <section className="area-page player" aria-labelledby="player-heading" aria-busy={confirmed && !state.profile && !state.error}>
       {state.profile ? (
         <>
           <ProfileHeader profile={state.profile} />
@@ -150,7 +154,9 @@ export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: s
           <h2 id="player-heading">
             {gameName} <span className="player-header__tag">#{tagLine}</span>
           </h2>
-          {state.error ? (
+          {!confirmed ? (
+            <RiotConfirm gameName={gameName} tagLine={tagLine} onConfirm={confirm} what="Abrir o perfil" />
+          ) : state.error ? (
             <p className="notice notice--info" role="alert">{state.error}</p>
           ) : (
             <p className="muted">Buscando o jogador na Riot…</p>

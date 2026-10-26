@@ -100,3 +100,7 @@
   .live-button { margin-left: 0; width: 100%; max-width: none; justify-items: stretch; }
   .live-button__status { text-align: left; }
 }
+
+/* Endereço aberto de fora do RiftLab (CC-1218): a consulta à Riot espera o clique. */
+.riot-confirm { margin: 0; padding: 20px 24px; display: grid; gap: 14px; justify-items: start; max-width: 64ch; color: var(--ntext-muted); line-height: 1.5; }
+.riot-confirm p { margin: 0; }

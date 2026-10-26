@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type LiveGame, type LiveParticipant } from "../../shared/api/client";
 import { isAbortError, isApiError } from "../../shared/api/errors";
 import { Link } from "../../shared/router/Link";
+import { useRiotIntent } from "../../shared/router/intent";
 import { routeToPath } from "../../shared/router/routes";
 import { count } from "../../shared/text/count";
 import { ChampionAvatar } from "../history/ChampionAvatar";
 import { roleShort } from "../history/presentation";
 import { championName } from "../matches/format";
 import { LOOKUP_ERRORS } from "../players/lookupErrors";
+import { RiotConfirm } from "../players/RiotConfirm";
 import { emblemSrc, isTier, rankTitle } from "../ranked/tiers";
 import { elapsed, queueName, spellIcon, styleIcon, type LiveIcon } from "./liveAssets";
 import "./live.css";
@@ -113,10 +115,12 @@ function TeamPanel({ team, version, queueLabel }: { team: LiveTeam; version: str
 /** Partida ao vivo (CC-1211), como o "Live Game" do op.gg: os dois times com campeão, feitiços,
  * estilos de runa, Riot ID e elo. A Riot não dá placar ao vivo, então não há abates nem ouro. */
 export function LivePage({ gameName, tagLine }: { gameName: string; tagLine: string }) {
-  const [state, setState] = useState<{ live: LiveGame | null; error: string | null; loading: boolean }>({ live: null, error: null, loading: true });
+  const [confirmed, confirm] = useRiotIntent();
+  const [state, setState] = useState<{ live: LiveGame | null; error: string | null; loading: boolean }>({ live: null, error: null, loading: confirmed });
   const [attempt, setAttempt] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
+    if (!confirmed) return; // aberta de fora do RiftLab: só com o clique (CC-1218)
     const controller = new AbortController();
     api.getLiveGame(gameName, tagLine, controller.signal)
       .then((live) => setState({ live, error: null, loading: false }))
@@ -126,7 +130,7 @@ export function LivePage({ gameName, tagLine }: { gameName: string; tagLine: str
         setState({ live: null, error: message ?? "Não foi possível consultar a partida ao vivo agora.", loading: false });
       });
     return () => controller.abort();
-  }, [gameName, tagLine, attempt]);
+  }, [gameName, tagLine, attempt, confirmed]);
   const game = state.live?.game ?? null;
   useEffect(() => {
     if (!game?.startedAt) return;
@@ -137,6 +141,10 @@ export function LivePage({ gameName, tagLine }: { gameName: string; tagLine: str
     setState((current) => ({ ...current, loading: true }));
     setAttempt((value) => value + 1);
   }, []);
+  const start = useCallback(() => {
+    setState((current) => ({ ...current, loading: true }));
+    confirm();
+  }, [confirm]);
 
   const shownName = state.live?.gameName ?? gameName;
   const shownTag = state.live?.tagLine ?? tagLine;
@@ -159,13 +167,16 @@ export function LivePage({ gameName, tagLine }: { gameName: string; tagLine: str
           </p>
         </div>
         <div className="live-head__actions">
-          <button type="button" className="button button--secondary" onClick={retry} disabled={state.loading}>
-            {state.loading ? "Verificando…" : "Verificar de novo"}
-          </button>
+          {confirmed ? (
+            <button type="button" className="button button--secondary" onClick={retry} disabled={state.loading}>
+              {state.loading ? "Verificando…" : "Verificar de novo"}
+            </button>
+          ) : null}
           <Link to={routeToPath({ name: "player", gameName: shownName, tagLine: shownTag })} className="arrow-link">Ver perfil</Link>
         </div>
       </header>
 
+      {!confirmed ? <RiotConfirm gameName={gameName} tagLine={tagLine} onConfirm={start} what="Procurar a partida ao vivo" /> : null}
       {state.loading && !state.live && !state.error ? <p className="live-state surface" role="status">Procurando partida em andamento…</p> : null}
       {state.error ? <p className="live-state surface" role="alert">{state.error}</p> : null}
       {state.live?.state === "NOT_IN_GAME" ? (

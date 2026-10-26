@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "../../app/App";
 import { createMockApi, json, matchSummary } from "../../test/mockApi";
+import { IN_APP_STATE } from "../../shared/router/intent";
 import { readRecentPlayers, rememberPlayer } from "./recentPlayers";
 
 afterEach(() => {
@@ -27,8 +28,10 @@ function profile(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function setup(path: string, configure: (api: ReturnType<typeof createMockApi>) => void) {
-  window.history.replaceState(null, "", path);
+/** `fromApp`: a entrada veio do roteador do RiftLab (busca, link interno); sem ela, o endereço foi
+ * aberto de fora (link de outro site, favorito) e nada vai à Riot sem o clique (CC-1218). */
+function setup(path: string, configure: (api: ReturnType<typeof createMockApi>) => void, fromApp = true) {
+  window.history.replaceState(fromApp ? IN_APP_STATE : null, "", path);
   const api = createMockApi();
   api.on("GET", /^\/api\/v1\/dashboard$/, () => json(503, {}));
   api.on("GET", /^\/api\/v1\/ranked\/me$/, () => json(200, { status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }));
@@ -75,6 +78,29 @@ describe("perfil de jogador por Riot ID", () => {
     const lookups = api.callsTo("POST", /\/players\/lookup$/);
     expect(lookups[0].body).toEqual({ gameName: "Pão de Queijo", tagLine: "BR1", refresh: false });
     expect(api.callsTo("GET", /^\/api\/v1\/matches$/).some((call) => call.search.get("player") === PLAYER_ID)).toBe(true);
+  });
+
+  it("endereço aberto de fora do RiftLab não consulta a Riot até o clique (CC-1218)", async () => {
+    const api = setup("/jogador/Pão de Queijo-BR1", (mock) => {
+      mock.on("POST", /^\/api\/v1\/players\/lookup$/, () => json(200, profile()));
+      mock.on("POST", /\/players\/.+\/sync$/, () => json(202, { state: "QUEUED" }));
+      mock.on("POST", /^\/api\/v1\/players\/live\/status$/, () => json(200, { state: "NOT_IN_GAME", gameName: "Pão de Queijo", tagLine: "BR1", checkedAt: "2026-10-19T15:00:00Z" }));
+    }, false);
+    const confirm = await screen.findByRole("button", { name: "Buscar Pão de Queijo#BR1 na Riot" });
+    expect(screen.getByRole("heading", { name: /Pão de Queijo #BR1/ })).toBeInTheDocument();
+    expect(screen.getByText(/aberto de fora do RiftLab/)).toBeInTheDocument();
+    // Nem a busca, nem o aviso ao vivo, nem a sincronização: nada vai à Riot sem o clique.
+    expect(api.callsTo("POST", /^\/api\/v1\/players\//)).toEqual([]);
+
+    fireEvent.click(confirm);
+    expect(await screen.findByText(/Nível 321/)).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(api.callsTo("POST", /\/players\/lookup$/)).toHaveLength(1);
+      expect(api.callsTo("POST", /\/players\/live\/status$/)).toHaveLength(1);
+      expect(api.callsTo("POST", /\/players\/.+\/sync$/)).toHaveLength(1);
+    });
+    // A entrada passa a contar como do app: recarregar não pede o clique de novo.
+    expect(window.history.state).toEqual(IN_APP_STATE);
   });
 
   it("Atualizar consulta a Riot de novo e pede a sincronização das partidas", async () => {

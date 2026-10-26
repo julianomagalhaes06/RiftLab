@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { RouterContext, type Router } from "./context";
+import { IN_APP_STATE } from "./intent";
 import { parseRoute, routeToPath, type Route } from "./routes";
 
 interface LocationState {
@@ -32,10 +33,11 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     }
     const next = `${url.pathname}${url.search}`;
     const current = `${window.location.pathname}${window.location.search}`;
+    // A marca diz que a entrada veio de dentro do app (CC-1218, `intent.ts`).
     if (options?.replace || next === current) {
-      window.history.replaceState(null, "", next);
+      window.history.replaceState(IN_APP_STATE, "", next);
     } else {
-      window.history.pushState(null, "", next);
+      window.history.pushState(IN_APP_STATE, "", next);
     }
     setLocation({ pathname: url.pathname, search: url.search });
   }, []);

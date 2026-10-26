@@ -37,6 +37,7 @@ for (const width of [360, 1280]) {
       let body: unknown = null;
       await mockApi(page, { "POST /api/v1/players/live": (request) => { body = request.body; return ok(inGame); } });
       await page.goto("/jogador/Jogador%20Teste-BR1");
+      await page.getByRole("button", { name: /na Riot$/ }).click(); // aberto de fora do app (CC-1218)
       await page.getByRole("link", { name: "Partida ao vivo" }).click();
       await expect(page).toHaveURL(/\/jogador\/Jogador%20Teste-BR1\/ao-vivo$/);
       const blue = page.getByRole("region", { name: "Time azul" });
@@ -59,6 +60,7 @@ for (const width of [360, 1280]) {
         "POST /api/v1/players/live": () => ok(inGame),
       });
       await page.goto("/jogador/Jogador%20Teste-BR1");
+      await page.getByRole("button", { name: /na Riot$/ }).click(); // aberto de fora do app (CC-1218)
       await expect(page.getByText(/Este jogador está em partida neste momento · Ranqueada Flex · \d+:\d\d de jogo/)).toBeVisible();
       await noHorizontalScroll(page);
       await page.getByRole("link", { name: "Ao vivo agora" }).click();
@@ -68,6 +70,7 @@ for (const width of [360, 1280]) {
     test("fora de partida, o botão fica neutro", async ({ page }) => {
       await mockApi(page);
       await page.goto("/jogador/Jogador%20Teste-BR1");
+      await page.getByRole("button", { name: /na Riot$/ }).click(); // aberto de fora do app (CC-1218)
       await expect(page.getByRole("link", { name: "Partida ao vivo" })).toBeVisible();
       await expect(page.getByText(/em partida neste momento/)).toHaveCount(0);
     });
@@ -75,6 +78,7 @@ for (const width of [360, 1280]) {
     test("fora de partida explica e não quebra a página", async ({ page }) => {
       await mockApi(page);
       await page.goto("/jogador/Jogador%20Teste-BR1/ao-vivo");
+      await page.getByRole("button", { name: /na Riot$/ }).click(); // aberto de fora do app (CC-1218)
       await expect(page.getByText("Jogador Teste#BR1 não está em partida agora.")).toBeVisible();
       await expect(page.getByRole("button", { name: "Verificar de novo" })).toBeEnabled();
       await noHorizontalScroll(page);

@@ -154,7 +154,7 @@ A navegação principal oferece Painel, Campeões, Minha posição e Histórico 
 - o elo em Solo/Duo e Flex;
 - as partidas ranqueadas recentes do jogador, importadas sob demanda pelo mesmo caminho da atualização do Histórico.
 
-O botão **Atualizar** consulta a Riot de novo; perfis consultados há menos de 10 minutos vêm do banco. É identificação, não login: qualquer Riot ID pode ser consultado. Contrato em `contracts.md` (CC-1101/CC-1102).
+O botão **Atualizar** consulta a Riot de novo; perfis consultados há menos de 10 minutos vêm do banco. O perfil e a partida ao vivo abertos de fora do RiftLab (link de outro site, favorito, nova aba) esperam um clique em **Buscar na Riot** antes de gastar a chave; pela busca e pelos links do app, abrem direto (CC-1218). É identificação, não login: qualquer Riot ID pode ser consultado. Contrato em `contracts.md` (CC-1101/CC-1102).
 
 **Nicks na tela da partida (CC-1210).** No placar de uma partida importada, cada campeão mostra embaixo o Riot ID (Nome#TAG) de quem jogou, com link para o perfil do jogador; a busca na Riot só acontece no clique. O nome é lido na hora da resposta bruta da Riot que o worker guardou na importação, e nada novo vai para o banco. Expurgar a partida apaga o bruto e os nomes junto. É o Riot ID da época da partida: quem trocou de nome depois pode não ser encontrado pelo link. Partidas DEMO não têm nick. Contrato em `contracts.md` (CC-1210).
 

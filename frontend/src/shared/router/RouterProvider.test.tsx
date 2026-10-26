@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { useRouter } from "./context";
+import { openedInApp } from "./intent";
 import { Link } from "./Link";
 import { RouterProvider } from "./RouterProvider";
 
@@ -46,6 +47,23 @@ describe("RouterProvider (History API)", () => {
     fireEvent.click(screen.getByRole("button", { name: "ir" }));
     expect(window.location.pathname + window.location.search).toBe("/matches/DEMO-0008?participant=2");
     expect(screen.getByTestId("href")).toHaveTextContent("participant=2");
+  });
+
+  it("marca as entradas criadas pelo app; um endereço aberto de fora começa sem a marca (CC-1218)", () => {
+    window.history.replaceState(null, "", "/jogador/Alvo-BR1");
+    render(
+      <RouterProvider>
+        <Probe />
+      </RouterProvider>,
+    );
+    expect(openedInApp()).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "ir" }));
+    expect(openedInApp()).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "trocar" }));
+    expect(openedInApp()).toBe(true);
+    fireEvent.click(screen.getByRole("link", { name: "protótipo" }));
+    expect(openedInApp()).toBe(true);
   });
 
   it("voltar/avançar (popstate) atualizam a rota", async () => {

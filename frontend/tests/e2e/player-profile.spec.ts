@@ -81,6 +81,7 @@ for (const width of [360, 1280]) {
     test("sugestões: perfil já aberto aparece ao digitar parte do nome; sem # sugere BR1 (CC-1208)", async ({ page }) => {
       await mockApi(page);
       await page.goto("/jogador/Jogador%20Teste-BR1");
+      await page.getByRole("button", { name: /na Riot$/ }).click(); // aberto de fora do app (CC-1218)
       await expect(page.getByText(/Nível 321/)).toBeVisible();
       await page.goto("/historico");
       const search = page.getByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
@@ -99,9 +100,33 @@ for (const width of [360, 1280]) {
       await expect(page).toHaveURL(/\/jogador\/Jogador%20Teste-BR1$/);
     });
 
+    test("endereço aberto de fora do app: nada vai à Riot até o clique; recarregar não pede de novo (CC-1218)", async ({ page }) => {
+      await mockApi(page);
+      const riot: string[] = [];
+      page.on("request", (request) => {
+        if (new URL(request.url()).pathname.startsWith("/api/v1/players/") && request.method() === "POST") riot.push(request.url());
+      });
+      await page.goto("/jogador/Jogador%20Teste-BR1");
+      const confirm = page.getByRole("button", { name: "Buscar Jogador Teste#BR1 na Riot" });
+      await expect(confirm).toBeVisible();
+      await expect(page.getByText(/aberto de fora do RiftLab/)).toBeVisible();
+      await noHorizontalScroll(page);
+      await page.screenshot({ path: `test-results/perfil-fora-do-app-${width}.png` });
+      expect(riot).toEqual([]);
+
+      await confirm.click();
+      await expect(page.getByText(/Nível 321/)).toBeVisible();
+      await expect.poll(() => riot.length).toBeGreaterThan(0);
+
+      await page.reload();
+      await expect(page.getByText(/Nível 321/)).toBeVisible();
+      await expect(page.getByRole("button", { name: /na Riot$/ })).toHaveCount(0);
+    });
+
     test("Riot ID inexistente explica e não quebra a página", async ({ page }) => {
       await mockApi(page, { "POST /api/v1/players/lookup": () => problem(404, "PLAYER_NOT_FOUND") });
       await page.goto("/jogador/Ninguem-000");
+      await page.getByRole("button", { name: /na Riot$/ }).click(); // aberto de fora do app (CC-1218)
       await expect(page.getByRole("alert")).toContainText("Nenhuma conta Riot com esse Riot ID");
       await noHorizontalScroll(page);
     });
