@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from riftlab import db
+from riftlab.api.loopback import LoopbackGuardMiddleware
 from riftlab.api.routes.analyses import router as analyses_router
 from riftlab.api.routes.champions import router as champions_router
 from riftlab.api.routes.decisions import router as decisions_router
@@ -45,6 +46,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await app.state.db_engine.dispose()
 
     app = FastAPI(title="RiftLab API", version="0.1.0", lifespan=lifespan)
+    # O último adicionado envolve os outros: o request id já existe quando a guarda recusa.
+    app.add_middleware(LoopbackGuardMiddleware, allowed_hosts=settings.api_allowed_hosts)
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router)
     app.include_router(champions_router)

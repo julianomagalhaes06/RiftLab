@@ -15,8 +15,13 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
 
-    api_host: str = "0.0.0.0"
+    # Loopback por padrão (CC-1215): a API não tem autenticação. O container define
+    # RIFTLAB_API_HOST=0.0.0.0 e o compose publica a porta só em 127.0.0.1.
+    api_host: str = "127.0.0.1"
     api_port: int = 8000
+    # Nomes de Host aceitos pela API (sem porta), contra DNS rebinding e acesso pela rede local
+    # (CC-1215). O compose acrescenta `api`, o nome com que o proxy do frontend chega.
+    api_allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost", "::1")
 
     database_url: str = "postgresql+asyncpg://riftlab:riftlab@db:5432/riftlab"
     database_ready_timeout_seconds: float = 2.0

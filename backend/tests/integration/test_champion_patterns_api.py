@@ -97,7 +97,7 @@ async def test_real_patterns_are_read_only_scoped_and_abstain_on_stale_versions(
         app = create_app(settings)
         async with (
             app.router.lifespan_context(app),
-            AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client,
+            AsyncClient(transport=ASGITransport(app=app), base_url="http://127.0.0.1") as client,
         ):
             url = f"/api/v1/champions/patterns?championId=89&patch={patch}&phase=first"
             response = await client.get(url)

@@ -14,4 +14,5 @@ RUN npm run build
 
 ENV NODE_ENV=production
 EXPOSE 5173
-CMD ["npm", "run", "preview"]
+# Dentro do container o bind é em todas as interfaces; o compose publica só em 127.0.0.1.
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0"]

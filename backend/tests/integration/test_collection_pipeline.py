@@ -584,7 +584,7 @@ async def test_partial_or_invalid_raw_pairs_never_become_analysable(
         app = create_app(sample.settings)
         async with app.router.lifespan_context(app):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
+                transport=ASGITransport(app=app), base_url="http://127.0.0.1"
             ) as client:
                 for match_id in sample.ids:
                     assert (await client.get(f"/api/v1/matches/{match_id}")).status_code == 404

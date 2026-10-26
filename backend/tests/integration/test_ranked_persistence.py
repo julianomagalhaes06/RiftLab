@@ -252,7 +252,7 @@ async def test_get_route_is_account_scoped_and_contains_no_identifiers(
         app = create_app(settings)
         async with app.router.lifespan_context(app):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
+                transport=ASGITransport(app=app), base_url="http://127.0.0.1"
             ) as client:
                 response = await client.get("/api/v1/ranked/me")
                 assert response.status_code == 200

@@ -110,7 +110,7 @@ async def test_unhandled_exception_secret_absent_even_with_default_formatter_han
 
     try:
         transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
             response = await client.get("/__test__/boom")
     finally:
         api_logger.removeHandler(handler)

@@ -21,7 +21,9 @@ async def app_and_client() -> AsyncIterator[tuple[object, AsyncClient]]:
     )
     app = create_app(settings)
     async with app.router.lifespan_context(app):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
             yield app, client
 
 

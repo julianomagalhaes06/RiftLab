@@ -71,6 +71,8 @@ Especificação para implementação. Prefixo /api/v1, JSON camelCase; IDs opaco
 
 Os DTOs ficam em `backend/src/riftlab/shared/api/`. O envelope de erro (`application/problem+json`) é único, com códigos 409 específicos (IMPORT_ACTIVE, IDEMPOTENCY_CONFLICT, ATTEMPT_LOCKED, ATTEMPT_NOT_REVEALED, HINTS_DISABLED, FEEDBACK_EXISTS, MATCH_PURGED).
 
+Fronteira do loopback (CC-1215). A API não tem autenticação e só atende a própria estação: `cc api` escuta em 127.0.0.1 por padrão (o container usa 0.0.0.0 e o compose publica só em 127.0.0.1), e o Vite dev/preview também escuta só em 127.0.0.1. Toda requisição passa por `api/loopback.py`: `Host` fora de `RIFTLAB_API_ALLOWED_HOSTS` (padrão `127.0.0.1`, `localhost`, `::1`; o compose acrescenta `api`, nome do proxy do frontend) responde 400 HOST_NOT_ALLOWED, e `Sec-Fetch-Site` `cross-site` ou `same-site` responde 403 CROSS_SITE_REQUEST. Sem o cabeçalho (CLI, curl) ou com `same-origin`/`none` (a SPA pelo proxy, endereço digitado) a requisição segue. Toda resposta sai com `X-Frame-Options: DENY`, `frame-ancestors 'none'` (somado à CSP própria do relatório HTML) e `nosniff`. O Vite repete o anti-framing, desliga CORS e só deixa a própria SPA chamar `/__open-in-editor`.
+
 Importação real (CC-201): job PostgreSQL durável com token de posse
 (`import_jobs.lease_generation`, incrementado a cada reserva `SELECT ... FOR
 UPDATE SKIP LOCKED`) e link de retry (`retry_of_job_id`) — ver

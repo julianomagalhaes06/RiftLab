@@ -91,7 +91,7 @@ async def test_history_scope_filters_before_pagination_and_changes_with_account(
         )
         async with app.router.lifespan_context(app):
             async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
+                transport=ASGITransport(app=app), base_url="http://127.0.0.1"
             ) as client:
                 first = await client.get("/api/v1/matches", params={"scope": "account", "limit": 1})
                 assert first.status_code == 200

@@ -88,7 +88,9 @@ async def test_own_matches_only_ordered_by_end_and_unknown_scores(
         app = create_app(settings)
         app.state.settings = settings
         app.state.session_factory = session_factory
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
             response = await client.get("/api/v1/dashboard")
             assert response.status_code == 200
             for value in ("own-hash", "third-party", "dashboard-test", "subjectHash", "puuid"):
@@ -180,7 +182,9 @@ async def test_queue_follows_latest_own_match_unless_requested(
         app = create_app(settings)
         app.state.settings = settings
         app.state.session_factory = session_factory
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
             flex = await client.get("/api/v1/dashboard", params={"queue": "RANKED_FLEX_SR"})
             assert flex.status_code == 200 and flex.json()["queue"] == 440
             assert flex.json()["queueSelection"] == "EXPLICIT"

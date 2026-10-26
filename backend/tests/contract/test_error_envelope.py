@@ -61,7 +61,7 @@ async def error_probe_client() -> AsyncIterator[AsyncClient]:
     # servidores/test clients logarem); sem isso, o teste falharia com o
     # RuntimeError em vez de inspecionar o corpo 500 que o handler devolveu.
     transport = ASGITransport(app=app, raise_app_exceptions=False)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         yield client
 
 
@@ -191,7 +191,7 @@ async def test_method_not_allowed_preserves_allow_header_without_leaking_detail(
         return {}
 
     transport = ASGITransport(app=app, raise_app_exceptions=False)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         response = await client.post("/__test__/only-get")
 
     assert response.status_code == 405

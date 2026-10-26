@@ -529,7 +529,9 @@ async def _inventory_names(settings: Settings, match_id: str) -> dict[int, str |
     """Nomes dos itens do inventário nas decisões da partida (2ª compra em diante)."""
     app = create_app(settings)
     async with app.router.lifespan_context(app):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
             listing = await client.get(
                 f"/api/v1/matches/{match_id}/decisions", params={"participantId": 1}
             )
@@ -597,7 +599,7 @@ async def test_list_marks_the_local_account_participant_without_exposing_its_has
         app = create_app(settings)
         async with app.router.lifespan_context(app):
             transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
                 response = await client.get("/api/v1/matches", params={"limit": 100})
                 detail = await client.get(f"/api/v1/matches/{match_id}")
         assert detail.status_code == 200 and detail.json()["localParticipantId"] == 4
@@ -612,7 +614,7 @@ async def test_list_marks_the_local_account_participant_without_exposing_its_has
         assert not any(word in k.lower() for k in _keys(response.json()) for word in _PERSONAL)
 
         async with AsyncClient(
-            transport=ASGITransport(app=create_app(Settings())), base_url="http://test"
+            transport=ASGITransport(app=create_app(Settings())), base_url="http://127.0.0.1"
         ) as anonymous:
             app2 = anonymous._transport.app  # type: ignore[attr-defined]
             async with app2.router.lifespan_context(app2):

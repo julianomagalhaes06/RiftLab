@@ -68,7 +68,7 @@ async def test_dashboard_http_validation_and_no_private_fields(monkeypatch):
     app = create_app(Settings())
     app.state.settings = Settings()
     app.state.session_factory = None
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://127.0.0.1") as client:
         for query in ("window=0", "window=101", "window=x", "origin=OTHER", "queue=440"):
             assert (await client.get("/api/v1/dashboard?" + query)).status_code == 422
         response = await client.get("/api/v1/dashboard?window=10&origin=DEMO")
