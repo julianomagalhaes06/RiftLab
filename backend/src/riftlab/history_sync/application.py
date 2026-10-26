@@ -9,11 +9,12 @@ grava PUUID, Riot ID ou IDs de partida na execução: só contagens e códigos d
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -31,8 +32,8 @@ from riftlab.ingestion.infrastructure.riot_account import (
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.models import MatchModel
-from riftlab.ingestion.purge import is_purged
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.ingestion.tombstone import MatchPurgedError
 from riftlab.ranked.domain import account_key
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import SourceError, SourceRateLimitedError
@@ -198,11 +199,28 @@ def _transport(settings: Settings) -> RiotHttpTransport:
 async def _finish(factory: SessionFactory, run_id: Any, **fields: Any) -> None:
     async with unit_of_work(factory) as session:
         run = await session.get(Run, run_id)
-        assert run is not None
+        if run is None or run.state != "RUNNING":
+            return  # já encerrada (expirada por outro passo): não reabre nem sobrescreve
         for name, value in fields.items():
             setattr(run, name, value)
         run.finished_at = datetime.now(UTC)
         run.game_name = run.tag_line = None  # o Riot ID não fica depois da execução (CC-1103)
+
+
+async def _expire_stale(session: AsyncSession, now: datetime) -> None:
+    """Execução ativa parada há mais de STALE_AFTER (erro perdido, worker derrubado) termina
+    FAILED SYNC_STALE e sem o Riot ID, sem esperar outro pedido da mesma conta (CC-1216)."""
+    await session.execute(
+        update(Run)
+        .where(
+            Run.state.in_(ACTIVE),
+            func.coalesce(Run.started_at, Run.requested_at) < now - STALE_AFTER,
+        )
+        .values(
+            state="FAILED", error_code="SYNC_STALE", finished_at=now, game_name=None, tag_line=None
+        )
+        .execution_options(synchronize_session=False)
+    )
 
 
 async def process_next_history_sync(
@@ -212,9 +230,12 @@ async def process_next_history_sync(
     transport: RiotHttpTransport | None = None,
     now: datetime | None = None,
 ) -> bool:
-    """Um passo do worker: reserva a execução QUEUED mais antiga, se houver."""
+    """Um passo do worker: expira execuções abandonadas e reserva a QUEUED mais antiga, se houver.
+    A execução reservada sempre termina: erro inesperado a encerra como FAILED SYNC_FAILED (sem
+    o Riot ID) antes de propagar; se nem isso der certo (banco fora), a expiração a encerra."""
     now = now or datetime.now(UTC)
     async with unit_of_work(factory) as session:
+        await _expire_stale(session, now)
         run = (
             await session.scalars(
                 select(Run)
@@ -242,10 +263,28 @@ async def process_next_history_sync(
         else now - timedelta(days=settings.history_sync_lookback_days)
     )
     try:
+        await _run(factory, settings, run_id, key, riot_id, since, transport)
+    except Exception:
+        with contextlib.suppress(Exception):
+            await _finish(factory, run_id, state="FAILED", error_code="SYNC_FAILED")
+        raise
+    return True
+
+
+async def _run(
+    factory: SessionFactory,
+    settings: Settings,
+    run_id: Any,
+    key: str,
+    riot_id: tuple[str | None, str | None],
+    since: datetime,
+    transport: RiotHttpTransport | None,
+) -> None:
+    try:
         account = _account_for(settings, key, riot_id)
         if account is None or not settings.riot_api_key:
             await _finish(factory, run_id, state="FAILED", error_code="ACCOUNT_CHANGED")
-            return True
+            return
         own = transport is None
         client = transport or _transport(settings)
         try:
@@ -263,13 +302,14 @@ async def process_next_history_sync(
                 await client.aclose()
     except RiotAccountConfigError:
         await _finish(factory, run_id, state="FAILED", error_code="ACCOUNT_NOT_CONFIGURED")
-        return True
+        return
     except SourceError as exc:
         retry = exc.retry_after_seconds if isinstance(exc, SourceRateLimitedError) else None
         await _finish(
             factory, run_id, state="FAILED", error_code=exc.code[:40], retry_after_seconds=retry
         )
-        return True
+        return
+    secret = settings.subject_hash_secret
     known = purged = enqueued = 0
     for match_id in ids:
         async with factory() as session:
@@ -279,11 +319,13 @@ async def process_next_history_sync(
             )
         if exists or (latest is not None and latest.state != ImportJobState.FAILED):
             known += 1
-        elif await is_purged(factory, match_id, settings.subject_hash_secret):
+            continue
+        try:
+            await request_import(factory, match_id, ImportMode.RIOT, secret=secret)
+        except MatchPurgedError:
             purged += 1  # expurgo pedido não volta por sincronização (CC-603)
-        else:
-            await request_import(factory, match_id, ImportMode.RIOT)
-            enqueued += 1
+            continue
+        enqueued += 1
     await _finish(
         factory,
         run_id,
@@ -293,4 +335,3 @@ async def process_next_history_sync(
         skipped_purged=purged,
         new_enqueued=enqueued,
     )
-    return True

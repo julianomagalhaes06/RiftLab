@@ -69,6 +69,7 @@ async def test_request_import_does_not_duplicate_when_concurrent_job_succeeds_in
         requested_match_id,
         mode,
         _after_initial_read=_concurrent_job_reaches_succeeded,
+        secret=None,
     )
 
     non_failed = await _non_failed_jobs(session_factory, requested_match_id, mode)
@@ -121,6 +122,7 @@ async def test_retry_import_does_not_duplicate_when_successor_already_succeeded_
         session_factory,
         old_failed.id,
         _after_initial_read=_successor_reaches_succeeded,
+        secret=None,
     )
 
     non_failed = await _non_failed_jobs(session_factory, requested_match_id, mode)

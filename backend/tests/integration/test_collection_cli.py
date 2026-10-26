@@ -88,6 +88,7 @@ async def test_cli_collect_import_and_reports_end_to_end(
             "collected": 2,
             "enqueued": 2,
             "alreadyRequested": 0,
+            "purged": 0,
             "rawIncomplete": 0,
             "drained": None,
         }

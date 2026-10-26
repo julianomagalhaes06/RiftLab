@@ -167,7 +167,7 @@ O botão **Atualizar** consulta a Riot de novo; perfis consultados há menos de 
 - **O que fica:** o perfil guarda só dois HMACs (do Riot ID e do PUUID), o ícone, o nível e o horário da consulta; o elo fica nas observações ligadas ao HMAC do Riot ID.
 - **Sincronização:** o pedido traz o Riot ID, e a execução o guarda só enquanto está ativa. Uma restrição do banco recusa execução terminada com Riot ID.
 - **Por quanto tempo:** `cc retention run` apaga, sem preservar observação alguma, o perfil, o elo e as execuções de quem não foi consultado nos últimos 7 dias (`RIFTLAB_PLAYER_PROFILE_RETENTION_DAYS`). A conta configurada não expira.
-- **Apagar a pedido:** `cc retention purge-player --game-name Nome --tag-line TAG` lista e, com `--execute`, apaga perfil, elo e execuções terminadas desse Riot ID.
+- **Apagar a pedido:** `cc retention purge-player --game-name Nome --tag-line TAG` lista e, com `--execute`, apaga perfil, elo e execuções terminadas desse Riot ID; uma execução ainda ativa perde o Riot ID na hora. Execução abandonada (worker derrubado, erro inesperado) termina sem o Riot ID em até 10 minutos.
 - **O que não sai junto:** as partidas importadas pela sincronização seguem a retenção de partidas (90 dias) e a remoção por partida; nelas os participantes já estão só como HMAC.
 
 **Revisão da partida (F1, CC-1003–CC-1005).** A partida tem uma seção **Revisão da partida** para o participante selecionado. Ela cobre:
@@ -223,7 +223,7 @@ Validação integrada e falhas críticas (CC-601):
 Remoção e retenção de dados (CC-603):
 - **Remover:** a página de cada partida tem "Remover esta partida". A prévia (`GET /api/v1/matches/{id}/purge-preview`) mostra o que sai e quais datasets e modelos registrados são invalidados, e a remoção só é enviada depois de a pessoa digitar o id (`DELETE /api/v1/matches/{id}?confirm=`).
 - **Como o worker remove:** o job `PURGE`, consultável em `/imports/{jobId}`, apaga primeiro os arquivos brutos, restritos ao diretório de armazenamento. Depois, numa transação, apaga todos os dependentes e retira de ativo os modelos treinados com datasets que listam a partida; o registro recusa promovê-los de novo.
-- **O que fica:** uma lápide só com um HMAC do id. Ela impede a reimportação real da mesma partida e permite repetir o pedido com o mesmo resultado.
+- **O que fica:** uma lápide só com um HMAC do id. Ela impede a reimportação real da mesma partida por qualquer caminho (tela, sincronização, `cc collect import`, nova tentativa ou job que já estava na fila) e permite repetir o pedido com o mesmo resultado.
 - **O que a remoção não desfaz:** remover linhas não desfaz o que um modelo já treinado aprendeu, e a contagem agregada de popularidade versionada no repositório não é recontada sozinha.
 - **Retenção:** `cc retention run` só lista o que passou do prazo (90 dias para partidas importadas, 365 para observações de elo, preservando a mais recente, e 7 dias para perfis de terceiros, CC-1103) e apaga apenas com `--execute`.
 

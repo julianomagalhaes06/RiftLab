@@ -130,7 +130,9 @@ class Sample:
 
     async def import_all(self, session_factory):
         fetched = self.h.manifest().fetched_ids()
-        enqueue = await enqueue_collected_imports(session_factory, self.raw_store, fetched)
+        enqueue = await enqueue_collected_imports(
+            session_factory, self.raw_store, fetched, secret=self.settings.subject_hash_secret
+        )
         drain = await drain_local(
             session_factory, self.raw_store, self.settings, catalog_source_factory=self.catalog
         )
@@ -149,7 +151,10 @@ async def test_blockers_report_selects_exact_current_tuple_and_counts_missing_ve
         stale_run = await stale_sample.h.run()
         assert stale_run.stop_reason == StopReason.COMPLETED
         await enqueue_collected_imports(
-            session_factory, stale_sample.raw_store, stale_sample.h.manifest().fetched_ids()
+            session_factory,
+            stale_sample.raw_store,
+            stale_sample.h.manifest().fetched_ids(),
+            secret=stale_sample.settings.subject_hash_secret,
         )
         assert await ingestion_application.process_next_job(
             session_factory, stale_sample.raw_store, stale_sample.settings, local_only=True
@@ -553,12 +558,17 @@ async def test_partial_or_invalid_raw_pairs_never_become_analysable(
             sample.raw_store.store(bad_pair, kind, raw, hashlib.sha256(raw).hexdigest())
 
         enqueue = await enqueue_collected_imports(
-            session_factory, sample.raw_store, [only_match, bad_pair]
+            session_factory,
+            sample.raw_store,
+            [only_match, bad_pair],
+            secret=sample.settings.subject_hash_secret,
         )
         assert (enqueue.enqueued, enqueue.raw_incomplete) == (1, 1)  # o incompleto nem vira job
 
         # mesmo forçando um job para o par incompleto, o import local falha sem criar partida
-        await request_import(session_factory, only_match, ImportMode.RIOT)
+        await request_import(
+            session_factory, only_match, ImportMode.RIOT, secret=sample.settings.subject_hash_secret
+        )
         await drain_local(
             session_factory,
             sample.raw_store,
@@ -620,7 +630,7 @@ async def test_integrity_check_detects_real_violations(session_factory, tmp_path
                     )
                 )
         # `ready_fake`: importação RIOT concluída + preparação "pronta" SEM extração
-        await request_import(session_factory, ready_fake, ImportMode.RIOT)
+        await request_import(session_factory, ready_fake, ImportMode.RIOT, secret=None)
         async with unit_of_work(session_factory) as session:
             await SqlAlchemyIngestionRepository(session).enqueue_preparation(
                 ready_fake, ImportMode.RIOT
@@ -748,7 +758,7 @@ async def test_worker_imports_a_collected_match_without_key_client_or_cooldown(
     [match_id] = sample.ids
     try:
         await sample.h.run()
-        await request_import(session_factory, match_id, ImportMode.RIOT)
+        await request_import(session_factory, match_id, ImportMode.RIOT, secret=None)
         async with unit_of_work(session_factory) as session:
             await SqlAlchemyIngestionRepository(session).extend_riot_cooldown_until(
                 datetime.now(UTC) + timedelta(hours=1)

@@ -15,7 +15,9 @@ from riftlab.config import Settings
 from riftlab.ingestion.application import process_next_job, raw_pair_available, request_import
 from riftlab.ingestion.domain import ImportJobState, ImportMode
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+from riftlab.ingestion.purge import is_purged
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.ingestion.tombstone import MatchPurgedError
 from riftlab.preparation.application import CatalogSourceFactory, process_next_preparation
 from riftlab.shared.db import unit_of_work
 
@@ -28,6 +30,7 @@ class ImportEnqueueReport:
     enqueued: int
     already_requested: int
     raw_incomplete: int  # par match+timeline ausente/corrompido: nunca vira job
+    purged: int = 0  # partida com lápide (CC-603): nunca vira job e o bruto coletado sai
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,10 +40,20 @@ class DrainReport:
 
 
 async def enqueue_collected_imports(
-    session_factory: SessionFactory, raw_store: DurableRawMatchStore, match_ids: Iterable[str]
+    session_factory: SessionFactory,
+    raw_store: DurableRawMatchStore,
+    match_ids: Iterable[str],
+    *,
+    secret: str | None,
 ) -> ImportEnqueueReport:
-    enqueued = already = incomplete = 0
+    """Partida expurgada (lápide, CC-603) que a coleta trouxe de novo não vira job e o bruto dela
+    sai do armazenamento (CC-1216); o manifesto da coleta continua listando o id."""
+    enqueued = already = incomplete = purged = 0
     for match_id in match_ids:
+        if await is_purged(session_factory, match_id, secret):
+            raw_store.purge(match_id)
+            purged += 1
+            continue
         if not raw_pair_available(raw_store, match_id):
             incomplete += 1
             continue
@@ -51,9 +64,14 @@ async def enqueue_collected_imports(
         if latest is not None and latest.state != ImportJobState.FAILED:
             already += 1
             continue
-        await request_import(session_factory, match_id, ImportMode.RIOT)
+        try:
+            await request_import(session_factory, match_id, ImportMode.RIOT, secret=secret)
+        except MatchPurgedError:  # expurgo concluído entre a checagem e a criação do job
+            raw_store.purge(match_id)
+            purged += 1
+            continue
         enqueued += 1
-    return ImportEnqueueReport(enqueued, already, incomplete)
+    return ImportEnqueueReport(enqueued, already, incomplete, purged)
 
 
 async def drain_local(

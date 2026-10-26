@@ -281,7 +281,7 @@ async def test_reimport_does_not_rewrite_original_score(session_factory) -> None
         frames=(),
         events=(),
     )
-    await _persist_result(session_factory, job, result)
+    await _persist_result(session_factory, job, result, None)
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         assert (await repo.get_participant(match_id, 1)).score == ParticipantScore(

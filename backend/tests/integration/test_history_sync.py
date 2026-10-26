@@ -102,7 +102,7 @@ async def test_sync_enqueues_only_new_matches_and_respects_cooldown(
 ):
     settings = _settings(tmp_path)
     await import_demo_match(session_factory, tmp_path, _demo_match)
-    await request_import(session_factory, PENDING, ImportMode.RIOT)
+    await request_import(session_factory, PENDING, ImportMode.RIOT, secret="synthetic-secret")
     async with unit_of_work(session_factory) as session:
         session.add(
             PurgeTombstoneModel(
@@ -235,6 +235,63 @@ async def test_stale_running_and_account_change_never_block_or_leak(
     assert seen == []  # conta trocada: nenhuma chamada à Riot
     status = await sync_status(session_factory, settings)
     assert (status["state"], status["reason"]) == ("FAILED", "ACCOUNT_CHANGED")
+
+
+THIRD = application.RiotAccountConfig(
+    "Synthetic Third", "XYZ", application.ALLOWED_PLATFORM, application.ALLOWED_REGIONAL_ROUTING
+)
+
+
+async def _run_row(session_factory) -> tuple[str, str | None, str | None, str | None]:
+    async with session_factory() as session:
+        run = (await session.scalars(select(Run))).one()
+        return run.state, run.error_code, run.game_name, run.tag_line
+
+
+@pytest.mark.asyncio
+async def test_worker_expires_an_abandoned_run_without_waiting_for_a_new_request(
+    session_factory, tmp_path, clean
+):
+    # Worker derrubado (SIGKILL) depois da reserva: RUNNING com o Riot ID de terceiro (CC-1216).
+    settings = _settings(tmp_path)
+    _, created = await request_sync(session_factory, settings, now=NOW, account=THIRD)
+    assert created
+    async with unit_of_work(session_factory) as session:
+        run = (await session.scalars(select(Run))).one()
+        run.state, run.started_at = "RUNNING", NOW
+    assert await _run_row(session_factory) == ("RUNNING", None, "Synthetic Third", "XYZ")
+
+    # Ainda dentro do prazo: nada muda.
+    assert not await process_next_history_sync(
+        session_factory, settings, now=NOW + timedelta(minutes=9)
+    )
+    assert (await _run_row(session_factory))[0] == "RUNNING"
+
+    # Nenhum pedido novo da conta: o próprio passo do worker a encerra.
+    assert not await process_next_history_sync(
+        session_factory, settings, now=NOW + timedelta(minutes=11)
+    )
+    assert await _run_row(session_factory) == ("FAILED", "SYNC_STALE", None, None)
+
+
+@pytest.mark.asyncio
+async def test_unexpected_error_after_the_reservation_finishes_without_the_riot_id(
+    session_factory, tmp_path, clean, monkeypatch
+):
+    settings = _settings(tmp_path)
+    await request_sync(session_factory, settings, now=NOW, account=THIRD)
+
+    async def broken_import(*_args, **_kwargs):
+        raise RuntimeError("banco caiu no meio do laço")
+
+    monkeypatch.setattr(application, "request_import", broken_import)
+    transport, client, _ = _transport([NEW])
+    try:
+        with pytest.raises(RuntimeError):
+            await process_next_history_sync(session_factory, settings, transport=transport, now=NOW)
+    finally:
+        await client.aclose()
+    assert await _run_row(session_factory) == ("FAILED", "SYNC_FAILED", None, None)
 
 
 @pytest.mark.asyncio

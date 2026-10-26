@@ -304,7 +304,8 @@ O exemplo público da lista de sementes é `configs/collection-seeds.example.yam
   é paga de novo (1 por 100 ids).
 - **Da coleta à análise.** `collect import` enfileira a importação a partir do raw local
   (nunca busca de novo; o worker também prefere o raw local quando completo) e cada
-  importação enfileira a preparação automática do CC-205. `report integrity` sai com `1`
+  importação enfileira a preparação automática do CC-205. Partida expurgada (lápide) é
+  ignorada, contada em `purged` e tem o bruto coletado apagado de novo. `report integrity` sai com `1`
   se alguma partida parcial for analisável (READY sem extração, partida sem
   participantes ou eventos, órfã, ou sem o par bruto).
 - **Relatórios.** `collect report`: rodadas, requisições, partidas novas/duplicadas/

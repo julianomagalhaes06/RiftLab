@@ -6044,7 +6044,7 @@
                 }
               }
             },
-            "description": "Job ainda ativo ou não está FAILED."
+            "description": "Job ainda ativo, não está FAILED ou partida expurgada (MATCH_PURGED)."
           },
           "422": {
             "content": {

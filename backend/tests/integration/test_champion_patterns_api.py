@@ -92,7 +92,9 @@ async def test_real_patterns_are_read_only_scoped_and_abstain_on_stale_versions(
             for kind, document in (("match", match), ("timeline", timeline)):
                 raw = json.dumps(document).encode()
                 store.store(match_id, kind, raw, hashlib.sha256(raw).hexdigest())
-        await enqueue_collected_imports(session_factory, store, ids)
+        await enqueue_collected_imports(
+            session_factory, store, ids, secret=settings.subject_hash_secret
+        )
         await drain_local(session_factory, store, settings, catalog_source_factory=source_factory)
         app = create_app(settings)
         async with (

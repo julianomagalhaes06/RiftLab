@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riftlab.catalog.patches import latest_catalog
@@ -293,12 +293,14 @@ async def purge_player(
     execute: bool = False,
 ) -> dict[str, Any]:
     """Apaga, para um Riot ID, o perfil, as observações de elo e as execuções de sincronização
-    terminadas (uma execução ativa fica: o worker a encerra e apaga o Riot ID dela). Sem
-    `execute`, só conta. Nunca devolve identificadores. As partidas importadas seguem a
-    retenção e o expurgo por partida."""
+    terminadas. Uma execução ativa fica, mas perde o Riot ID agora (CC-1216): a QUEUED termina
+    ACCOUNT_CHANGED sem rede e a RUNNING termina pelo worker ou pela expiração, sem depender
+    de o worker sobreviver. Sem `execute`, só conta. Nunca devolve identificadores. As partidas
+    importadas seguem a retenção e o expurgo por partida."""
     name, tag = normalize_riot_id(game_name, tag_line)
     key = _key(settings, name, tag)
     finished = Run.state.not_in(("QUEUED", "RUNNING"))
+    active = Run.state.in_(("QUEUED", "RUNNING"))
 
     async def count(session: AsyncSession, model: Any, *where: Any) -> int:
         return int(await session.scalar(select(func.count()).select_from(model).where(*where)) or 0)
@@ -309,8 +311,15 @@ async def purge_player(
             "playerProfiles": await count(session, Profile, Profile.account_key == key),
             "rankObservations": await count(session, Observation, Observation.account_key == key),
             "syncRuns": await count(session, Run, Run.account_key == key, finished),
+            "activeSyncRuns": await count(session, Run, Run.account_key == key, active),
         }
         if execute:
+            await session.execute(
+                update(Run)
+                .where(Run.account_key == key, active)
+                .values(game_name=None, tag_line=None)
+                .execution_options(synchronize_session=False)
+            )
             await session.execute(delete(Observation).where(Observation.account_key == key))
             await session.execute(delete(Run).where(Run.account_key == key, finished))
             await session.execute(delete(Profile).where(Profile.account_key == key))

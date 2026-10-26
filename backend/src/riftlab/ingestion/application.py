@@ -36,6 +36,7 @@ from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, Rio
 from riftlab.ingestion.infrastructure.subject_hash import SubjectHashSecretMissingError
 from riftlab.ingestion.models import ParticipantFinalItemsModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.ingestion.tombstone import MatchPurgedError, ensure_not_purged, scrubbed_match_id
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import (
     ConflictError,
@@ -59,6 +60,8 @@ async def request_import(
     requested_match_id: str,
     mode: ImportMode,
     _after_initial_read: Callable[[], object] | None = None,
+    *,
+    secret: str | None,
 ) -> ImportJob:
     """POST /imports: idempotente. Reaproveita o job mais recente da
     identidade se ainda ativo ou já SUCCEEDED (nunca duplica partida/job
@@ -70,7 +73,9 @@ async def request_import(
     QUEUED/RUNNING/RETRY_WAIT). A perdedora nunca recebe 409: reconsulta
     numa transação nova e devolve o job da vencedora. _after_initial_read é
     injetável só para teste (barreira determinística da janela de corrida),
-    nunca usado em produção."""
+    nunca usado em produção. Partida RIOT expurgada levanta MatchPurgedError na
+    mesma transação que criaria o job, sob o lock do expurgo (CC-1216); `secret`
+    é o segredo da lápide (RIFTLAB_SUBJECT_HASH_SECRET)."""
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         latest = await repo.get_latest_import_job(requested_match_id, mode)
@@ -91,9 +96,12 @@ async def request_import(
     )
     try:
         async with unit_of_work(session_factory) as session:
+            await ensure_not_purged(session, requested_match_id, mode, secret)
             repo = SqlAlchemyIngestionRepository(session)
             await repo.create_import_job(new_job)
         return new_job
+    except MatchPurgedError:
+        raise
     except ConflictError:
         async with unit_of_work(session_factory) as session:
             repo = SqlAlchemyIngestionRepository(session)
@@ -116,6 +124,8 @@ async def retry_import(
     session_factory: SessionFactory,
     job_id: uuid.UUID,
     _after_initial_read: Callable[[], object] | None = None,
+    *,
+    secret: str | None,
 ) -> ImportJob:
     """POST /imports/{id}/retry: só permitido quando o job alvo está FAILED
     (docs/contracts.md). Cria uma nova tentativa vinculada — histórico do job
@@ -151,9 +161,12 @@ async def retry_import(
     )
     try:
         async with unit_of_work(session_factory) as session:
+            await ensure_not_purged(session, target.requested_match_id, target.mode, secret)
             repo = SqlAlchemyIngestionRepository(session)
             await repo.create_import_job(new_job)
         return new_job
+    except MatchPurgedError:
+        raise
     except ConflictError:
         async with unit_of_work(session_factory) as session:
             repo = SqlAlchemyIngestionRepository(session)
@@ -266,6 +279,30 @@ async def _finalize_failed(
         await repo.mark_import_failed(job.id, job.lease_generation, error_code)
 
 
+async def _is_purged(session_factory: SessionFactory, job: ImportJob, secret: str | None) -> bool:
+    try:
+        async with unit_of_work(session_factory) as session:
+            await ensure_not_purged(session, job.requested_match_id, job.mode, secret)
+    except MatchPurgedError:
+        return True
+    return False
+
+
+async def _drop_purged(
+    session_factory: SessionFactory,
+    raw_store: DurableRawMatchStore,
+    job: ImportJob,
+    secret: str | None,
+) -> None:
+    """Partida com lápide: o bruto sai de novo e o job termina FAILED sem o id real."""
+    raw_store.purge(job.requested_match_id)
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        await repo.mark_import_purged(
+            job.id, job.lease_generation, scrubbed_match_id(job.requested_match_id, secret)
+        )
+
+
 async def _finalize_deferred_by_cooldown(
     session_factory: SessionFactory, job: ImportJob, retry_at: datetime
 ) -> None:
@@ -298,14 +335,17 @@ async def _extend_riot_cooldown_until(session_factory: SessionFactory, until: da
 
 
 async def _persist_result(
-    session_factory: SessionFactory, job: ImportJob, result: MatchSourceResult
+    session_factory: SessionFactory, job: ImportJob, result: MatchSourceResult, secret: str | None
 ) -> None:
     """Transação única e curta: match+participantes+eventos+SUCCEEDED juntos,
     ou nada (docs/architecture.md, plano do CC-201: "falha parcial não libera
     partida"). existing != None é a recuperação idempotente depois de um
     crash anterior a este ponto (match já persistido por uma execução
-    passada, raw_store já tinha os bytes — sem nova rede); nunca re-insere."""
+    passada, raw_store já tinha os bytes — sem nova rede); nunca re-insere.
+    Primeira instrução: a lápide, sob o lock do expurgo (CC-1216) — um job criado antes do
+    expurgo, ou que correu com ele, nunca recria a partida."""
     async with unit_of_work(session_factory) as session:
+        await ensure_not_purged(session, result.match_id, job.mode, secret)
         ingestion_repo = SqlAlchemyIngestionRepository(session)
         timeline_repo = SqlAlchemyTimelineRepository(session)
 
@@ -401,6 +441,11 @@ async def process_next_job(
     if job is None:
         return False
 
+    if await _is_purged(session_factory, job, settings.subject_hash_secret):
+        # Antes de qualquer rede: o job veio de antes do expurgo ou correu com ele (CC-1216).
+        await _drop_purged(session_factory, raw_store, job, settings.subject_hash_secret)
+        return True
+
     local = job.mode == ImportMode.RIOT and (
         local_only or raw_pair_available(raw_store, job.requested_match_id)
     )
@@ -452,7 +497,10 @@ async def process_next_job(
             await heartbeat_task
 
     try:
-        await _persist_result(session_factory, job, result)
+        await _persist_result(session_factory, job, result, settings.subject_hash_secret)
+    except MatchPurgedError:
+        # Expurgo concluído durante a busca: o bruto que ela gravou sai de novo.
+        await _drop_purged(session_factory, raw_store, job, settings.subject_hash_secret)
     except _LeaseLostDuringPersistError:
         logger.warning("worker perdeu a posse do job %s antes de persistir com sucesso", job.id)
     return True

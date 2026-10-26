@@ -425,6 +425,19 @@ class SqlAlchemyIngestionRepository:
         )
         return await self._apply_guarded_update(stmt)
 
+    async def mark_import_purged(
+        self, job_id: uuid.UUID, generation: int, scrubbed_match_id: str
+    ) -> bool:
+        """Job de partida com lápide (CC-1216): FAILED MATCH_PURGED, sem o id real."""
+        stmt = self._guarded_update(job_id, generation).values(
+            state=ImportJobState.FAILED.value,
+            lease_until=None,
+            retry_at=None,
+            error_code="MATCH_PURGED",
+            requested_match_id=scrubbed_match_id,
+        )
+        return await self._apply_guarded_update(stmt)
+
     async def mark_import_retry_wait(
         self, job_id: uuid.UUID, generation: int, retry_at: datetime, error_code: str
     ) -> bool:

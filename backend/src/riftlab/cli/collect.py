@@ -1126,12 +1126,15 @@ def collect_import(
         engine = build_engine(settings.database_url)
         session_factory = build_session_factory(engine)
         try:
-            enqueue = await enqueue_collected_imports(session_factory, raw_store, fetched)
+            enqueue = await enqueue_collected_imports(
+                session_factory, raw_store, fetched, secret=settings.subject_hash_secret
+            )
             result: dict[str, Any] = {
                 "collected": len(fetched),
                 "enqueued": enqueue.enqueued,
                 "alreadyRequested": enqueue.already_requested,
                 "rawIncomplete": enqueue.raw_incomplete,
+                "purged": enqueue.purged,
                 "drained": None,
             }
             if drain:
@@ -1147,7 +1150,8 @@ def collect_import(
     data = asyncio.run(_run())
     text = (
         f"coletadas: {data['collected']} | enfileiradas: {data['enqueued']} | já pedidas: "
-        f"{data['alreadyRequested']} | par bruto incompleto: {data['rawIncomplete']}"
+        f"{data['alreadyRequested']} | par bruto incompleto: {data['rawIncomplete']} | "
+        f"expurgadas (ignoradas): {data['purged']}"
     )
     if data["drained"] is not None:
         text += (

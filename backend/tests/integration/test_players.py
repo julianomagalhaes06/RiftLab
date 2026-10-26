@@ -462,6 +462,35 @@ async def test_retention_drops_old_third_party_profiles_and_keeps_the_own_accoun
 
 
 @pytest.mark.asyncio
+async def test_retention_drops_the_riot_id_of_an_active_run_of_an_expired_profile(
+    session_factory, tmp_path, clean
+):
+    # Execução que o worker abandonou (CC-1216): o perfil é o único caminho até ela.
+    settings = _settings(tmp_path)
+    stale = await _seed_profile(session_factory, settings, "Velho", "AAA", NOW - timedelta(days=30))
+    async with unit_of_work(session_factory) as session:
+        await session.execute(
+            text(
+                "INSERT INTO history_sync_runs (id, account_key, state, game_name, tag_line, "
+                "requested_at, started_at) VALUES (gen_random_uuid(), :key, 'RUNNING', 'Velho', "
+                "'AAA', :at, :at)"
+            ),
+            {"key": stale, "at": NOW - timedelta(days=29)},
+        )
+    raw = DurableRawMatchStore(tmp_path / "raw")
+    common = {"match_days": 100000, "rank_days": 100000, "secret": SECRET, "now": NOW}
+    done = await retention(
+        session_factory, raw, execute=True, profile_days=7, own_key=None, **common
+    )
+    assert done["deletedPlayerProfiles"] == 1
+    async with session_factory() as session:
+        run = await session.scalar(
+            select(Run).where(Run.account_key == stale, Run.state == "RUNNING")
+        )
+        assert run is not None and (run.game_name, run.tag_line) == (None, None)
+
+
+@pytest.mark.asyncio
 async def test_purge_player_lists_then_deletes_one_riot_id(session_factory, tmp_path, clean):
     settings = _settings(tmp_path)
     target = await _seed_profile(session_factory, settings, "Alvo", "CCC", NOW)
@@ -475,11 +504,21 @@ async def test_purge_player_lists_then_deletes_one_riot_id(session_factory, tmp_
             {"key": target},
         )
     plan = await purge_player(session_factory, settings, " alvo ", "#ccc")
-    assert plan == {"dryRun": True, "playerProfiles": 1, "rankObservations": 2, "syncRuns": 1}
+    assert plan == {
+        "dryRun": True,
+        "playerProfiles": 1,
+        "rankObservations": 2,
+        "syncRuns": 1,
+        "activeSyncRuns": 1,
+    }
     assert await _rows(session_factory, target) == (1, 2, 2)
     await purge_player(session_factory, settings, "Alvo", "CCC", execute=True)
-    # A execução ativa fica (o worker a encerra e apaga o Riot ID dela).
+    # A execução ativa fica, mas sem o Riot ID desde já (CC-1216): não depende do worker.
     assert await _rows(session_factory, target) == (0, 0, 1)
+    async with session_factory() as session:
+        active = await session.scalar(select(Run).where(Run.account_key == target))
+        assert active is not None and active.state == "QUEUED"
+        assert (active.game_name, active.tag_line) == (None, None)
     assert await _rows(session_factory, other) == (1, 2, 1)
     with pytest.raises(PlayerLookupError):
         await purge_player(session_factory, settings, "Alvo", "C")

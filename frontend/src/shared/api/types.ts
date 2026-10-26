@@ -3067,7 +3067,7 @@ export interface operations {
                     "application/json": components["schemas"]["ProblemDetail"];
                 };
             };
-            /** @description Job ainda ativo ou não está FAILED. */
+            /** @description Job ainda ativo, não está FAILED ou partida expurgada (MATCH_PURGED). */
             409: {
                 headers: {
                     [name: string]: unknown;

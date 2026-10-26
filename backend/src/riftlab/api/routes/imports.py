@@ -14,10 +14,9 @@ from riftlab.ingestion.application import get_import_job, request_import, retry_
 from riftlab.ingestion.domain import ImportJob
 from riftlab.ingestion.domain import ImportMode as DomainImportMode
 from riftlab.ingestion.domain import JobKind as DomainJobKind
-from riftlab.ingestion.purge import is_purged
 from riftlab.shared.api.enums import ImportJobKind, ImportJobState
 from riftlab.shared.api.imports import ImportJobAccepted, ImportJobStatus, ImportRequest
-from riftlab.shared.errors import ConflictError, RiotKeyMissingError
+from riftlab.shared.errors import RiotKeyMissingError
 
 router = APIRouter(prefix="/api/v1/imports", tags=["imports"])
 
@@ -49,13 +48,14 @@ async def create_import(payload: ImportRequest, request: Request) -> ImportJobAc
         # requisição em si é inválida para este servidor (nenhuma chave
         # configurada), não um conflito de estado nem uma falha interna.
         raise RiotKeyMissingError()
-    if mode == DomainImportMode.RIOT and await is_purged(
+    # CC-603/CC-1216: expurgo pedido não volta por reimportação (409 MATCH_PURGED, checado
+    # na mesma transação que criaria o job).
+    job = await request_import(
         request.app.state.session_factory,
         payload.match_id,
-        request.app.state.settings.subject_hash_secret,
-    ):
-        raise ConflictError("MATCH_PURGED")  # CC-603: expurgo pedido não volta por reimportação
-    job = await request_import(request.app.state.session_factory, payload.match_id, mode)
+        mode,
+        secret=request.app.state.settings.subject_hash_secret,
+    )
     return _to_accepted(job)
 
 
@@ -75,12 +75,19 @@ async def get_import(job_id: uuid.UUID, request: Request) -> ImportJobStatus:
     response_model=ImportJobAccepted,
     responses={
         404: _NOT_FOUND_RESPONSE,
-        409: {"model": ProblemDetail, "description": "Job ainda ativo ou não está FAILED."},
+        409: {
+            "model": ProblemDetail,
+            "description": "Job ainda ativo, não está FAILED ou partida expurgada (MATCH_PURGED).",
+        },
         422: _INVALID_JOB_ID_RESPONSE,
     },
 )
 async def retry_import_route(job_id: uuid.UUID, request: Request) -> ImportJobAccepted:
-    job = await retry_import(request.app.state.session_factory, job_id)
+    job = await retry_import(
+        request.app.state.session_factory,
+        job_id,
+        secret=request.app.state.settings.subject_hash_secret,
+    )
     return _to_accepted(job)
 
 

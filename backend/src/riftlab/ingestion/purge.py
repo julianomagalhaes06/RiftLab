@@ -21,8 +21,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
-import hmac
 import json
 import logging
 import uuid
@@ -55,6 +53,7 @@ from riftlab.ingestion.models import (
     PurgeTombstoneModel,
 )
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+from riftlab.ingestion.tombstone import PURGED_PREFIX, lock_match_ref, match_ref
 from riftlab.learning.models import LearningAttemptModel
 from riftlab.ml.models import (
     DatasetManifestMatchModel,
@@ -78,7 +77,6 @@ from riftlab.timeline.models import (
 logger = logging.getLogger(__name__)
 
 SessionFactory = async_sessionmaker[AsyncSession]
-PURGED_PREFIX = "PURGED-"
 LIMITATIONS = (
     "Modelos já treinados não desaprendem: os que usaram esta partida saem de ativo e só "
     "voltam depois de retreino e revalidação sem ela.",
@@ -91,12 +89,6 @@ LIMITATIONS = (
 
 class LeaseLostError(Exception):
     """O job foi reclamado por outro worker no meio do expurgo; a transação é desfeita."""
-
-
-def match_ref(match_id: str, secret: str | None) -> str:
-    """Referência irreversível do id para a lápide (HMAC com o segredo local)."""
-    key = (secret or "riftlab-local-purge").encode()
-    return hmac.new(key, f"riftlab-purge-v1:{match_id}".encode(), hashlib.sha256).hexdigest()
 
 
 def _points(match_id: str) -> Any:
@@ -368,6 +360,8 @@ async def purge_match(
     ref = match_ref(match_id, secret)
     now = datetime.now(UTC)
     async with session_factory.begin() as session:
+        # Primeiro lock: criação de job e persistência da mesma partida esperam a lápide (CC-1216).
+        await lock_match_ref(session, ref)
         patch = await session.scalar(
             select(MatchModel.patch).where(MatchModel.match_id == match_id)
         )
@@ -603,6 +597,17 @@ async def retention(
             )
     if expired:
         async with session_factory.begin() as session:
+            # Execução ativa de perfil expirado perde o Riot ID agora; o perfil, único caminho até
+            # ela, sai em seguida (CC-1216).
+            await session.execute(
+                update(HistorySyncRunModel)
+                .where(
+                    HistorySyncRunModel.account_key.in_(expired),
+                    HistorySyncRunModel.state.in_(("QUEUED", "RUNNING")),
+                )
+                .values(game_name=None, tag_line=None)
+                .execution_options(synchronize_session=False)
+            )
             await session.execute(
                 delete(HistorySyncRunModel).where(
                     HistorySyncRunModel.account_key.in_(expired),

@@ -224,7 +224,7 @@ async def test_persist_result_rolls_back_everything_when_lease_lost_meanwhile(
     )
 
     try:
-        await _persist_result(session_factory, stale_owner, result)
+        await _persist_result(session_factory, stale_owner, result, None)
     except _LeaseLostDuringPersistError:
         pass
     else:
