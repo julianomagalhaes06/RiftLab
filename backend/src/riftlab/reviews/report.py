@@ -28,7 +28,8 @@ from riftlab.learning.application import get_attempt
 from riftlab.reviews.application import list_feedback
 from riftlab.shared.errors import InvalidRequestError, NotFoundError
 
-REPORT_VERSION = "report_v1"
+# v2 (CC-1217): revisor como rótulo por relatório ("Revisor 1, 2…"), nunca derivado do apelido.
+REPORT_VERSION = "report_v2"
 REMOVED = "[removido]"
 _RIOT_ID = re.compile(r"[^\s#]{1,32}#[A-Za-z0-9]{2,5}\b")
 _TOKEN = re.compile(r"\bRGAPI-[A-Za-z0-9-]+|\b[A-Za-z0-9_-]{32,}\b")
@@ -95,6 +96,9 @@ async def build_report(
     quality = result.get("quality", {})
     manual = quality.get("budgetSource") == "USER_PROVIDED"
     objective = result.get("objective", {})
+    # O ref guardado é SHA-256 sem chave do apelido: no arquivo exportado ele deixaria testar o
+    # apelido e ligar o revisor entre relatórios. Fora do sistema vale só a ordem neste relatório.
+    labels: dict[str, str] = {}
     report: dict[str, Any] = {
         "reportVersion": REPORT_VERSION,
         "generatedAt": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -145,7 +149,12 @@ async def build_report(
         },
         "learning": None,
         "feedback": [
-            {**f, "itemName": names.get(f["itemId"]), "reason": scrub(f["reason"])}
+            {
+                **f,
+                "itemName": names.get(f["itemId"]),
+                "reason": scrub(f["reason"]),
+                "reviewerRef": labels.setdefault(f["reviewerRef"], f"Revisor {len(labels) + 1}"),
+            }
             for f in feedback
         ],
         "limits": LIMITS,
@@ -274,7 +283,7 @@ def render_html(report: dict[str, Any]) -> str:
     parts += [
         "<h2>Julgamentos de revisores</h2>",
         "<table><thead><tr><th>Alternativa</th><th>Nota (0–3)</th><th>Motivo</th><th>Rubrica</th>"
-        f"<th>Revisor (ref.)</th></tr></thead><tbody>{feedback}</tbody></table>"
+        f"<th>Revisor</th></tr></thead><tbody>{feedback}</tbody></table>"
         if feedback
         else "<p>Nenhum julgamento registrado.</p>",
         "<h2>Versões</h2><ul>",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import uuid
 
 import pytest
@@ -186,6 +187,37 @@ async def test_reflection_once_after_reveal_and_transfer_has_no_hints(
         "usedHints",
         "reflections",
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("_demo_match", ["DEMO-0008"], indirect=True)
+async def test_exported_report_labels_reviewers_without_anything_derived_from_the_alias(
+    app_client, session_factory, tmp_path, _demo_match
+) -> None:
+    # CC-1217: o ref antigo era sha256("riftlab-reviewer-v1:" + apelido)[:12], sem segredo.
+    decision = (await _decisions(app_client, session_factory, tmp_path, _demo_match))[-1]
+    analysis_id = (await _revealed_attempt(app_client, decision["decisionId"]))["analysisId"]
+    url = f"/api/v1/analyses/{analysis_id}/feedback"
+    for alias in ("rev-z", "rev-y"):
+        posted = await app_client.post(
+            url, json=_feedback(alias=alias), headers={"Idempotency-Key": f"fb-{uuid.uuid4()}"}
+        )
+        assert posted.status_code == 201
+    guessable = {
+        alias: hashlib.sha256(f"riftlab-reviewer-v1:{alias}".encode()).hexdigest()[:12]
+        for alias in ("rev-z", "rev-y")
+    }
+    base = f"/api/v1/analyses/{analysis_id}/report"
+
+    report = (await app_client.get(base)).json()
+    assert report["reportVersion"] == "report_v2"
+    # Ordem dos julgamentos neste relatório, não o apelido: quem julgou primeiro é o Revisor 1.
+    assert [f["reviewerRef"] for f in report["feedback"]] == ["Revisor 1", "Revisor 2"]
+    page = (await app_client.get(base, params={"format": "html"})).text
+    assert "<td>Revisor 1</td>" in page and "<td>Revisor 2</td>" in page
+    for text_ in (str(report), page):
+        for alias, ref in guessable.items():
+            assert alias not in text_ and ref not in text_
 
 
 @pytest.mark.asyncio
