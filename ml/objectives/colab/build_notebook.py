@@ -99,6 +99,9 @@ print("torch", torch.__version__, "CUDA", torch.version.cuda, "GPU", torch.cuda.
         code(f"""
 # 2) Bibliotecas fixadas (as mesmas versões do ambiente local, exceto o torch do Colab)
 !pip install -q {PINS}
+# O Colab traz torchao 0.10; o peft 0.21 recusa versões abaixo de 0.16 ao injetar o LoRA, mesmo sem
+# usá-lo. O treino não usa torchao.
+!pip uninstall -q -y torchao
 import importlib.metadata as md
 from packaging.version import Version
 for name in ["torch", "transformers", "peft", "accelerate", "tokenizers", "huggingface-hub"]:
@@ -143,8 +146,9 @@ assert Version(md.version("torch").split("+")[0]) >= Version("2.6"), (
             "print(open(CONFIG).read())\n"
         ),
         code("""
-# 5) Treino (perda por lote e perda na validação ao fim de cada época)
+# 5) Treino (perda por lote e perda na validação ao fim de cada época). Falha interrompe aqui.
 !cd /content/riftlab/ml/objectives && python -m riftlab_objectives.train --config "$CONFIG"
+assert _exit_code == 0, "o treino falhou: veja a mensagem acima"
 """),
         code(
             "# 6) Conferência rápida na validação com o adaptador de menor perda (os números\n"
@@ -160,6 +164,7 @@ assert Version(md.version("torch").split("+")[0]) >= Version("2.6"), (
         ),
         code("""
 !cd /content/riftlab/ml/objectives && python -m riftlab_objectives.evaluate --config "$CHECK" --split val --run "$RUN-val-gpu"
+assert _exit_code == 0, "a conferência na validação falhou: veja a mensagem acima"
 """),
         code(
             "# 7) Empacota e baixa: adaptadores, manifesto, log, conferência e ambiente\n"
