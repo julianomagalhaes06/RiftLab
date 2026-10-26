@@ -1,24 +1,45 @@
 #!/usr/bin/env bash
-# Move para "Em andamento" os cards do board citados com "refs #N" nas mensagens de commit.
-# Uso: board-progress.sh <arquivo com as mensagens>. Precisa de GH_TOKEN com o escopo `project`.
-# Variáveis: PROJECT_OWNER, PROJECT_NUMBER, REPO (dono/nome), STATUS_FIELD, TARGET_STATUS,
-# DONE_STATUS e DRY_RUN=1 para só mostrar o que faria.
+# Automação do board RiftLab. Dois modos:
+#   board-progress.sh commits <arquivo com mensagens>  "refs #N" leva o card N para "Em andamento"
+#                                                      (não mexe em quem já está lá ou concluído).
+#   board-progress.sh issue <N> <opened|reopened|closed>  card da issue N vai para Backlog,
+#                                                      "Em andamento" ou "Concluído"; issue nova
+#                                                      entra no board.
+# Precisa de GH_TOKEN com os escopos `repo` e `project`. Variáveis: PROJECT_OWNER,
+# PROJECT_NUMBER, REPO (dono/nome) e DRY_RUN=1 para só mostrar o que faria.
 set -euo pipefail
 
-messages_file="$1"
+mode="$1"
 owner="${PROJECT_OWNER:?}"
 number="${PROJECT_NUMBER:?}"
 repo="${REPO:?}"
 field_name="${STATUS_FIELD:-Status}"
-target="${TARGET_STATUS:-Em andamento}"
-done_status="${DONE_STATUS:-Concluído}"
+target="Em andamento"
+done_status="Concluído"
+force=0
+add_missing=0
 
-# "refs #6", "Refs: #6", "ref #6 #7" → 6 e 7.
-issues=$(grep -oiE '\brefs?:?[[:space:]]+(#[0-9]+[[:space:],]*)+' "$messages_file" | grep -oE '#[0-9]+' | tr -d '#' | sort -un || true)
-if [ -z "$issues" ]; then
-  echo "Nenhum 'refs #N' nos commits."
-  exit 0
-fi
+case "$mode" in
+  commits)
+    # "refs #6", "Refs: #6", "ref #6 #7" → 6 e 7.
+    issues=$(grep -oiE '\brefs?:?[[:space:]]+(#[0-9]+[[:space:],]*)+' "$2" | grep -oE '#[0-9]+' | tr -d '#' | sort -un || true)
+    if [ -z "$issues" ]; then
+      echo "Nenhum 'refs #N' nos commits."
+      exit 0
+    fi
+    ;;
+  issue)
+    issues="$2"
+    force=1
+    case "$3" in
+      opened) target="Backlog"; add_missing=1 ;;
+      reopened) target="Em andamento"; add_missing=1 ;;
+      closed) target="$done_status" ;;
+      *) echo "Ação de issue sem regra: $3"; exit 0 ;;
+    esac
+    ;;
+  *) echo "Modo desconhecido: $mode" >&2; exit 2 ;;
+esac
 
 project=$(gh api graphql -f owner="$owner" -F number="$number" -f field="$field_name" -f query='
   query($owner: String!, $number: Int!, $field: String!) {
@@ -46,12 +67,26 @@ for issue in $issues; do
       } }
     }' 2>/dev/null || true)
   node=$(jq -c --arg project "$project_id" '.data.repository.issue.projectItems.nodes[]? | select(.project.id == $project)' <<<"$item" 2>/dev/null || true)
+  if [ -z "$node" ] && [ "$add_missing" = "1" ]; then
+    content=$(gh api "repos/$repo/issues/$issue" -q .node_id)
+    if [ "${DRY_RUN:-0}" = "1" ]; then
+      echo "#$issue: entraria no board (simulação)"
+      node='{"id":"(novo)","fieldValueByName":null}'
+    else
+      new_id=$(gh api graphql -f project="$project_id" -f content="$content" -f query='
+        mutation($project: ID!, $content: ID!) {
+          addProjectV2ItemById(input: { projectId: $project, contentId: $content }) { item { id } }
+        }' -q '.data.addProjectV2ItemById.item.id')
+      node=$(jq -cn --arg id "$new_id" '{id: $id, fieldValueByName: null}')
+      echo "#$issue entrou no board."
+    fi
+  fi
   if [ -z "$node" ]; then
     echo "#$issue não está no board; ignorado."
     continue
   fi
   status=$(jq -r '.fieldValueByName.name // ""' <<<"$node")
-  if [ "$status" = "$target" ] || [ "$status" = "$done_status" ]; then
+  if [ "$status" = "$target" ] || { [ "$force" = "0" ] && [ "$status" = "$done_status" ]; }; then
     echo "#$issue já está em '$status'; mantido."
     continue
   fi
