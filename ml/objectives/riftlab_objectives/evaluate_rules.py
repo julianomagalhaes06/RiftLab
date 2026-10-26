@@ -19,14 +19,19 @@ ROOT = Path(__file__).resolve().parents[3]
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 sys.path.insert(0, str(ROOT / "backend" / "src"))
 
-from riftlab.objectives.rules import RULES_VERSION, interpret  # noqa: E402
+import importlib  # noqa: E402
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--split", required=True, choices=["train", "val", "test"])
-    parser.add_argument("--corpus", default="v1", choices=["v1", "v2"])
+    parser.add_argument("--corpus", default="v1", choices=["v1", "v2", "v3"])
+    parser.add_argument("--rules", default="v1", choices=["v1", "v2"])  # v2: CC-1401
     args = parser.parse_args()
+    module = importlib.import_module(
+        "riftlab.objectives.rules" if args.rules == "v1" else "riftlab.objectives.rules_v2"
+    )
+    interpret, RULES_VERSION = module.interpret, module.RULES_VERSION
     path = CORPUS / f"{args.split}-{args.corpus}.jsonl"
     rows = [json.loads(line) for line in path.read_text("utf-8").splitlines()]
     for row in rows:
@@ -39,7 +44,8 @@ def main() -> None:
                                  "split": args.split, "corpus": args.corpus,
                                  "corpusSha256": hashlib.sha256(path.read_bytes()).hexdigest()}
     suffix = "" if args.corpus == "v1" else f"{args.corpus}-"
-    out = ROOT / "artifacts" / "objectives" / f"rules-{suffix}{args.split}"
+    version = "" if args.rules == "v1" else f"{args.rules}-"
+    out = ROOT / "artifacts" / "objectives" / f"rules-{version}{suffix}{args.split}"
     out.mkdir(parents=True, exist_ok=True)
     (out / "predictions.jsonl").write_text(
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
