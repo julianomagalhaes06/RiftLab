@@ -4,6 +4,7 @@ import asyncio
 import errno
 import hashlib
 import json
+import math
 import re
 import socket
 import ssl
@@ -100,6 +101,11 @@ def _backoff_seconds(attempt: int) -> float:
     return min(_MAX_BACKOFF_SECONDS, 0.5 * (2 ** (attempt - 1)))
 
 
+# Teto para o Retry-After (CC-1220): `inf`/`nan` ou um valor absurdo viravam OverflowError ao
+# virar timedelta, e o job ficava RUNNING até esgotar os leases.
+_MAX_RETRY_AFTER_SECONDS = 24 * 60 * 60.0
+
+
 def _parse_retry_after(raw_value: str | None) -> float | None:
     if raw_value is None:
         return None
@@ -107,7 +113,9 @@ def _parse_retry_after(raw_value: str | None) -> float | None:
         seconds = float(raw_value)
     except ValueError:
         return None
-    return max(0.0, seconds)
+    if not math.isfinite(seconds):
+        return None
+    return min(max(0.0, seconds), _MAX_RETRY_AFTER_SECONDS)
 
 
 def _diagnostic_result_for_status(status_code: int) -> str:

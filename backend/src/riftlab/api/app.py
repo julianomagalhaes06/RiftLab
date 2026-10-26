@@ -45,7 +45,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             await app.state.db_engine.dispose()
 
-    app = FastAPI(title="RiftLab API", version="0.1.0", lifespan=lifespan)
+    # Swagger UI/ReDoc só em desenvolvimento (CC-1220): as páginas carregam JS de CDN sem SRI.
+    # O schema (`/openapi.json`) segue servido; o versionado sai de `cc openapi export`.
+    docs = settings.environment == "development"
+    app = FastAPI(
+        title="RiftLab API",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+    )
     # O último adicionado envolve os outros: o request id já existe quando a guarda recusa.
     app.add_middleware(LoopbackGuardMiddleware, allowed_hosts=settings.api_allowed_hosts)
     app.add_middleware(RequestIdMiddleware)

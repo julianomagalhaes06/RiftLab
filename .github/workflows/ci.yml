@@ -5,9 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# Só leitura do repositório; nenhum job precisa escrever (CC-1220).
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
+    # Runner travado não segura o CI por horas (40370740490 parou ~50 min no Playwright).
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17.11-bookworm
@@ -25,10 +31,12 @@ jobs:
     env:
       RIFTLAB_DATABASE_URL: postgresql+asyncpg://riftlab_test:riftlab_test@localhost:5432/riftlab_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Instalar uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
         with:
           version: "0.12.13"
 
@@ -57,10 +65,13 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22.23.2"
           cache: "npm"
@@ -103,9 +114,12 @@ jobs:
 
   compose-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Build das imagens
         run: docker compose build
@@ -135,7 +149,7 @@ jobs:
       # E2E da demonstração contra a stack REAL: roda AQUI (e não no job `frontend`) porque este
       # é o único job com api + worker + PostgreSQL + frontend no ar e já migrados; o job
       # `frontend` mantém os specs com API simulada, rápidos e sem backend.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22.23.2"
           cache: "npm"

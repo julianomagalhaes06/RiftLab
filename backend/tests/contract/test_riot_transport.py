@@ -665,6 +665,31 @@ async def test_429_without_retry_after_raises_rate_limited_immediately() -> None
     assert excinfo.value.retry_after_seconds is None
 
 
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        ("7", 7.0),
+        ("-5", 0.0),
+        ("999999999", 86400.0),  # teto de um dia
+        ("inf", None),  # virava OverflowError no timedelta do worker (CC-1220)
+        ("-inf", None),
+        ("nan", None),
+        ("1e400", None),
+        ("Wed, 21 Oct 2026 07:28:00 GMT", None),  # data HTTP: não interpretada, como antes
+    ],
+)
+async def test_429_retry_after_is_finite_and_bounded(header: str, expected: float | None) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, headers={"Retry-After": header})
+
+    transport = _transport(handler, budget=_budget(max_attempts_per_request=1))
+    with pytest.raises(SourceRateLimitedError) as excinfo:
+        await transport.fetch_match("BR1_1000000001")
+    await transport.aclose()
+
+    assert excinfo.value.retry_after_seconds == expected
+
+
 async def test_429_exceeding_attempt_budget_raises_rate_limited() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(429, headers={"Retry-After": "1"})
