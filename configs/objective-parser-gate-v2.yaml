@@ -1,0 +1,33 @@
+# Gate v2 do interpretador de objetivo (CC-1303), registrado ANTES de qualquer avaliação no teste
+# v2 e antes do treino do LoRA v2. O teste v1 já foi usado (configs/objective-parser-gate.yaml),
+# então a nova versão é avaliada num teste novo, escrito e selado antes do gerador de treino v2.
+# Só vira padrão do backend o que passar aqui; o registro é copiado para o gate principal, que o
+# backend confere (backend/tests/unit/test_objective_gate.py), junto com a decisão.
+gate:
+  version: objective_gate_v2
+  registeredBeforeTest: "2026-10-26T17:14-03:00"
+  thresholds:
+    jsonValidRate: 0.95            # JSON válido antes do validador
+    macroF1: 0.90                  # 5 saídas, incluindo NEEDS_INPUT
+    maxNeedsInputRecallDrop: 0.05  # em relação à referência (o provedor padrão atual)
+    maxLatencyP95Seconds: 15.0     # timeout do servidor (RIFTLAB_OBJECTIVE_PARSER_TIMEOUT_SECONDS)
+  reference: rules_v1
+  candidates:
+    - qwen2.5-1.5b-lora-v2         # treino no corpus v2 (Colab, GPU), época de menor perda no val
+    - qwen2.5-1.5b-lora-v1         # adaptador do CC-503, só para medir o efeito do corpus v2
+  procedure: >-
+    Uma única execução por sistema no teste v2, na CPU local (i3-7020U), mesma config de geração do
+    v1 (greedy, maxNewTokens 12). O adaptador é conferido por SHA-256 antes de carregar. Nenhum
+    ajuste depois de consultar o teste; resultado negativo é registrado como saiu.
+corpus:
+  rubric: ml/objectives/corpus/RUBRIC.md
+  testSha256: 8dec2afc6fc9c6e75da1bbea18c3d0cb4da076b61cc631b614b01d47270d8c01
+  testSize: 119
+  testRuns: 0
+  humanReview: >-
+    um revisor, às cegas, todas as 120 frases antes do selo final: 117/120 (κ 0,967); uma frase
+    sem consenso saiu; duas ficaram com o rótulo da rubrica
+  trainSha256: 011b1802aa176af39b9bc16702f39c56ba5c0a3650ac59d91f06ff5104b233f8
+  valSha256: 3d61b64a9491805321c207e4a2498b45e596ce8614e2efb50a4fa5fe8408b6cb
+results: []
+decision: null

@@ -1,0 +1,23 @@
+# CC-1303: LoRA v2 sobre o Qwen2.5-1.5B-Instruct no corpus v2 (CC-1302), mesmos hiperparâmetros
+# do v1 (CC-503) para isolar o efeito do corpus. Executado no Colab (GPU T4) pelo notebook
+# ml/objectives/colab/; idêntico à config que o notebook grava no manifesto do treino.
+model: Qwen/Qwen2.5-1.5B-Instruct
+revision: 989aa7980e4cf806f80c7fef2b1adb7bc71aa306
+license: apache-2.0
+seed: 503
+corpus: v2
+threads: 4
+device: auto
+epochs: 3
+batchSize: 4
+gradAccumulation: 4
+gradientCheckpointing: true
+learningRate: 0.0002
+maxHours: 3
+maxNewTokens: 12
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  targetModules: [q_proj, k_proj, v_proj, o_proj]
+output: artifacts/objectives/lora-1.5b-v2-colab
