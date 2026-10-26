@@ -3,7 +3,7 @@ name: Board
 # Automação do board RiftLab (o GitHub não deixa configurar as automações nativas do board pela
 # API, então as regras ficam aqui):
 #   - commit com "refs #N" leva o card N para "Em andamento";
-#   - issue aberta entra no board em "Backlog"; reaberta volta para "Em andamento";
+#   - issue aberta entra no board em "Backlog", na sprint atual; reaberta volta para "Em andamento";
 #     fechada (inclusive por "Closes #N" num commit) vai para "Concluído".
 on:
   push:
