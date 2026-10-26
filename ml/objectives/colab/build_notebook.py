@@ -24,10 +24,11 @@ EMBED = [
     "riftlab_objectives/metrics.py",
     "riftlab_objectives/train.py",
     "riftlab_objectives/evaluate.py",
-    "corpus/train-v2.jsonl",
-    "corpus/val-v2.jsonl",
+    "corpus/train-v3.jsonl",
+    "corpus/val-v3.jsonl",
 ]
-CORPUS = "v2"  # CC-1302; o v1 está no histórico (ffbcea8)
+CORPUS = "v3"  # CC-1402; v1 e v2 estão no histórico (ffbcea8, 56a09af)
+EPOCHS = 4  # v2: 3 épocas e a perda na validação ainda caía; a época é escolhida pelo val
 # CC-1301: mesmas versões do uv.lock local, todas sem CVE conhecido em 26/10/2026.
 PINS = "transformers==5.19.0 peft==0.21.2 accelerate==1.15.0 huggingface-hub==1.33.0 pyyaml"
 MODELS = {
@@ -133,7 +134,7 @@ assert Version(md.version("torch").split("+")[0]) >= Version("2.6"), (
             f"RUN = f'lora-{{MODEL_SIZE}}-{CORPUS}-colab'\n"
             "config = {\n"
             f"    'model': model, 'revision': revision, 'license': 'apache-2.0', 'seed': 503, 'corpus': '{CORPUS}',\n"
-            "    'threads': 4, 'device': 'auto', 'epochs': 3, 'batchSize': 4, 'gradAccumulation': 4,\n"
+            f"    'threads': 4, 'device': 'auto', 'epochs': {EPOCHS}, 'batchSize': 4, 'gradAccumulation': 4,\n"
             "    'gradientCheckpointing': True, 'learningRate': 0.0002, 'maxHours': 3,\n"
             "    'maxNewTokens': 12,\n"
             "    'lora': {'r': 16, 'alpha': 32, 'dropout': 0.05,\n"
