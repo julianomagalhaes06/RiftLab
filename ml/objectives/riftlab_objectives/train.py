@@ -53,8 +53,8 @@ def batches(examples, size: int, rng: random.Random | None, device: str = "cpu")
         yield ids.to(device), labels.to(device), mask.to(device)
 
 
-def load_split(tokenizer, name: str):
-    path = CORPUS / f"{name}-v1.jsonl"
+def load_split(tokenizer, name: str, version: str = "v1"):
+    path = CORPUS / f"{name}-{version}.jsonl"
     rows = [json.loads(line) for line in path.read_text("utf-8").splitlines()]
     return [encode(tokenizer, r["text"], r["label"]) for r in rows], hashlib.sha256(
         path.read_bytes()).hexdigest()
@@ -107,8 +107,9 @@ def main() -> None:
         r=lora["r"], lora_alpha=lora["alpha"], lora_dropout=lora["dropout"],
         target_modules=lora["targetModules"], task_type="CAUSAL_LM"))
     model.to(device)
-    train, train_sha = load_split(tokenizer, "train")
-    val, val_sha = load_split(tokenizer, "val")
+    corpus = config.get("corpus", "v1")  # v2: CC-1302
+    train, train_sha = load_split(tokenizer, "train", corpus)
+    val, val_sha = load_split(tokenizer, "val", corpus)
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad], lr=config["learningRate"])
     out = ROOT / config["output"]

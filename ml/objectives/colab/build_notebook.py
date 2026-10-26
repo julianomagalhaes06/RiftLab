@@ -1,4 +1,4 @@
-"""CC-503: gera o notebook do Colab que treina o LoRA em GPU com o mesmo código e dados.
+"""CC-503/CC-1302: gera o notebook do Colab que treina o LoRA em GPU com o mesmo código e dados.
 
 Uso: python3 build_notebook.py  → riftlab-objective-lora-colab.ipynb (ao lado deste arquivo)
 
@@ -24,9 +24,10 @@ EMBED = [
     "riftlab_objectives/metrics.py",
     "riftlab_objectives/train.py",
     "riftlab_objectives/evaluate.py",
-    "corpus/train-v1.jsonl",
-    "corpus/val-v1.jsonl",
+    "corpus/train-v2.jsonl",
+    "corpus/val-v2.jsonl",
 ]
+CORPUS = "v2"  # CC-1302; o v1 está no histórico (ffbcea8)
 # CC-1301: mesmas versões do uv.lock local, todas sem CVE conhecido em 26/10/2026.
 PINS = "transformers==5.19.0 peft==0.21.2 accelerate==1.15.0 huggingface-hub==1.33.0 pyyaml"
 MODELS = {
@@ -126,9 +127,9 @@ assert Version(md.version("torch").split("+")[0]) >= Version("2.6"), (
             f"MODELS = {json.dumps(MODELS)}\n"
             "import yaml\n"
             "model, revision = MODELS[MODEL_SIZE]\n"
-            "RUN = f'lora-{MODEL_SIZE}-colab'\n"
+            f"RUN = f'lora-{{MODEL_SIZE}}-{CORPUS}-colab'\n"
             "config = {\n"
-            "    'model': model, 'revision': revision, 'license': 'apache-2.0', 'seed': 503,\n"
+            f"    'model': model, 'revision': revision, 'license': 'apache-2.0', 'seed': 503, 'corpus': '{CORPUS}',\n"
             "    'threads': 4, 'device': 'auto', 'epochs': 3, 'batchSize': 4, 'gradAccumulation': 4,\n"
             "    'gradientCheckpointing': True, 'learningRate': 0.0002, 'maxHours': 3,\n"
             "    'maxNewTokens': 12,\n"
@@ -153,7 +154,7 @@ assert Version(md.version("torch").split("+")[0]) >= Version("2.6"), (
             "print({k: manifest[k] for k in ['stopReason', 'bestEpoch', 'valLossByEpoch', 'hours',\n"
             "                                'device', 'gpu', 'cudaMaxMemoryMb']})\n"
             "check = {'model': model, 'revision': revision, 'adapter': manifest['adapter'],\n"
-            "         'seed': 0, 'device': 'auto', 'maxNewTokens': 12}\n"
+            f"         'seed': 0, 'device': 'auto', 'maxNewTokens': 12, 'corpus': '{CORPUS}'}}\n"
             "CHECK = f'{ROOT}/configs/experiments/objective-eval-{RUN}.yaml'\n"
             "open(CHECK, 'w').write(yaml.safe_dump(check, sort_keys=False))\n"
         ),

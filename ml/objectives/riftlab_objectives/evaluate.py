@@ -66,7 +66,7 @@ def main() -> None:
     args = parser.parse_args()
     config = yaml.safe_load(Path(args.config).read_text())
     name = "val" if args.split == "smoke" else args.split
-    path = CORPUS / f"{name}-v1.jsonl"
+    path = CORPUS / f"{name}-{config.get('corpus', 'v1')}.jsonl"  # v2: CC-1302
     rows = [json.loads(line) for line in path.read_text("utf-8").splitlines()]
     if args.split == "smoke":
         rows = rows[:: max(1, len(rows) // 20)][:20]

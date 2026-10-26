@@ -25,8 +25,9 @@ from riftlab.objectives.rules import RULES_VERSION, interpret  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--split", required=True, choices=["train", "val", "test"])
+    parser.add_argument("--corpus", default="v1", choices=["v1", "v2"])
     args = parser.parse_args()
-    path = CORPUS / f"{args.split}-v1.jsonl"
+    path = CORPUS / f"{args.split}-{args.corpus}.jsonl"
     rows = [json.loads(line) for line in path.read_text("utf-8").splitlines()]
     for row in rows:
         t0 = time.perf_counter()
@@ -35,9 +36,10 @@ def main() -> None:
         row["raw"] = json.dumps({"priority": row["pred"]})
         row["jsonValid"] = True  # saída construída pelo código, não gerada
     summary = summarise(rows) | {"config": {"provider": "RULES", "version": RULES_VERSION},
-                                 "split": args.split,
+                                 "split": args.split, "corpus": args.corpus,
                                  "corpusSha256": hashlib.sha256(path.read_bytes()).hexdigest()}
-    out = ROOT / "artifacts" / "objectives" / f"rules-{args.split}"
+    suffix = "" if args.corpus == "v1" else f"{args.corpus}-"
+    out = ROOT / "artifacts" / "objectives" / f"rules-{suffix}{args.split}"
     out.mkdir(parents=True, exist_ok=True)
     (out / "predictions.jsonl").write_text(
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")

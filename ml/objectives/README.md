@@ -8,9 +8,10 @@ entra pelo sidecar opcional `serve.py`, em loopback, e a saída é validada ante
 
 ## Conteúdo
 
-- `corpus/`: rubrica (`RUBRIC.md`), teste de 100 frases escrito à mão e selado antes do gerador,
-  e treino/validação sintéticos gerados por templates exclusivos de cada split. Os dados são
-  sintéticos, sem jogadores reais.
+- `corpus/`: rubrica (`RUBRIC.md`), testes escritos à mão e selados antes do gerador (v1: 100
+  frases, já usado; v2: 119 frases, CC-1302, revisado às cegas), e treino/validação sintéticos
+  gerados por templates exclusivos de cada split (`build_corpus.py` → v1, `build_corpus_v2.py` →
+  v2). As configs escolhem o corpus pela chave `corpus`. Dados sintéticos, sem jogadores reais.
 - `riftlab_objectives/`:
   - `prompt.py`: prompt e parser estrito.
   - `train.py`: LoRA, perda só na resposta.
