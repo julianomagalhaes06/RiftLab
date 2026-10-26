@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 class RepositoryIgnoreTests(unittest.TestCase):
-    def test_portable_assets_and_private_exclusions(self):
+    def test_docs_versioned_and_sensitive_material_local(self):
         source = Path(__file__).resolve().parents[2] / ".gitignore"
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -17,11 +17,11 @@ class RepositoryIgnoreTests(unittest.TestCase):
             expected = {
                 "docs/requirements.md": False,
                 "docs/aps/prototipo-final/index.html": False,
-                ".private/artifacts/model/model.cbm": False,
-                ".private/colab/CC-701/train_colab.py": False,
+                ".private/artifacts/model/model.cbm": True,
+                ".private/colab/CC-701/train_colab.py": True,
                 ".private/colab/CC-703/riftlab-cc703-colab.zip": True,
-                ".private/colab/CC-703/riftlab-cc703-resultados.zip": False,
-                "artifacts/objectives/model/adapter_model.safetensors": False,
+                ".private/colab/CC-703/riftlab-cc703-resultados.zip": True,
+                "artifacts/objectives/model/adapter_model.safetensors": True,
                 ".env": True,
                 ".env.production": True,
                 ".env.example": False,

@@ -1,11 +1,6 @@
 # Local workspace files
-# Private runtime, raw data and execution history stay local.
-/.private/*
-!/.private/artifacts/
-!/.private/colab/
-/.private/colab/*/bundle-map*.json
-/.private/colab/*/riftlab-*-colab/
-/.private/colab/*/riftlab-*-colab.zip
+# Private runtime, raw data, models, Colab material and execution history stay local.
+/.private/
 /backup_riftlab_ignored.sh
 # Downloaded third-party pages can contain browser/session data.
 /docs/*.html
@@ -26,7 +21,7 @@
 *.key
 # Data and model artifacts
 /data/
-/artifacts/**/logs/
+/artifacts/
 *.log
 /mlruns/
 /wandb/
@@ -35,10 +30,7 @@
 *.safetensors
 *.gguf
 *.pt
-# Audited models and aggregate experimental returns are portable project assets.
-!/.private/artifacts/**/*.cbm
-!/artifacts/**/*.safetensors
-# Credentials remain excluded even inside otherwise versioned directories.
+# Credentials stay excluded anywhere in the tree.
 **/riot-account*
 **/bundle-map*
 **/credentials
