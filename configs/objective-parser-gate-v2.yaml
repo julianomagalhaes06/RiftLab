@@ -23,11 +23,43 @@ corpus:
   rubric: ml/objectives/corpus/RUBRIC.md
   testSha256: 8dec2afc6fc9c6e75da1bbea18c3d0cb4da076b61cc631b614b01d47270d8c01
   testSize: 119
-  testRuns: 0
+  testRuns: 1
   humanReview: >-
     um revisor, às cegas, todas as 120 frases antes do selo final: 117/120 (κ 0,967); uma frase
     sem consenso saiu; duas ficaram com o rótulo da rubrica
   trainSha256: 011b1802aa176af39b9bc16702f39c56ba5c0a3650ac59d91f06ff5104b233f8
   valSha256: 3d61b64a9491805321c207e4a2498b45e596ce8614e2efb50a4fa5fe8408b6cb
-results: []
-decision: null
+results:
+  # Uma execução por sistema no teste v2 (26/10/2026, ~17h50–18h35, CPU i3-7020U, stack parada).
+  # Veredito pelos limiares acima; a referência é rules_v1 (needsInputRecall 0,8182).
+  - parserVersion: rules_v1
+    provider: RULES
+    jsonValidRate: 1.0
+    macroF1: 0.6996
+    needsInputRecall: 0.8182
+    latencyP95Seconds: 0.0002
+    approved: false            # referência; abaixo do macro-F1 mínimo no teste novo
+  - parserVersion: qwen2.5-1.5b-lora-v1
+    provider: LOCAL_MODEL
+    jsonValidRate: 1.0
+    macroF1: 0.8505
+    needsInputRecall: 0.7727
+    latencyP95Seconds: 10.63
+    approved: false            # macro-F1 < 0,90; injeção 7/15
+  - parserVersion: qwen2.5-1.5b-lora-v2
+    provider: LOCAL_MODEL
+    jsonValidRate: 1.0
+    macroF1: 0.8459
+    needsInputRecall: 0.9318
+    latencyP95Seconds: 10.98
+    approved: false            # macro-F1 < 0,90; injeção 15/15, mas pede esclarecimento demais
+decision:
+  defaultProvider: RULES
+  defaultParserVersion: rules_v1
+  note: >-
+    Nenhum sistema passou. O LoRA v2 corrigiu a falha do v1 (injeção 15/15 contra 7/15; recall de
+    NEEDS_INPUT 0,93 contra 0,77), mas pede esclarecimento em frases diretas e situações claras
+    (16 dos 19 erros) e fica em macro-F1 0,846. As regras caem de 0,918 (teste v1, do mesmo autor
+    das regras) para 0,700 no teste novo. Pelo procedimento registrado, o padrão segue as regras;
+    o formulário continua o caminho principal e o texto só vale depois da confirmação. O gate não
+    é alterado depois do teste: outra versão exige teste novo, ainda não usado.

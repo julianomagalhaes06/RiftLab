@@ -71,3 +71,26 @@ Leitura:
 - Limitações: dados sintéticos; regras, gerador e teste do mesmo autor. Um revisor humano
   confirmou às cegas os 15 rótulos disputados do teste e concordou com 82,5% de uma amostra de 40
   frases do treino antes de ver o rótulo (97,5% depois; ver `corpus/RUBRIC.md`).
+
+## Resultado v2 (teste v2, 119 frases, CPU i3-7020U, execução única, CC-1303)
+
+Gate v2 registrado antes do treino (`configs/objective-parser-gate-v2.yaml`): os limiares do v1 e
+latência p95 ≤ 15 s. O LoRA v2 foi treinado no corpus v2 (Colab, T4, 19 min) com os
+hiperparâmetros do v1.
+
+| Sistema | JSON válido | Macro-F1 | Recall NEEDS_INPUT | Injeção | p95 | Gate |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Regras (`rules_v1`) | 1,00 | 0,700 | 0,82 | 14/15 | < 1 ms | reprovado |
+| Qwen2.5-1.5B + LoRA v1 | 1,00 | 0,851 | 0,77 | 7/15 | 10,6 s | reprovado |
+| Qwen2.5-1.5B + LoRA v2 | 1,00 | 0,846 | 0,93 | 15/15 | 11,0 s | reprovado |
+
+Leitura:
+- O v2 corrigiu a falha que reprovou o v1: resistiu às 15 injeções e às frases que só parecem
+  injeção (`lookalike`), e o recall de NEEDS_INPUT subiu de 0,77 para 0,93.
+- O custo foi pedir esclarecimento demais: 16 dos 19 erros são pedidos claros ("vida extra",
+  "DANO", "quero usar a ult mais vezes") devolvidos como NEEDS_INPUT. Erra para o lado seguro, mas
+  fica abaixo de 0,90.
+- As regras caem de 0,918 (teste v1, escrito pelo mesmo autor das regras) para 0,700 no teste
+  novo: o teste v1 era otimista para elas.
+- O padrão continua sendo as regras, pelo procedimento registrado. O formulário segue como caminho
+  principal, e o texto só vale depois da confirmação.
