@@ -102,3 +102,12 @@ pré-registrado e [procedimento no Colab](colab/GATE_V3.md). Avaliação ainda p
 296 frases no teste principal após revisão humana e quatro ambiguidades reais em conjunto
 diagnóstico separado, sem rótulo único. Os LoRAs serão avaliados em GPU T4; essa latência
 não representa o desempenho na CPU local. O provedor padrão permanece `rules_v1`.
+
+## Inferência local quantizada (experimental)
+
+O [runtime local com pouca RAM](../../docs/inferencia-local.md) usa GGUF Q4_K_M
+com LoRA v3 F16 separado no llama.cpp, Vulkan/RX 7600 e um sidecar sem torch.
+A ponte WSL/Windows usa pipes locais e o servidor fica em loopback, com autenticação.
+Em 40 frases de desenvolvimento, a rota real do backend atingiu p95 de 0,216 s e
+38 acertos, com pico de 428 MiB de RAM física no processo do modelo. Não representa
+teste independente, consumo total da aplicação ou promoção do provedor padrão.

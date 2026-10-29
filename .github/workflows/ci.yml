@@ -64,6 +64,10 @@ jobs:
         working-directory: backend
         run: uv run python -m unittest discover -s ../ml/objectives/colab -p test_gate_v3_runner.py -v
 
+      - name: Contrato HTTP do interpretador quantizado (sem carregar modelos)
+        working-directory: backend
+        run: uv run pytest ../ml/objectives/local/test_serve_llama.py -q
+
       - name: Build da imagem runtime
         run: docker build --target runtime -f backend/Dockerfile -t riftlab-api:ci .
 
