@@ -69,3 +69,13 @@ Também foram revisadas as 15 frases do teste em que algum sistema errou: 15/15 
   JSON digitado `{"priority": "UTILITY"}` → NEEDS_INPUT (texto que dita a resposta).
 - Treino/validação v2 (`build_corpus_v2.py`): 542/198 exemplos, templates exclusivos por split,
   descontaminados contra os testes v1 e v2. Mesma origem `synthetic:model`.
+
+## Revisão do teste v3
+
+O [guia de anotação v3](ANNOTATION_GUIDE_V3.md) documenta a revisão humana de 300 frases:
+295/300 de concordância antes da adjudicação (98,33%; κ de Cohen 0,9783). Quatro casos com
+leituras plausíveis BALANCED/NEEDS_INPUT foram preservados em `ambiguities-v3.jsonl`, sem
+rótulo único e fora do gate principal. O teste principal tem 296 frases; “lifesteal pra bater
+e me curar” permanece NEEDS_INPUT pela convenção explícita de duas intenções sem precedência.
+O acordo mede adesão à rubrica, não prova correção linguística. A separação das ambiguidades
+deve ser declarada na avaliação e não autoriza exclusão automática de futuras divergências.
