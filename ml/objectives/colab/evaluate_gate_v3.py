@@ -13,10 +13,9 @@ import sys
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.request import urlopen
 
-REPOSITORY = "julianomagalhaes06/RiftLab"
 GATE_PATH = "configs/objective-parser-gate-v3.yaml"
+PROOF_PATH = "configs/objective-parser-gate-v3-registration.json"
 RUNS = (
     (
         "rules_v1",
@@ -75,26 +74,26 @@ def check_files(root, hashes):
 def check_registration(root, commit, ci_run):
     if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
         raise RuntimeError("Commit de registro inválido")
-    with urlopen(
-        f"https://api.github.com/repos/{REPOSITORY}/actions/runs/{int(ci_run)}",
-        timeout=60,
-    ) as f:
-        ci = json.load(f)
-    if (ci["head_sha"], ci["status"], ci["conclusion"], ci["name"]) != (
+    # O notebook confere este arquivo contra seu manifesto. A montagem do pacote verificou
+    # CI e gate pela API autenticada no desktop; nenhum token do GitHub vai para o Colab.
+    proof = json.loads((root / PROOF_PATH).read_text())
+    if (
+        proof["commit"],
+        proof["ciRun"],
+        proof["ciStatus"],
+        proof["ciConclusion"],
+        proof["ciName"],
+    ) != (
         commit,
+        int(ci_run),
         "completed",
         "success",
         "CI",
     ):
         raise RuntimeError("A CI precisa estar verde no commit de registro")
-    with urlopen(
-        f"https://raw.githubusercontent.com/{REPOSITORY}/{commit}/{GATE_PATH}",
-        timeout=60,
-    ) as f:
-        published = f.read()
-    if published != (root / GATE_PATH).read_bytes():
+    if proof["gateSha256"] != sha(root / GATE_PATH):
         raise RuntimeError("Gate local difere do registro publicado")
-    return {"commit": commit, "ciRun": ci_run, "verifiedAt": now()}
+    return proof
 
 
 def run_once(root, journal, name, command, retry=False, execute=subprocess.run):

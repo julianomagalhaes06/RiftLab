@@ -31,7 +31,10 @@ python ml/objectives/colab/build_gate_v3_notebook.py \
   --registration-commit SHA_COMPLETO --ci-run ID_DA_CI_VERDE
 ```
 
-O Python precisa de PyYAML; pode ser o venv de `ml/objectives`. A saída padrão é local,
+O Python precisa de PyYAML e o desktop precisa de `gh` autenticado; pode ser o venv de
+`ml/objectives`. A montagem consulta a API autenticada do GitHub, exige CI verde no SHA
+informado e confere os bytes do gate remoto. Exporta somente um comprovante com commit,
+CI, hash e horário; não lê nem exporta o arquivo de credenciais. A saída padrão é local,
 em `.private/colab/sprint14-cc1404/`, com notebook, ZIP e `SHA256SUMS`. O pacote contém somente
 o código congelado, gate/configs, teste sintético e os dois adaptadores selecionados. Não
 contém credenciais, conta Riot, banco, dados de jogadores, respostas humanas privadas,
@@ -39,8 +42,10 @@ treino, validação ou os quatro casos diagnósticos. O notebook inclui os hashe
 
 No Colab, selecionar GPU T4 e executar as células em ordem. O upload solicitado é somente
 `riftlab-cc1404-colab-input.zip`. O Drive precisa ser montado para salvar o registro em
-`MyDrive/RiftLab/cc1404/<SHA-do-gate>/`. O notebook confirma pela API pública do GitHub a CI
-verde no commit informado e compara o gate com os bytes publicados antes de avaliar.
+`MyDrive/RiftLab/cc1404/<SHA-do-gate>/`. O notebook confere o comprovante e todos os hashes
+contra seu manifesto antes de avaliar. Não consulta o repositório privado nem precisa de
+credenciais GitHub no Colab. O comprovante é um registro da verificação feita na montagem,
+não uma assinatura emitida pelo GitHub; a confiança começa no notebook/pacote auditados.
 
 Não executar duas sessões desse notebook em paralelo. Cada sistema roda uma vez, em
 processo separado, com saídas/logs persistentes. Executar as células novamente reutiliza

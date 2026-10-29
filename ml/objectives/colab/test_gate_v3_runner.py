@@ -1,13 +1,12 @@
 """Verificações do protocolo com fixtures fictícias, sem modelos nem corpus reservado."""
 
 import importlib.util
-import io
 import json
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 HERE = Path(__file__).resolve().parent
 
@@ -122,18 +121,20 @@ class GateAndNotebookTests(unittest.TestCase):
     def test_registration_requires_green_ci_on_the_exact_commit(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            ci = {
-                "head_sha": "b" * 40,
-                "status": "completed",
-                "conclusion": "success",
-                "name": "CI",
-            }
-            with patch.object(
-                runner, "urlopen", return_value=io.BytesIO(json.dumps(ci).encode())
-            ) as network:
-                with self.assertRaisesRegex(RuntimeError, "commit de registro"):
-                    runner.check_registration(root, "a" * 40, 1)
-                self.assertEqual(network.call_count, 1)
+            (root / runner.PROOF_PATH).parent.mkdir()
+            (root / runner.PROOF_PATH).write_text(
+                json.dumps(
+                    {
+                        "commit": "b" * 40,
+                        "ciRun": 1,
+                        "ciStatus": "completed",
+                        "ciConclusion": "success",
+                        "ciName": "CI",
+                    }
+                )
+            )
+            with self.assertRaisesRegex(RuntimeError, "commit de registro"):
+                runner.check_registration(root, "a" * 40, 1)
 
     def test_registration_rejects_unpublished_gate_bytes(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -141,24 +142,57 @@ class GateAndNotebookTests(unittest.TestCase):
             gate = root / runner.GATE_PATH
             gate.parent.mkdir()
             gate.write_text("local changed")
+            (root / runner.PROOF_PATH).write_text(
+                json.dumps(
+                    {
+                        "commit": "a" * 40,
+                        "ciRun": 1,
+                        "ciStatus": "completed",
+                        "ciConclusion": "success",
+                        "ciName": "CI",
+                        "gateSha256": "0" * 64,
+                    }
+                )
+            )
+            with self.assertRaisesRegex(RuntimeError, "registro publicado"):
+                runner.check_registration(root, "a" * 40, 1)
+
+    def test_packager_refuses_to_build_before_ci_succeeds(self):
+        ci = {
+            "head_sha": "a" * 40,
+            "status": "in_progress",
+            "conclusion": None,
+            "name": "CI",
+        }
+        invoke = Mock(return_value=json.dumps(ci))
+        with self.assertRaisesRegex(RuntimeError, "antes de empacotar"):
+            builder.registration_proof(Path("unused"), "a" * 40, 1, invoke=invoke)
+        self.assertEqual(invoke.call_count, 1)
+
+    def test_packager_verifies_published_gate_without_exporting_credentials(self):
+        import base64
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            gate = root / builder.GATE_PATH
+            gate.parent.mkdir()
+            gate.write_bytes(b"fixture registered gate")
             ci = {
                 "head_sha": "a" * 40,
                 "status": "completed",
                 "conclusion": "success",
                 "name": "CI",
             }
-            with (
-                patch.object(
-                    runner,
-                    "urlopen",
-                    side_effect=[
-                        io.BytesIO(json.dumps(ci).encode()),
-                        io.BytesIO(b"registered"),
-                    ],
-                ),
-                self.assertRaisesRegex(RuntimeError, "registro publicado"),
-            ):
-                runner.check_registration(root, "a" * 40, 1)
+            remote = {
+                "encoding": "base64",
+                "content": base64.b64encode(gate.read_bytes()).decode(),
+            }
+            invoke = Mock(side_effect=[json.dumps(ci), json.dumps(remote)])
+            proof = builder.registration_proof(root, "a" * 40, 1, invoke=invoke)
+            (root / runner.PROOF_PATH).write_text(json.dumps(proof))
+            self.assertEqual(runner.check_registration(root, "a" * 40, 1), proof)
+            self.assertEqual(invoke.call_count, 2)
+            self.assertNotIn("token", proof)
 
     def test_comparison_includes_latency_and_does_not_silently_promote_lora(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -1,7 +1,7 @@
 # CC-1404: registro prévio, com avaliação transferida para Colab antes de abrir o teste.
 gate:
   version: objective_gate_v3
-  registeredBeforeTest: '2026-10-29T12:41:49+00:00'
+  registeredBeforeTest: '2026-10-29T12:55:57+00:00'
   thresholds:
     jsonValidRate: 0.95
     macroF1: 0.9
@@ -29,6 +29,8 @@ gate:
     é reutilizada com hashes. Falha técnica sem métricas requer revisão, registro de causa e retry explícito;
     tentativa interrompida sem conclusão não é retomada automaticamente. Journal, logs e resultados no
     Drive persistem entre sessões; não apagar nem usar dois notebooks em paralelo.
+  supersedesBeforeEvaluation: '8435c25833a043d96d9da4449e9960fce4065b19: correção de acesso ao registro
+    privado, sem avaliação realizada e sem alterar candidatos, limiares ou corpus.'
 environment:
   platform: Google Colab
   gpu: T4
@@ -54,6 +56,10 @@ environment:
     de latência não são diretamente comparáveis aos gates v1/v2 medidos em CPU local.
   hardwareRecord: 'environment.json: lscpu (modelo/topologia), nvidia-smi, Python, bibliotecas, CUDA e
     GPU, antes de qualquer predição. Se o ambiente mudar entre sistemas, parar e preservar os resultados.'
+  registrationVerification: Montagem no desktop verifica CI verde e bytes do gate na API autenticada via
+    gh antes de criar pacote. Notebook verifica comprovante e hashes embutidos; não recebe credenciais
+    nem consulta repositório privado. Comprovante é registro da montagem auditada, não assinatura emitida
+    pelo GitHub.
 corpus:
   rubric: ml/objectives/corpus/RUBRIC.md
   annotationGuide: ml/objectives/corpus/ANNOTATION_GUIDE_V3.md
@@ -83,8 +89,8 @@ freezeSha256:
   ml/objectives/riftlab_objectives/metrics.py: e4000c465c70134b10f35c1e6b859120d07d27995e2ce40a69e79d59f1a51047
   ml/objectives/riftlab_objectives/evaluate.py: b42820f04ef7f9bbe3bb8b107f9f03b171390ce80057a39f18190073a0a01b1e
   ml/objectives/riftlab_objectives/evaluate_rules.py: 3cb7ceaef52cfc74cffb1aa80e47663e7a39e93c9132c85e80beb517e8dde931
-  ml/objectives/colab/evaluate_gate_v3.py: 776e753873d79104d8fa4bb17bd76028733fa1eb0d0f7b0086077ad334f1570f
-  ml/objectives/colab/build_gate_v3_notebook.py: 128e1ec5fb549b75d2da015eea443940b93b305fea32dcc01282eebf77723e5a
+  ml/objectives/colab/evaluate_gate_v3.py: 2cbe654195fa659102745cc13a95484f148702ec11f1fd3aa72cfc322c88a919
+  ml/objectives/colab/build_gate_v3_notebook.py: 5ceb5c3482fa7ec7b692bc54fcbb1e221523c33e4fbca8da0569b2cb425e2c36
   configs/experiments/objective-eval-lora-1.5b-v3.yaml: 7da10d08d5355813b8cdd8b3543a2493478c6c1b994f67b43fea35e45522f025
   configs/experiments/objective-eval-lora-1.5b-v2-on-v3.yaml: 3a93134371e08a73ec495017acfb51d3360d748e2fcfa042cd1c406831446b13
   ml/objectives/corpus/test-v3.jsonl: 2dcb3ee4f42bd2817773bb715f586c1f3c1fb05ac2f1460951b863c258864991

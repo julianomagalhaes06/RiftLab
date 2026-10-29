@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import subprocess
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 GATE_PATH = "configs/objective-parser-gate-v3.yaml"
+PROOF_PATH = "configs/objective-parser-gate-v3-registration.json"
+REPOSITORY = "julianomagalhaes06/RiftLab"
 PINS = (
     "transformers==5.19.0",
     "peft==0.21.2",
@@ -29,6 +33,53 @@ def cell(kind, text):
     return value
 
 
+def registration_proof(root, commit, ci_run, invoke=subprocess.check_output):
+    """Confere GitHub no desktop; exporta só metadados, nunca credenciais ou dados de conta."""
+    ci = json.loads(
+        invoke(
+            ["gh", "api", f"repos/{REPOSITORY}/actions/runs/{int(ci_run)}"], text=True
+        )
+    )
+    if (ci["head_sha"], ci["status"], ci["conclusion"], ci["name"]) != (
+        commit,
+        "completed",
+        "success",
+        "CI",
+    ):
+        raise RuntimeError(
+            "A CI precisa estar verde no commit de registro antes de empacotar"
+        )
+    remote = json.loads(
+        invoke(
+            [
+                "gh",
+                "api",
+                f"repos/{REPOSITORY}/contents/{GATE_PATH}",
+                "--method",
+                "GET",
+                "-f",
+                f"ref={commit}",
+            ],
+            text=True,
+        )
+    )
+    if remote["encoding"] != "base64":
+        raise RuntimeError("Formato inesperado do gate publicado")
+    published = base64.b64decode(remote["content"])
+    if published != (root / GATE_PATH).read_bytes():
+        raise RuntimeError("Gate local difere do registro publicado")
+    return {
+        "commit": commit,
+        "ciRun": int(ci_run),
+        "ciStatus": ci["status"],
+        "ciConclusion": ci["conclusion"],
+        "ciName": ci["name"],
+        "gateSha256": hashlib.sha256(published).hexdigest(),
+        "verifiedAt": datetime.now(timezone.utc).isoformat(),
+        "verification": "CI e gate conferidos na API autenticada via gh durante a montagem no desktop; sem credenciais no pacote.",
+    }
+
+
 def build_notebook(commit, ci_run, bundle_sha, manifest, gate_sha):
     metadata = {"commit": commit, "ciRun": ci_run, "gateSha256": gate_sha}
     cells = [
@@ -38,7 +89,8 @@ def build_notebook(commit, ci_run, bundle_sha, manifest, gate_sha):
 # RiftLab — avaliação única do gate v3 (CC-1404)
 
 Avalia regras v1/v2 e LoRA v2/v3, sem treino. O gate foi publicado e sua CI passou antes
-deste pacote. O notebook confere esse registro online e os hashes antes de avaliar.
+deste pacote. A montagem conferiu CI e gate na API autenticada do GitHub no desktop;
+o notebook confere o comprovante e os hashes, sem receber credenciais do repositório.
 
 1. No Colab, escolha **Ambiente de execução → Alterar tipo → GPU T4**.
 2. Execute as células em ordem. Autorize o Drive para preservar o registro entre sessões.
@@ -114,7 +166,7 @@ print('Pacote conferido:', len(MANIFEST), 'arquivos')
         cell(
             "code",
             """
-# 4. Confere CI/registro, ambiente e hashes; baixa base e avalia uma vez por sistema.
+# 4. Confere comprovante CI/registro, ambiente e hashes; baixa base e avalia uma vez por sistema.
 import os
 os.environ['HF_HOME'] = '/content/riftlab-hf-cache'
 os.environ['HF_HUB_DISABLE_IMPLICIT_TOKEN'] = '1'
@@ -122,7 +174,18 @@ os.environ['HF_HUB_DISABLE_XET'] = '1'
 command = [sys.executable, str(ROOT / 'ml/objectives/colab/evaluate_gate_v3.py'),
            '--registration-commit', REGISTRATION['commit'], '--ci-run', str(REGISTRATION['ciRun']),
            '--journal', str(JOURNAL)]
-subprocess.run(command, check=True)
+from datetime import datetime, timezone
+log = JOURNAL / ('runner-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f') + '.log')
+with log.open('w') as output:
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          text=True, bufsize=1) as process:
+        for line in process.stdout:
+            print(line, end='')
+            output.write(line)
+            output.flush()
+        status = process.wait()
+if status:
+    raise RuntimeError('Execução interrompida. Execute somente a última célula e envie o ZIP com os logs.')
 """,
         ),
         cell(
@@ -178,11 +241,15 @@ def main():
         if name != GATE_PATH and digest != gate["freezeSha256"][name]:
             raise SystemExit(f"Hash divergente antes de empacotar: {name}")
         manifest[name] = digest
+    proof = registration_proof(ROOT, args.registration_commit, args.ci_run)
+    proof_bytes = (json.dumps(proof, ensure_ascii=False, indent=2) + "\n").encode()
+    manifest[PROOF_PATH] = hashlib.sha256(proof_bytes).hexdigest()
     args.output.mkdir(parents=True, exist_ok=True)
     bundle = args.output / "riftlab-cc1404-colab-input.zip"
     with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as z:
         for name in files:
             z.write(ROOT / name, name)
+        z.writestr(PROOF_PATH, proof_bytes)
     notebook = build_notebook(
         args.registration_commit,
         args.ci_run,
