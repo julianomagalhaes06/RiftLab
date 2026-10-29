@@ -60,6 +60,10 @@ jobs:
         working-directory: backend
         run: uv run pytest -v
 
+      - name: Protocolo do gate v3 (fixtures ficticias, sem modelos ou teste reservado)
+        working-directory: backend
+        run: uv run python -m unittest discover -s ../ml/objectives/colab -p test_gate_v3_runner.py -v
+
       - name: Build da imagem runtime
         run: docker build --target runtime -f backend/Dockerfile -t riftlab-api:ci .
 

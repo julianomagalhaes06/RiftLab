@@ -1,0 +1,12 @@
+# CC-1404: mesmo adaptador v2, agora no teste v3 e no Colab T4.
+model: Qwen/Qwen2.5-1.5B-Instruct
+revision: 989aa7980e4cf806f80c7fef2b1adb7bc71aa306
+license: apache-2.0
+adapter: artifacts/objectives/lora-1.5b-v2-colab/epoch-3
+adapterSha256: a0862b7ff9eb841b3bae2fcba1fad8f6e3c22bc4fbd8ab7627178448a8a8ae5f
+parserVersion: qwen2.5-1.5b-lora-v2
+corpus: v3
+seed: 0
+threads: 4
+device: cuda
+maxNewTokens: 12

@@ -1,0 +1,101 @@
+# CC-1404: registro prévio, com avaliação transferida para Colab antes de abrir o teste.
+gate:
+  version: objective_gate_v3
+  registeredBeforeTest: '2026-10-29T12:41:49+00:00'
+  thresholds:
+    jsonValidRate: 0.95
+    macroF1: 0.9
+    maxNeedsInputRecallDrop: 0.05
+    maxLatencyP95Seconds: 15.0
+  reference: rules_v1
+  candidates:
+  - rules_v2
+  - qwen2.5-1.5b-lora-v2
+  - qwen2.5-1.5b-lora-v3
+  procedure: Uma execução por sistema no teste v3 de 296 frases, na ordem rules_v1, rules_v2, LoRA v2
+    e LoRA v3. Google Colab com GPU T4 para os LoRAs (CUDA float32), regras na CPU da mesma sessão; CPU
+    e GPU efetivas registradas antes de qualquer execução. Não selecionar hardware pelo resultado. Mesma
+    sessão sem trabalhos concorrentes. Decodificação greedy, seed 0, threads 4, maxNewTokens 12, sem warmup
+    de geração; carregar e mesclar adaptador conforme evaluate.py congelado. Conferir hashes antes de
+    carregar. Download da base antes das execuções. Sem ajuste posterior ao teste, mesmo com resultado
+    negativo. Os resumos usam arredondamento do metrics.py congelado; o comparador aplica todos os quatro
+    limiares, inclusive latência.
+  decisionRule:
+    rulesV2Passes: rules_v2 torna-se o padrão RULES após auditar retorno e validar backend.
+    onlyLoraPasses: Padrão segue rules_v1 até decisão explícita sobre provedor LOCAL_MODEL e ambiente
+      onde o modelo será servido.
+    nonePasses: Padrão segue rules_v1. Teste v3 passa a desenvolvimento; nova versão exige novo teste.
+  retryPolicy: Métricas produzidas nunca permitem repetir, inclusive após falha posterior. Execução concluída
+    é reutilizada com hashes. Falha técnica sem métricas requer revisão, registro de causa e retry explícito;
+    tentativa interrompida sem conclusão não é retomada automaticamente. Journal, logs e resultados no
+    Drive persistem entre sessões; não apagar nem usar dois notebooks em paralelo.
+environment:
+  platform: Google Colab
+  gpu: T4
+  rulesDevice: cpu
+  modelDevice: cuda
+  modelDtype: float32
+  threads: 4
+  model: Qwen/Qwen2.5-1.5B-Instruct
+  revision: 989aa7980e4cf806f80c7fef2b1adb7bc71aa306
+  python: Colab >=3.11; versão efetiva capturada antes de executar
+  torch: CUDA pré-instalado do Colab >=2.6; versão efetiva e CUDA capturadas antes de executar, sem seleção
+    posterior. Não instalar torch CPU nem trocar a versão para melhorar o resultado.
+  pinnedPackages:
+    transformers: 5.19.0
+    peft: 0.21.2
+    accelerate: 1.15.0
+    huggingface-hub: 1.33.0
+    pyyaml: 6.0.3
+    tokenizers: 0.23.3
+    safetensors: 0.8.0
+  latencyScope: Latência por frase, incluindo geração e parsing, no Colab. Limite de 15 s preservado.
+    Não demonstra latência, viabilidade de execução ou atendimento ao timeout na CPU do desktop. Resultados
+    de latência não são diretamente comparáveis aos gates v1/v2 medidos em CPU local.
+  hardwareRecord: 'environment.json: lscpu (modelo/topologia), nvidia-smi, Python, bibliotecas, CUDA e
+    GPU, antes de qualquer predição. Se o ambiente mudar entre sistemas, parar e preservar os resultados.'
+corpus:
+  rubric: ml/objectives/corpus/RUBRIC.md
+  annotationGuide: ml/objectives/corpus/ANNOTATION_GUIDE_V3.md
+  testSha256: 2dcb3ee4f42bd2817773bb715f586c1f3c1fb05ac2f1460951b863c258864991
+  testSize: 296
+  testRuns: 1
+  humanReview: Um revisor, às cegas, 300/300 respondidas, zero brancos; 295/300 acordos (98,3333%), kappa
+    0,9783048886 ANTES da adjudicação. Quatro ambiguidades reais B/N preservadas fora do principal; R145
+    N pela convenção explícita. Consenso não prova correção; seleção e limites declarados, sem exclusão
+    automática de divergências.
+  trainSha256: f7e1e5b4cd1e7489d157fafe3a5b67c40aea8b53c053d7c3d118859e6b3d0cef
+  valSha256: 82b4902835f1f71dd5e2fd6bc6ebba1f109f7cda5346038d36105a55c2d9c8d1
+  separateAmbiguities:
+    path: ml/objectives/corpus/ambiguities-v3.jsonl
+    size: 4
+    sha256: f897ec1db84ac7b36125f6204ee6c7e4812e9d4a91a6410585dd0ab04b33f996
+    includedInGate: false
+    note: Diagnóstico sem rótulo único, não executado neste protocolo; estudar esclarecimento exige avaliação
+      separada registrada antes.
+freezeSha256:
+  backend/src/riftlab/__init__.py: 91447944015cec709e8aa7655f7e9d64e1e4508e7023a57fe3746911c0fc6fed
+  backend/src/riftlab/objectives/__init__.py: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  backend/src/riftlab/objectives/rules.py: 2f242a9cd786da71fafe5ed9d80cca4572f4cc5f3da49b1c3f884500d04ad6da
+  backend/src/riftlab/objectives/rules_v2.py: 09f21dd6b7c505f95de3553a27b5e299286f4fd1eb530726dabed24ffed23352
+  ml/objectives/riftlab_objectives/__init__.py: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  ml/objectives/riftlab_objectives/prompt.py: 3b6a25d87ad5383af24085c964ddc8765c84d625833ef14efc5c2865f4db79ac
+  ml/objectives/riftlab_objectives/metrics.py: e4000c465c70134b10f35c1e6b859120d07d27995e2ce40a69e79d59f1a51047
+  ml/objectives/riftlab_objectives/evaluate.py: b42820f04ef7f9bbe3bb8b107f9f03b171390ce80057a39f18190073a0a01b1e
+  ml/objectives/riftlab_objectives/evaluate_rules.py: 3cb7ceaef52cfc74cffb1aa80e47663e7a39e93c9132c85e80beb517e8dde931
+  ml/objectives/colab/evaluate_gate_v3.py: 776e753873d79104d8fa4bb17bd76028733fa1eb0d0f7b0086077ad334f1570f
+  ml/objectives/colab/build_gate_v3_notebook.py: 128e1ec5fb549b75d2da015eea443940b93b305fea32dcc01282eebf77723e5a
+  configs/experiments/objective-eval-lora-1.5b-v3.yaml: 7da10d08d5355813b8cdd8b3543a2493478c6c1b994f67b43fea35e45522f025
+  configs/experiments/objective-eval-lora-1.5b-v2-on-v3.yaml: 3a93134371e08a73ec495017acfb51d3360d748e2fcfa042cd1c406831446b13
+  ml/objectives/corpus/test-v3.jsonl: 2dcb3ee4f42bd2817773bb715f586c1f3c1fb05ac2f1460951b863c258864991
+  artifacts/objectives/lora-1.5b-v2-colab/epoch-3/adapter_config.json: 511019f3cf5a2b1af9c04ea3734787b2ba14216c81715e912bb94cc851c03959
+  artifacts/objectives/lora-1.5b-v2-colab/epoch-3/adapter_model.safetensors: a0862b7ff9eb841b3bae2fcba1fad8f6e3c22bc4fbd8ab7627178448a8a8ae5f
+  artifacts/objectives/lora-1.5b-v3-colab/epoch-2/adapter_config.json: fc4230d6d601819a7c49b975a2158aee01126f43779fdc0675257752772befe4
+  artifacts/objectives/lora-1.5b-v3-colab/epoch-2/adapter_model.safetensors: 65c60a9b1b588d8395dcbeb1d523039efd2f1fb6f490c7f316e0066a4f844a28
+results: []
+decision:
+  status: PENDING_EVALUATION
+  defaultProvider: RULES
+  defaultParserVersion: rules_v1
+  note: Registro anterior a qualquer avaliação de sistemas no teste v3. Resultado ainda desconhecido;
+    não promover candidato por presunção.

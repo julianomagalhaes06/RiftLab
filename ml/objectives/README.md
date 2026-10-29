@@ -94,3 +94,11 @@ Leitura:
   novo: o teste v1 era otimista para elas.
 - O padrão continua sendo as regras, pelo procedimento registrado. O formulário segue como caminho
   principal, e o texto só vale depois da confirmação.
+
+## Gate v3 registrado (avaliação pendente)
+
+O próximo experimento tem [gate v3](../../configs/objective-parser-gate-v3.yaml)
+pré-registrado e [procedimento no Colab](colab/GATE_V3.md). Avaliação ainda pendente:
+296 frases no teste principal após revisão humana e quatro ambiguidades reais em conjunto
+diagnóstico separado, sem rótulo único. Os LoRAs serão avaliados em GPU T4; essa latência
+não representa o desempenho na CPU local. O provedor padrão permanece `rules_v1`.

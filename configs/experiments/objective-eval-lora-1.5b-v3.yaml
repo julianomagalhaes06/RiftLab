@@ -1,0 +1,12 @@
+# CC-1404: avaliação única no Colab T4, conforme gate v3 pré-registrado.
+model: Qwen/Qwen2.5-1.5B-Instruct
+revision: 989aa7980e4cf806f80c7fef2b1adb7bc71aa306
+license: apache-2.0
+adapter: artifacts/objectives/lora-1.5b-v3-colab/epoch-2
+adapterSha256: 65c60a9b1b588d8395dcbeb1d523039efd2f1fb6f490c7f316e0066a4f844a28
+parserVersion: qwen2.5-1.5b-lora-v3
+corpus: v3
+seed: 0
+threads: 4
+device: cuda
+maxNewTokens: 12
