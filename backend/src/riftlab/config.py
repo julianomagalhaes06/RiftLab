@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     # (sidecar em loopback, ml/objectives serve). Timeout abre o formulário (RNF03).
     objective_parser: str = "rules"
     objective_model_url: str | None = None
+    objective_model_socket_path: str | None = None
     objective_model_version: str = "local_model_unversioned"
     objective_parser_timeout_seconds: float = 15.0
 

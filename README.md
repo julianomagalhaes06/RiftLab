@@ -57,6 +57,10 @@ scripts/demo.sh up     # abra http://127.0.0.1:5173
 scripts/demo.sh down
 ```
 
+Para testar o interpretador quantizado na RX 7600, seguir o
+[roteiro local com LLM](docs/roteiro-teste-local-llm.md). Ele prepara uma
+demonstração separada e mantém o modelo como opção experimental.
+
 ## Documentação
 
 - [Requisitos](docs/requirements.md)

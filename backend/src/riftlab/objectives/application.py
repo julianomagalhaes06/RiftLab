@@ -86,13 +86,24 @@ class LocalModelParser:
 
     provider = "LOCAL_MODEL"
 
-    def __init__(self, url: str, version: str, transport: httpx.AsyncBaseTransport | None = None):
+    def __init__(
+        self,
+        url: str,
+        version: str,
+        transport: httpx.AsyncBaseTransport | None = None,
+        *,
+        socket_path: str | None = None,
+    ):
         self.url = url
         self.version = version
         self._transport = transport
+        self._socket_path = socket_path
 
     async def interpret(self, text: str) -> Interpretation:
-        async with httpx.AsyncClient(transport=self._transport, timeout=None) as client:
+        transport = self._transport
+        if transport is None and self._socket_path:
+            transport = httpx.AsyncHTTPTransport(uds=self._socket_path)
+        async with httpx.AsyncClient(transport=transport, timeout=None) as client:
             response = await client.post(self.url, json={"text": text})
         response.raise_for_status()
         body = response.json()
@@ -119,7 +130,14 @@ async def interpret_objective(
         )
 
 
-def build_parser(kind: str, url: str | None, version: str) -> ObjectiveParser:
-    if kind == "local_model" and url:
-        return LocalModelParser(url, version)
+def build_parser(
+    kind: str,
+    url: str | None,
+    version: str,
+    socket_path: str | None = None,
+) -> ObjectiveParser:
+    if kind == "local_model" and (url or socket_path):
+        return LocalModelParser(
+            url or "http://localhost/interpret", version, socket_path=socket_path
+        )
     return RulesParser()

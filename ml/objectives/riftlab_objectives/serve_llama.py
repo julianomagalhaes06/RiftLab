@@ -7,16 +7,43 @@ The backend keeps responsibility for validating the model's output and opening t
 from __future__ import annotations
 
 import argparse
+import contextlib
 import ipaddress
 import json
+import os
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from threading import BoundedSemaphore
+from socketserver import ThreadingUnixStreamServer
+from threading import BoundedSemaphore, Thread
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
 from riftlab_objectives.prompt import messages
+
+
+@contextlib.contextmanager
+def unix_listener(path: Path, handler):
+    """Share the same bounded handler with a container; never replace an existing file."""
+    path = path.absolute()
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # UnixStreamServer.bind refuses a live socket, a stale socket, and symlinks alike.
+    with ThreadingUnixStreamServer(str(path), handler) as server:
+        identity = path.stat().st_ino
+        server.daemon_threads = True
+        thread = Thread(
+            target=server.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True
+        )
+        try:
+            os.chmod(path, 0o600)
+            thread.start()
+            yield server
+        finally:
+            if thread.is_alive():
+                server.shutdown()
+                thread.join(timeout=2)
+            if path.exists() and path.stat().st_ino == identity:
+                path.unlink()
 
 
 def completion_url(value: str) -> str:
@@ -140,6 +167,11 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--api-key-file", type=Path)
     parser.add_argument(
+        "--unix-socket",
+        type=Path,
+        help="additional Unix socket for a local container (same UID)",
+    )
+    parser.add_argument(
         "--windows-relay",
         type=Path,
         help="PowerShell JSON-lines relay for a model on Windows loopback",
@@ -154,10 +186,13 @@ def main() -> None:
 
         relay = WindowsRelay(args.llama_url, args.windows_relay, args.api_key_file)
     try:
-        with ThreadingHTTPServer(
-            ("127.0.0.1", args.port),
-            make_handler(args.llama_url, args.version, key, relay),
-        ) as server:
+        handler = make_handler(args.llama_url, args.version, key, relay)
+        with contextlib.ExitStack() as stack:
+            server = stack.enter_context(
+                ThreadingHTTPServer(("127.0.0.1", args.port), handler)
+            )
+            if args.unix_socket:
+                stack.enter_context(unix_listener(args.unix_socket, handler))
             server.serve_forever()
     except KeyboardInterrupt:
         pass

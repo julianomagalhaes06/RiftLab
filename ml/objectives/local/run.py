@@ -33,6 +33,7 @@ def main() -> None:
     )
     parser.add_argument("--model-port", type=int, default=18765)
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--unix-socket", type=Path)
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text())
     paths = {}
@@ -92,22 +93,25 @@ def main() -> None:
             env["PYTHONPATH"] = (
                 str(here.parent) + os.pathsep + env.get("PYTHONPATH", "")
             )
+            sidecar_command = [
+                sys.executable,
+                "-m",
+                "riftlab_objectives.serve_llama",
+                "--llama-url",
+                f"http://127.0.0.1:{args.model_port}/completion",
+                "--version",
+                manifest["parserVersion"],
+                "--port",
+                str(args.port),
+                "--api-key-file",
+                str(key.resolve()),
+                "--windows-relay",
+                str(here / "windows_http_relay.ps1"),
+            ]
+            if args.unix_socket:
+                sidecar_command += ["--unix-socket", str(args.unix_socket.resolve())]
             sidecar = subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "riftlab_objectives.serve_llama",
-                    "--llama-url",
-                    f"http://127.0.0.1:{args.model_port}/completion",
-                    "--version",
-                    manifest["parserVersion"],
-                    "--port",
-                    str(args.port),
-                    "--api-key-file",
-                    str(key.resolve()),
-                    "--windows-relay",
-                    str(here / "windows_http_relay.ps1"),
-                ],
+                sidecar_command,
                 env=env,
                 stdout=log,
                 stderr=log,

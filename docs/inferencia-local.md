@@ -79,6 +79,10 @@ Os SHA256 dos GGUF obtidos nesta preparação foram:
 
 ## Inicialização e integração
 
+Para executar a aplicação em Docker, seguir o
+[roteiro de teste local](roteiro-teste-local-llm.md), que monta apenas um socket
+Unix no contêiner da API e usa uma demonstração com banco separado.
+
 Criar um manifesto JSON local com `parserVersion` e as chaves `server`, `model` e
 `adapter`; cada uma contém `path` relativo ao manifesto e `sha256` do arquivo.
 `server` aponta para `llama-server.exe`. Usar a versão identificável
@@ -113,7 +117,10 @@ RIFTLAB_OBJECTIVE_MODEL_VERSION=qwen2.5-1.5b-lora-v3-q4_k_m
 
 Essas variáveis precisam ser exportadas no shell que inicia o backend. Um backend
 em Docker tem outro loopback: não usar esse endereço dentro de um contêiner sem
-uma configuração de rede explícita. O launcher não altera `.env` ou Compose.
+uma configuração de transporte explícita. O override optativo
+`compose.local-llm.yaml` usa `RIFTLAB_OBJECTIVE_MODEL_SOCKET_PATH`, sem expor novas
+portas. O launcher aceita `--unix-socket CAMINHO` para esse caso. O launcher não
+altera `.env` ou Compose automaticamente.
 
 O sidecar aceita um pedido por vez e rejeita imediatamente excesso de concorrência
 com 429, evitando fila ilimitada de gerações. O backend existente converte essa

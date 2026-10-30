@@ -66,7 +66,11 @@ jobs:
 
       - name: Contrato HTTP do interpretador quantizado (sem carregar modelos)
         working-directory: backend
-        run: uv run pytest ../ml/objectives/local/test_serve_llama.py -q
+        run: uv run pytest ../ml/objectives/local/test_serve_llama.py ../ml/objectives/local/test_unix_sidecar.py -q
+
+      - name: Validar configuração optativa da demonstração com LLM (sem subir serviços)
+        working-directory: .
+        run: bash scripts/local_llm_demo.sh config
 
       - name: Build da imagem runtime
         run: docker build --target runtime -f backend/Dockerfile -t riftlab-api:ci .

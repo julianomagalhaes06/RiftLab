@@ -23,7 +23,10 @@ async def post_interpret(
 ) -> ObjectiveInterpretResult:
     settings = request.app.state.settings
     parser = getattr(request.app.state, "objective_parser", None) or build_parser(
-        settings.objective_parser, settings.objective_model_url, settings.objective_model_version
+        settings.objective_parser,
+        settings.objective_model_url,
+        settings.objective_model_version,
+        settings.objective_model_socket_path,
     )
     result = await interpret_objective(parser, body.text, settings.objective_parser_timeout_seconds)
     return ObjectiveInterpretResult.model_validate(result.as_payload())

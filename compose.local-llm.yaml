@@ -1,0 +1,16 @@
+# Opt-in only: API -> Unix socket -> WSL sidecar -> Windows pipes -> RX 7600.
+# Never mounts weights, tokens, or Windows binaries in a container.
+services:
+  api:
+    environment:
+      RIFTLAB_OBJECTIVE_PARSER: local_model
+      RIFTLAB_OBJECTIVE_MODEL_URL: http://localhost/interpret
+      RIFTLAB_OBJECTIVE_MODEL_SOCKET_PATH: /run/riftlab-objective/interpret.sock
+      RIFTLAB_OBJECTIVE_MODEL_VERSION: qwen2.5-1.5b-lora-v3-q4_k_m
+    volumes:
+      - type: bind
+        source: ${RIFTLAB_LOCAL_MODEL_SOCKET_DIR:?Defina o diretorio privado do socket no WSL}
+        target: /run/riftlab-objective
+        read_only: true
+        bind:
+          create_host_path: false
