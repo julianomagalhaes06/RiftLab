@@ -61,6 +61,9 @@ Para testar o interpretador quantizado na RX 7600, seguir o
 [roteiro local com LLM](docs/roteiro-teste-local-llm.md). Ele prepara uma
 demonstração separada e mantém o modelo como opção experimental.
 
+Para conectar o modelo às partidas e à interface habituais, usar o
+[guia da LLM no ambiente normal](docs/llm-ambiente-normal.md).
+
 ## Documentação
 
 - [Requisitos](docs/requirements.md)

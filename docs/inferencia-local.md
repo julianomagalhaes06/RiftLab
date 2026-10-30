@@ -82,6 +82,7 @@ Os SHA256 dos GGUF obtidos nesta preparação foram:
 Para executar a aplicação em Docker, seguir o
 [roteiro de teste local](roteiro-teste-local-llm.md), que monta apenas um socket
 Unix no contêiner da API e usa uma demonstração com banco separado.
+Para usar os dados existentes, seguir o [guia do ambiente normal](llm-ambiente-normal.md).
 
 Criar um manifesto JSON local com `parserVersion` e as chaves `server`, `model` e
 `adapter`; cada uma contém `path` relativo ao manifesto e `sha256` do arquivo.
