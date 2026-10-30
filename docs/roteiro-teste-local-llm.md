@@ -151,10 +151,27 @@ Ctrl+C caso ainda esteja ativo. Os resultados e logs continuam privados.
 
 ## Alcance da validação
 
-A configuração Compose foi validada sem subir contêineres. O transporte HTTP por
-socket, sua limpeza, a preservação de arquivos existentes e o fallback da rota
-foram testados com geração fictícia, sem carregar pesos. A medição anterior com
-GPU e backend está em [inferência local](inferencia-local.md). O fluxo completo
-Docker → socket → sidecar → Windows → GPU e a jornada pela interface precisam
-ser executados em uma sessão disponível; este roteiro não registra essa etapa
-como já aprovada. O modelo quantizado permanece experimental.
+A preparação incluiu configuração Compose e testes do transporte HTTP por socket
+com geração fictícia. Em 30/10/2026, o roteiro também foi executado com os quatro
+serviços Docker, banco separado, fixtures DEMO e o modelo real na RX 7600.
+
+Foram conferidos no navegador o caminho Histórico DEMO → decisão → interpretação
+→ confirmação → comparação, o funcionamento com regras e com o modelo, a queda
+controlada do modelo e a continuação pelo formulário. As verificações passaram
+em 360 e 1280 px, sem erros JavaScript ou requisições externas observadas pelo
+navegador. A volta às regras pela recriação da API também foi verificada.
+
+Quatro pedidos pelo proxy real do frontend levaram de 0,2253 a 0,2478 s, com o
+modelo já carregado. Essa amostra não estima um p95. O processo do modelo atingiu
+404,8 MiB de RAM física; o monitor registrou no mínimo 2361,9 MiB disponíveis no
+Windows. Uma amostra dos quatro contêineres somou aproximadamente 350 MiB e não
+inclui modelo, sidecar, ponte, navegador ou demais processos do computador.
+
+O runtime executou com UID 1000, código do root somente para leitura, dados
+brutos somente para leitura na API e escrita permitida ao worker. A construção
+da imagem não precisa trocar recursivamente o dono de código e dependências;
+somente o diretório de dados recebe permissão de escrita.
+
+Esses resultados validam o percurso operacional nessa sessão, sem provar uso
+prolongado ou qualidade em novos textos. A medição anterior está em
+[inferência local](inferencia-local.md). O modelo quantizado permanece experimental.

@@ -45,7 +45,9 @@ CMD ["pytest"]
 # ---- runtime: api e worker compartilham esta imagem, comando definido no compose ----
 FROM base AS runtime
 RUN uv sync --frozen --no-dev
-RUN useradd --create-home --uid 1000 riftlab && chown -R riftlab:riftlab /app
+# Código e dependências permanecem do root e legíveis ao usuário de execução.
+# Somente os dados abaixo precisam de escrita; evitar copiar toda a venv no overlay.
+RUN useradd --create-home --uid 1000 riftlab
 # Dono correto antes do volume nomeado do worker (CC-201, compose.yaml:
 # riftlab_raw_data em /app/data/raw) ser montado por cima — Docker copia
 # conteudo/permissoes de um caminho ja existente na imagem para dentro do

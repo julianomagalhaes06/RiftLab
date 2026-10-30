@@ -128,11 +128,12 @@ falha, indisponibilidade, timeout ou saída inválida em abertura do formulário
 A confirmação pelo usuário continua obrigatória. `/health` verifica o processo
 do sidecar; o modelo precisa terminar o carregamento antes de aceitar inferência.
 
-Foram exercitados a rota real do backend por ASGI, o HTTP do sidecar, a ponte
-nativa e a GPU, incluindo indisponibilidade e dois pedidos simultâneos. Isso não
-mede a aplicação completa com banco, worker, frontend e uso prolongado. O teste
-manual da jornada e a avaliação independente da variante quantizada continuam
-necessários antes de uma promoção do provedor.
+O ensaio inicial exercitou a rota real do backend por ASGI, o HTTP do sidecar,
+a ponte nativa e a GPU, incluindo indisponibilidade e dois pedidos simultâneos.
+Posteriormente, o [roteiro com Docker](roteiro-teste-local-llm.md) foi executado
+com banco, worker, frontend, API e modelo reais, incluindo a jornada no navegador
+e fallback após parada do modelo. Isso não comprova uso prolongado ou avaliação
+independente da variante quantizada; o padrão do produto permanece pelas regras.
 
 ## Reproduzir as medições
 
