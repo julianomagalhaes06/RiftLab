@@ -16,6 +16,9 @@ from riftlab.api.routes.imports import router as imports_router
 from riftlab.api.routes.learning import router as learning_router
 from riftlab.api.routes.matches import router as matches_router
 from riftlab.api.routes.objectives import router as objectives_router
+from riftlab.auth.api import router as auth_router
+from riftlab.auth.application import LoginThrottle
+from riftlab.auth.middleware import AuthMiddleware
 from riftlab.catalog.api import router as catalog_router
 from riftlab.config import Settings, get_settings
 from riftlab.dashboard.api import router as dashboard_router
@@ -39,6 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = settings
         app.state.db_engine = db.build_engine(settings.database_url)
         app.state.session_factory = build_session_factory(app.state.db_engine)
+        app.state.login_throttle = LoginThrottle()
         logger.info("riftlab api iniciada modo=%s", "DEMO" if settings.demo_mode else "REAL")
         try:
             yield
@@ -56,9 +60,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url="/redoc" if docs else None,
     )
     # O último adicionado envolve os outros: o request id já existe quando a guarda recusa.
+    # A sessão (cards #10/#11) fica por dentro da guarda do loopback.
+    app.add_middleware(AuthMiddleware)
     app.add_middleware(LoopbackGuardMiddleware, allowed_hosts=settings.api_allowed_hosts)
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router)
+    app.include_router(auth_router)
     app.include_router(champions_router)
     app.include_router(imports_router)
     app.include_router(matches_router)
