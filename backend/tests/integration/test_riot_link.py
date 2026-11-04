@@ -126,6 +126,26 @@ async def test_icon_challenge_links_the_account_only_with_the_requested_icon(
 
 
 @pytest.mark.asyncio
+async def test_deleting_the_user_removes_the_riot_id_with_the_link(session_factory, users):
+    riot = FakeRiot(icon=1)
+    state = await riot_link.start_challenge(
+        session_factory, SETTINGS, users[0], "Jogadora", "BR1", transport=riot.transport(), now=NOW
+    )
+    riot.icon = state["iconId"]
+    await riot_link.verify_challenge(
+        session_factory, SETTINGS, users[0], transport=riot.transport(), now=NOW
+    )
+    await riot_link.start_challenge(
+        session_factory, SETTINGS, users[0], "Jogadora", "BR1", transport=riot.transport(), now=NOW
+    )
+    async with unit_of_work(session_factory) as session:
+        await session.execute(delete(UserModel).where(UserModel.id == users[0]))
+    async with session_factory() as session:
+        assert await session.get(RiotLinkModel, users[0]) is None
+        assert await session.get(RiotLinkChallengeModel, users[0]) is None
+
+
+@pytest.mark.asyncio
 async def test_expired_or_missing_challenge_asks_for_a_new_icon(session_factory, users):
     riot = FakeRiot(icon=0)
     with pytest.raises(RiotLinkError, match="NO_CHALLENGE"):

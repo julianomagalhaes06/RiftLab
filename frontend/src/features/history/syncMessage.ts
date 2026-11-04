@@ -15,6 +15,9 @@ export function syncMessage(status: HistorySyncStatus | null, failedRequest: boo
   if (!status) return "Verificando partidas novas na Riot…";
   const next = clock(status.nextAllowedAt);
   if (status.state === "UNAVAILABLE") {
+    if (status.reason === "ACCOUNT_NOT_LINKED") {
+      return "Vincule sua conta Riot em Minha conta para trazer suas partidas automaticamente.";
+    }
     return status.reason === "ACCOUNT_NOT_CONFIGURED"
       ? "Atualização automática indisponível: a conta própria não está configurada no servidor."
       : "Atualização automática indisponível: o servidor está sem chave da Riot. Importe partidas pelo ID.";

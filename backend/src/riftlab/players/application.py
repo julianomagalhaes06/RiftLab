@@ -12,7 +12,6 @@ from __future__ import annotations
 import unicodedata
 import uuid
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete, func, select, update
@@ -25,8 +24,6 @@ from riftlab.ingestion.infrastructure.riot_account import (
     ALLOWED_PLATFORM,
     ALLOWED_REGIONAL_ROUTING,
     RiotAccountConfig,
-    RiotAccountConfigError,
-    load_riot_account,
 )
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
@@ -44,6 +41,7 @@ from riftlab.shared.errors import (
     SourceNotFoundError,
     SourceRateLimitedError,
 )
+from riftlab.shared.own_account import CONFIGURED, OwnAccount, resolve
 
 SessionFactory = async_sessionmaker[AsyncSession]
 # Perfil consultado há menos disso é devolvido sem nova consulta (o botão Atualizar força).
@@ -221,15 +219,17 @@ async def own_player(
     *,
     transport: RiotHttpTransport | None = None,
     now: datetime | None = None,
+    account: OwnAccount = CONFIGURED,
 ) -> dict[str, Any]:
-    """Perfil da conta configurada (chip do topo, CC-1202). O Riot ID vem do arquivo da conta,
-    nunca do banco. Guardado: devolve sem consultar a Riot, qualquer que seja a idade (o
+    """Perfil da conta própria (chip do topo, CC-1202): a configurada ou, com sessão, a
+    vinculada ao usuário (card #13). Sem conta, NotFoundError. O Riot ID vem do arquivo da
+    conta ou do vínculo. Guardado: devolve sem consultar a Riot, qualquer que seja a idade (o
     Atualizar da página do jogador renova). Sem perfil guardado: uma consulta, como a busca
     (3 requisições); sem chave, RIOT_KEY_MISSING."""
-    try:
-        account = load_riot_account(Path(settings.ranked_account_file))
-    except (RiotAccountConfigError, OSError) as exc:
-        raise NotFoundError("conta não configurada") from exc
+    resolved = resolve(settings, account)
+    if resolved is None:
+        raise NotFoundError("conta não configurada")
+    account = resolved
     key = _key(settings, account.game_name, account.tag_line)
     async with read_only_unit_of_work(factory) as session:
         stored = await session.scalar(select(Profile).where(Profile.account_key == key))

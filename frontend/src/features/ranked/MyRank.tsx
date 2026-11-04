@@ -9,6 +9,7 @@ import { count } from "../../shared/text/count";
 
 const reasonNames: Record<string, string> = {
   ACCOUNT_OR_SECRET_MISSING: "Configure a conta local e o segredo de vínculo para consultar sua posição.",
+  ACCOUNT_NOT_LINKED: "Vincule sua conta Riot em Minha conta (no seu nome, no topo) para ver sua posição.",
   NO_OBSERVATION: "Ainda não há observação desta fila. Com a chave da Riot configurada, ela é consultada ao abrir esta tela.",
   RIOT_KEY_MISSING: "A chave da Riot está ausente. A última posição observada continua visível.",
   OBSERVATION_OLD: "Esta observação tem mais de 24 horas.",

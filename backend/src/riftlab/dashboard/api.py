@@ -73,6 +73,7 @@ async def get_dashboard(
     origin: Literal["REAL", "DEMO"] = "REAL",
     queue: Literal["RANKED_SOLO_5x5", "RANKED_FLEX_SR"] | None = None,
 ) -> Dashboard:
+    from riftlab.auth.request_account import own_account
     from riftlab.dashboard.application import QUEUE_IDS, dashboard
 
     return await dashboard(
@@ -81,4 +82,5 @@ async def get_dashboard(
         window=window,
         origin=origin,
         queue=QUEUE_IDS[queue] if queue else None,
+        account=await own_account(request),
     )

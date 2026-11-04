@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
+from riftlab.auth.request_account import own_account
 from riftlab.ranked.application import ranked_me
 from riftlab.ranked.domain import SOLO_QUEUE, RankedQueue
 
@@ -51,6 +52,9 @@ class RankedMe(BaseModel):
 )
 async def get_ranked_me(request: Request, queue: RankedQueue = SOLO_QUEUE) -> RankedMe:
     data = await ranked_me(
-        request.app.state.session_factory, request.app.state.settings, queue=queue
+        request.app.state.session_factory,
+        request.app.state.settings,
+        queue=queue,
+        account=await own_account(request),
     )
     return RankedMe.model_validate(data)

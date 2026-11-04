@@ -6,25 +6,23 @@ Nada disso sai da API: quem chama só recebe o hash para comparar no banco."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from riftlab.config import Settings
-from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfigError, load_riot_account
 from riftlab.ranked.domain import account_key
 from riftlab.ranked.models import RankedObservationModel as Observation
+from riftlab.shared.own_account import CONFIGURED, OwnAccount, resolve
 
 
-async def local_subject_hash(session: AsyncSession, settings: Settings) -> str | None:
-    """None sem conta configurada, sem segredo ou sem observação real da conta."""
-    try:
-        key = account_key(
-            load_riot_account(Path(settings.ranked_account_file)), settings.subject_hash_secret
-        )
-    except (OSError, RiotAccountConfigError):
+async def local_subject_hash(
+    session: AsyncSession, settings: Settings, account: OwnAccount = CONFIGURED
+) -> str | None:
+    """None sem conta (configurada ou vinculada), sem segredo ou sem observação real dela."""
+    resolved = resolve(settings, account)
+    if resolved is None:
         return None
+    key = account_key(resolved, settings.subject_hash_secret)
     if key is None:
         return None
     return await session.scalar(

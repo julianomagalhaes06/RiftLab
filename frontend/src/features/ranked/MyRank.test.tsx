@@ -162,3 +162,11 @@ describe("Minha posição atualizada pela sincronização da conta", () => {
     expect(mock.callsTo("GET", /^\/api\/v1\/ranked\/me$/)).toHaveLength(2);
   });
 });
+
+describe("Minha posição com contas locais (Sprint 2, #13)", () => {
+  it("orienta o vínculo quando o usuário ainda não tem conta Riot vinculada", async () => {
+    mock.on("GET", /^\/api\/v1\/ranked\/me$/, () => json(200, { status: "UNAVAILABLE", reason: "ACCOUNT_NOT_LINKED", position: null, change: null }));
+    render(<MyRank />);
+    expect(await screen.findAllByText(/Vincule sua conta Riot em Minha conta/)).not.toHaveLength(0);
+  });
+});

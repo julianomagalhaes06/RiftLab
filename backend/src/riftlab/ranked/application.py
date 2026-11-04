@@ -25,6 +25,7 @@ from riftlab.ranked.domain import (
 from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.db import read_only_unit_of_work, unit_of_work
 from riftlab.shared.errors import SourceError
+from riftlab.shared.own_account import CONFIGURED, NOT_LINKED, OwnAccount, resolve
 
 FRESH_FOR = timedelta(hours=24)
 ORIGIN = "RIOT_LEAGUE_V4"
@@ -191,9 +192,19 @@ async def ranked_me(
     *,
     queue: RankedQueue = SOLO_QUEUE,
     now: datetime | None = None,
+    account: OwnAccount = CONFIGURED,
 ) -> dict[str, Any]:
+    """`account`: a conta configurada (padrão) ou a vinculada ao usuário (card #13);
+    `None` explícito = usuário sem conta Riot vinculada."""
     demo = demo_ranked_active(settings)
-    key = DEMO_ACCOUNT_KEY if demo else _identity(settings)
+    if not demo and account is None:
+        return {"status": "UNAVAILABLE", "reason": NOT_LINKED, "position": None, "change": None}
+    resolved = resolve(settings, account)
+    key = (
+        DEMO_ACCOUNT_KEY
+        if demo
+        else (account_key(resolved, settings.subject_hash_secret) if resolved else None)
+    )
     if key is None:
         return {
             "status": "UNAVAILABLE",

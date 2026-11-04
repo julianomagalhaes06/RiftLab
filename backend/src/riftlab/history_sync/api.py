@@ -7,8 +7,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Request, Response
 
+from riftlab.auth.request_account import not_linked, own_account
 from riftlab.history_sync.application import request_sync, sync_status
+from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfig
+from riftlab.ranked.domain import account_key
 from riftlab.shared.api.common import CamelModel
+from riftlab.shared.own_account import NOT_LINKED, OwnAccount
 
 router = APIRouter(prefix="/api/v1/history/sync", tags=["history"])
 
@@ -40,8 +44,15 @@ class HistorySyncStatus(CamelModel):
     ),
 )
 async def post_history_sync(request: Request, response: Response) -> HistorySyncStatus:
+    account = await own_account(request)
+    if not_linked(request, account):
+        response.status_code = 200
+        return HistorySyncStatus(state="UNAVAILABLE", reason=NOT_LINKED)
+    # Conta vinculada (card #13): a execução leva o Riot ID dela até terminar.
     status, created = await request_sync(
-        request.app.state.session_factory, request.app.state.settings
+        request.app.state.session_factory,
+        request.app.state.settings,
+        account=_linked(account),
     )
     if not created:
         response.status_code = 200
@@ -55,6 +66,17 @@ async def post_history_sync(request: Request, response: Response) -> HistorySync
     description="Somente banco; nenhuma chamada à Riot.",
 )
 async def get_history_sync(request: Request) -> HistorySyncStatus:
+    settings = request.app.state.settings
+    account = await own_account(request)
+    if not_linked(request, account):
+        return HistorySyncStatus(state="UNAVAILABLE", reason=NOT_LINKED)
+    linked = _linked(account)
+    key = account_key(linked, settings.subject_hash_secret) if linked else None
     return HistorySyncStatus.model_validate(
-        await sync_status(request.app.state.session_factory, request.app.state.settings)
+        await sync_status(request.app.state.session_factory, settings, key=key)
     )
+
+
+def _linked(account: OwnAccount) -> RiotAccountConfig | None:
+    """Conta vinculada explícita; a configurada segue o caminho padrão (None)."""
+    return account if isinstance(account, RiotAccountConfig) else None
