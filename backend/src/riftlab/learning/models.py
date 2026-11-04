@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 import riftlab.analyses.models  # noqa: F401  (alvo da FK analyses)
+import riftlab.auth.models  # noqa: F401  (registra a tabela users para a FK do dono)
 from riftlab.shared.db import Base, CreatedAtMixin, UuidPkMixin
 
 
@@ -40,3 +41,7 @@ class LearningAttemptModel(UuidPkMixin, CreatedAtMixin, Base):
     reflection: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     reflected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="STUDY")
+    # Sprint 2 (#11): dono da tentativa; None = criada sem sessão (instalação de uma pessoa).
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )

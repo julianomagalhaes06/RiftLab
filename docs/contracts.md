@@ -378,3 +378,7 @@ Minha posição (`/ranked/me`), Painel (`/dashboard`), Histórico (`/matches`, p
 - **Sem usuário** (login não exigido): a conta do arquivo `RIFTLAB_RANKED_ACCOUNT_FILE`, como antes.
 
 A sincronização da conta vinculada leva o Riot ID dela na execução só enquanto está ativa (CC-1103) e grava elo e partidas sob a chave HMAC do vínculo. O elo e o participante da conta seguem a mesma chave.
+
+## Dados de estudo por usuário (Sprint 2, card #11)
+
+`learning_attempts.user_id` registra o dono da tentativa (escolha, pistas, revelação e reflexão). Todas as rotas `/api/v1/learning-attempts*` e a contagem de estudo do Painel filtram pelo usuário da sessão; tentativa de outra pessoa responde 404, como inexistente. Sem sessão, valem só as tentativas sem dono, criadas antes das contas ou numa instalação sem login. Apagar o usuário apaga as tentativas dele. A ativação no Docker é por `RIFTLAB_AUTH_REQUIRED=true` no `.env` (padrão `false` enquanto os cards da Sprint 2 estão em andamento). Pendente neste card: julgamentos por rubrica (`analysis_feedback`) ainda não têm dono por usuário.

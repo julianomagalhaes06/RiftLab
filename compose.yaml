@@ -34,6 +34,8 @@ services:
       RIFTLAB_OBJECTIVE_MODEL_URL: ${RIFTLAB_OBJECTIVE_MODEL_URL:-}
       RIFTLAB_OBJECTIVE_MODEL_VERSION: ${RIFTLAB_OBJECTIVE_MODEL_VERSION:-local_model_unversioned}
       RIFTLAB_DEMO_RANKED: ${RIFTLAB_DEMO_RANKED:-false}
+      # Contas locais (Sprint 2, #10/#11): com true, as rotas /api/v1 exigem login.
+      RIFTLAB_AUTH_REQUIRED: ${RIFTLAB_AUTH_REQUIRED:-false}
       # Dentro do container o bind é em todas as interfaces; a porta só é publicada em
       # 127.0.0.1. O proxy do frontend chega com Host `api` (CC-1215).
       RIFTLAB_API_HOST: 0.0.0.0

@@ -106,7 +106,10 @@ async def create_attempt(
     body: dict[str, Any],
     idempotency_key: str,
     configs: Path,
+    *,
+    owner: uuid.UUID | None = None,
 ) -> tuple[dict[str, Any], bool]:
+    """`owner`: usuário da sessão (Sprint 2, #11); sem sessão, tentativa sem dono."""
     digest = request_hash(body)
     async with session_factory() as session:
         existing = await session.scalar(
@@ -115,7 +118,7 @@ async def create_attempt(
             )
         )
         if existing is not None:
-            if existing.request_sha256 != digest:
+            if existing.request_sha256 != digest or existing.user_id != owner:
                 raise ConflictError("IDEMPOTENCY_CONFLICT")
             return _public(existing, await _extra(session, existing)), False
         decision_id = uuid.UUID(str(body["decisionId"]))
@@ -144,12 +147,13 @@ async def create_attempt(
         skipped=False,
         exercise_version=EXERCISE_VERSION,
         mode=body.get("mode") or "STUDY",
+        user_id=owner,
     )
     try:
         async with session_factory.begin() as session:
             session.add(row)
     except IntegrityError:
-        return await create_attempt(session_factory, body, idempotency_key, configs)
+        return await create_attempt(session_factory, body, idempotency_key, configs, owner=owner)
     async with session_factory() as session:
         stored = await session.get(LearningAttemptModel, attempt_id)
         assert stored is not None
@@ -157,9 +161,17 @@ async def create_attempt(
 
 
 async def _load(
-    session: AsyncSession, attempt_id: uuid.UUID, *, lock: bool = False
+    session: AsyncSession,
+    attempt_id: uuid.UUID,
+    owner: uuid.UUID | None,
+    *,
+    lock: bool = False,
 ) -> LearningAttemptModel:
-    statement = select(LearningAttemptModel).where(LearningAttemptModel.id == attempt_id)
+    """Tentativa de outro usuário (ou com dono, pedida sem sessão) responde como inexistente."""
+    statement = select(LearningAttemptModel).where(
+        LearningAttemptModel.id == attempt_id,
+        LearningAttemptModel.user_id.is_not_distinct_from(owner),
+    )
     row = await session.scalar(statement.with_for_update() if lock else statement)
     if row is None:
         raise NotFoundError(f"tentativa {attempt_id} não encontrada")
@@ -167,10 +179,14 @@ async def _load(
 
 
 async def get_attempt(
-    session_factory: async_sessionmaker[AsyncSession], attempt_id: uuid.UUID, configs: Path
+    session_factory: async_sessionmaker[AsyncSession],
+    attempt_id: uuid.UUID,
+    configs: Path,
+    *,
+    owner: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     async with session_factory() as session:
-        row = await _load(session, attempt_id)
+        row = await _load(session, attempt_id, owner)
         extra = await _extra(session, row)
         if row.status == "REVEALED" and row.analysis_id is not None:
             from riftlab.analyses.application import get_analysis
@@ -184,11 +200,13 @@ async def answer_attempt(
     attempt_id: uuid.UUID,
     body: dict[str, Any],
     configs: Path,
+    *,
+    owner: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     item, skipped = body.get("itemId"), bool(body.get("skipped"))
     rationale = body.get("rationale")
     async with session_factory.begin() as session:
-        row = await _load(session, attempt_id, lock=True)
+        row = await _load(session, attempt_id, owner, lock=True)
         same = (row.selected_item_id, row.skipped, row.rationale) == (item, skipped, rationale)
         if row.status != "OPEN":
             if row.status == "ANSWERED" and same:
@@ -204,7 +222,7 @@ async def answer_attempt(
                 rationale,
             )
             row.status = "ANSWERED"
-    return await get_attempt(session_factory, attempt_id, configs)
+    return await get_attempt(session_factory, attempt_id, configs, owner=owner)
 
 
 async def hint_attempt(
@@ -212,29 +230,35 @@ async def hint_attempt(
     attempt_id: uuid.UUID,
     level: int,
     configs: Path,
+    *,
+    owner: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     async with session_factory.begin() as session:
-        row = await _load(session, attempt_id, lock=True)
+        row = await _load(session, attempt_id, owner, lock=True)
         if row.mode == "TRANSFER":
             raise ConflictError("HINTS_DISABLED")
         row.hint_level = max(row.hint_level, level)
-    return await get_attempt(session_factory, attempt_id, configs)
+    return await get_attempt(session_factory, attempt_id, configs, owner=owner)
 
 
 async def reveal_attempt(
-    session_factory: async_sessionmaker[AsyncSession], attempt_id: uuid.UUID, configs: Path
+    session_factory: async_sessionmaker[AsyncSession],
+    attempt_id: uuid.UUID,
+    configs: Path,
+    *,
+    owner: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     async with session_factory() as session:
-        row = await _load(session, attempt_id)
+        row = await _load(session, attempt_id, owner)
         body = {"decisionId": str(row.decision_id), "objective": row.objective}
     analysis, _ = await create_analysis(session_factory, body, f"attempt:{attempt_id}", configs)
     async with session_factory.begin() as session:
-        row = await _load(session, attempt_id, lock=True)
+        row = await _load(session, attempt_id, owner, lock=True)
         if row.status != "REVEALED":
             row.status = "REVEALED"
             row.analysis_id = uuid.UUID(analysis["analysisId"])
             row.revealed_at = datetime.now(UTC)
-    return await get_attempt(session_factory, attempt_id, configs)
+    return await get_attempt(session_factory, attempt_id, configs, owner=owner)
 
 
 async def reflect_attempt(
@@ -242,10 +266,12 @@ async def reflect_attempt(
     attempt_id: uuid.UUID,
     reflection: str,
     configs: Path,
+    *,
+    owner: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """CC-505: one reflection after the comparison; the same text again is idempotent."""
     async with session_factory.begin() as session:
-        row = await _load(session, attempt_id, lock=True)
+        row = await _load(session, attempt_id, owner, lock=True)
         if row.status != "REVEALED":
             raise ConflictError("ATTEMPT_NOT_REVEALED")
         if row.reflection is None:
@@ -253,13 +279,26 @@ async def reflect_attempt(
             row.reflected_at = datetime.now(UTC)
         elif row.reflection != reflection:
             raise ConflictError("ATTEMPT_LOCKED")
-    return await get_attempt(session_factory, attempt_id, configs)
+    return await get_attempt(session_factory, attempt_id, configs, owner=owner)
 
 
-async def progress(session_factory: async_sessionmaker[AsyncSession]) -> dict[str, Any]:
-    """CC-505: local, descriptive counts. No score, ranking or skill estimate."""
+async def progress(
+    session_factory: async_sessionmaker[AsyncSession], *, owner: uuid.UUID | None = None
+) -> dict[str, Any]:
+    """CC-505: local, descriptive counts. No score, ranking or skill estimate. Só as
+    tentativas do usuário da sessão (#11); sem sessão, as sem dono."""
     async with session_factory() as session:
-        rows = (await session.execute(select(LearningAttemptModel))).scalars().all()
+        rows = (
+            (
+                await session.execute(
+                    select(LearningAttemptModel).where(
+                        LearningAttemptModel.user_id.is_not_distinct_from(owner)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     def count(mode: str) -> dict[str, int]:
         part = [r for r in rows if r.mode == mode]
