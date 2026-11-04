@@ -46,6 +46,15 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   SUBJECT_HASH_SECRET_MISSING:
     "Configuração local incompleta: falta o segredo usado para anonimizar jogadores. Verifique o ambiente do servidor.",
 
+  // --- contas locais (Sprint 2, #10) ---
+  AUTH_REQUIRED: "Sua sessão terminou. Entre de novo para continuar.",
+  INVALID_CREDENTIALS: "Usuário ou senha incorretos.",
+  USERNAME_TAKEN: "Esse nome de usuário já está em uso. Escolha outro.",
+  INVALID_USERNAME: "Use de 3 a 32 caracteres: letras, números, ponto, hífen ou sublinhado.",
+  INVALID_PASSWORD: "A senha precisa ter de 10 a 128 caracteres.",
+  LOGIN_RATE_LIMITED: "Muitas tentativas seguidas. Aguarde alguns minutos antes de tentar de novo.",
+  CSRF_HEADER_MISSING: "A requisição não veio da interface do RiftLab e foi recusada.",
+
   // --- estudo, avaliação e relatório (CC-304/505) ---
   ATTEMPT_LOCKED:
     "Esta tentativa já tem uma resposta (ou reflexão) registrada; para mudar, comece uma nova tentativa.",

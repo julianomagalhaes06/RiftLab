@@ -21,6 +21,10 @@ import { PlayerPage } from "../features/players/PlayerPage";
 import { LivePage } from "../features/live/LivePage";
 import { PlayerSearch } from "../features/players/PlayerSearch";
 import { ProfileChip } from "../features/players/ProfileChip";
+import { AuthProvider } from "../features/auth/AuthProvider";
+import { useAuth } from "../features/auth/authContext";
+import { AuthScreen } from "../features/auth/AuthScreen";
+import { UserMenu } from "../features/auth/UserMenu";
 import "./App.css";
 import "../design/concept-c.css";
 
@@ -80,6 +84,13 @@ function renderPage(route: Route): ReactNode {
 }
 
 function AppShell() {
+  const { authRequired, user } = useAuth();
+  // Login exigido pelo servidor e sem sessão: só a tela de entrar/criar conta (#10/#14).
+  if (authRequired && !user) return <AuthScreen />;
+  return <AppContent />;
+}
+
+function AppContent() {
   const { route, navigate, href } = useRouter();
   const mainRef = useRef<HTMLElement>(null);
   // Só o CAMINHO conta: trocar de participante (?participant=N) não devolve o foco ao
@@ -118,6 +129,7 @@ function AppShell() {
             <div className="app__tools">
               <PlayerSearch />
               <ProfileChip />
+              <UserMenu />
             </div>
           </div>
           <ContextStrip />
@@ -146,9 +158,11 @@ function AppShell() {
 export default function App() {
   return (
     <RouterProvider>
-      <DemoNoticeProvider>
-        <AppShell />
-      </DemoNoticeProvider>
+      <AuthProvider>
+        <DemoNoticeProvider>
+          <AppShell />
+        </DemoNoticeProvider>
+      </AuthProvider>
     </RouterProvider>
   );
 }
