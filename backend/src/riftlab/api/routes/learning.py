@@ -34,6 +34,14 @@ from riftlab.shared.api.learning import (
 )
 
 router = APIRouter(prefix="/api/v1/learning-attempts", tags=["learning"])
+
+
+def _owner(request: Request) -> uuid.UUID | None:
+    """Usuário da sessão (Sprint 2, #11): cada um só vê e altera as próprias tentativas."""
+    user = getattr(request.state, "user", None)
+    return user.id if user is not None else None
+
+
 _ERRORS: dict[int | str, dict[str, object]] = {
     404: {"model": ProblemDetail},
     409: {"model": ProblemDetail},
@@ -50,7 +58,11 @@ async def post_attempt(
 ) -> LearningAttemptPublicState:
     payload = body.model_dump(mode="json", by_alias=True)
     state, created = await create_attempt(
-        request.app.state.session_factory, payload, idempotency_key, _configs(request)
+        request.app.state.session_factory,
+        payload,
+        idempotency_key,
+        _configs(request),
+        owner=_owner(request),
     )
     if not created:
         response.status_code = 200
@@ -60,12 +72,16 @@ async def post_attempt(
 @router.get("/progress", response_model=LearningProgress)
 async def read_progress(request: Request) -> LearningProgress:
     """CC-505: contagens locais descritivas (não é nota nem estimativa de habilidade)."""
-    return LearningProgress.model_validate(await progress(request.app.state.session_factory))
+    return LearningProgress.model_validate(
+        await progress(request.app.state.session_factory, owner=_owner(request))
+    )
 
 
 @router.get("/{attempt_id}", response_model=LearningAttemptPublicState, responses=_ERRORS)
 async def read_attempt(attempt_id: uuid.UUID, request: Request) -> LearningAttemptPublicState:
-    state = await get_attempt(request.app.state.session_factory, attempt_id, _configs(request))
+    state = await get_attempt(
+        request.app.state.session_factory, attempt_id, _configs(request), owner=_owner(request)
+    )
     return LearningAttemptPublicState.model_validate(state)
 
 
@@ -78,6 +94,7 @@ async def post_answer(
         attempt_id,
         body.model_dump(mode="json", by_alias=True),
         _configs(request),
+        owner=_owner(request),
     )
     return LearningAttemptPublicState.model_validate(state)
 
@@ -87,7 +104,11 @@ async def post_hint(
     attempt_id: uuid.UUID, body: LearningAttemptHintRequest, request: Request
 ) -> LearningAttemptPublicState:
     state = await hint_attempt(
-        request.app.state.session_factory, attempt_id, body.level, _configs(request)
+        request.app.state.session_factory,
+        attempt_id,
+        body.level,
+        _configs(request),
+        owner=_owner(request),
     )
     return LearningAttemptPublicState.model_validate(state)
 
@@ -96,7 +117,9 @@ async def post_hint(
 async def post_reveal(
     attempt_id: uuid.UUID, body: LearningAttemptRevealRequest, request: Request
 ) -> LearningAttemptPublicState:
-    state = await reveal_attempt(request.app.state.session_factory, attempt_id, _configs(request))
+    state = await reveal_attempt(
+        request.app.state.session_factory, attempt_id, _configs(request), owner=_owner(request)
+    )
     return LearningAttemptPublicState.model_validate(state)
 
 
@@ -107,6 +130,10 @@ async def post_reflection(
     attempt_id: uuid.UUID, body: LearningAttemptReflectionRequest, request: Request
 ) -> LearningAttemptPublicState:
     state = await reflect_attempt(
-        request.app.state.session_factory, attempt_id, body.reflection, _configs(request)
+        request.app.state.session_factory,
+        attempt_id,
+        body.reflection,
+        _configs(request),
+        owner=_owner(request),
     )
     return LearningAttemptPublicState.model_validate(state)

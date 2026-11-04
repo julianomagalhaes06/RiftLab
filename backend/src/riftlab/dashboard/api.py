@@ -83,4 +83,5 @@ async def get_dashboard(
         origin=origin,
         queue=QUEUE_IDS[queue] if queue else None,
         account=await own_account(request),
+        attempt_owner=request.state.user.id if request.state.user else None,
     )

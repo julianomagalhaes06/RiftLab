@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from collections import Counter
 from datetime import timedelta
 from pathlib import Path
@@ -59,6 +60,7 @@ async def dashboard(
     origin: Literal["REAL", "DEMO"],
     queue: int | None = None,
     account: OwnAccount = CONFIGURED,
+    attempt_owner: uuid.UUID | None = None,
 ) -> Dashboard:
     """`account`: conta configurada (padrão) ou a vinculada ao usuário da sessão (card #13)."""
     mapping = None
@@ -87,7 +89,10 @@ async def dashboard(
                 .select_from(Attempt)
                 .join(DecisionPointModel, Attempt.decision_id == DecisionPointModel.id)
                 .join(MatchModel, DecisionPointModel.match_id == MatchModel.match_id)
-                .where(demo_match if origin == "DEMO" else ~demo_match)
+                .where(
+                    demo_match if origin == "DEMO" else ~demo_match,
+                    Attempt.user_id.is_not_distinct_from(attempt_owner),
+                )
             )
         ).one()
         progress = DashboardProgress(
