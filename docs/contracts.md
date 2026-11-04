@@ -348,3 +348,13 @@ popularidade campeão/ordem. Suporte exige60 linhas legais e10 partidas distinta
 na célula de treino. Avaliação e artefatos experimentais não alteram rotas, scope,
 modelos ativos ou o tratamento atual do 1º/2º item. Ganho de imitação não demonstra
 pertinência estratégica; essa finalidade exige revisão humana específica.
+
+## Contas locais e sessão (Sprint 2, card #10)
+
+Autenticação própria, sem login da Riot (RSO exige chave de produção).
+
+- **Rotas:** `GET /api/v1/auth/session` → `SessionState {authRequired, user}`; `POST /api/v1/auth/register` (201) e `POST /api/v1/auth/login` (200) recebem `{username, password}`, abrem a sessão e devolvem `SessionState`; `POST /api/v1/auth/logout` (204) apaga a sessão e o cookie.
+- **Regras:** usuário com 3 a 32 caracteres `[A-Za-z0-9_.-]`, único sem diferenciar maiúsculas (`USERNAME_TAKEN` 409); senha de 10 a 128 caracteres (`INVALID_USERNAME`/`INVALID_PASSWORD` 422). Senha guardada com Argon2id (`argon2-cffi`, parâmetros padrão), calculada fora do laço de eventos e refeita no login se os parâmetros mudarem.
+- **Sessão:** token de 256 bits só no cookie `riftlab_session` (`HttpOnly`, `SameSite=Strict`, `Path=/`, `Secure` com `RIFTLAB_AUTH_COOKIE_SECURE`), validade de `RIFTLAB_AUTH_SESSION_DAYS` (7). O banco (`auth_sessions`) guarda só o SHA-256 do token; logout e expiração invalidam.
+- **Recusas:** usuário inexistente e senha errada respondem igual (`INVALID_CREDENTIALS` 401, mesmo custo de verificação). Cinco falhas por usuário ou vinte por IP em 15 min ⇒ `LOGIN_RATE_LIMITED` 429 com `Retry-After`. O limite fica em memória do processo da API.
+- **Proteção (`RIFTLAB_AUTH_REQUIRED=true`):** toda rota `/api/v1/*`, exceto `/api/v1/auth/*`, exige sessão válida (`AUTH_REQUIRED` 401); métodos que alteram dados exigem o cabeçalho `X-RiftLab-Request` (`CSRF_HEADER_MISSING` 403). Health e OpenAPI ficam fora. Sem a opção, as rotas continuam abertas e a sessão, quando existe, só identifica o usuário.
