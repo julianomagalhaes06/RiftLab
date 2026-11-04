@@ -358,3 +358,14 @@ Autenticação própria, sem login da Riot (RSO exige chave de produção).
 - **Sessão:** token de 256 bits só no cookie `riftlab_session` (`HttpOnly`, `SameSite=Strict`, `Path=/`, `Secure` com `RIFTLAB_AUTH_COOKIE_SECURE`), validade de `RIFTLAB_AUTH_SESSION_DAYS` (7). O banco (`auth_sessions`) guarda só o SHA-256 do token; logout e expiração invalidam.
 - **Recusas:** usuário inexistente e senha errada respondem igual (`INVALID_CREDENTIALS` 401, mesmo custo de verificação). Cinco falhas por usuário ou vinte por IP em 15 min ⇒ `LOGIN_RATE_LIMITED` 429 com `Retry-After`. O limite fica em memória do processo da API.
 - **Proteção (`RIFTLAB_AUTH_REQUIRED=true`):** toda rota `/api/v1/*`, exceto `/api/v1/auth/*`, exige sessão válida (`AUTH_REQUIRED` 401); métodos que alteram dados exigem o cabeçalho `X-RiftLab-Request` (`CSRF_HEADER_MISSING` 403). Health e OpenAPI ficam fora. Sem a opção, as rotas continuam abertas e a sessão, quando existe, só identifica o usuário.
+
+## Vínculo da conta Riot pelo ícone de perfil (Sprint 2, card #12)
+
+Comprova a posse do Riot ID sem RSO, com a chave de desenvolvimento. Todas as rotas exigem sessão (`AUTH_REQUIRED` 401), mesmo sem `RIFTLAB_AUTH_REQUIRED`.
+
+- `GET /api/v1/riot-link` → `RiotLinkState {state: NONE|PENDING|LINKED, gameName, tagLine, iconId, expiresAt, linkedAt}`.
+- `POST /api/v1/riot-link/challenge {gameName, tagLine}`: Account-V1 e Summoner-V4 (2 requisições); sorteia um ícone inicial (0 a 28) diferente do atual, válido por 10 min, e substitui o desafio anterior. Conta Riot já vinculada a outro usuário ⇒ `ACCOUNT_ALREADY_LINKED` 409.
+- `POST /api/v1/riot-link/verify`: confere o ícone (2 requisições). Igual ⇒ grava o vínculo e apaga o desafio; diferente ⇒ `ICON_MISMATCH` 409 e o desafio continua; vencido ⇒ `CHALLENGE_EXPIRED` 409 sem consultar a Riot; sem desafio ⇒ `NO_CHALLENGE` 409.
+- `DELETE /api/v1/riot-link` (204): desfaz o vínculo e o desafio.
+- Erros da Riot e de configuração seguem a busca de jogadores (`PLAYER_NOT_FOUND`, `RIOT_KEY_MISSING`, `SECRET_MISSING`, `RIOT_RATE_LIMITED` etc.).
+- **Dados:** `riot_links.account_key` (HMAC do Riot ID, mesmo de `ranked_observations`) é único por instalação e cruza com elo e sincronização; `subject_hash` é o HMAC do PUUID, que nunca é gravado. O Riot ID do próprio usuário fica guardado porque a Riot só é consultada por ele; sai ao desvincular ou apagar a conta. O desafio guarda o Riot ID só enquanto existe.

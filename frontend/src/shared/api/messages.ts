@@ -54,6 +54,10 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_PASSWORD: "A senha precisa ter de 10 a 128 caracteres.",
   LOGIN_RATE_LIMITED: "Muitas tentativas seguidas. Aguarde alguns minutos antes de tentar de novo.",
   CSRF_HEADER_MISSING: "A requisição não veio da interface do RiftLab e foi recusada.",
+  NO_CHALLENGE: "Peça um ícone para comprovar a conta antes de verificar.",
+  CHALLENGE_EXPIRED: "O prazo de 10 minutos terminou. Peça um novo ícone para tentar de novo.",
+  ICON_MISMATCH: "O ícone de perfil ainda não é o pedido. Troque-o no cliente do jogo e verifique de novo.",
+  ACCOUNT_ALREADY_LINKED: "Essa conta Riot já está vinculada a outro usuário desta instalação.",
 
   // --- estudo, avaliação e relatório (CC-304/505) ---
   ATTEMPT_LOCKED:

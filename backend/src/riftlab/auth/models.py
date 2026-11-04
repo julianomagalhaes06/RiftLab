@@ -33,3 +33,37 @@ class AuthSessionModel(Base):
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RiotLinkChallengeModel(Base):
+    """Desafio do ícone em andamento (card #12): um por usuário. O Riot ID canônico fica só
+    enquanto o desafio existe; verificar, recomeçar ou expirar o substitui ou apaga."""
+
+    __tablename__ = "riot_link_challenges"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    account_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    game_name: Mapped[str] = mapped_column(String(32), nullable=False)
+    tag_line: Mapped[str] = mapped_column(String(8), nullable=False)
+    icon_id: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RiotLinkModel(Base):
+    """Conta Riot vinculada e comprovada. `account_key` (HMAC do Riot ID) cruza com o elo e a
+    sincronização e é única: uma conta Riot pertence a um usuário só. O Riot ID do próprio
+    usuário fica guardado porque a Riot só é consultada por ele; sai ao desvincular."""
+
+    __tablename__ = "riot_links"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    account_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    subject_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    game_name: Mapped[str] = mapped_column(String(32), nullable=False)
+    tag_line: Mapped[str] = mapped_column(String(8), nullable=False)
+    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

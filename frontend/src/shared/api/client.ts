@@ -45,6 +45,7 @@ export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
 export type SessionState = Schemas["SessionState"];
 export type SessionUser = Schemas["SessionUser"];
+export type RiotLinkState = Schemas["RiotLinkState"];
 
 /** Evento global: uma resposta 401 AUTH_REQUIRED pede para a interface rever a sessão. */
 export const AUTH_REQUIRED_EVENT = "riftlab:auth-required";
@@ -94,6 +95,11 @@ export interface ApiClient {
   register(username: string, password: string, signal?: AbortSignal): Promise<SessionState>;
   login(username: string, password: string, signal?: AbortSignal): Promise<SessionState>;
   logout(signal?: AbortSignal): Promise<void>;
+  /** Vínculo da conta Riot pelo desafio do ícone (#12). */
+  getRiotLink(signal?: AbortSignal): Promise<RiotLinkState>;
+  startRiotLink(gameName: string, tagLine: string, signal?: AbortSignal): Promise<RiotLinkState>;
+  verifyRiotLink(signal?: AbortSignal): Promise<RiotLinkState>;
+  unlinkRiot(signal?: AbortSignal): Promise<void>;
   getCatalogCurrent(signal?: AbortSignal): Promise<CatalogCurrent>;
   /** Partida ao vivo do Riot ID (CC-1211); o Riot ID vai no corpo, fora dos logs. */
   getLiveGame(gameName: string, tagLine: string, signal?: AbortSignal): Promise<LiveGame>;
@@ -231,6 +237,11 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     login: (username, password, signal) =>
       request("POST", "/api/v1/auth/login", { body: { username, password }, signal }),
     logout: (signal) => request("POST", "/api/v1/auth/logout", { signal }),
+    getRiotLink: (signal) => request("GET", "/api/v1/riot-link", { signal }),
+    startRiotLink: (gameName, tagLine, signal) =>
+      request("POST", "/api/v1/riot-link/challenge", { body: { gameName, tagLine }, signal }),
+    verifyRiotLink: (signal) => request("POST", "/api/v1/riot-link/verify", { signal }),
+    unlinkRiot: (signal) => request("DELETE", "/api/v1/riot-link", { signal }),
     getCatalogCurrent: (signal) => request("GET", "/api/v1/catalog/current", { signal }),
     getLiveGame: (gameName, tagLine, signal) =>
       request("POST", "/api/v1/players/live", { body: { gameName, tagLine }, signal }),

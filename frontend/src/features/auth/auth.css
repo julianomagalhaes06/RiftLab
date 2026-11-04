@@ -16,3 +16,15 @@
 .user-menu { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .user-menu__name { color: var(--ntext-muted); font-size: .875rem; max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-menu__out { min-height: 36px; padding: 0 12px; }
+
+.user-menu__name a { color: inherit; text-decoration: none; }
+.user-menu__name a:hover { color: var(--ntext); text-decoration: underline; }
+.account-card { display: grid; gap: 12px; max-width: 640px; }
+.account-card h3 { margin: 0; }
+.account-card .form { display: grid; gap: 8px; max-width: 360px; }
+.account-card .form .button { justify-self: start; }
+.account-card__riot { margin: 0; font-family: var(--font-display); font-size: 1.25rem; color: var(--ntext); }
+.account-steps { margin: 0; padding-left: 20px; color: var(--ntext-muted); line-height: 1.6; }
+.account-icon { margin: 0; display: grid; justify-items: start; gap: 6px; color: var(--ntext-subtle); font-size: .8125rem; }
+.account-icon img { border: 1px solid var(--portrait-outline); }
+.account-actions { display: flex; flex-wrap: wrap; gap: 12px; }

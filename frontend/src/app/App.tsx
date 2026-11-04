@@ -25,6 +25,7 @@ import { AuthProvider } from "../features/auth/AuthProvider";
 import { useAuth } from "../features/auth/authContext";
 import { AuthScreen } from "../features/auth/AuthScreen";
 import { UserMenu } from "../features/auth/UserMenu";
+import { AccountPage } from "../features/auth/AccountPage";
 import "./App.css";
 import "../design/concept-c.css";
 
@@ -33,6 +34,7 @@ const TITLES: Record<Route["name"], string> = {
   panel: "Painel — RiftLab",
   champions: "Campeões — RiftLab",
   position: "Minha posição — RiftLab",
+  account: "Minha conta — RiftLab",
   history: "Histórico — RiftLab",
   historyMatch: "Contexto da partida — RiftLab",
   import: "Importação — RiftLab",
@@ -54,6 +56,8 @@ function renderPage(route: Route): ReactNode {
       return <ChampionsPage />;
     case "position":
       return <PositionPage />;
+    case "account":
+      return <AccountPage />;
     case "history":
       return <HistoryPage />;
     case "historyMatch":
