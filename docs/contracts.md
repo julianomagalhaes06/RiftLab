@@ -369,3 +369,12 @@ Comprova a posse do Riot ID sem RSO, com a chave de desenvolvimento. Todas as ro
 - `DELETE /api/v1/riot-link` (204): desfaz o vínculo e o desafio.
 - Erros da Riot e de configuração seguem a busca de jogadores (`PLAYER_NOT_FOUND`, `RIOT_KEY_MISSING`, `SECRET_MISSING`, `RIOT_RATE_LIMITED` etc.).
 - **Dados:** `riot_links.account_key` (HMAC do Riot ID, mesmo de `ranked_observations`) é único por instalação e cruza com elo e sincronização; `subject_hash` é o HMAC do PUUID, que nunca é gravado. O Riot ID do próprio usuário fica guardado porque a Riot só é consultada por ele; sai ao desvincular ou apagar a conta. O desafio guarda o Riot ID só enquanto existe.
+
+## Conta própria por usuário (Sprint 2, card #13)
+
+Minha posição (`/ranked/me`), Painel (`/dashboard`), Histórico (`/matches`, participante da conta), sincronização (`/history/sync`) e o chip do topo (`/players/me`) resolvem a conta própria pela requisição:
+
+- **Usuário na sessão:** a conta Riot vinculada a ele (card #12). Sem vínculo, essas rotas respondem sem dados da conta e com o motivo `ACCOUNT_NOT_LINKED` (`ranked/me` e `history/sync` com `UNAVAILABLE`, `players/me` com `reason`); nunca usam a conta configurada de outra pessoa.
+- **Sem usuário** (login não exigido): a conta do arquivo `RIFTLAB_RANKED_ACCOUNT_FILE`, como antes.
+
+A sincronização da conta vinculada leva o Riot ID dela na execução só enquanto está ativa (CC-1103) e grava elo e partidas sob a chave HMAC do vínculo. O elo e o participante da conta seguem a mesma chave.

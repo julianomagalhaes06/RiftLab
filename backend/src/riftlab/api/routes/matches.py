@@ -20,6 +20,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from riftlab.auth.request_account import own_account
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_catalog_mapping
 from riftlab.catalog.patches import load_persisted_mapping
 from riftlab.champions.application import ChampionAsset as ChampionAssetData
@@ -119,10 +120,12 @@ async def list_imported_matches(
         else None
     )
 
+    account = await own_account(request)
+
     async def selected_subject(session: AsyncSession) -> str | None:
         if subject is not None:
             return subject
-        return await local_subject_hash(session, settings)
+        return await local_subject_hash(session, settings, account)
 
     page = await list_matches(
         request.app.state.session_factory,
@@ -164,6 +167,7 @@ async def list_imported_matches(
 )
 async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail:
     settings = request.app.state.settings
+    account = await own_account(request)
     detail = await get_match_detail(
         request.app.state.session_factory,
         match_id,
@@ -171,7 +175,7 @@ async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail
             request.app.state.session_factory,
             Path(settings.catalog_mappings_path),
         ),
-        local_subject=lambda session: local_subject_hash(session, settings),
+        local_subject=lambda session: local_subject_hash(session, settings, account),
     )
     summary = _to_summary(
         detail.match,

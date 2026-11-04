@@ -20,7 +20,6 @@ from riftlab.dashboard.api import (
     DashboardQueue,
 )
 from riftlab.decisions.models import DecisionPointModel
-from riftlab.ingestion.infrastructure.riot_account import RiotAccountConfigError, load_riot_account
 from riftlab.ingestion.models import MatchModel, ParticipantModel
 from riftlab.learning.models import LearningAttemptModel as Attempt
 from riftlab.ranked.domain import SOLO_QUEUE, account_key
@@ -28,6 +27,7 @@ from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.api.matches import ChampionAsset, MatchParticipant
 from riftlab.shared.db import read_only_unit_of_work
 from riftlab.shared.errors import SourceSchemaError
+from riftlab.shared.own_account import CONFIGURED, OwnAccount, resolve
 
 QUEUE_IDS = {"RANKED_SOLO_5x5": 420, "RANKED_FLEX_SR": 440}
 DASHBOARD_QUEUES = (420, 440)
@@ -58,7 +58,9 @@ async def dashboard(
     window: int,
     origin: Literal["REAL", "DEMO"],
     queue: int | None = None,
+    account: OwnAccount = CONFIGURED,
 ) -> Dashboard:
+    """`account`: conta configurada (padrão) ou a vinculada ao usuário da sessão (card #13)."""
     mapping = None
     mapping_path = Path(settings.catalog_mappings_path)
     try:
@@ -67,12 +69,8 @@ async def dashboard(
         overrides = None
     key = None
     if origin == "REAL":
-        try:
-            key = account_key(
-                load_riot_account(Path(settings.ranked_account_file)), settings.subject_hash_secret
-            )
-        except (OSError, RiotAccountConfigError):
-            pass
+        resolved = resolve(settings, account)
+        key = account_key(resolved, settings.subject_hash_secret) if resolved else None
     demo_match = MatchModel.match_id.like("DEMO-%")
     async with read_only_unit_of_work(factory) as session:
         await session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
