@@ -8,7 +8,12 @@ from sqlalchemy import distinct, func, select
 
 from riftlab.catalog.infrastructure.catalog_mapping import load_catalog_mapping
 from riftlab.catalog.models import ItemModel
-from riftlab.catalog.patches import current_patch_window, persisted_mapping
+from riftlab.catalog.patches import (
+    PATCH_PATTERN,
+    current_patch_window,
+    persisted_mapping,
+    published_patch,
+)
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.champions.application import champion_assets
 from riftlab.champions.patterns import (
@@ -25,10 +30,18 @@ from riftlab.decisions.selection import build_versions
 from riftlab.ingestion.models import MatchModel, ParticipantModel
 from riftlab.shared.api.matches import ChampionAsset
 from riftlab.shared.db import read_only_unit_of_work
+from riftlab.shared.numeric import patch_order_key
 from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION
 from riftlab.timeline.models import MatchReconstructionModel
 
 router = APIRouter(tags=["champions"])
+# Patches oferecidos no filtro: o atual, a janela de análise e os mais recentes com partidas.
+MAX_PATCH_OPTIONS = 12
+
+
+def _newest(patches: set[str]) -> list[str]:
+    valid = [patch for patch in patches if PATCH_PATTERN.fullmatch(patch)]
+    return sorted(valid, key=lambda patch: patch_order_key(patch) or (0, 0), reverse=True)
 
 
 @router.get("/api/v1/champions/patterns", response_model=ChampionPatterns)
@@ -52,12 +65,27 @@ async def get_champion_patterns(
                 status="EMPTY",
             )
         scope = load_real_scope(Path(settings.scope_path), window)
-        patches = list(window[:2])
-        chosen_patch = patch or patches[0]
+        # Patch atual do jogo: o publicado (renovado pelo worker) ou, sem ele, o da janela.
+        current = _newest({p for p in (await published_patch(session), window[0]) if p})[0]
+        imported = await session.scalars(
+            select(distinct(MatchModel.patch)).where(
+                MatchModel.match_id.like("BR1_%"),
+                MatchModel.queue.in_(scope.queues),
+                MatchModel.map_id == scope.map_id,
+            )
+        )
+        patches = _newest({current, *window[:2], *imported.all()})[:MAX_PATCH_OPTIONS]
+        chosen_patch = patch or current
         mapping = await persisted_mapping(
             session, load_catalog_mapping(Path(settings.catalog_mappings_path))
         )
-        assets = await champion_assets(session, mapping, "BR1_1", chosen_patch, scope.champion_ids)
+        # Nome e retrato: catálogo do patch escolhido ou, se ainda não sincronizado (patch novo),
+        # o do patch mais recente disponível; a contagem continua do patch escolhido.
+        assets = {}
+        for candidate in dict.fromkeys([chosen_patch, *patches]):
+            assets = await champion_assets(session, mapping, "BR1_1", candidate, scope.champion_ids)
+            if assets:
+                break
         base = (
             select(ParticipantModel.champion_id, func.count(distinct(ParticipantModel.match_id)))
             .join(MatchModel, MatchModel.match_id == ParticipantModel.match_id)
@@ -96,6 +124,8 @@ async def get_champion_patterns(
         )
         response = ChampionPatterns(
             patches=patches,
+            current_patch=current,
+            analysis_patches=list(window[:2]),
             patch=chosen_patch,
             phase=phase,
             champions=choices,

@@ -40,7 +40,12 @@ class ChampionSituation(CamelModel):
 
 
 class ChampionPatterns(CamelModel):
+    """`patches`: opções do filtro, do mais novo ao mais antigo. `current_patch`: patch atual do
+    jogo (padrão do filtro). `analysis_patches`: janela de análise; fora dela, `OUT_OF_SCOPE`."""
+
     patches: list[str]
+    current_patch: str | None = None
+    analysis_patches: list[str] = Field(default_factory=list)
     patch: str | None
     role: Literal["BOTTOM"] = "BOTTOM"
     phase: Literal["first", "second", "sequence"]

@@ -878,12 +878,20 @@ export interface components {
             /** Matches */
             matches: number;
         };
-        /** ChampionPatterns */
+        /**
+         * ChampionPatterns
+         * @description `patches`: opções do filtro, do mais novo ao mais antigo. `current_patch`: patch atual do
+         *     jogo (padrão do filtro). `analysis_patches`: janela de análise; fora dela, `OUT_OF_SCOPE`.
+         */
         ChampionPatterns: {
+            /** Analysispatches */
+            analysisPatches?: string[];
             /** Championid */
             championId: number | null;
             /** Champions */
             champions: components["schemas"]["ChampionChoice"][];
+            /** Currentpatch */
+            currentPatch?: string | null;
             /**
              * Eligibledecisions
              * @default 0

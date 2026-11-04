@@ -20,7 +20,7 @@ A interface consulta `https://ddragon.leagueoflegends.com/cdn/{versão}/data/pt_
 
 `GET /api/v1/champions/patterns` é uma consulta descritiva em transação READ ONLY, sem coleta, extração, escrita ou uso dos arquivos de datasets. Parâmetros: `championId` inteiro positivo opcional, `patch` no formato `major.minor`, `phase=first|second|sequence` (padrão `sequence`) e `role=BOTTOM` (única função suportada). Resposta `ChampionPatterns`, tipada no OpenAPI; parâmetros inválidos retornam 422.
 
-O recorte vem da configuração vigente e da janela de patches detectada no banco. A lista de campeões inclui contagem de partidas importadas no patch/função e nomes/retratos do catálogo fixado. A amostra detalhada limita-se às 200 participações mais recentes do campeão selecionado. Pontos devem corresponder à reconstrução corrente, ao catálogo da marca e às versões atuais de seleção, features, recorte, classificação e curadoria. DEMO não entra nos agregados reais.
+O recorte vem da configuração vigente e da janela de patches detectada no banco. Sem `patch` no pedido, vale o patch atual do jogo (`currentPatch`): o último publicado no Data Dragon, gravado pelo worker, ou o da janela quando ainda não há esse registro. `patches` lista, do mais novo ao mais antigo, o patch atual, os da janela de análise (`analysisPatches`) e os que têm partidas reais importadas, até 12. Fora da janela de análise, a resposta é `OUT_OF_SCOPE`, mas a contagem por campeão continua preenchida. A lista de campeões inclui contagem de partidas importadas no patch/função escolhidos e nomes/retratos do catálogo fixado do patch; sem catálogo sincronizado para ele (patch recém-lançado), usa o catálogo do patch mais recente da lista que o tenha. A amostra detalhada limita-se às 200 participações mais recentes do campeão selecionado. Pontos devem corresponder à reconstrução corrente, ao catálogo da marca e às versões atuais de seleção, features, recorte, classificação e curadoria. DEMO não entra nos agregados reais.
 
 `observedDecisions` conta compras principais reconstruídas nas ordens selecionadas; `eligibleDecisions` é o subconjunto elegível. `patternDenominator` conta participações com exatamente uma compra elegível por ordem exigida, em ordem temporal crescente. Uma sequência nunca é completada com eventos incertos ou ausentes. Os seis padrões mais frequentes mantêm o denominador completo; nomes e versões dos itens vêm do catálogo da respectiva reconstrução.
 
@@ -31,7 +31,11 @@ As observações históricas agregadas não alteram baseline, treino, teste rese
 ## Patch vigente e suporte (CC-314)
 
 `cc patch detect` lê somente `versions.json` público e grava o patch vigente,
-data e hash no banco configurado. A preparação e `cc catalog sync` resolvem
+data e hash no banco configurado (linha `current` de `current_patch`, que define a janela de análise).
+Patch atual do jogo: o worker, só no modo real (chave da Riot configurada), relê o mesmo `versions.json`
+a cada `published_patch_refresh_seconds` (6 h) e grava apenas a linha `published`; falha mantém o valor
+anterior e tenta de novo em 15 min. Essa linha serve às telas (Campeões) e nunca move a janela de análise,
+que continua explícita. `cc patch detect` atualiza as duas linhas. A demonstração não usa a rede. A preparação e `cc catalog sync` resolvem
 um patch ausente dos overrides por `major.minor`: escolhem a primeira versão
 publicada para aquele minor na lista do Data Dragon (a última ocorrência na
 lista decrescente), e gravam versão, data, hash e regra. Uma resolução gravada

@@ -12,6 +12,12 @@ import { championName } from "../matches/format";
 
 const PHASES = { sequence: "1º → 2º item", first: "Primeiro item", second: "Segundo item" } as const;
 
+/** "16.22 (atual)" para o patch atual do jogo; os demais, só o número. */
+function patchLabel(patch: string | null | undefined, current: string | null | undefined): string {
+  if (!patch) return "não detectado";
+  return patch === current ? `${patch} (atual)` : patch;
+}
+
 function ItemPortrait({ item }: { item: NonNullable<ChampionPatterns["patterns"]>[number]["items"][number] }) {
   return <ItemNames version={item.dataDragonVersion}><LocalizedItemPortrait item={item} /></ItemNames>;
 }
@@ -72,8 +78,8 @@ export function ChampionsPage() {
     </section> : !data ? <p role="status">Carregando campeões e amostra local…</p> : <>
       <div className="champions-filters surface surface--pad" aria-label="Filtros dos padrões observados">
         <label>Patch<select value={patch ?? data.patch ?? ""} onChange={(event) => update("patch", event.target.value)}>
-          {data.patches.map((value) => <option key={value}>{value}</option>)}
-          {data.patch && !data.patches.includes(data.patch) && <option>{data.patch}</option>}
+          {data.patches.map((value) => <option key={value} value={value}>{patchLabel(value, data.currentPatch)}</option>)}
+          {data.patch && !data.patches.includes(data.patch) && <option value={data.patch}>{patchLabel(data.patch, data.currentPatch)}</option>}
         </select></label>
         <label>Função<select value="BOTTOM" disabled><option value="BOTTOM">Atirador · rota inferior</option></select></label>
         <label>Etapa da build<select value={phase} onChange={(event) => update("phase", event.target.value)}>
@@ -85,6 +91,7 @@ export function ChampionsPage() {
         {/* CC-1206: lista como "Campeões em foco" do Painel; escolhido com véu e barra roxos. */}
         <nav className="champions-roster" aria-labelledby="champions-roster-heading">
           <div className="section-head"><h3 id="champions-roster-heading">Campeões em foco</h3></div>
+          <p className="champions-roster__patch">Partidas coletadas no patch {patchLabel(data.patch, data.currentPatch)}</p>
           <ul className="row-list surface">
             {roster.map((champion) => {
               const pressed = champion.championId === (championId ?? data.championId);
@@ -97,12 +104,12 @@ export function ChampionsPage() {
             })}
           </ul>
           {/* CC-904: campeões sem partida no filtro saem da lista e viram uma linha. */}
-          {absent.length ? <p className="champions-roster__absent">Sem partidas neste patch: {absent.map((c) => championName(c)).join(", ")}.</p> : null}
+          {absent.length ? <p className="champions-roster__absent">Sem partidas no patch {data.patch}: {absent.map((c) => championName(c)).join(", ")}.</p> : null}
         </nav>
         <div className="champions-content" aria-live="polite" aria-busy={loading}>
           {loading ? <p role="status">Carregando padrões deste filtro…</p> : <>
           <section className="champion-overview surface surface--pad">
-            <p className="champion-overview__context">BOTTOM · patch {data.patch ?? "não detectado"}</p>
+            <p className="champion-overview__context">BOTTOM · patch {patchLabel(data.patch, data.currentPatch)}</p>
             <h3>{chosen ? <ChampionBadge participant={chosen} size={56} /> : "Campeão fora do recorte"}</h3>
             <dl className="champion-stats">
               <div><dt className="metric__label">Participações examinadas</dt><dd>{data.sampledParticipations} de {data.totalParticipations}</dd></div>
@@ -125,7 +132,9 @@ export function ChampionsPage() {
               </li>)}
             </ol> : <div className="champion-empty" role="status">
               <h4>{data.status === "SMALL_SAMPLE" ? "Amostra insuficiente para publicar padrões" : data.status === "OUT_OF_SCOPE" ? "Seleção fora do recorte validado" : "Ainda não há trajetos elegíveis neste filtro"}</h4>
-              <p>São necessárias pelo menos {data.minimumSample} participações com a etapa completa e elegível. Nenhum padrão é preenchido por estimativa.</p>
+              {data.status === "OUT_OF_SCOPE" && data.patch && !(data.analysisPatches ?? []).includes(data.patch)
+                ? <p>O patch {data.patch} ainda não está na janela de análise{(data.analysisPatches ?? []).length ? ` (${(data.analysisPatches ?? []).join(" e ")})` : ""}. Os padrões só são publicados para patches da janela; a contagem de partidas continua visível.</p>
+                : <p>São necessárias pelo menos {data.minimumSample} participações com a etapa completa e elegível. Nenhum padrão é preenchido por estimativa.</p>}
             </div>}
             <p className="champion-limit">Sem ranking de itens validado para este guia. O baseline de popularidade usado no estudo é separado desta amostra local.</p>
           </section>

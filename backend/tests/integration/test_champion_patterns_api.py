@@ -11,12 +11,16 @@ from pipeline_helpers import (
     reset_match,
     write_prepare_configs,
 )
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from riftlab.api.app import create_app
 from riftlab.catalog.domain import CatalogItemSourceDTO, CatalogSourceResult
 from riftlab.catalog.infrastructure.curation import CURATION_RULES_VERSION
-from riftlab.catalog.patches import CurrentPatchModel, record_current_patch
+from riftlab.catalog.patches import (
+    CurrentPatchModel,
+    record_current_patch,
+    record_published_patch,
+)
 from riftlab.collection.importing import drain_local, enqueue_collected_imports
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.shared.db import unit_of_work
@@ -38,15 +42,13 @@ async def test_real_patterns_are_read_only_scoped_and_abstain_on_stale_versions(
     store = DurableRawMatchStore(tmp_path / "raw")
     ids = [f"BR1_{uuid.uuid4().int % 10**18}" for _ in range(6)]
     async with session_factory() as session:
-        previous = await session.get(CurrentPatchModel, "current")
-        previous_values = (
+        previous_rows = [
             {
-                column.name: getattr(previous, column.name)
+                column.name: getattr(row, column.name)
                 for column in CurrentPatchModel.__table__.columns
             }
-            if previous
-            else None
-        )
+            for row in (await session.scalars(select(CurrentPatchModel))).all()
+        ]
 
     class Source:
         async def load_catalog(self, game_patch):
@@ -121,6 +123,37 @@ async def test_real_patterns_are_read_only_scoped_and_abstain_on_stale_versions(
                 "status"
             ] == "NO_ELIGIBLE"
             assert (await client.get(url + "&role=TOP")).status_code == 422
+            # Sem patch no pedido: o patch atual do jogo é o padrão, com contagem por campeão.
+            default = (await client.get("/api/v1/champions/patterns?championId=89")).json()
+            assert (default["currentPatch"], default["patch"]) == (patch, patch)
+            assert default["analysisPatches"] == [patch, other_patch]
+            assert {patch, other_patch} <= set(default["patches"])
+            counts = {c["championId"]: c["matches"] for c in default["champions"]}
+            assert counts[89] == 5
+            # Patch publicado mais novo: vira o padrão, sem partidas e fora da janela de análise,
+            # e os patches com partidas importadas continuam selecionáveis.
+            newer = f"{major}.20"
+            await record_published_patch(
+                session_factory, json.dumps([f"{newer}.1", f"{patch}.1"]).encode()
+            )
+            moved = (await client.get("/api/v1/champions/patterns?championId=89")).json()
+            assert (moved["currentPatch"], moved["patch"], moved["status"]) == (
+                newer,
+                newer,
+                "OUT_OF_SCOPE",
+            )
+            assert moved["analysisPatches"] == [patch, other_patch]
+            assert moved["patches"].index(newer) < moved["patches"].index(patch)
+            assert all(c["matches"] == 0 for c in moved["champions"])
+            # Sem catálogo do patch novo, nome e retrato vêm do mais recente disponível.
+            named = {c["championId"]: c["champion"] for c in default["champions"]}
+            assert all(c["champion"] == named[c["championId"]] for c in moved["champions"])
+            chosen = (await client.get(url)).json()
+            assert (chosen["currentPatch"], chosen["patch"], chosen["status"]) == (
+                newer,
+                patch,
+                "AVAILABLE",
+            )
             scope_path.write_text(scope_path.read_text().replace("2026-09-19", "2026-09-20"))
             stale = (await client.get(url)).json()
             assert stale["status"] == "NO_ELIGIBLE"
@@ -130,5 +163,4 @@ async def test_real_patterns_are_read_only_scoped_and_abstain_on_stale_versions(
             await reset_match(session_factory, match_id)
         async with unit_of_work(session_factory) as session:
             await session.execute(delete(CurrentPatchModel))
-            if previous_values:
-                session.add(CurrentPatchModel(**previous_values))
+            session.add_all(CurrentPatchModel(**row) for row in previous_rows)

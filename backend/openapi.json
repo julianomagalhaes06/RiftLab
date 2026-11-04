@@ -646,7 +646,15 @@
       },
       "ChampionPatterns": {
         "additionalProperties": false,
+        "description": "`patches`: opções do filtro, do mais novo ao mais antigo. `current_patch`: patch atual do\njogo (padrão do filtro). `analysis_patches`: janela de análise; fora dela, `OUT_OF_SCOPE`.",
         "properties": {
+          "analysisPatches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Analysispatches",
+            "type": "array"
+          },
           "championId": {
             "anyOf": [
               {
@@ -664,6 +672,17 @@
             },
             "title": "Champions",
             "type": "array"
+          },
+          "currentPatch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentpatch"
           },
           "eligibleDecisions": {
             "default": 0,

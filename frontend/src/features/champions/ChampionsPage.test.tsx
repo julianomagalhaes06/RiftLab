@@ -28,7 +28,7 @@ describe("Campeões com padrões observados", () => {
     expect(screen.getByText(/Sem ranking de itens validado/)).toBeInTheDocument();
     // CC-904: campeão sem partida no filtro sai da lista e aparece numa linha.
     expect(screen.queryByRole("button", { name: /Miss Fortune/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Sem partidas neste patch: Miss Fortune.")).toBeInTheDocument();
+    expect(screen.getByText("Sem partidas no patch 16.19: Miss Fortune.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Jinx/ }));
     expect(await screen.findByText("Ainda não há trajetos elegíveis neste filtro")).toBeInTheDocument();
     // CC-1206: lista como "Campeões em foco"; só o escolhido tem véu e barra roxos.
@@ -42,6 +42,32 @@ describe("Campeões com padrões observados", () => {
     fireEvent.change(screen.getByLabelText("Patch"), { target: { value: "16.18" } });
     await waitFor(() => expect(window.location.search).toContain("patch=16.18"));
     expect(mock.calls.some((call) => call.search.get("patch") === "16.18")).toBe(true);
+  });
+
+  it("abre no patch atual do jogo, mostra as partidas coletadas nele e permite outro patch", async () => {
+    window.history.replaceState(null, "", "/campeoes");
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/champions\/patterns$/, ({ search }) => json(200, search.get("patch") === "16.21"
+      ? championPatterns({ patches: ["16.22", "16.21", "16.19", "16.18"], currentPatch: "16.22", patch: "16.21",
+        status: "OUT_OF_SCOPE", patterns: [], situations: [] })
+      : championPatterns({ patches: ["16.22", "16.21", "16.19", "16.18"], currentPatch: "16.22", patch: "16.22",
+        status: "OUT_OF_SCOPE", patterns: [], situations: [], champions: championPatterns().champions.map(
+          (champion) => ({ ...champion, matches: champion.championId === 51 ? 3 : 0 })) })));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    expect(await screen.findByText("Partidas coletadas no patch 16.22 (atual)")).toBeInTheDocument();
+    const select = screen.getByLabelText("Patch");
+    expect(select).toHaveValue("16.22");
+    expect(screen.getByRole("option", { name: "16.22 (atual)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "16.21" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Caitlyn/ })).toHaveTextContent("3 partidas");
+    expect(screen.getByText("Sem partidas no patch 16.22: Jinx, Miss Fortune.")).toBeInTheDocument();
+    expect(screen.getByText(/O patch 16.22 ainda não está na janela de análise \(16.19 e 16.18\)/)).toBeInTheDocument();
+    // O pedido sem patch deixa o servidor escolher o atual.
+    expect(mock.callsTo("GET", /^\/api\/v1\/champions\/patterns$/).map((call) => call.search.get("patch"))).toEqual([null]);
+    fireEvent.change(select, { target: { value: "16.21" } });
+    expect(await screen.findByText("Partidas coletadas no patch 16.21")).toBeInTheDocument();
+    expect(window.location.search).toContain("patch=16.21");
   });
 
   it("abstém com amostra pequena e mantém as situações para estudo", async () => {

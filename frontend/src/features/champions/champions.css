@@ -13,6 +13,7 @@
 .champions-roster button .champion { gap: 12px; font-size: .9375rem; font-weight: 600; min-width: 0; }
 .champions-roster small { color: var(--ntext-subtle); font-size: .8125rem; white-space: nowrap; }
 .champions-roster__absent { margin: 10px 2px 0; color: var(--ntext-subtle); font-size: .8125rem; line-height: 1.4; }
+.champions-roster__patch { margin: 0 2px 10px; color: var(--ntext-subtle); font-size: .8125rem; line-height: 1.4; }
 
 .champions-content { display: grid; min-width: 0; gap: 24px; }
 .champions-content p { color: var(--ntext-muted); line-height: 1.5; }

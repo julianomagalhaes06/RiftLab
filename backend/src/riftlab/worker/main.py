@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from riftlab import db
+from riftlab.catalog.patches import PublishedPatchRefresher
 from riftlab.config import Settings, get_settings
 from riftlab.history_sync.application import process_next_history_sync
 from riftlab.ingestion.application import process_next_job
@@ -73,6 +74,7 @@ async def run(settings: Settings | None = None, stop_event: asyncio.Event | None
     engine = db.build_engine(settings.database_url)
     session_factory = build_session_factory(engine)
     raw_store = DurableRawMatchStore(Path(settings.raw_storage_dir))
+    published = PublishedPatchRefresher(session_factory, settings)
 
     try:
         while not stop_event.is_set():
@@ -92,6 +94,8 @@ async def run(settings: Settings | None = None, stop_event: asyncio.Event | None
             synced = await _run_step(
                 "sincronizacao", lambda: process_next_history_sync(session_factory, settings)
             )
+            # Patch atual do jogo para as telas; nunca conta como trabalho de fila.
+            await _run_step("patch publicado", published.step)
             processed = imported or prepared or purged or synced
             _touch_heartbeat(heartbeat_path)
             if not processed:

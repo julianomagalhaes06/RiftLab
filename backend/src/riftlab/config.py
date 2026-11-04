@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     # uso: processar um job já toca o heartbeat, não é preciso um timer
     # separado (CC-201).
     worker_poll_interval_seconds: float = 2.0
+    # Patch atual do jogo (versions.json público): renovado pelo worker só no modo real.
+    published_patch_refresh_seconds: float = 6 * 3600.0
     # CC-901: sincronização do histórico da conta própria ao abrir a aba Histórico.
     # Intervalo mínimo entre execuções, espera maior depois de chave rejeitada,
     # janela da primeira listagem e teto de IDs por listagem (uma requisição).

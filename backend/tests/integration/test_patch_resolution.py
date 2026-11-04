@@ -104,5 +104,7 @@ async def test_detected_patch_is_recorded_without_any_match_collection(session_f
 
     async with unit_of_work(session_factory) as session:
         await session.execute(
-            delete(CurrentPatchModel).where(CurrentPatchModel.singleton == "current")
+            delete(CurrentPatchModel).where(
+                CurrentPatchModel.singleton.in_(["current", "published"])
+            )
         )
