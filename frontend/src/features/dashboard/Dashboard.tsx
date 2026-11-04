@@ -132,7 +132,7 @@ export function Dashboard() {
                 {data.origin === "DEMO" ? <p className="panel-metrics__source">DEMO · participante 1 das partidas sintéticas; não representa seu desempenho.</p> : null}
                 {data.status === "IDENTITY_UNAVAILABLE" ? <div className="panel-metrics__state">
                   <strong>Conta própria ainda sem vínculo observado</strong>
-                  <p>Atualize Minha posição pelo comando administrativo para registrar o vínculo da conta. Depois, importe suas partidas. As partidas de terceiros continuam disponíveis para estudo no Histórico.</p>
+                  <p>O vínculo da conta é registrado na primeira atualização de Minha posição com a chave da Riot configurada. Depois, importe suas partidas. As partidas de terceiros continuam disponíveis para estudo no Histórico.</p>
                   <Link to="/minha-posicao" className="arrow-link">Consultar Minha posição</Link>
                 </div> : data.status === "EMPTY" ? <div className="panel-metrics__state">
                   <strong>Nenhuma partida neste recorte</strong>

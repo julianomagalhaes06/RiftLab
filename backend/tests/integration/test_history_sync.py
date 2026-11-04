@@ -20,6 +20,9 @@ from riftlab.ingestion.domain import ImportMode
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.models import ImportJobModel, PurgeTombstoneModel
 from riftlab.ingestion.purge import match_ref
+from riftlab.ranked.application import ranked_me
+from riftlab.ranked.domain import account_key
+from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.db import unit_of_work
 
 PUUID = "synthetic-own-puuid"
@@ -41,7 +44,25 @@ def _settings(
     )
 
 
-def _transport(ids: list[str], *, status: int = 200, headers: dict | None = None):
+SILVER = {
+    "queueType": "RANKED_SOLO_5x5",
+    "puuid": PUUID,
+    "tier": "SILVER",
+    "rank": "IV",
+    "leaguePoints": 60,
+    "wins": 1,
+    "losses": 4,
+}
+
+
+def _transport(
+    ids: list[str],
+    *,
+    status: int = 200,
+    headers: dict | None = None,
+    league: object | None = None,
+):
+    """`status` vale para listagem e elo; `league` é o corpo do League-V4 (padrão: [])."""
     seen: list[httpx.Request] = []
 
     def responder(request: httpx.Request) -> httpx.Response:
@@ -53,6 +74,10 @@ def _transport(ids: list[str], *, status: int = 200, headers: dict | None = None
             return httpx.Response(200, json={"puuid": PUUID})
         if status != 200:
             return httpx.Response(status, headers=headers or {})
+        if "/lol/league/v4/entries/by-puuid/" in request.url.path:
+            assert request.url.host == "br1.api.riotgames.com"
+            assert request.url.path.endswith(PUUID)
+            return httpx.Response(200, json=[] if league is None else league)
         assert request.url.path.endswith(f"{PUUID}/ids")
         return httpx.Response(200, json=ids)
 
@@ -61,11 +86,39 @@ def _transport(ids: list[str], *, status: int = 200, headers: dict | None = None
     return RiotHttpTransport("synthetic-key", budget, client=client), client, seen
 
 
+def _key(name: str, tag: str = "BR1") -> str:
+    account = application.RiotAccountConfig(
+        name, tag, application.ALLOWED_PLATFORM, application.ALLOWED_REGIONAL_ROUTING
+    )
+    key = account_key(account, "synthetic-secret")
+    assert key is not None
+    return key
+
+
+SYNTHETIC_KEYS = [_key("synthetic-owner"), _key("someone-else"), _key("Synthetic Third", "XYZ")]
+
+
+async def _observations(session_factory, key: str) -> list[Observation]:
+    async with session_factory() as session:
+        return list(
+            (
+                await session.scalars(
+                    select(Observation)
+                    .where(Observation.account_key == key)
+                    .order_by(Observation.captured_at, Observation.queue)
+                )
+            ).all()
+        )
+
+
 @pytest.fixture
 async def clean(session_factory):
     async def wipe() -> None:
         async with unit_of_work(session_factory) as session:
             await session.execute(delete(Run))
+            await session.execute(
+                delete(Observation).where(Observation.account_key.in_(SYNTHETIC_KEYS))
+            )
             await session.execute(
                 delete(ImportJobModel).where(
                     ImportJobModel.requested_match_id.in_([NEW, PENDING, PURGED])
@@ -181,6 +234,11 @@ async def test_riot_failures_finish_failed_and_hold_new_requests(
         await client.aclose()
     status = await sync_status(session_factory, settings)
     assert (status["state"], status["reason"], status["newEnqueued"]) == ("FAILED", code, 0)
+    observations = await _observations(session_factory, _key("synthetic-owner"))
+    assert [(o.queue, o.state, o.error_code) for o in observations] == [
+        ("RANKED_FLEX_SR", "FAILED", code),
+        ("RANKED_SOLO_5x5", "FAILED", code),
+    ]
     finished = status["finishedAt"]
     assert status["nextAllowedAt"] == finished + timedelta(seconds=wait)
     held, created = await request_sync(
@@ -235,6 +293,70 @@ async def test_stale_running_and_account_change_never_block_or_leak(
     assert seen == []  # conta trocada: nenhuma chamada à Riot
     status = await sync_status(session_factory, settings)
     assert (status["state"], status["reason"]) == ("FAILED", "ACCOUNT_CHANGED")
+
+
+@pytest.mark.asyncio
+async def test_sync_records_the_ranked_position_of_the_account(session_factory, tmp_path, clean):
+    settings = _settings(tmp_path)
+    await request_sync(session_factory, settings, now=NOW)
+    transport, client, seen = _transport([], league=[SILVER])
+    try:
+        await process_next_history_sync(session_factory, settings, transport=transport, now=NOW)
+    finally:
+        await client.aclose()
+    # Conta, listagem e elo: três requisições, dentro do orçamento da execução.
+    assert len(seen) == 3
+    assert (await sync_status(session_factory, settings))["state"] == "SUCCEEDED"
+    observations = await _observations(session_factory, _key("synthetic-owner"))
+    assert [(o.queue, o.state, o.tier, o.division, o.league_points) for o in observations] == [
+        ("RANKED_FLEX_SR", "UNRANKED", None, None, None),
+        ("RANKED_SOLO_5x5", "READY", "SILVER", "IV", 60),
+    ]
+    assert {(o.season, o.captured_at, o.origin) for o in observations} == {
+        ("2026", NOW, "RIOT_LEAGUE_V4")
+    }
+    assert all(o.subject_hash and PUUID not in str(vars(o)) for o in observations)
+
+    solo = await ranked_me(session_factory, settings, now=NOW + timedelta(minutes=1))
+    assert (solo["status"], solo["reason"]) == ("READY", None)
+    assert (solo["position"]["tier"], solo["position"]["wins"], solo["position"]["losses"]) == (
+        "SILVER",
+        1,
+        4,
+    )
+    flex = await ranked_me(session_factory, settings, queue="RANKED_FLEX_SR", now=NOW)
+    assert (flex["status"], flex["position"]["state"]) == ("UNRANKED", "UNRANKED")
+
+
+@pytest.mark.asyncio
+async def test_ranked_failure_keeps_the_previous_position_and_still_enqueues_matches(
+    session_factory, tmp_path, clean
+):
+    settings = _settings(tmp_path)
+    await request_sync(session_factory, settings, now=NOW)
+    transport, client, _ = _transport([], league=[SILVER])
+    try:
+        await process_next_history_sync(session_factory, settings, transport=transport, now=NOW)
+    finally:
+        await client.aclose()
+
+    finished = (await sync_status(session_factory, settings))["finishedAt"]
+    later = finished + timedelta(seconds=301)
+    assert (await request_sync(session_factory, settings, now=later))[1]
+    # Resposta do elo fora do formato: a listagem já valeu e a partida nova é enfileirada.
+    transport, client, _ = _transport([NEW], league={"unexpected": True})
+    try:
+        await process_next_history_sync(session_factory, settings, transport=transport, now=later)
+    finally:
+        await client.aclose()
+    status = await sync_status(session_factory, settings)
+    assert (status["state"], status["newEnqueued"]) == ("SUCCEEDED", 1)
+    latest = (await _observations(session_factory, _key("synthetic-owner")))[-2:]
+    assert [(o.state, o.error_code) for o in latest] == [("FAILED", "SCHEMA_UNSUPPORTED")] * 2
+
+    solo = await ranked_me(session_factory, settings, now=later)
+    assert (solo["status"], solo["reason"]) == ("STALE", "SCHEMA_UNSUPPORTED")
+    assert (solo["position"]["tier"], solo["position"]["observedAt"]) == ("SILVER", NOW)
 
 
 THIRD = application.RiotAccountConfig(

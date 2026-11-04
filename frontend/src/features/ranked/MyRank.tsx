@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
-import { api, type RankedMe, type RankedQueue } from "../../shared/api/client";
+import { api, type HistorySyncStatus, type RankedMe, type RankedQueue } from "../../shared/api/client";
+import { active } from "../history/syncMessage";
 import "./ranked.css";
 import { preferredQueue } from "./preferredQueue";
 import { RankCard, type RankCardChange } from "./RankCard";
@@ -8,7 +9,7 @@ import { count } from "../../shared/text/count";
 
 const reasonNames: Record<string, string> = {
   ACCOUNT_OR_SECRET_MISSING: "Configure a conta local e o segredo de vínculo para consultar sua posição.",
-  NO_OBSERVATION: "Ainda não há observação desta fila. Atualize pelo comando administrativo.",
+  NO_OBSERVATION: "Ainda não há observação desta fila. Com a chave da Riot configurada, ela é consultada ao abrir esta tela.",
   RIOT_KEY_MISSING: "A chave da Riot está ausente. A última posição observada continua visível.",
   OBSERVATION_OLD: "Esta observação tem mais de 24 horas.",
   RIOT_AUTH_FAILED: "A atualização falhou por autenticação na Riot. A posição anterior foi preservada.",
@@ -42,7 +43,7 @@ function LpRules({ current }: { current: Tier | null }) {
         <li>De Ferro a Diamante, cada divisão vai de 0 a 100 PDL, de IV a I.</li>
         <li>Ao chegar a 100 PDL, a promoção acontece e o excedente segue para a divisão seguinte.</li>
         <li>Mestre, Grão-Mestre e Desafiante não têm divisões, e o PDL não tem teto.</li>
-        <li>A posição muda quando o comando administrativo de atualização é executado.</li>
+        <li>A posição é consultada na Riot ao abrir esta tela, o Painel ou o Histórico, com um intervalo mínimo entre consultas.</li>
         <li>A variação entre observações não é atribuída a uma partida importada.</li>
       </ul>
       <ol className="tier-ladder" aria-label="Elos, do menor ao maior">
@@ -73,10 +74,50 @@ function changeStrip(data: RankedMe["change"]): RankCardChange {
 
 const observedAt = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
+const SYNC_POLL_MS = 2000;
+
+/**
+ * Ao abrir, pede a sincronização da conta própria (CC-901). A mesma execução do worker consulta
+ * o elo na Riot; o servidor respeita o intervalo mínimo e a execução ativa. `round` muda quando
+ * uma execução acompanhada termina, para a posição ser lida de novo do banco.
+ */
+function useRankRefresh(): { updating: boolean; round: number } {
+  const [updating, setUpdating] = useState(false);
+  const [round, setRound] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    let timer: number | undefined;
+    let followed = false;
+    const stop = () => {
+      if (!controller.signal.aborted) setUpdating(false);
+    };
+    const follow = (status: HistorySyncStatus) => {
+      if (controller.signal.aborted) return;
+      if (active(status)) {
+        followed = true;
+        setUpdating(true);
+        timer = window.setTimeout(() => {
+          api.getHistorySync(controller.signal).then(follow).catch(stop);
+        }, SYNC_POLL_MS);
+        return;
+      }
+      setUpdating(false);
+      if (followed) setRound((value) => value + 1);
+    };
+    api.requestHistorySync(controller.signal).then(follow).catch(stop);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, []);
+  return { updating, round };
+}
+
 export function MyRank({ compact = false }: { compact?: boolean }) {
   const [selection, setSelection] = useState<RankedQueue | null>(null);
   const [results, setResults] = useState<Partial<Record<RankedQueue, { data?: RankedMe; failed?: boolean }>>>({});
   const queueId = useId();
+  const { updating, round } = useRankRefresh();
   useEffect(() => {
     const controller = new AbortController();
     for (const queue of ["RANKED_SOLO_5x5", "RANKED_FLEX_SR"] as const) {
@@ -89,7 +130,7 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
       });
     }
     return () => controller.abort();
-  }, []);
+  }, [round]);
   const queue = selection ?? preferredQueue(results.RANKED_SOLO_5x5?.data, results.RANKED_FLEX_SR?.data);
   const data = results[queue]?.data ?? null;
   const error = results[queue]?.failed === true;
@@ -120,7 +161,8 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
         {error && <p className="rank-card__state" role="alert">Não foi possível consultar a posição armazenada.</p>}
         {data?.status === "UNAVAILABLE" && <p className="rank-card__state" role="status">{reasonNames[data.reason ?? ""] ?? "Posição indisponível para esta conta."}</p>}
         {position?.state === "UNRANKED" && <p className="rank-card__state" role="status">Não classificado na {queueLabel} nesta observação válida.</p>}
-        {data?.status === "STALE" && <p className="rank-card__note" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}
+        {updating && <p className="rank-card__note" role="status" aria-busy="true">Atualizando a posição com a Riot…</p>}
+        {data?.status === "STALE" && !updating && <p className="rank-card__note" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}
         {position?.origin === "DEMO_FICTITIOUS" && <p className="rank-card__note" role="note">Elo fictício de demonstração: não foi consultado na Riot e não pertence a nenhuma conta.</p>}
       </RankCard>
       {!compact ? (

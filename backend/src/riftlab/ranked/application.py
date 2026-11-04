@@ -14,10 +14,11 @@ from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, Rio
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
 from riftlab.ingestion.models import MatchModel, ParticipantModel
 from riftlab.ranked.domain import (
-    FLEX_QUEUE,
+    QUEUES,
     SEASON_PATTERN,
     SOLO_QUEUE,
     RankedQueue,
+    RankEntry,
     account_key,
     parse_league_entries,
 )
@@ -26,6 +27,57 @@ from riftlab.shared.db import read_only_unit_of_work, unit_of_work
 from riftlab.shared.errors import SourceError
 
 FRESH_FOR = timedelta(hours=24)
+ORIGIN = "RIOT_LEAGUE_V4"
+
+
+def league_observations(
+    key: str,
+    entries: dict[str, RankEntry],
+    *,
+    subject_hash: str,
+    season: str,
+    captured_at: datetime,
+) -> list[Observation]:
+    """Uma observação por fila a partir de uma resposta válida do League-V4: READY com a
+    entrada da conta ou UNRANKED quando a fila não aparece."""
+    observations = []
+    for queue in QUEUES:
+        entry = entries.get(queue)
+        observations.append(
+            Observation(
+                account_key=key,
+                subject_hash=subject_hash,
+                queue=queue,
+                season=season,
+                captured_at=captured_at,
+                state="READY" if entry else "UNRANKED",
+                tier=entry.tier if entry else None,
+                division=entry.division if entry else None,
+                league_points=entry.league_points if entry else None,
+                wins=entry.wins if entry else None,
+                losses=entry.losses if entry else None,
+                origin=ORIGIN,
+            )
+        )
+    return observations
+
+
+def failed_observations(
+    key: str, *, season: str, captured_at: datetime, error_code: str
+) -> list[Observation]:
+    """Tentativa sem resposta válida: registra o motivo sem apagar a posição anterior."""
+    return [
+        Observation(
+            account_key=key,
+            queue=queue,
+            season=season,
+            captured_at=captured_at,
+            state="FAILED",
+            error_code=error_code[:40],
+            origin=ORIGIN,
+        )
+        for queue in QUEUES
+    ]
 
 
 def _account_path(settings: Settings) -> Path:
@@ -67,18 +119,9 @@ async def refresh_ranked(
     except SourceError as exc:
         stamp = captured_at or datetime.now(UTC)
         async with unit_of_work(factory) as session:
-            for queue in (SOLO_QUEUE, FLEX_QUEUE):
-                session.add(
-                    Observation(
-                        account_key=key,
-                        queue=queue,
-                        season=season,
-                        captured_at=stamp,
-                        state="FAILED",
-                        error_code=exc.code,
-                        origin="RIOT_LEAGUE_V4",
-                    )
-                )
+            session.add_all(
+                failed_observations(key, season=season, captured_at=stamp, error_code=exc.code)
+            )
         raise
     finally:
         if own_transport:
@@ -86,24 +129,11 @@ async def refresh_ranked(
     stamp = captured_at or datetime.now(UTC)
     subject_hash = compute_real_subject_hash(puuid, settings.subject_hash_secret)
     async with unit_of_work(factory) as session:
-        for queue in (SOLO_QUEUE, FLEX_QUEUE):
-            entry = entries.get(queue)
-            session.add(
-                Observation(
-                    account_key=key,
-                    subject_hash=subject_hash,
-                    queue=queue,
-                    season=season,
-                    captured_at=stamp,
-                    state="READY" if entry else "UNRANKED",
-                    tier=entry.tier if entry else None,
-                    division=entry.division if entry else None,
-                    league_points=entry.league_points if entry else None,
-                    wins=entry.wins if entry else None,
-                    losses=entry.losses if entry else None,
-                    origin="RIOT_LEAGUE_V4",
-                )
+        session.add_all(
+            league_observations(
+                key, entries, subject_hash=subject_hash, season=season, captured_at=stamp
             )
+        )
     return {
         "state": "READY" if entries.get(SOLO_QUEUE) else "UNRANKED",
         "queue": SOLO_QUEUE,

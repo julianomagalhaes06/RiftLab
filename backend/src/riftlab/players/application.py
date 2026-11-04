@@ -32,6 +32,7 @@ from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
 from riftlab.players.models import PlayerProfileModel as Profile
+from riftlab.ranked.application import league_observations
 from riftlab.ranked.domain import FLEX_QUEUE, SOLO_QUEUE, account_key, parse_league_entries
 from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.db import read_only_unit_of_work, unit_of_work
@@ -205,24 +206,11 @@ async def lookup_player(
         profile.subject_hash = subject
         profile.profile_icon_id, profile.summoner_level = icon, level
         profile.refreshed_at = now
-        for queue in (SOLO_QUEUE, FLEX_QUEUE):
-            entry = entries.get(queue)
-            session.add(
-                Observation(
-                    account_key=key,
-                    subject_hash=subject,
-                    queue=queue,
-                    season=season or str(now.year),
-                    captured_at=now,
-                    state="READY" if entry else "UNRANKED",
-                    tier=entry.tier if entry else None,
-                    division=entry.division if entry else None,
-                    league_points=entry.league_points if entry else None,
-                    wins=entry.wins if entry else None,
-                    losses=entry.losses if entry else None,
-                    origin="RIOT_LEAGUE_V4",
-                )
+        session.add_all(
+            league_observations(
+                key, entries, subject_hash=subject, season=season or str(now.year), captured_at=now
             )
+        )
         await session.flush()
         return await _view(session, profile, (canonical_name, canonical_tag), None)
 

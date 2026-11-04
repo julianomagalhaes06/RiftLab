@@ -124,3 +124,41 @@ describe("card de elo (CC-1203)", () => {
     expect(container.querySelector(".rank-card__goal")).toHaveTextContent("Faltam 10 PDL para Mestre");
   });
 });
+
+describe("Minha posição atualizada pela sincronização da conta", () => {
+  const sync = { listed: 0, newEnqueued: 0, alreadyKnown: 0, skippedPurged: 0 };
+  const unranked = () => ({ ...rank(), status: "STALE", reason: "OBSERVATION_OLD", position: { ...rank().position,
+    state: "UNRANKED", tier: null, division: null, leaguePoints: null, wins: null, losses: null } });
+
+  it("pede a sincronização ao abrir e relê a posição quando a execução termina", async () => {
+    let refreshed = false;
+    mock.on("POST", /^\/api\/v1\/history\/sync$/, () => json(202, { ...sync, state: "QUEUED", requestedAt: "2026-11-04T12:00:00Z" }));
+    mock.on("GET", /^\/api\/v1\/history\/sync$/, () => {
+      refreshed = true;
+      return json(200, { ...sync, state: "SUCCEEDED", finishedAt: "2026-11-04T12:00:02Z", nextAllowedAt: "2099-01-01T00:00:00Z" });
+    });
+    mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, search.get("queue") === "RANKED_SOLO_5x5"
+      ? (refreshed ? { ...rank(), position: { ...rank().position, tier: "SILVER", leaguePoints: 60 } } : unranked())
+      : { ...unranked(), position: { ...unranked().position, queue: "RANKED_FLEX_SR" } }));
+    render(<MyRank />);
+    expect(await screen.findByText("Atualizando a posição com a Riot…")).toBeInTheDocument();
+    // Durante a atualização, o aviso de observação antiga não contradiz o estado.
+    expect(screen.queryByText(/Esta observação tem mais de 24 horas/)).not.toBeInTheDocument();
+    expect(await screen.findByText("Elo Prata IV, 60 de 100 PDL", {}, { timeout: 4000 })).toBeInTheDocument();
+    expect(screen.queryByText("Atualizando a posição com a Riot…")).not.toBeInTheDocument();
+    expect(mock.callsTo("POST", /^\/api\/v1\/history\/sync$/)).toHaveLength(1);
+    expect(mock.callsTo("GET", /^\/api\/v1\/ranked\/me$/)).toHaveLength(4);
+  }, 10000);
+
+  it("no intervalo mínimo ou sem chave, mantém a posição guardada sem nova leitura", async () => {
+    mock.on("POST", /^\/api\/v1\/history\/sync$/, () => json(200, { ...sync, state: "SUCCEEDED", reason: "COOLDOWN",
+      finishedAt: "2026-11-04T12:00:02Z", nextAllowedAt: "2099-01-01T00:00:00Z" }));
+    mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, rank(search.get("queue")!)));
+    render(<MyRank />);
+    await screen.findByText("Elo Platina IV, 75 de 100 PDL");
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+    expect(screen.queryByText("Atualizando a posição com a Riot…")).not.toBeInTheDocument();
+    expect(mock.callsTo("GET", /^\/api\/v1\/history\/sync$/)).toHaveLength(0);
+    expect(mock.callsTo("GET", /^\/api\/v1\/ranked\/me$/)).toHaveLength(2);
+  });
+});

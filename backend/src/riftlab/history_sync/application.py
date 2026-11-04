@@ -5,6 +5,11 @@ intervalo mínimo entre execuções. O worker faz a rede fora da transação: re
 própria, lista os IDs ranqueados recentes e enfileira IMPORT (modo RIOT) só para as partidas
 novas; as importações seguem o caminho normal do worker, com limitador e cooldown. Nunca
 grava PUUID, Riot ID ou IDs de partida na execução: só contagens e códigos de erro.
+
+A mesma execução consulta o elo da conta (League-V4) e grava uma observação por fila, com a
+temporada do ano corrente, como a busca de jogadores. Falha só no elo fica registrada como
+observação FAILED e não impede enfileirar as partidas; falha na conta ou na listagem também
+fica registrada no elo, preservando a última posição válida.
 """
 
 from __future__ import annotations
@@ -31,10 +36,13 @@ from riftlab.ingestion.infrastructure.riot_account import (
 )
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
+from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
 from riftlab.ingestion.models import MatchModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.ingestion.tombstone import MatchPurgedError
-from riftlab.ranked.domain import account_key
+from riftlab.ranked.application import failed_observations, league_observations
+from riftlab.ranked.domain import account_key, parse_league_entries
+from riftlab.ranked.models import RankedObservationModel
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import SourceError, SourceRateLimitedError
 
@@ -190,7 +198,7 @@ def _transport(settings: Settings) -> RiotHttpTransport:
     assert settings.riot_api_key is not None
     return RiotHttpTransport(
         settings.riot_api_key,
-        # Conta + uma listagem; nada de partidas aqui (as importações têm orçamento próprio).
+        # Conta, listagem e elo; nada de partidas aqui (as importações têm orçamento próprio).
         RiotFetchBudget(max_matches=0, max_requests=3, max_total_seconds=60.0, stop_on_429=True),
         rate_limiter=RiotRateLimiter(),
     )
@@ -263,12 +271,19 @@ async def process_next_history_sync(
         else now - timedelta(days=settings.history_sync_lookback_days)
     )
     try:
-        await _run(factory, settings, run_id, key, riot_id, since, transport)
+        await _run(factory, settings, run_id, key, riot_id, since, transport, now)
     except Exception:
         with contextlib.suppress(Exception):
             await _finish(factory, run_id, state="FAILED", error_code="SYNC_FAILED")
         raise
     return True
+
+
+async def _record_ranked(
+    factory: SessionFactory, observations: list[RankedObservationModel]
+) -> None:
+    async with unit_of_work(factory) as session:
+        session.add_all(observations)
 
 
 async def _run(
@@ -279,7 +294,9 @@ async def _run(
     riot_id: tuple[str | None, str | None],
     since: datetime,
     transport: RiotHttpTransport | None,
+    now: datetime,
 ) -> None:
+    season = str(now.year)
     try:
         account = _account_for(settings, key, riot_id)
         if account is None or not settings.riot_api_key:
@@ -297,6 +314,21 @@ async def _run(
                 start_time=int(since.timestamp()),
                 match_type="ranked",
             )
+            try:
+                entries = parse_league_entries(
+                    await client.fetch_league_entries_by_puuid(puuid), puuid
+                )
+                ranked = league_observations(
+                    key,
+                    entries,
+                    subject_hash=compute_real_subject_hash(puuid, settings.subject_hash_secret),
+                    season=season,
+                    captured_at=now,
+                )
+            except SourceError as exc:
+                ranked = failed_observations(
+                    key, season=season, captured_at=now, error_code=exc.code
+                )
         finally:
             if own:
                 await client.aclose()
@@ -304,11 +336,15 @@ async def _run(
         await _finish(factory, run_id, state="FAILED", error_code="ACCOUNT_NOT_CONFIGURED")
         return
     except SourceError as exc:
+        await _record_ranked(
+            factory, failed_observations(key, season=season, captured_at=now, error_code=exc.code)
+        )
         retry = exc.retry_after_seconds if isinstance(exc, SourceRateLimitedError) else None
         await _finish(
             factory, run_id, state="FAILED", error_code=exc.code[:40], retry_after_seconds=retry
         )
         return
+    await _record_ranked(factory, ranked)
     secret = settings.subject_hash_secret
     known = purged = enqueued = 0
     for match_id in ids:
