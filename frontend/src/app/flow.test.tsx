@@ -170,7 +170,7 @@ describe("fluxo principal: demonstração → importação → partida → decis
     expect(screen.getByText(/Aproximadamente 640 de ouro/)).toBeInTheDocument();
 
     // Volta às decisões do mesmo participante.
-    fireEvent.click(screen.getByRole("link", { name: /Voltar às decisões da partida DEMO-0008/ }));
+    fireEvent.click(screen.getByRole("link", { name: /^Voltar às decisões da partida$/ }));
     await screen.findByRole("heading", { name: "Decisões de Campeão #9001 (Atirador)" });
     expect(window.location.search).toBe("?participant=1");
 

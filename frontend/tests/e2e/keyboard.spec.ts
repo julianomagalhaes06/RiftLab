@@ -65,7 +65,7 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
   await expect(page.getByText("Componente Sintético A")).toBeVisible();
 
   // Volta às decisões do mesmo participante, ainda só com teclado.
-  await tabTo(page, /^Voltar às decisões da partida DEMO-0008/);
+  await tabTo(page, /^Voltar às decisões da partida$/);
   await expectFocusVisible(page);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: /^Decisões de Campeão #9000/ })).toBeVisible();

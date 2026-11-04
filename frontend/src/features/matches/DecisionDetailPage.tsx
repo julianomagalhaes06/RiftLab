@@ -325,7 +325,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         to={{ name: "match", matchId: decision.matchId, participantId: decision.participantId }}
         className="match-back"
       >
-        Voltar às decisões da partida {decision.matchId}
+        Voltar às decisões da partida
       </Link>
       <header className="decision-hero">
         {participant ? <ChampionAvatar participant={participant} size={56} className="portrait decision-hero__portrait" /> : null}
