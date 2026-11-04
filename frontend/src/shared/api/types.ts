@@ -694,6 +694,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/riot-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vínculo da conta Riot do usuário */
+        get: operations["get_link_api_v1_riot_link_get"];
+        put?: never;
+        post?: never;
+        /** Desfaz o vínculo da conta Riot */
+        delete: operations["delete_link_api_v1_riot_link_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/riot-link/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sorteia o ícone que comprova a conta (Account-V1 e Summoner-V4) */
+        post: operations["post_challenge_api_v1_riot_link_challenge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/riot-link/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confere o ícone e vincula */
+        post: operations["post_verify_api_v1_riot_link_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -2561,6 +2613,34 @@ export interface components {
             /** Team */
             team: number;
         };
+        /** RiotIdBody */
+        RiotIdBody: {
+            /** Gamename */
+            gameName: string;
+            /** Tagline */
+            tagLine: string;
+        };
+        /**
+         * RiotLinkState
+         * @description `NONE`: sem vínculo; `PENDING`: desafio ativo (`iconId` até `expiresAt`); `LINKED`.
+         */
+        RiotLinkState: {
+            /** Expiresat */
+            expiresAt?: string | null;
+            /** Gamename */
+            gameName?: string | null;
+            /** Iconid */
+            iconId?: number | null;
+            /** Linkedat */
+            linkedAt?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "NONE" | "PENDING" | "LINKED";
+            /** Tagline */
+            tagLine?: string | null;
+        };
         /**
          * SessionState
          * @description `authRequired`: o servidor exige login nas rotas da aplicação.
@@ -4293,6 +4373,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_link_api_v1_riot_link_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiotLinkState"];
+                };
+            };
+        };
+    };
+    delete_link_api_v1_riot_link_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_challenge_api_v1_riot_link_challenge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RiotIdBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiotLinkState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_verify_api_v1_riot_link_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiotLinkState"];
                 };
             };
         };

@@ -45,7 +45,7 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
 
     fill("jogadora", "senha-correta-1");
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
-    expect(await screen.findByText("jogadora")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Minha conta (jogadora)" })).toHaveAttribute("href", "/conta");
     expect(screen.queryByRole("heading", { name: "Entrar no RiftLab" })).not.toBeInTheDocument();
     // Toda chamada leva o cabeçalho anti-CSRF.
     const login = mock.callsTo("POST", /^\/api\/v1\/auth\/login$/);

@@ -10,6 +10,7 @@
  *   /decisions/:decisionId               detalhe de uma decisão
  *   /jogador/:nome-:tag                  perfil de um jogador pelo Riot ID (CC-1102)
  *   /jogador/:nome-:tag/ao-vivo          partida ao vivo do jogador (CC-1211)
+ *   /conta                              conta local e vínculo da conta Riot (Sprint 2, #12)
  *   /prototipo                           protótipo ilustrativo do CC-102 (dados fictícios)
  */
 export type Route =
@@ -17,6 +18,7 @@ export type Route =
   | { name: "panel" }
   | { name: "champions" }
   | { name: "position" }
+  | { name: "account" }
   | { name: "history" }
   | { name: "historyMatch"; matchId: string; participantId: number | null }
   | { name: "import"; jobId: string }
@@ -78,6 +80,7 @@ export function parseRoute(pathname: string, search = ""): Route {
   if (trimmed === "/importar") return { name: "importEntry" };
   if (trimmed === "/campeoes") return { name: "champions" };
   if (trimmed === "/minha-posicao") return { name: "position" };
+  if (trimmed === "/conta") return { name: "account" };
   if (trimmed === "/historico") return { name: "history" };
   const parts = trimmed.split("/").slice(1).map(safeDecode);
   const [head, id, ...rest] = parts;
@@ -130,6 +133,8 @@ export function routeToPath(route: Route): string {
       return "/campeoes";
     case "position":
       return "/minha-posicao";
+    case "account":
+      return "/conta";
     case "history":
       return "/historico";
     case "historyMatch": {

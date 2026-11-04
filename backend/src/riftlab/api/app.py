@@ -18,6 +18,7 @@ from riftlab.api.routes.matches import router as matches_router
 from riftlab.api.routes.objectives import router as objectives_router
 from riftlab.auth.api import router as auth_router
 from riftlab.auth.application import LoginThrottle
+from riftlab.auth.link_api import router as riot_link_router
 from riftlab.auth.middleware import AuthMiddleware
 from riftlab.catalog.api import router as catalog_router
 from riftlab.config import Settings, get_settings
@@ -66,6 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(riot_link_router)
     app.include_router(champions_router)
     app.include_router(imports_router)
     app.include_router(matches_router)
