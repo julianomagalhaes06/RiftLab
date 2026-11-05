@@ -21,6 +21,11 @@ import { PlayerPage } from "../features/players/PlayerPage";
 import { LivePage } from "../features/live/LivePage";
 import { PlayerSearch } from "../features/players/PlayerSearch";
 import { ProfileChip } from "../features/players/ProfileChip";
+import { AuthProvider } from "../features/auth/AuthProvider";
+import { useAuth } from "../features/auth/authContext";
+import { AuthScreen } from "../features/auth/AuthScreen";
+import { UserMenu } from "../features/auth/UserMenu";
+import { AccountPage } from "../features/auth/AccountPage";
 import "./App.css";
 import "../design/concept-c.css";
 
@@ -29,6 +34,7 @@ const TITLES: Record<Route["name"], string> = {
   panel: "Painel — RiftLab",
   champions: "Campeões — RiftLab",
   position: "Minha posição — RiftLab",
+  account: "Minha conta — RiftLab",
   history: "Histórico — RiftLab",
   historyMatch: "Contexto da partida — RiftLab",
   import: "Importação — RiftLab",
@@ -50,6 +56,8 @@ function renderPage(route: Route): ReactNode {
       return <ChampionsPage />;
     case "position":
       return <PositionPage />;
+    case "account":
+      return <AccountPage />;
     case "history":
       return <HistoryPage />;
     case "historyMatch":
@@ -80,6 +88,15 @@ function renderPage(route: Route): ReactNode {
 }
 
 function AppShell() {
+  const { checked, authRequired, user } = useAuth();
+  // Até saber da sessão, nenhuma tela dispara chamadas (evita 401 com login exigido).
+  if (!checked) return <p className="app-loading" role="status">Carregando o RiftLab…</p>;
+  // Login exigido pelo servidor e sem sessão: só a tela de entrar/criar conta (#10/#14).
+  if (authRequired && !user) return <AuthScreen />;
+  return <AppContent />;
+}
+
+function AppContent() {
   const { route, navigate, href } = useRouter();
   const mainRef = useRef<HTMLElement>(null);
   // Só o CAMINHO conta: trocar de participante (?participant=N) não devolve o foco ao
@@ -118,6 +135,7 @@ function AppShell() {
             <div className="app__tools">
               <PlayerSearch />
               <ProfileChip />
+              <UserMenu />
             </div>
           </div>
           <ContextStrip />
@@ -146,9 +164,11 @@ function AppShell() {
 export default function App() {
   return (
     <RouterProvider>
-      <DemoNoticeProvider>
-        <AppShell />
-      </DemoNoticeProvider>
+      <AuthProvider>
+        <DemoNoticeProvider>
+          <AppShell />
+        </DemoNoticeProvider>
+      </AuthProvider>
     </RouterProvider>
   );
 }

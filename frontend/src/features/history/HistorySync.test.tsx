@@ -53,6 +53,7 @@ describe("CC-901: sincronização do histórico", () => {
   it("explica indisponibilidade, chave recusada, limite e intervalo mínimo", () => {
     expect(syncMessage({ ...base, state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" }, false)).toMatch(/sem chave da Riot/);
     expect(syncMessage({ ...base, state: "UNAVAILABLE", reason: "ACCOUNT_NOT_CONFIGURED" }, false)).toMatch(/conta própria não está configurada/);
+    expect(syncMessage({ ...base, state: "UNAVAILABLE", reason: "ACCOUNT_NOT_LINKED" }, false)).toMatch(/Vincule sua conta Riot em Minha conta/);
     expect(syncMessage({ ...base, state: "FAILED", reason: "RIOT_AUTH_FAILED" }, false)).toMatch(/chave da Riot foi recusada/);
     expect(
       syncMessage({ ...base, state: "FAILED", reason: "RIOT_AUTH_FAILED", nextAllowedAt: "2026-10-19T13:00:00Z" }, false),

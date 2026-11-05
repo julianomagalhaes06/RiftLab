@@ -17,7 +17,7 @@ describe("Painel com partidas importadas recentes", () => {
     api.on("GET", /^\/api\/v1\/matches$/, () => new Promise<Response>((resolve) => { release = resolve; }));
     vi.stubGlobal("fetch", api.fetch);
     render(<App />);
-    expect(within(screen.getByRole("region", { name: "Partidas importadas recentes" })).getByRole("status")).toHaveTextContent("Carregando partidas recentes");
+    expect(within(await screen.findByRole("region", { name: "Partidas importadas recentes" })).getByRole("status")).toHaveTextContent("Carregando partidas recentes");
     release(json(200, { items: [], nextCursor: null }));
     expect(await screen.findByText("Nenhuma partida importada")).toBeInTheDocument();
   });

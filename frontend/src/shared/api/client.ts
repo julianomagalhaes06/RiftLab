@@ -43,6 +43,12 @@ export type AnalysisReferenceSource = Schemas["AnalysisReferenceSource"];
 /** Fila do Painel (CC-904): sem valor, o servidor usa a da partida própria mais recente. */
 export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
+export type SessionState = Schemas["SessionState"];
+export type SessionUser = Schemas["SessionUser"];
+export type RiotLinkState = Schemas["RiotLinkState"];
+
+/** Evento global: uma resposta 401 AUTH_REQUIRED pede para a interface rever a sessão. */
+export const AUTH_REQUIRED_EVENT = "riftlab:auth-required";
 export type PlayerProfile = Schemas["PlayerProfile"];
 export type CatalogCurrent = Schemas["CatalogCurrent"];
 export type OwnPlayer = Schemas["OwnPlayer"];
@@ -84,6 +90,18 @@ export interface ApiClient {
   lookupPlayer(gameName: string, tagLine: string, refresh?: boolean, signal?: AbortSignal): Promise<PlayerProfile>;
   /** Perfil da conta configurada; sem perfil, `profile` nulo e o motivo (CC-1202). */
   getOwnPlayer(signal?: AbortSignal): Promise<OwnPlayer>;
+  /** Contas locais (Sprint 2, #10): sessão por cookie HttpOnly. */
+  getAuthSession(signal?: AbortSignal): Promise<SessionState>;
+  register(username: string, password: string, signal?: AbortSignal): Promise<SessionState>;
+  login(username: string, password: string, signal?: AbortSignal): Promise<SessionState>;
+  logout(signal?: AbortSignal): Promise<void>;
+  /** Visitante (#14): sessão curta, só a demonstração. */
+  enterAsGuest(signal?: AbortSignal): Promise<SessionState>;
+  /** Vínculo da conta Riot pelo desafio do ícone (#12). */
+  getRiotLink(signal?: AbortSignal): Promise<RiotLinkState>;
+  startRiotLink(gameName: string, tagLine: string, signal?: AbortSignal): Promise<RiotLinkState>;
+  verifyRiotLink(signal?: AbortSignal): Promise<RiotLinkState>;
+  unlinkRiot(signal?: AbortSignal): Promise<void>;
   getCatalogCurrent(signal?: AbortSignal): Promise<CatalogCurrent>;
   /** Partida ao vivo do Riot ID (CC-1211); o Riot ID vai no corpo, fora dos logs. */
   getLiveGame(gameName: string, tagLine: string, signal?: AbortSignal): Promise<LiveGame>;
@@ -169,6 +187,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
         signal: options.signal,
         headers: {
           accept: "application/json",
+          // Anti-CSRF (#10): página de outro site não consegue enviar este cabeçalho.
+          "X-RiftLab-Request": "1",
           ...(options.body === undefined ? {} : { "content-type": "application/json" }),
           ...(options.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}),
         },
@@ -181,7 +201,14 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
       throw new ApiError(0, NETWORK_ERROR);
     }
     if (!response.ok) {
-      throw await parseProblem(response);
+      const problem = await parseProblem(response);
+      if (problem.status === 401 && problem.code === "AUTH_REQUIRED" && typeof window !== "undefined") {
+        window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
+      }
+      throw problem;
+    }
+    if (response.status === 204) {
+      return undefined as T;
     }
     try {
       return (await response.json()) as T;
@@ -206,6 +233,18 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     lookupPlayer: (gameName, tagLine, refresh = false, signal) =>
       request("POST", "/api/v1/players/lookup", { body: { gameName, tagLine, refresh }, signal }),
     getOwnPlayer: (signal) => request("GET", "/api/v1/players/me", { signal }),
+    getAuthSession: (signal) => request("GET", "/api/v1/auth/session", { signal }),
+    register: (username, password, signal) =>
+      request("POST", "/api/v1/auth/register", { body: { username, password }, signal }),
+    login: (username, password, signal) =>
+      request("POST", "/api/v1/auth/login", { body: { username, password }, signal }),
+    logout: (signal) => request("POST", "/api/v1/auth/logout", { signal }),
+    enterAsGuest: (signal) => request("POST", "/api/v1/auth/guest", { signal }),
+    getRiotLink: (signal) => request("GET", "/api/v1/riot-link", { signal }),
+    startRiotLink: (gameName, tagLine, signal) =>
+      request("POST", "/api/v1/riot-link/challenge", { body: { gameName, tagLine }, signal }),
+    verifyRiotLink: (signal) => request("POST", "/api/v1/riot-link/verify", { signal }),
+    unlinkRiot: (signal) => request("DELETE", "/api/v1/riot-link", { signal }),
     getCatalogCurrent: (signal) => request("GET", "/api/v1/catalog/current", { signal }),
     getLiveGame: (gameName, tagLine, signal) =>
       request("POST", "/api/v1/players/live", { body: { gameName, tagLine }, signal }),

@@ -240,8 +240,16 @@ async def post_live_status(body: PlayerSyncRequest, request: Request) -> PlayerL
     ),
 )
 async def get_own_player(request: Request) -> OwnPlayer:
+    from riftlab.auth.request_account import not_linked, own_account
+    from riftlab.shared.own_account import NOT_LINKED
+
+    account = await own_account(request)
+    if not_linked(request, account):
+        return OwnPlayer(reason=NOT_LINKED)
     try:
-        profile = await own_player(request.app.state.session_factory, request.app.state.settings)
+        profile = await own_player(
+            request.app.state.session_factory, request.app.state.settings, account=account
+        )
     except NotFoundError:
         return OwnPlayer(reason="ACCOUNT_NOT_CONFIGURED")
     except PlayerLookupError as exc:

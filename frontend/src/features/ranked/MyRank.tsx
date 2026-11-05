@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { api, type HistorySyncStatus, type RankedMe, type RankedQueue } from "../../shared/api/client";
 import { active } from "../history/syncMessage";
+import { useAuth } from "../auth/authContext";
 import "./ranked.css";
 import { preferredQueue } from "./preferredQueue";
 import { RankCard, type RankCardChange } from "./RankCard";
@@ -9,6 +10,7 @@ import { count } from "../../shared/text/count";
 
 const reasonNames: Record<string, string> = {
   ACCOUNT_OR_SECRET_MISSING: "Configure a conta local e o segredo de vínculo para consultar sua posição.",
+  ACCOUNT_NOT_LINKED: "Vincule sua conta Riot em Minha conta (no seu nome, no topo) para ver sua posição.",
   NO_OBSERVATION: "Ainda não há observação desta fila. Com a chave da Riot configurada, ela é consultada ao abrir esta tela.",
   RIOT_KEY_MISSING: "A chave da Riot está ausente. A última posição observada continua visível.",
   OBSERVATION_OLD: "Esta observação tem mais de 24 horas.",
@@ -81,10 +83,11 @@ const SYNC_POLL_MS = 2000;
  * o elo na Riot; o servidor respeita o intervalo mínimo e a execução ativa. `round` muda quando
  * uma execução acompanhada termina, para a posição ser lida de novo do banco.
  */
-function useRankRefresh(): { updating: boolean; round: number } {
+function useRankRefresh(enabled: boolean): { updating: boolean; round: number } {
   const [updating, setUpdating] = useState(false);
   const [round, setRound] = useState(0);
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     let timer: number | undefined;
     let followed = false;
@@ -109,7 +112,7 @@ function useRankRefresh(): { updating: boolean; round: number } {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, []);
+  }, [enabled]);
   return { updating, round };
 }
 
@@ -117,7 +120,9 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
   const [selection, setSelection] = useState<RankedQueue | null>(null);
   const [results, setResults] = useState<Partial<Record<RankedQueue, { data?: RankedMe; failed?: boolean }>>>({});
   const queueId = useId();
-  const { updating, round } = useRankRefresh();
+  // Visitante (Sprint 2, #14): sem conta Riot, nada a sincronizar.
+  const guest = useAuth().user?.guest === true;
+  const { updating, round } = useRankRefresh(!guest);
   useEffect(() => {
     const controller = new AbortController();
     for (const queue of ["RANKED_SOLO_5x5", "RANKED_FLEX_SR"] as const) {
@@ -159,7 +164,9 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
       >
         {!data && !error && <p className="rank-card__state" role="status">Carregando posição observada…</p>}
         {error && <p className="rank-card__state" role="alert">Não foi possível consultar a posição armazenada.</p>}
-        {data?.status === "UNAVAILABLE" && <p className="rank-card__state" role="status">{reasonNames[data.reason ?? ""] ?? "Posição indisponível para esta conta."}</p>}
+        {data?.status === "UNAVAILABLE" && <p className="rank-card__state" role="status">{guest
+          ? "Visitantes não têm posição ranqueada. Crie uma conta e vincule sua conta Riot para ver a sua."
+          : reasonNames[data.reason ?? ""] ?? "Posição indisponível para esta conta."}</p>}
         {position?.state === "UNRANKED" && <p className="rank-card__state" role="status">Não classificado na {queueLabel} nesta observação válida.</p>}
         {updating && <p className="rank-card__note" role="status" aria-busy="true">Atualizando a posição com a Riot…</p>}
         {data?.status === "STALE" && !updating && <p className="rank-card__note" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}

@@ -4,12 +4,16 @@
 espera o worker importar e PREPARAR sozinho (catálogo -> reconstrução ->
 extração) e lê a lista/detalhe de decisões. Só biblioteca padrão.
 
+Com login exigido (contas locais, Sprint 2), entra como visitante antes: a sessão vai num
+cookie e toda chamada leva o cabeçalho anti-CSRF `X-RiftLab-Request`.
+
 Uso: python3 scripts/smoke_import_flow.py [--base-url http://127.0.0.1:8000]
 Sai com código != 0 e uma linha de causa se qualquer etapa falhar."""
 
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
 import json
 import sys
 import time
@@ -20,6 +24,10 @@ from typing import Any
 MATCH_ID = "DEMO-0008"
 PARTICIPANT_ID = 1
 PERSONAL_WORDS = ("subject", "hash", "puuid", "riotid")
+# Sessão (cookie HttpOnly) compartilhada por todas as chamadas, sem proxy do ambiente.
+OPENER = urllib.request.build_opener(
+    urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()), urllib.request.ProxyHandler({})
+)
 
 
 def fail(message: str) -> None:
@@ -30,10 +38,13 @@ def fail(message: str) -> None:
 def call(method: str, url: str, body: dict[str, Any] | None = None) -> tuple[int, Any]:
     data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(  # noqa: S310 - URL local fixada pelo chamador
-        url, data=data, method=method, headers={"content-type": "application/json"}
+        url,
+        data=data,
+        method=method,
+        headers={"content-type": "application/json", "X-RiftLab-Request": "1"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=15) as response:  # noqa: S310
+        with OPENER.open(request, timeout=15) as response:
             return response.status, json.loads(response.read() or b"null")
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read() or b"null")
@@ -67,6 +78,15 @@ def main() -> None:
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
     deadline = time.monotonic() + args.timeout
+
+    status, session = call("GET", f"{base}/api/v1/auth/session")
+    if status != 200:
+        fail(f"GET /auth/session respondeu {status}: {session}")
+    if session.get("authRequired"):
+        status, guest = call("POST", f"{base}/api/v1/auth/guest")
+        if status != 201 or not (guest.get("user") or {}).get("guest"):
+            fail(f"POST /auth/guest respondeu {status}: {guest}")
+        print("login exigido: sessão de visitante aberta")
 
     status, accepted = call("POST", f"{base}/api/v1/imports", {"matchId": MATCH_ID, "mode": "DEMO"})
     if status != 202:

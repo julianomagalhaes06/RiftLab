@@ -20,14 +20,17 @@ function stubApi(configure?: (api: ReturnType<typeof createMockApi>) => void) {
 describe("App: importar partida", () => {
   beforeEach(() => window.history.replaceState(null, "", "/importar"));
 
-  it("mostra RiftLab, a demonstração e a faixa DEMO antes do health resolver", () => {
-    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
+  it("mostra RiftLab, a demonstração e a faixa DEMO antes do health resolver", async () => {
+    // Só a sessão responde (sem login exigido); o resto, incluindo o health, fica pendente.
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => String(input).endsWith("/api/v1/auth/session")
+      ? Promise.resolve(new Response(JSON.stringify({ authRequired: false, user: null }), { headers: { "content-type": "application/json" } }))
+      : new Promise(() => {})));
 
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "RiftLab" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "RiftLab" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Explorar demonstração" })).toBeInTheDocument();
-    expect(screen.getByRole("note")).toHaveTextContent("Partidas DEMO são sintéticas");
+    expect(await screen.findByRole("note")).toHaveTextContent("Partidas DEMO são sintéticas");
     expect(screen.getByRole("status")).toHaveTextContent("Verificando disponibilidade");
     // A lista crua de partidas saiu da entrada: elas ficam no Histórico.
     expect(screen.queryByRole("heading", { name: "Partidas importadas" })).not.toBeInTheDocument();

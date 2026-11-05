@@ -79,6 +79,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/guest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Entra como visitante, só com a demonstração */
+        post: operations["post_guest_api_v1_auth_guest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Entra com usuário e senha */
+        post: operations["post_login_api_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Encerra a sessão atual */
+        post: operations["post_logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cria a conta local e abre a sessão */
+        post: operations["post_register_api_v1_auth_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sessão atual */
+        get: operations["get_session_api_v1_auth_session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog/current": {
         parameters: {
             query?: never;
@@ -626,6 +711,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/riot-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vínculo da conta Riot do usuário */
+        get: operations["get_link_api_v1_riot_link_get"];
+        put?: never;
+        post?: never;
+        /** Desfaz o vínculo da conta Riot */
+        delete: operations["delete_link_api_v1_riot_link_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/riot-link/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sorteia o ícone que comprova a conta (Account-V1 e Summoner-V4) */
+        post: operations["post_challenge_api_v1_riot_link_challenge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/riot-link/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confere o ícone e vincula */
+        post: operations["post_verify_api_v1_riot_link_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/live": {
         parameters: {
             query?: never;
@@ -996,6 +1133,13 @@ export interface components {
              * Format: date-time
              */
             until: string;
+        };
+        /** Credentials */
+        Credentials: {
+            /** Password */
+            password: string;
+            /** Username */
+            username: string;
         };
         /** CursorPage[DecisionStateSummary] */
         CursorPage_DecisionStateSummary_: {
@@ -2486,6 +2630,58 @@ export interface components {
             /** Team */
             team: number;
         };
+        /** RiotIdBody */
+        RiotIdBody: {
+            /** Gamename */
+            gameName: string;
+            /** Tagline */
+            tagLine: string;
+        };
+        /**
+         * RiotLinkState
+         * @description `NONE`: sem vínculo; `PENDING`: desafio ativo (`iconId` até `expiresAt`); `LINKED`.
+         */
+        RiotLinkState: {
+            /** Expiresat */
+            expiresAt?: string | null;
+            /** Gamename */
+            gameName?: string | null;
+            /** Iconid */
+            iconId?: number | null;
+            /** Linkedat */
+            linkedAt?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "NONE" | "PENDING" | "LINKED";
+            /** Tagline */
+            tagLine?: string | null;
+        };
+        /**
+         * SessionState
+         * @description `authRequired`: o servidor exige login nas rotas da aplicação.
+         */
+        SessionState: {
+            /** Authrequired */
+            authRequired: boolean;
+            user: components["schemas"]["SessionUser"] | null;
+        };
+        /**
+         * SessionUser
+         * @description `guest`: visitante, restrito à demonstração (card #14).
+         */
+        SessionUser: {
+            /**
+             * Guest
+             * @default false
+             */
+            guest: boolean;
+            /** Id */
+            id: string;
+            /** Username */
+            username: string;
+        };
         /** TimelineGoldFrame */
         TimelineGoldFrame: {
             /**
@@ -2802,6 +2998,149 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_guest_api_v1_auth_guest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionState"];
+                };
+            };
+        };
+    };
+    post_login_api_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Credentials"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionState"];
+                };
+            };
+            /** @description Recusado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Muitas tentativas */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_register_api_v1_auth_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Credentials"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionState"];
+                };
+            };
+            /** @description Nome em uso */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Dados inválidos */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_session_api_v1_auth_session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionState"];
                 };
             };
         };
@@ -4079,6 +4418,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_link_api_v1_riot_link_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiotLinkState"];
+                };
+            };
+        };
+    };
+    delete_link_api_v1_riot_link_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_challenge_api_v1_riot_link_challenge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RiotIdBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiotLinkState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_verify_api_v1_riot_link_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiotLinkState"];
                 };
             };
         };

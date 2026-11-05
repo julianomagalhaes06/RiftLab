@@ -36,8 +36,20 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
       }
     });
 
-    // Entrada
+    // Login exigido por padrão (Sprint 2): cria uma conta pela própria tela. Conta, e não
+    // visitante, porque o roteiro termina removendo a partida (visitante não remove).
     await page.goto("/importar");
+    const login = page.getByRole("heading", { name: "Entrar no RiftLab" });
+    const ready = page.getByText("Serviço disponível");
+    await expect(login.or(ready)).toBeVisible();
+    if (await login.isVisible()) {
+      await page.getByRole("button", { name: "Criar conta" }).click();
+      await page.getByLabel("Usuário").fill(`e2e_${Date.now()}`);
+      await page.getByLabel("Senha").fill("senha-e2e-stack-1");
+      await page.getByRole("button", { name: "Criar conta" }).click();
+    }
+
+    // Entrada
     await expect(page.getByText("Serviço disponível")).toBeVisible();
     await expect(
       page.getByText("Analise partidas concluídas. O RiftLab não acompanha jogos em andamento."),

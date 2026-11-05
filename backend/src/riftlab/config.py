@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     # (CC-1215). O compose acrescenta `api`, o nome com que o proxy do frontend chega.
     api_allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost", "::1")
 
+    # Contas locais (Sprint 2, cards #10/#11): com auth_required, as rotas /api/v1 exigem sessão
+    # (cookie HttpOnly, SameSite=Strict) e o cabeçalho X-RiftLab-Request nas alterações.
+    auth_required: bool = False
+    auth_session_days: int = 7
+    # Só com HTTPS: o compose local serve HTTP em loopback.
+    auth_cookie_secure: bool = False
+
     database_url: str = "postgresql+asyncpg://riftlab:riftlab@db:5432/riftlab"
     database_ready_timeout_seconds: float = 2.0
 

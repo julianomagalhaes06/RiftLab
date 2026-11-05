@@ -44,7 +44,7 @@ def test_zero_deaths_is_not_missing_and_empty_is_not_zero_performance():
 async def test_dashboard_http_validation_and_no_private_fields(monkeypatch):
     calls = []
 
-    async def fake(factory, settings, *, window, origin, queue):
+    async def fake(factory, settings, *, window, origin, queue, **_owner):
         from riftlab.dashboard.api import Dashboard
 
         calls.append((window, origin, queue))

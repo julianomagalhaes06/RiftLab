@@ -10,6 +10,7 @@ describe("parseRoute", () => {
     expect(parseRoute("/importar")).toEqual({ name: "importEntry" });
     expect(parseRoute("/campeoes")).toEqual({ name: "champions" });
     expect(parseRoute("/minha-posicao")).toEqual({ name: "position" });
+    expect(parseRoute("/conta")).toEqual({ name: "account" });
     expect(parseRoute("/historico")).toEqual({ name: "history" });
     expect(parseRoute("/historico/DEMO-0008", "?participant=3")).toEqual({
       name: "historyMatch", matchId: "DEMO-0008", participantId: 3,

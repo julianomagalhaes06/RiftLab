@@ -352,8 +352,10 @@ async def test_player_match_list_marks_the_player_as_local(app_client, session_f
 
 @pytest.mark.asyncio
 async def test_no_table_keeps_a_riot_id_at_rest(session_factory, clean):
-    """Guarda de esquema (CC-1103): só a execução ativa da sincronização tem Riot ID, e o banco
-    recusa uma execução terminada que ainda o tenha."""
+    """Guarda de esquema (CC-1103): Riot ID de terceiros nunca fica em repouso. Só têm Riot ID a
+    execução ativa da sincronização (o banco recusa uma terminada que ainda o tenha) e, desde a
+    Sprint 2 (#12/#13), o vínculo da conta do PRÓPRIO usuário, comprovado pelo desafio do
+    ícone, e o desafio enquanto existe; ambos saem ao desvincular ou ao apagar o usuário."""
     async with session_factory() as session:
         conn = await session.connection()
         columns = await conn.run_sync(
@@ -363,7 +365,7 @@ async def test_no_table_keeps_a_riot_id_at_rest(session_factory, clean):
             }
         )
     holders = {t for t, cols in columns.items() if cols & {"game_name", "tag_line"}}
-    assert holders == {"history_sync_runs"}
+    assert holders == {"history_sync_runs", "riot_links", "riot_link_challenges"}
     with pytest.raises(IntegrityError):
         async with unit_of_work(session_factory) as session:
             session.add(
