@@ -38,6 +38,12 @@ def _configs(request: Request) -> Path:
     return configured if configured is not None and (configured / "ranking").is_dir() else _CONFIGS
 
 
+def _owner(request: Request) -> uuid.UUID | None:
+    """Usuário da sessão (Sprint 2, #11): julgamentos e relatório são da própria conta."""
+    user = getattr(request.state, "user", None)
+    return user.id if user is not None else None
+
+
 @router.post("", status_code=201, response_model=AnalysisResult, responses=_ERRORS)
 async def post_analysis(
     body: AnalysisRequest,
@@ -77,6 +83,7 @@ async def post_feedback(
         analysis_id,
         body.model_dump(mode="json", by_alias=True),
         idempotency_key,
+        owner=_owner(request),
     )
     if not created:
         response.status_code = 200
@@ -108,7 +115,11 @@ async def read_report(
     """CC-505: exportação rastreável (JSON ou HTML autossuficiente), sem identificadores
     pessoais; com attemptId vinculado inclui resposta inicial, pistas e reflexão."""
     report = await build_report(
-        request.app.state.session_factory, analysis_id, attempt_id, _configs(request)
+        request.app.state.session_factory,
+        analysis_id,
+        attempt_id,
+        _configs(request),
+        owner=_owner(request),
     )
     name = f"riftlab-analise-{str(analysis_id)[:8]}.{format.value}"
     headers = {**_REPORT_HEADERS, "Content-Disposition": f'attachment; filename="{name}"'}

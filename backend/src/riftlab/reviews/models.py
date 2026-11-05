@@ -8,6 +8,7 @@ from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, UniqueConst
 from sqlalchemy.orm import Mapped, mapped_column
 
 import riftlab.analyses.models  # noqa: F401  (alvo da FK analyses)
+import riftlab.auth.models  # noqa: F401  (alvo da FK users)
 from riftlab.shared.db import Base, CreatedAtMixin, UuidPkMixin
 
 
@@ -32,3 +33,7 @@ class AnalysisFeedbackModel(UuidPkMixin, CreatedAtMixin, Base):
     reason: Mapped[str] = mapped_column(String(1000), nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
     request_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    # Sprint 2 (#11): dono do julgamento; None = feito sem sessão.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
