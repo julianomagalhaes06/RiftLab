@@ -12,7 +12,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select, update
 
 from riftlab.api.app import create_app
-from riftlab.auth.application import LoginThrottle
+from riftlab.auth.application import LoginThrottle, create_guest
 from riftlab.auth.models import AuthSessionModel, UserModel
 from riftlab.config import Settings
 from riftlab.shared.db import unit_of_work
@@ -62,7 +62,7 @@ async def test_register_opens_a_session_with_a_protected_cookie(client, names, s
     assert response.status_code == 201, response.text
     assert response.json() == {
         "authRequired": True,
-        "user": {"id": response.json()["user"]["id"], "username": name},
+        "user": {"id": response.json()["user"]["id"], "username": name, "guest": False},
     }
     cookie = response.headers["set-cookie"].lower()
     assert "riftlab_session=" in cookie and "httponly" in cookie and "samesite=strict" in cookie
@@ -205,3 +205,50 @@ async def test_without_auth_required_routes_stay_open(session_factory):
     async for c in _client(Settings(auth_required=False)):
         assert (await c.get("/api/v1/auth/session")).json() == {"authRequired": False, "user": None}
         assert (await c.get("/api/v1/matches")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_guest_session_is_short_and_limited_to_the_demonstration(client, session_factory):
+    response = await client.post("/api/v1/auth/guest", headers=HEADERS)
+    assert response.status_code == 201
+    user = response.json()["user"]
+    assert user["guest"] is True and user["username"].startswith("visitante-")
+    assert "max-age=86400" in response.headers["set-cookie"].lower()
+    try:
+        for method, path, body in (
+            ("GET", "/api/v1/riot-link", None),
+            ("GET", "/api/v1/matches/BR1_123", None),
+            ("POST", "/api/v1/players/lookup", {"gameName": "Alguem", "tagLine": "BR1"}),
+            ("POST", "/api/v1/imports", {"matchId": "BR1_123", "mode": "RIOT"}),
+            ("DELETE", "/api/v1/matches/DEMO-0008?confirm=DEMO-0008", None),
+        ):
+            blocked = await client.request(method, path, json=body, headers=HEADERS)
+            assert (blocked.status_code, blocked.json()["code"]) == (403, "GUEST_DEMO_ONLY"), path
+        assert (await client.get("/api/v1/players/me")).status_code == 200
+        listing = await client.get("/api/v1/matches", params={"scope": "all", "limit": 100})
+        assert all(m["matchId"].startswith("DEMO-") for m in listing.json()["items"])
+        assert (await client.get("/api/v1/dashboard")).json()["origin"] == "DEMO"
+        # Sem senha: o nome do visitante não entra pelo login.
+        client.cookies.clear()
+        refused = await client.post(
+            "/api/v1/auth/login",
+            json={"username": user["username"], "password": "qualquer-senha-1"},
+            headers=HEADERS,
+        )
+        assert refused.json()["code"] == "INVALID_CREDENTIALS"
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(delete(UserModel).where(UserModel.username == user["username"]))
+
+
+@pytest.mark.asyncio
+async def test_old_guests_are_removed_when_a_new_one_arrives(session_factory):
+    old, _ = await create_guest(session_factory, now=datetime.now(UTC) - timedelta(days=2))
+    new, _ = await create_guest(session_factory)
+    try:
+        async with session_factory() as session:
+            assert await session.get(UserModel, old.id) is None
+            assert await session.get(UserModel, new.id) is not None
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(delete(UserModel).where(UserModel.id == new.id))

@@ -31,6 +31,19 @@ export function AuthScreen() {
     headingRef.current?.focus();
   }
 
+  async function enterAsGuest() {
+    setSending(true);
+    setError(null);
+    try {
+      const session = await api.enterAsGuest();
+      if (session.user) signedIn(session.user);
+    } catch (caught) {
+      setError(isApiError(caught) ? messageForCode(caught.code) : "Não foi possível entrar agora. Tente de novo.");
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!username.trim() || !password) {
@@ -79,6 +92,12 @@ export function AuthScreen() {
             {sending ? "Enviando…" : mode === "login" ? "Entrar" : "Criar conta"}
           </button>
         </form>
+        <div className="auth-card__guest">
+          <button type="button" className="button button--secondary" disabled={sending} onClick={() => void enterAsGuest()}>
+            Entrar como visitante
+          </button>
+          <p className="auth-card__hint">Sem cadastro: só a demonstração, com partidas sintéticas, por um dia.</p>
+        </div>
         <p className="auth-card__switch">
           {mode === "login" ? "Ainda não tem conta?" : "Já tem conta?"}{" "}
           <button type="button" className="text-link" onClick={() => switchMode(mode === "login" ? "register" : "login")}>

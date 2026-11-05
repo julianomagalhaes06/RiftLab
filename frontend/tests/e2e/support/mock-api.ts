@@ -232,6 +232,7 @@ export type RouteKey =
   | "POST /api/v1/auth/login"
   | "POST /api/v1/auth/register"
   | "POST /api/v1/auth/logout"
+  | "POST /api/v1/auth/guest"
   | "POST /api/v1/history/sync"
   | "GET /api/v1/history/sync"
   | "POST /api/v1/players/lookup"
@@ -274,6 +275,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["POST /api/v1/auth/login", "POST", /^\/api\/v1\/auth\/login$/],
   ["POST /api/v1/auth/register", "POST", /^\/api\/v1\/auth\/register$/],
   ["POST /api/v1/auth/logout", "POST", /^\/api\/v1\/auth\/logout$/],
+  ["POST /api/v1/auth/guest", "POST", /^\/api\/v1\/auth\/guest$/],
   ["POST /api/v1/history/sync", "POST", /^\/api\/v1\/history\/sync$/],
   ["GET /api/v1/history/sync", "GET", /^\/api\/v1\/history\/sync$/],
   ["POST /api/v1/players/lookup", "POST", /^\/api\/v1\/players\/lookup$/],
@@ -463,6 +465,7 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "POST /api/v1/auth/login": () => problem(401, "INVALID_CREDENTIALS"),
   "POST /api/v1/auth/register": () => problem(409, "USERNAME_TAKEN"),
   "POST /api/v1/auth/logout": () => ({ status: 204, body: "" }),
+  "POST /api/v1/auth/guest": () => ok({ authRequired: false, user: { id: "00000000-0000-4000-8000-000000000000", username: "visitante-00000000", guest: true } }, 201),
   // CC-901: sem chave da Riot (como na demonstração), a aba Histórico não sincroniza.
   "POST /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
   "GET /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),

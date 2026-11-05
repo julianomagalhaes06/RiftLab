@@ -95,6 +95,8 @@ export interface ApiClient {
   register(username: string, password: string, signal?: AbortSignal): Promise<SessionState>;
   login(username: string, password: string, signal?: AbortSignal): Promise<SessionState>;
   logout(signal?: AbortSignal): Promise<void>;
+  /** Visitante (#14): sessão curta, só a demonstração. */
+  enterAsGuest(signal?: AbortSignal): Promise<SessionState>;
   /** Vínculo da conta Riot pelo desafio do ícone (#12). */
   getRiotLink(signal?: AbortSignal): Promise<RiotLinkState>;
   startRiotLink(gameName: string, tagLine: string, signal?: AbortSignal): Promise<RiotLinkState>;
@@ -237,6 +239,7 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     login: (username, password, signal) =>
       request("POST", "/api/v1/auth/login", { body: { username, password }, signal }),
     logout: (signal) => request("POST", "/api/v1/auth/logout", { signal }),
+    enterAsGuest: (signal) => request("POST", "/api/v1/auth/guest", { signal }),
     getRiotLink: (signal) => request("GET", "/api/v1/riot-link", { signal }),
     startRiotLink: (gameName, tagLine, signal) =>
       request("POST", "/api/v1/riot-link/challenge", { body: { gameName, tagLine }, signal }),

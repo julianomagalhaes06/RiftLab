@@ -28,3 +28,4 @@
 .account-icon { margin: 0; display: grid; justify-items: start; gap: 6px; color: var(--ntext-subtle); font-size: .8125rem; }
 .account-icon img { border: 1px solid var(--portrait-outline); }
 .account-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.auth-card__guest { display: grid; gap: 6px; justify-items: start; padding-top: 12px; border-top: 1px solid var(--nline); }
