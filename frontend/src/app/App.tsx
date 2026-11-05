@@ -88,7 +88,9 @@ function renderPage(route: Route): ReactNode {
 }
 
 function AppShell() {
-  const { authRequired, user } = useAuth();
+  const { checked, authRequired, user } = useAuth();
+  // Até saber da sessão, nenhuma tela dispara chamadas (evita 401 com login exigido).
+  if (!checked) return <p className="app-loading" role="status">Carregando o RiftLab…</p>;
   // Login exigido pelo servidor e sem sessão: só a tela de entrar/criar conta (#10/#14).
   if (authRequired && !user) return <AuthScreen />;
   return <AppContent />;
