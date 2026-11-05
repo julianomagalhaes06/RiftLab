@@ -8,6 +8,8 @@ services:
       RIFTLAB_RIOT_API_KEY: ""
       RIFTLAB_SUBJECT_HASH_SECRET: ""
       RIFTLAB_DEMO_RANKED: "true"
+      # A demonstração da defesa abre direto, sem login (contas locais: Sprint 2).
+      RIFTLAB_AUTH_REQUIRED: "false"
   worker:
     environment:
       RIFTLAB_RIOT_API_KEY: ""
