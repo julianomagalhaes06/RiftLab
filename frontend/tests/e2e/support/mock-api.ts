@@ -228,6 +228,10 @@ export type RouteKey =
   | "GET /api/v1/decisions/:id"
   | "GET /api/v1/dashboard"
   | "GET /api/v1/ranked/me"
+  | "GET /api/v1/auth/session"
+  | "POST /api/v1/auth/login"
+  | "POST /api/v1/auth/register"
+  | "POST /api/v1/auth/logout"
   | "POST /api/v1/history/sync"
   | "GET /api/v1/history/sync"
   | "POST /api/v1/players/lookup"
@@ -266,6 +270,10 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/decisions/:id", "GET", /^\/api\/v1\/decisions\/[^/]+$/],
   ["GET /api/v1/dashboard", "GET", /^\/api\/v1\/dashboard$/],
   ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
+  ["GET /api/v1/auth/session", "GET", /^\/api\/v1\/auth\/session$/],
+  ["POST /api/v1/auth/login", "POST", /^\/api\/v1\/auth\/login$/],
+  ["POST /api/v1/auth/register", "POST", /^\/api\/v1\/auth\/register$/],
+  ["POST /api/v1/auth/logout", "POST", /^\/api\/v1\/auth\/logout$/],
   ["POST /api/v1/history/sync", "POST", /^\/api\/v1\/history\/sync$/],
   ["GET /api/v1/history/sync", "GET", /^\/api\/v1\/history\/sync$/],
   ["POST /api/v1/players/lookup", "POST", /^\/api\/v1\/players\/lookup$/],
@@ -450,6 +458,11 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "GET /api/v1/decisions/:id": () => ok(decisionState()),
   "GET /api/v1/dashboard": () => ok(dashboard({ status: "IDENTITY_UNAVAILABLE", totalMatches: 0, sampledMatches: 0, winSamples: 0, wins: 0, winRate: null, kdaSamples: 0, kda: null, distinctChampions: 0, champions: [], recentMatches: [], progress: { attempts: 0, revealed: 0, reflections: 0, matches: 0 } })),
   "GET /api/v1/ranked/me": () => ok({ status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }),
+  // Sprint 2 (#10): sem login exigido por padrão, como numa instalação de uma pessoa.
+  "GET /api/v1/auth/session": () => ok({ authRequired: false, user: null }),
+  "POST /api/v1/auth/login": () => problem(401, "INVALID_CREDENTIALS"),
+  "POST /api/v1/auth/register": () => problem(409, "USERNAME_TAKEN"),
+  "POST /api/v1/auth/logout": () => ({ status: 204, body: "" }),
   // CC-901: sem chave da Riot (como na demonstração), a aba Histórico não sincroniza.
   "POST /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
   "GET /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
