@@ -41,3 +41,21 @@ for (const width of [1280, 360]) {
     await expect(page.getByRole("heading", { name: "Entrar no RiftLab" })).toBeVisible();
   });
 }
+
+test("entrar como visitante pelo teclado em 360px", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  let guest = false;
+  await mockApi(page, {
+    "GET /api/v1/auth/session": () => ok({ authRequired: true, user: guest ? { ...USER, username: "visitante-1a2b3c4d", guest: true } : null }),
+    "POST /api/v1/auth/guest": () => {
+      guest = true;
+      return ok({ authRequired: true, user: { ...USER, username: "visitante-1a2b3c4d", guest: true } }, 201);
+    },
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Entrar como visitante" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("link", { name: "Minha conta (visitante)" })).toBeVisible();
+  const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(scroll).toBeLessThanOrEqual(0);
+});

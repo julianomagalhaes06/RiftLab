@@ -14,7 +14,7 @@ const clock = (iso: string | null | undefined) =>
 
 /** Conta local e vínculo da conta Riot pelo desafio do ícone (Sprint 2, #12/#14). */
 export function AccountPage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [link, setLink] = useState<RiotLinkState | null>(null);
   const [failed, setFailed] = useState(false);
   const [version, setVersion] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function AccountPage() {
   const errorId = useId();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.guest) return;
     const controller = new AbortController();
     api.getRiotLink(controller.signal).then(setLink).catch(() => {
       if (!controller.signal.aborted) setFailed(true);
@@ -62,6 +62,22 @@ export function AccountPage() {
       <section className="area-page account-page" aria-labelledby="account-heading">
         <h2 id="account-heading">Minha conta</h2>
         <p className="muted">Este ambiente não usa contas locais. A conta Riot vem da configuração da instalação.</p>
+      </section>
+    );
+  }
+
+  if (user.guest) {
+    return (
+      <section className="area-page account-page" aria-labelledby="account-heading">
+        <header className="page-head">
+          <p className="page-head__context">Visitante</p>
+          <h2 id="account-heading">Minha conta</h2>
+          <p className="page-head__lead">Você está como visitante: só a demonstração, com partidas sintéticas, até amanhã.</p>
+        </header>
+        <div className="account-card surface surface--pad">
+          <p className="muted">Para usar suas partidas reais e vincular sua conta Riot, saia e crie uma conta.</p>
+          <button type="button" className="button" onClick={() => void signOut()}>Sair e criar conta</button>
+        </div>
       </section>
     );
   }

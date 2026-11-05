@@ -39,8 +39,11 @@ class Credentials(CamelModel):
 
 
 class SessionUser(CamelModel):
+    """`guest`: visitante, restrito à demonstração (card #14)."""
+
     id: str
     username: str
+    guest: bool = False
 
 
 class SessionState(CamelModel):
@@ -51,7 +54,7 @@ class SessionState(CamelModel):
 
 
 def _user(user: AuthUser | None) -> SessionUser | None:
-    return SessionUser(id=str(user.id), username=user.username) if user else None
+    return SessionUser(id=str(user.id), username=user.username, guest=user.guest) if user else None
 
 
 def _error(request: Request, exc: AuthError) -> JSONResponse:
@@ -62,12 +65,14 @@ def _error(request: Request, exc: AuthError) -> JSONResponse:
     )
 
 
-def _set_cookie(request: Request, response: Response, token: str) -> None:
+def _set_cookie(
+    request: Request, response: Response, token: str, lifetime: timedelta | None = None
+) -> None:
     settings = request.app.state.settings
     response.set_cookie(
         SESSION_COOKIE,
         token,
-        max_age=int(timedelta(days=settings.auth_session_days).total_seconds()),
+        max_age=int((lifetime or timedelta(days=settings.auth_session_days)).total_seconds()),
         httponly=True,
         samesite="strict",
         secure=settings.auth_cookie_secure,
@@ -137,6 +142,18 @@ async def post_login(
     throttle.succeeded(username)
     _set_cookie(request, response, token)
     return SessionState(auth_required=settings.auth_required, user=_user(user))
+
+
+@router.post(
+    "/guest",
+    response_model=SessionState,
+    status_code=201,
+    summary="Entra como visitante, só com a demonstração",
+)
+async def post_guest(request: Request, response: Response) -> SessionState:
+    user, token = await application.create_guest(request.app.state.session_factory)
+    _set_cookie(request, response, token, application.GUEST_LIFETIME)
+    return SessionState(auth_required=request.app.state.settings.auth_required, user=_user(user))
 
 
 @router.post("/logout", status_code=204, summary="Encerra a sessão atual")

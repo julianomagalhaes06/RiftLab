@@ -78,6 +78,38 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     expect(await screen.findByRole("button", { name: "Sair" })).toBeInTheDocument();
   });
 
+  it("entra como visitante sem cadastro e mostra a página de conta do visitante", async () => {
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user: null }));
+    mock.on("POST", /^\/api\/v1\/auth\/guest$/, () => json(201, {
+      authRequired: true, user: { id: USER.id, username: "visitante-1a2b3c4d", guest: true } }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    expect(await screen.findByText(/só a demonstração, com partidas sintéticas, por um dia/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Entrar como visitante" }));
+    const account = await screen.findByRole("link", { name: "Minha conta (visitante)" });
+    expect(account).toHaveTextContent("Visitante");
+    fireEvent.click(account);
+    expect(await screen.findByText(/Você está como visitante/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sair e criar conta" })).toBeInTheDocument();
+    expect(mock.callsTo("GET", /^\/api\/v1\/riot-link$/)).toHaveLength(0);
+  });
+
+  it("no Histórico, o visitante vê só a demonstração e não sincroniza com a Riot", async () => {
+    window.history.replaceState(null, "", "/historico");
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, {
+      authRequired: true, user: { id: USER.id, username: "visitante-1a2b3c4d", guest: true } }));
+    mock.on("GET", /^\/api\/v1\/matches$/, () => json(200, { items: [], nextCursor: null }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    expect(await screen.findByText(/Como visitante, você vê só as partidas de demonstração/)).toBeInTheDocument();
+    await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/matches$/).length).toBeGreaterThan(0));
+    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)[0].search.get("scope")).toBe("demo");
+    expect(mock.callsTo("POST", /^\/api\/v1\/history\/sync$/)).toHaveLength(0);
+    expect(screen.queryByRole("group", { name: "Origem da partida" })).not.toBeInTheDocument();
+  });
+
   it("volta à tela de login quando uma chamada responde AUTH_REQUIRED", async () => {
     const mock = createMockApi();
     let session: { authRequired: boolean; user: typeof USER | null } = { authRequired: true, user: USER };

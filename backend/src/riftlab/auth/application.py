@@ -49,6 +49,12 @@ class AuthError(Exception):
 class AuthUser:
     id: uuid.UUID
     username: str
+    guest: bool = False
+
+
+# Visitante (card #14): sessão curta, sem senha; o hash inválido impede login por senha.
+GUEST_LIFETIME = timedelta(days=1)
+GUEST_PASSWORD_HASH = "!visitante"
 
 
 def token_hash(token: str) -> str:
@@ -134,7 +140,7 @@ async def user_for_token(factory: SessionFactory, token: str | None) -> AuthUser
     async with factory() as session:
         row = (
             await session.execute(
-                select(UserModel.id, UserModel.username)
+                select(UserModel.id, UserModel.username, UserModel.is_guest)
                 .join(AuthSessionModel, AuthSessionModel.user_id == UserModel.id)
                 .where(
                     AuthSessionModel.token_hash == token_hash(token),
@@ -142,7 +148,33 @@ async def user_for_token(factory: SessionFactory, token: str | None) -> AuthUser
                 )
             )
         ).first()
-    return AuthUser(row.id, row.username) if row else None
+    return AuthUser(row.id, row.username, row.is_guest) if row else None
+
+
+async def create_guest(
+    factory: SessionFactory, *, now: datetime | None = None
+) -> tuple[AuthUser, str]:
+    """Novo visitante com sessão de GUEST_LIFETIME. Visitantes mais antigos que isso saem,
+    com as tentativas deles (exclusão em cascata)."""
+    now = now or datetime.now(UTC)
+    async with unit_of_work(factory) as session:
+        await session.execute(
+            delete(UserModel).where(
+                UserModel.is_guest.is_(True), UserModel.created_at <= now - GUEST_LIFETIME
+            )
+        )
+        name = f"visitante-{secrets.token_hex(4)}"
+        user = UserModel(
+            username=name,
+            username_key=name,
+            password_hash=GUEST_PASSWORD_HASH,
+            created_at=now,
+            is_guest=True,
+        )
+        session.add(user)
+        await session.flush()
+        token = await _new_session(session, user.id, GUEST_LIFETIME, now)
+        return AuthUser(user.id, user.username, True), token
 
 
 async def logout(factory: SessionFactory, token: str | None) -> None:
