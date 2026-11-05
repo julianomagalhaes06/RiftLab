@@ -1,24 +1,102 @@
-/* Contas locais (Sprint 2, #10/#14): só tokens e primitivas do padrão Arena. */
-.auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 40px 16px; background: var(--n0); }
-.auth-card { width: min(100%, 420px); display: grid; gap: 12px; }
-.auth-card h2 { margin: 0; font-family: var(--font-display); font-size: 1.5rem; color: var(--ntext); }
-.auth-card h2:focus { outline: none; }
-.auth-card h2:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-.auth-card .form { display: grid; gap: 8px; margin-top: 8px; }
-.auth-card .form .button { margin-top: 8px; justify-self: start; }
-.auth-card__brand { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; color: var(--ntext); font-weight: 600; }
-.auth-card__hint { margin: 0; color: var(--ntext-subtle); font-size: .8125rem; }
-.auth-card__switch { margin: 8px 0 0; color: var(--ntext-muted); }
-.auth-card__switch button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
-.auth-card__switch button:hover { color: var(--accent-hover); }
-.auth-card__switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Contas locais (Sprint 2): só tokens e primitivas do padrão Arena.
+   Exceção pedida pelo usuário (05/11/2026): a vitrine da tela de entrada usa emblemas de elo com
+   o halo do card de elo, como decoração da marca (sem dado de conta). */
 
+/* ---- Tela de entrada ---- */
+.auth-page { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; background: var(--n0); color: var(--ntext); }
+.auth-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 40px; border-bottom: 1px solid var(--nline); }
+.auth-top__brand { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 1.125rem var(--font-display); color: var(--ntext); }
+
+.auth-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); grid-template-areas: "hero card" "ladder card"; align-content: center; align-items: center; column-gap: 64px; row-gap: 28px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 56px 40px; }
+.auth-hero { grid-area: hero; align-self: end; }
+.auth-card { grid-area: card; }
+.auth-ladder { grid-area: ladder; align-self: start; }
+
+.auth-hero { display: grid; gap: 16px; min-width: 0; }
+.auth-hero__context { margin: 0; color: var(--ntext-subtle); font-size: .8125rem; }
+.auth-hero__title { margin: 0; max-width: 18ch; font: 600 2.5rem/1.15 var(--font-display); color: var(--ntext); }
+.auth-hero__lead { margin: 0; max-width: 48ch; color: var(--ntext-muted); font-size: 1rem; line-height: 1.5; }
+.auth-hero__points { display: grid; gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
+.auth-hero__points li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
+.auth-hero__points strong { display: block; font-size: .9375rem; font-weight: 600; color: var(--ntext); }
+.auth-hero__points small { display: block; margin-top: 2px; color: var(--ntext-muted); font-size: .8125rem; line-height: 1.45; }
+.auth-hero__check { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); background: var(--n1); color: var(--ntext-muted); }
+
+.auth-ladder { margin: 0; padding: 24px 28px 20px; display: grid; gap: 14px; max-width: 560px; }
+.auth-ladder__row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.auth-ladder__slot { position: relative; display: grid; place-items: center; }
+.auth-ladder__slot img { display: block; height: auto; position: relative; }
+.auth-ladder__slot:nth-child(1) img { width: 52px; }
+.auth-ladder__slot:nth-child(2) img { width: 62px; }
+.auth-ladder__slot:nth-child(3) img { width: 74px; }
+.auth-ladder__slot:nth-child(4) img { width: 88px; }
+.auth-ladder__slot:nth-child(5) img { width: 104px; }
+/* Halo do card de elo (mesma receita de rank-card.css), só no topo da escada. */
+.auth-ladder__slot:last-child::before { content: ""; position: absolute; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--tier-base) 32%, transparent), transparent 70%); }
+.auth-ladder figcaption { color: var(--ntext-muted); font-size: .8125rem; }
+
+.auth-card { display: grid; gap: 16px; min-width: 0; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+.auth-tabs > button[aria-selected="true"] { border-color: var(--accent-strong); background: var(--accent-surface); color: var(--ntext); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent-strong); }
+.auth-tabs > button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.auth-panel { display: grid; gap: 12px; }
+.auth-panel h1, .auth-welcome h1 { margin: 4px 0 0; font: 600 1.5rem var(--font-display); color: var(--ntext); }
+.auth-panel h1:focus, .auth-welcome h1:focus { outline: none; }
+.auth-panel h1:focus-visible, .auth-welcome h1:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.auth-panel > .muted, .auth-welcome > .muted { margin: 0; line-height: 1.5; }
+.auth-form { display: grid; gap: 8px; margin-top: 4px; }
+.auth-wide { width: 100%; }
+.auth-form .auth-wide { margin-top: 8px; }
+.auth-hint { margin: 0; color: var(--ntext-subtle); font-size: .8125rem; line-height: 1.4; }
+.auth-hint--center { text-align: center; }
+
+.auth-password { position: relative; }
+.auth-password .form__input { width: 100%; padding-right: 48px; }
+.auth-password__toggle { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ntext-muted); cursor: pointer; }
+.auth-password__toggle:hover { color: var(--ntext); background: var(--n2); }
+.auth-password__toggle:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
+
+.auth-rules { display: grid; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+.auth-rules li { display: flex; align-items: center; gap: 8px; color: var(--ntext-subtle); font-size: .8125rem; }
+.auth-rules li svg { flex: none; opacity: .35; }
+.auth-rules li.is-met { color: var(--ntext); }
+.auth-rules li.is-met svg { opacity: 1; color: var(--accent); }
+
+.auth-divider { display: flex; align-items: center; gap: 12px; margin: 4px 0; color: var(--ntext-subtle); font-size: .75rem; text-transform: lowercase; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--nline); }
+
+.auth-welcome { display: grid; gap: 12px; justify-items: start; }
+.auth-welcome__badge { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--accent-strong); border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
+
+.auth-foot { padding: 16px 40px 24px; border-top: 1px solid var(--nline); color: var(--ntext-subtle); font-size: .75rem; line-height: 1.5; }
+.auth-foot p { margin: 0; max-width: 980px; }
+.auth-foot p + p { margin-top: 4px; }
+
+@media (max-width: 960px) {
+  .auth-top { padding: 0 16px; }
+  /* Celular: título curto, formulário logo em seguida e a vitrine no fim. */
+  .auth-main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hero" "card" "ladder"; row-gap: 20px; padding: 20px 16px 32px; }
+  .auth-hero { gap: 12px; }
+  .auth-hero__title { font-size: 1.625rem; max-width: none; }
+  .auth-hero__points { display: none; }
+  .auth-ladder { padding: 16px 16px 14px; max-width: none; }
+  .auth-ladder__slot:nth-child(1) img { width: 34px; }
+  .auth-ladder__slot:nth-child(2) img { width: 40px; }
+  .auth-ladder__slot:nth-child(3) img { width: 48px; }
+  .auth-ladder__slot:nth-child(4) img { width: 56px; }
+  .auth-ladder__slot:nth-child(5) img { width: 66px; }
+  .auth-ladder__slot:last-child::before { width: 96px; height: 96px; }
+  .auth-foot { padding: 16px; }
+}
+
+/* ---- Menu do usuário no topo ---- */
 .user-menu { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .user-menu__name { color: var(--ntext-muted); font-size: .875rem; max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.user-menu__out { min-height: 36px; padding: 0 12px; }
-
 .user-menu__name a { color: inherit; text-decoration: none; }
 .user-menu__name a:hover { color: var(--ntext); text-decoration: underline; }
+.user-menu__out { min-height: 36px; padding: 0 12px; }
+
+/* ---- Minha conta ---- */
 .account-card { display: grid; gap: 12px; max-width: 640px; }
 .account-card h3 { margin: 0; }
 .account-card .form { display: grid; gap: 8px; max-width: 360px; }
@@ -28,4 +106,3 @@
 .account-icon { margin: 0; display: grid; justify-items: start; gap: 6px; color: var(--ntext-subtle); font-size: .8125rem; }
 .account-icon img { border: 1px solid var(--portrait-outline); }
 .account-actions { display: flex; flex-wrap: wrap; gap: 12px; }
-.auth-card__guest { display: grid; gap: 6px; justify-items: start; padding-top: 12px; border-top: 1px solid var(--nline); }

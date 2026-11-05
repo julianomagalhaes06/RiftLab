@@ -29,10 +29,10 @@ for (const width of [1280, 360]) {
 
     // Só teclado: usuário, senha e Enter.
     await page.getByLabel("Usuário").fill("jogadora");
-    await page.getByLabel("Senha").fill("senha-errada-1");
+    await page.getByLabel("Senha", { exact: true }).fill("senha-errada-1");
     await page.keyboard.press("Enter");
     await expect(page.getByRole("alert")).toHaveText("Usuário ou senha incorretos.");
-    await page.getByLabel("Senha").fill("senha-correta-1");
+    await page.getByLabel("Senha", { exact: true }).fill("senha-correta-1");
     await page.keyboard.press("Enter");
 
     await expect(page.getByRole("link", { name: "Minha conta (jogadora)" })).toBeVisible();

@@ -124,6 +124,28 @@ do `.chip`; a classe antiga `.section` (borda no topo) só fica como divisória 
 de uma superfície (estudo, comparação e reflexão da decisão); moldura em
 `app/App.tsx`, `app/ContextStrip.tsx` e `features/players/ProfileChip.tsx`.
 
+## Tela de entrada (contas locais)
+
+Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em `auth.css`):
+
+- **Topo** de 64 px só com a marca e o selo BR1; **rodapé** com créditos e o aviso legal da Riot.
+- **Desktop:** duas colunas. À esquerda, contexto (13 px), título em Chakra Petch (40 px), frase e
+  três pontos de valor com ícone de check neutro; abaixo, a vitrine com a escada de emblemas
+  Ferro → Prata → Ouro → Diamante → Desafiante (`.surface.surface--rank.brackets`). À direita, o
+  cartão (`.surface.surface--pad.brackets`) com abas Entrar/Criar conta (`role="tab"`, setas do
+  teclado alternam), campos do formulário, botão primário na largura toda, divisória "ou" e
+  "Entrar como visitante" como botão secundário na largura toda.
+- **Celular (≤ 960 px):** título curto, cartão logo em seguida e a vitrine no fim; os pontos de
+  valor saem. Sem rolagem horizontal em 360 px.
+- **Cadastro:** senha com mostrar/ocultar (`aria-pressed`), requisitos conferidos enquanto a
+  pessoa digita (check roxo e texto "atendido/pendente", nunca só cor) e, depois de criar, a
+  confirmação "Conta criada" com o próximo passo: "Vincular conta Riot" (primário) ou "Ir para o
+  Painel".
+- **Exceção ao princípio 1, pedida pelo usuário (05/11/2026):** a vitrine usa emblemas de elo
+  com o halo do card de elo fora do card de elo, como decoração da marca. Não mostra elo de
+  ninguém nem dado fictício. Tudo é local (emblemas em `public/ranked-emblems`): a tela não faz
+  requisição externa.
+
 ## Layout e responsivo
 
 - Conteúdo com largura máxima de 1360 px e margem de 40 px (32 px até 1280; 16 px no celular).

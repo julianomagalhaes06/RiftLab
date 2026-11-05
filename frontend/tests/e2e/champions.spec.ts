@@ -83,7 +83,8 @@ test("CDN fora do ar: navegação por teclado até a decisão continua, com rót
   await expect(page.getByRole("link", { name: /Participante 1 — Kai'Sa/ })).toHaveAttribute("aria-current", "true");
 
   await page.goto(`/decisions/${DECISION_1}`);
-  await expect(page.getByRole("heading", { name: /participante 1/ })).toBeVisible();
+  // Estado final: o nome vem da API (não do CDN); o cabeçalho com "participante 1" é só transitório.
+  await expect(page.getByRole("heading", { name: /^Decisão de Kai'Sa em / })).toBeVisible();
   await expect(page.getByText("Kai'Sa").first()).toBeVisible(); // cabeçalho e composição dos times
 });
 

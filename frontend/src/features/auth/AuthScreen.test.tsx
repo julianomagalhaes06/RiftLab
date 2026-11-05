@@ -68,13 +68,21 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     });
     vi.stubGlobal("fetch", mock.fetch);
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Criar conta" }));
-    expect(screen.getByRole("heading", { name: "Criar conta no RiftLab" })).toHaveFocus();
-    expect(screen.getByText(/senha com pelo menos 10/)).toBeInTheDocument();
+    const tab = await screen.findByRole("tab", { name: "Criar conta" });
+    fireEvent.click(tab);
+    expect(tab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "Criar conta no RiftLab" })).toBeInTheDocument();
+    // Requisitos conferidos enquanto digita, com estado em texto (não só cor).
+    expect(screen.getByText(/Senha com pelo menos 10 caracteres/)).toHaveTextContent("(pendente)");
     fill("jogadora", "senha-correta-1");
     fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
     expect(await screen.findByText("Esse nome de usuário já está em uso. Escolha outro.")).toBeInTheDocument();
+    expect(screen.getByText(/Senha com pelo menos 10 caracteres/)).toHaveTextContent("(atendido)");
     fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    // Depois do cadastro: confirmação com o próximo passo (vincular a conta Riot ou ir ao Painel).
+    expect(await screen.findByRole("heading", { name: "Conta criada" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Vincular conta Riot" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ir para o Painel" }));
     expect(await screen.findByRole("button", { name: "Sair" })).toBeInTheDocument();
   });
 
@@ -133,5 +141,24 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/auth\/session$/)).toHaveLength(1));
     expect(screen.queryByRole("heading", { name: "Entrar no RiftLab" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sair" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Tela de entrada: abas e senha", () => {
+  it("alterna as abas pelo teclado e mostra ou oculta a senha", async () => {
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user: null }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    const login = await screen.findByRole("tab", { name: "Entrar" });
+    login.focus();
+    fireEvent.keyDown(login, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Criar conta" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Criar conta" })).toHaveAttribute("aria-selected", "true");
+    const password = screen.getByLabelText("Senha");
+    expect(password).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Mostrar senha" }));
+    expect(password).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Ocultar senha" })).toHaveAttribute("aria-pressed", "true");
   });
 });

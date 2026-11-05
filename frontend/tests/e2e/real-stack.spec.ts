@@ -43,10 +43,12 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     const ready = page.getByText("Serviço disponível");
     await expect(login.or(ready)).toBeVisible();
     if (await login.isVisible()) {
-      await page.getByRole("button", { name: "Criar conta" }).click();
+      await page.getByRole("tab", { name: "Criar conta" }).click();
       await page.getByLabel("Usuário").fill(`e2e_${Date.now()}`);
-      await page.getByLabel("Senha").fill("senha-e2e-stack-1");
+      await page.getByLabel("Senha", { exact: true }).fill("senha-e2e-stack-1");
       await page.getByRole("button", { name: "Criar conta" }).click();
+      await page.getByRole("button", { name: "Ir para o Painel" }).click();
+      await page.goto("/importar");
     }
 
     // Entrada
