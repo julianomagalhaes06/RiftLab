@@ -44,9 +44,14 @@ async def submit_feedback(
     analysis_id: uuid.UUID,
     body: dict[str, Any],
     idempotency_key: str,
+    *,
+    owner: uuid.UUID | None = None,
 ) -> tuple[dict[str, Any], bool]:
+    """`owner`: usuário da sessão (Sprint 2, #11). O apelido do revisor vale dentro da conta:
+    o mesmo apelido em contas diferentes são revisores diferentes."""
     digest = request_hash({"analysisId": str(analysis_id), **body})
-    who = reviewer_hash(body["reviewerAlias"])
+    alias = body["reviewerAlias"]
+    who = reviewer_hash(alias if owner is None else f"{owner}:{alias}")
     async with session_factory() as session:
         by_key = await session.scalar(
             select(AnalysisFeedbackModel).where(
@@ -54,7 +59,7 @@ async def submit_feedback(
             )
         )
         if by_key is not None:
-            if by_key.request_sha256 != digest:
+            if by_key.request_sha256 != digest or by_key.user_id != owner:
                 raise ConflictError("IDEMPOTENCY_CONFLICT")
             return as_payload(by_key), False
         analysis = await session.get(AnalysisModel, analysis_id)
@@ -85,21 +90,30 @@ async def submit_feedback(
         reason=body["reason"],
         idempotency_key=idempotency_key,
         request_sha256=digest,
+        user_id=owner,
     )
     try:
         async with session_factory.begin() as session:
             session.add(row)
     except IntegrityError:
         # corrida: outra requisição gravou a mesma chave ou o mesmo julgamento
-        return await submit_feedback(session_factory, analysis_id, body, idempotency_key)
+        return await submit_feedback(
+            session_factory, analysis_id, body, idempotency_key, owner=owner
+        )
     return as_payload(row), True
 
 
-async def list_feedback(session: AsyncSession, analysis_id: uuid.UUID) -> list[dict[str, Any]]:
+async def list_feedback(
+    session: AsyncSession, analysis_id: uuid.UUID, owner: uuid.UUID | None = None
+) -> list[dict[str, Any]]:
+    """Só os julgamentos do usuário da sessão (#11); sem sessão, os sem dono."""
     rows = (
         await session.execute(
             select(AnalysisFeedbackModel)
-            .where(AnalysisFeedbackModel.analysis_id == analysis_id)
+            .where(
+                AnalysisFeedbackModel.analysis_id == analysis_id,
+                AnalysisFeedbackModel.user_id.is_not_distinct_from(owner),
+            )
             .order_by(AnalysisFeedbackModel.created_at, AnalysisFeedbackModel.id)
         )
     ).scalars()

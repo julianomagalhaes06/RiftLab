@@ -66,6 +66,48 @@ async def test_attempts_belong_to_their_user(app_client, session_factory, tmp_pa
                 # A tentativa criada sem sessão também não aparece para quem tem conta.
                 assert (await ana.get(f"/api/v1/learning-attempts/{legacy}")).status_code == 404
 
+                # Julgamentos e relatório também são da própria conta.
+                revealed = await ana.post(
+                    f"/api/v1/learning-attempts/{attempt}/reveal",
+                    json={"explicit": True},
+                    headers=HEADERS,
+                )
+                analysis = revealed.json()["comparison"]["analysisId"]
+                item = revealed.json()["comparison"]["candidates"][0]["itemId"]
+                judged = await ana.post(
+                    f"/api/v1/analyses/{analysis}/feedback",
+                    json={
+                        "itemId": item,
+                        "grade": 2,
+                        "reason": "faz sentido",
+                        "rubricVersion": "rubric_v1",
+                        "reviewerAlias": "revisor",
+                    },
+                    headers={"Idempotency-Key": f"fb-{uuid.uuid4()}", **HEADERS},
+                )
+                assert judged.status_code == 201, judged.text
+                mine = (await ana.get(f"/api/v1/analyses/{analysis}/report")).json()
+                theirs = (await bia.get(f"/api/v1/analyses/{analysis}/report")).json()
+                assert len(mine["feedback"]) == 1 and theirs["feedback"] == []
+                # Relatório com a tentativa de outra pessoa: a tentativa não existe para ela.
+                linked = await bia.get(
+                    f"/api/v1/analyses/{analysis}/report", params={"attemptId": attempt}
+                )
+                assert linked.status_code == 404
+                # O mesmo apelido em outra conta é outro revisor (sem conflito).
+                other = await bia.post(
+                    f"/api/v1/analyses/{analysis}/feedback",
+                    json={
+                        "itemId": item,
+                        "grade": 0,
+                        "reason": "discordo",
+                        "rubricVersion": "rubric_v1",
+                        "reviewerAlias": "revisor",
+                    },
+                    headers={"Idempotency-Key": f"fb-{uuid.uuid4()}", **HEADERS},
+                )
+                assert other.status_code == 201, other.text
+
                 progress_a = (await ana.get("/api/v1/learning-attempts/progress")).json()
                 progress_b = (await bia.get("/api/v1/learning-attempts/progress")).json()
                 assert progress_a["study"]["attempts"] == 1

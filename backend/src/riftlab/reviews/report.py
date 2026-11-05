@@ -82,7 +82,11 @@ async def build_report(
     analysis_id: uuid.UUID,
     attempt_id: uuid.UUID | None,
     configs: Path,
+    *,
+    owner: uuid.UUID | None = None,
 ) -> dict[str, Any]:
+    """`owner` (#11): julgamentos e tentativa do usuário da sessão; tentativa de outra pessoa
+    responde como inexistente."""
     async with session_factory() as session:
         analysis = await session.get(AnalysisModel, analysis_id)
         if analysis is None:
@@ -90,7 +94,7 @@ async def build_report(
         point = await session.get(DecisionPointModel, analysis.decision_id)
         values = ((point.features or {}).get("values", {})) if point else {}
         champion = await _champion(session, values.get("self_champion_id"))
-        feedback = await list_feedback(session, analysis_id)
+        feedback = await list_feedback(session, analysis_id, owner)
     result = analysis.result
     names = {c["itemId"]: c.get("name") for c in result.get("candidates", [])}
     quality = result.get("quality", {})
@@ -160,7 +164,7 @@ async def build_report(
         "limits": LIMITS,
     }
     if attempt_id is not None:
-        state = await get_attempt(session_factory, attempt_id, configs)
+        state = await get_attempt(session_factory, attempt_id, configs, owner=owner)
         if state.get("analysisId") != str(analysis_id):
             raise InvalidRequestError("tentativa não pertence a esta análise")
         options = {o["itemId"]: o.get("name") for o in state["options"]}
