@@ -35,7 +35,9 @@ describe("CC-901: sincronização do histórico", () => {
     );
     api.on("GET", /^\/api\/v1\/matches$/, () => {
       listCalls += 1;
-      const items = listCalls > 1 ? [matchSummary({ matchId: "BR1_1" }), matchSummary({ matchId: "BR1_2" })] : [matchSummary({ matchId: "BR1_1" })];
+      const items = listCalls > 1
+        ? [matchSummary({ matchId: "BR1_3" }), matchSummary({ matchId: "BR1_2" }), matchSummary({ matchId: "BR1_1" })]
+        : [matchSummary({ matchId: "BR1_1" })];
       return json(200, { items, nextCursor: null });
     });
     vi.stubGlobal("fetch", api.fetch);
@@ -45,8 +47,9 @@ describe("CC-901: sincronização do histórico", () => {
     expect(await screen.findByText(/2 partidas novas encontradas/, {}, { timeout: 4000 })).toBeInTheDocument();
     expect(posts).toBe(1);
     expect(screen.getByRole("button", { name: "Atualizar" })).toBeDisabled();
-    // A recarga não volta a "Carregando" e a partida nova aparece.
+    // As duas novas entram juntas, sem a lista voltar a "Carregando".
     expect(await screen.findByRole("link", { name: "Contexto da partida BR1_2" }, { timeout: 7000 })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Contexto da partida BR1_3" })).toBeInTheDocument();
     expect(screen.queryByText("Carregando partidas…")).not.toBeInTheDocument();
   }, 15000);
 

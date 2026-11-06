@@ -4,11 +4,14 @@ import { isAbortError, isApiError } from "../../shared/api/errors";
 import { usePagedList } from "../../shared/hooks/usePagedList";
 import { count } from "../../shared/text/count";
 import { DayGroups } from "../history/HistoryPage";
-import { HistorySync } from "../history/HistorySync";
+import { HistorySync, type SyncPending } from "../history/HistorySync";
+import { SyncPendingBox } from "../history/SyncPendingBox";
 import { clock } from "../history/syncMessage";
 import { RankCard } from "../ranked/RankCard";
 import { isTier, profileIconUrl } from "../ranked/tiers";
+import { useRouter } from "../../shared/router/context";
 import { useRiotIntent } from "../../shared/router/intent";
+import { routeToPath } from "../../shared/router/routes";
 import { LiveButton } from "../live/LiveButton";
 import { LOOKUP_ERRORS } from "./lookupErrors";
 import { rememberPlayer } from "./recentPlayers";
@@ -76,6 +79,11 @@ function ProfileHeader({ profile }: { profile: PlayerProfile }) {
 }
 
 function PlayerMatches({ profile, onRefresh }: { profile: PlayerProfile; onRefresh: (next: PlayerProfile) => void }) {
+  const [pending, setPending] = useState<SyncPending | null>(null);
+  const latestIds = useCallback(
+    (signal?: AbortSignal) => api.listMatches({ limit: PAGE_SIZE, player: profile.id }, signal).then((page) => page.items.map((m) => m.matchId)),
+    [profile.id],
+  );
   const list = usePagedList<MatchSummary>({
     resetKey: `player-${profile.id}`,
     fetchPage: (cursor, signal) => api.listMatches({ cursor, limit: PAGE_SIZE, player: profile.id }, signal),
@@ -93,12 +101,13 @@ function PlayerMatches({ profile, onRefresh }: { profile: PlayerProfile; onRefre
   );
   return (
     <>
-      <HistorySync onNewMatches={list.refresh} calls={calls} />
+      <HistorySync onNewMatches={list.refresh} calls={calls} latestIds={latestIds} knownIds={() => list.items.map((m) => m.matchId)} onPendingChange={setPending} />
       <section aria-labelledby="player-matches-heading">
         <h3 id="player-matches-heading">Partidas importadas</h3>
-        {list.status === "loading" ? <p className="muted" aria-busy="true">Carregando partidas…</p> : null}
+        {pending ? <SyncPendingBox pending={pending} /> : null}
+        {list.status === "loading" && !pending ? <p className="muted" aria-busy="true">Carregando partidas…</p> : null}
         {list.status === "error" ? <p className="muted">As partidas não puderam ser carregadas agora.</p> : null}
-        {list.status === "ready" && !list.items.length ? (
+        {list.status === "ready" && !list.items.length && !pending ? (
           <p className="muted">Nenhuma partida deste jogador importada ainda. A atualização busca as ranqueadas recentes.</p>
         ) : null}
         {list.items.length ? (
@@ -117,16 +126,44 @@ function PlayerMatches({ profile, onRefresh }: { profile: PlayerProfile; onRefre
   );
 }
 
-export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: string }) {
+function sameRiotId(a: { gameName: string; tagLine: string }, b: { gameName: string; tagLine: string }): boolean {
+  const norm = (value: string) => value.normalize("NFC").toLocaleLowerCase("pt-BR");
+  return norm(a.gameName) === norm(b.gameName) && norm(a.tagLine) === norm(b.tagLine);
+}
+
+export function PlayerPage({
+  gameName,
+  tagLine,
+  fromMatch = null,
+  previousRiotId = null,
+}: {
+  gameName: string;
+  tagLine: string;
+  /** Vindo do placar: a conta é achada pelo participante da partida, não pelo nome. */
+  fromMatch?: { matchId: string; participantId: number } | null;
+  /** Riot ID que o jogador usava na partida, quando mudou. */
+  previousRiotId?: string | null;
+}) {
+  const { navigate } = useRouter();
   const [state, setState] = useState<{ profile: PlayerProfile | null; error: string | null }>({ profile: null, error: null });
   const [confirmed, confirm] = useRiotIntent();
   useEffect(() => {
     if (!confirmed) return;
     // A página é remontada (key) a cada Riot ID: o estado inicial já é "buscando".
     const controller = new AbortController();
-    api
-      .lookupPlayer(gameName, tagLine, false, controller.signal)
+    const lookup = fromMatch
+      ? api.lookupPlayerFromMatch(fromMatch.matchId, fromMatch.participantId, controller.signal)
+      : api.lookupPlayer(gameName, tagLine, false, controller.signal);
+    lookup
       .then((profile) => {
+        if (fromMatch && !sameRiotId(profile, { gameName, tagLine })) {
+          // Trocou de Riot ID depois da partida: o endereço passa para o nome atual.
+          navigate(
+            routeToPath({ name: "player", gameName: profile.gameName, tagLine: profile.tagLine, previousRiotId: `${gameName}#${tagLine}` }),
+            { replace: true },
+          );
+          return;
+        }
         rememberPlayer(profile); // buscas recentes, só neste navegador (CC-1208)
         setState({ profile, error: null });
       })
@@ -136,7 +173,7 @@ export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: s
         setState({ profile: null, error: message ?? "Não foi possível buscar o jogador agora." });
       });
     return () => controller.abort();
-  }, [gameName, tagLine, confirmed]);
+  }, [gameName, tagLine, confirmed, fromMatch, navigate]);
   const onRefresh = useCallback((profile: PlayerProfile) => {
     rememberPlayer(profile);
     setState({ profile, error: null });
@@ -146,6 +183,11 @@ export function PlayerPage({ gameName, tagLine }: { gameName: string; tagLine: s
     <section className="area-page player" aria-labelledby="player-heading" aria-busy={confirmed && !state.profile && !state.error}>
       {state.profile ? (
         <>
+          {previousRiotId ? (
+            <p className="notice notice--info" role="note">
+              Na partida, este jogador aparecia como <strong>{previousRiotId}</strong>. O Riot ID mudou desde então.
+            </p>
+          ) : null}
           <ProfileHeader profile={state.profile} />
           <PlayerMatches profile={state.profile} onRefresh={onRefresh} />
         </>

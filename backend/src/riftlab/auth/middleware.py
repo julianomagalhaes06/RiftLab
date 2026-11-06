@@ -39,7 +39,10 @@ _MATCH = r"[A-Za-z0-9_-]{1,64}"
 PUBLIC_ROUTES: tuple[tuple[frozenset[str], re.Pattern[str]], ...] = (
     (frozenset({"GET"}), re.compile(r"/api/v1/catalog/current")),
     (frozenset({"GET"}), re.compile(r"/api/v1/champions/patterns")),
-    (frozenset({"POST"}), re.compile(r"/api/v1/players/(?:lookup|live|live/status)")),
+    (
+        frozenset({"POST"}),
+        re.compile(r"/api/v1/players/(?:lookup|lookup-from-match|live|live/status)"),
+    ),
     (frozenset({"GET", "POST"}), re.compile(rf"/api/v1/players/{_UUID}/sync")),
     (frozenset({"GET"}), re.compile(rf"/api/v1/matches/{_MATCH}(?:/review|/timeline|/decisions)?")),
     (frozenset({"POST"}), re.compile(rf"/api/v1/matches/{_MATCH}/preparation")),

@@ -78,7 +78,10 @@ describe("tela da partida", () => {
     expect(self).toHaveAttribute("aria-current", "true"); // a conta local vem selecionada
     expect(within(self).getByText("Você")).toBeInTheDocument();
     // CC-1210: Riot ID da partida embaixo do campeão, com link para o perfil; sem nome, nada.
-    expect(screen.getByRole("link", { name: "Perfil de Rival Ágil#BR1" })).toHaveAttribute("href", "/jogador/Rival%20%C3%81gil-BR1");
+    // O link leva a partida e o participante: o perfil é achado pela conta (nome pode ter mudado).
+    expect(screen.getByRole("link", { name: "Perfil de Rival Ágil#BR1" }).getAttribute("href")).toMatch(
+      /^\/jogador\/Rival%20%C3%81gil-BR1\?partida=BR1_\d+&participante=\d+$/,
+    );
     expect(screen.getAllByRole("link", { name: /^Perfil de / })).toHaveLength(1);
     expect(screen.getByText(/Riot ID como estava na partida/)).toBeInTheDocument();
 

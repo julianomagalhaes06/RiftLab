@@ -214,6 +214,7 @@ PUBLIC_REQUESTS = (
     ("GET", "/api/v1/catalog/current", None),
     ("GET", "/api/v1/champions/patterns", None),
     ("POST", "/api/v1/players/lookup", {"gameName": "Alguem", "tagLine": "BR1"}),
+    ("POST", "/api/v1/players/lookup-from-match", {"matchId": "BR1_123", "participantId": 1}),
     ("POST", "/api/v1/players/live", {"gameName": "Alguem", "tagLine": "BR1"}),
     ("POST", "/api/v1/players/live/status", {"gameName": "Alguem", "tagLine": "BR1"}),
     ("GET", f"/api/v1/players/{uuid.UUID(int=1)}/sync", None),

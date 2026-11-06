@@ -182,4 +182,40 @@ describe("perfil de jogador por Riot ID", () => {
     await screen.findByText(/Nível 321/);
     expect(readRecentPlayers().map((player) => player.gameName)).toEqual(["Novo Nome"]);
   });
+
+  it("vindo do placar, acha a conta mesmo com Riot ID novo e avisa o nome da partida", async () => {
+    const api = setup("/jogador/Nome%20Antigo-OLD?partida=BR1_42&participante=3", (mock) => {
+      mock.on("POST", /^\/api\/v1\/players\/lookup-from-match$/, () => json(200, profile({ gameName: "Nome Novo", tagLine: "NEW" })));
+      mock.on("POST", /^\/api\/v1\/players\/lookup$/, () => json(200, profile({ gameName: "Nome Novo", tagLine: "NEW" })));
+      mock.on("POST", /\/players\/.+\/sync$/, () => json(202, { state: "QUEUED" }));
+      mock.on("GET", /\/players\/.+\/sync$/, () => json(200, { state: "SUCCEEDED", newEnqueued: 0, finishedAt: "2026-10-19T15:00:00Z" }));
+    });
+    expect(await screen.findByRole("note")).toHaveTextContent("Na partida, este jogador aparecia como Nome Antigo#OLD");
+    expect(screen.getByRole("heading", { name: /Nome Novo #NEW/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/jogador/Nome%20Novo-NEW");
+    expect(api.callsTo("POST", /lookup-from-match$/)[0].body).toEqual({ matchId: "BR1_42", participantId: 3 });
+  });
+
+  it("partidas novas entram de uma vez: a caixa de espera fica até todas chegarem", async () => {
+    let listCalls = 0;
+    setup("/jogador/P%C3%A3o%20de%20Queijo-BR1", (mock) => {
+      mock.on("POST", /^\/api\/v1\/players\/lookup$/, () => json(200, profile()));
+      mock.on("POST", /\/players\/.+\/sync$/, () => json(202, { state: "QUEUED", newEnqueued: 0 }));
+      mock.on("GET", /\/players\/.+\/sync$/, () =>
+        json(200, { state: "SUCCEEDED", listed: 2, newEnqueued: 2, alreadyKnown: 0, skippedPurged: 0, finishedAt: "2026-10-19T15:00:00Z" }),
+      );
+      // A importação termina depois de algumas conferências: antes disso, nenhuma partida.
+      mock.on("GET", /^\/api\/v1\/matches$/, () => {
+        listCalls += 1;
+        const items = listCalls >= 4 ? [matchSummary({ matchId: "BR1_71" }), matchSummary({ matchId: "BR1_72" })] : [];
+        return json(200, { items, nextCursor: null });
+      });
+    });
+    expect(await screen.findByText("Trazendo 2 partidas novas da Riot…", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByText("Nenhuma partida deste jogador importada ainda.", { exact: false })).not.toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Contexto da partida BR1_72" }, { timeout: 10000 })).toBeInTheDocument();
+    // As duas aparecem juntas, e a espera some.
+    expect(screen.getByRole("link", { name: "Contexto da partida BR1_71" })).toBeInTheDocument();
+    expect(screen.queryByText(/Trazendo 2 partidas novas/)).not.toBeInTheDocument();
+  }, 20000);
 });

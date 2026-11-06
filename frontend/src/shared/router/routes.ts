@@ -12,6 +12,9 @@
  *   /matches/:matchId?participant=N      partida (preparação, participantes, decisões)
  *   /decisions/:decisionId               detalhe de uma decisão
  *   /jogador/:nome-:tag                  perfil de um jogador pelo Riot ID (CC-1102)
+ *     ?partida=BR1_…&participante=N      vindo do placar: o perfil é achado pela conta (o
+ *                                        Riot ID da partida pode ter mudado)
+ *     ?antes=Nome%23TAG                  Riot ID que o jogador tinha na partida
  *   /jogador/:nome-:tag/ao-vivo          partida ao vivo do jogador (CC-1211)
  *   /conta                              conta local e vínculo da conta Riot (Sprint 2, #12)
  *   /prototipo                           protótipo ilustrativo do CC-102 (dados fictícios)
@@ -30,7 +33,15 @@ export type Route =
   | { name: "import"; jobId: string }
   | { name: "match"; matchId: string; participantId: number | null }
   | { name: "decision"; decisionId: string }
-  | { name: "player"; gameName: string; tagLine: string }
+  | {
+      name: "player";
+      gameName: string;
+      tagLine: string;
+      /** Vindo do placar: participante da partida, para achar a conta mesmo com nome novo. */
+      fromMatch?: { matchId: string; participantId: number };
+      /** Riot ID que o jogador usava na partida (mostrado quando mudou). */
+      previousRiotId?: string;
+    }
   | { name: "live"; gameName: string; tagLine: string }
   | { name: "prototype" }
   | { name: "notFound"; path: string };
@@ -122,7 +133,7 @@ export function parseRoute(pathname: string, search = ""): Route {
       // Nome-TAG, como em sites de estatísticas: a TAG não tem hífen, então vale o último.
       const dash = id.lastIndexOf("-");
       const riotId = dash > 0 ? parseRiotId(`${id.slice(0, dash)}#${id.slice(dash + 1)}`) : null;
-      if (riotId) return { name: "player", ...riotId };
+      if (riotId) return { name: "player", ...riotId, ...playerContext(search) };
     }
     if (head === "decisions" && isUuid(id)) {
       return { name: "decision", decisionId: id.toLowerCase() };
@@ -137,6 +148,18 @@ export function parseRoute(pathname: string, search = ""): Route {
     return { name: "prototype" };
   }
   return { name: "notFound", path: trimmed };
+}
+
+/** Contexto opcional do perfil na query: partida de origem e Riot ID antigo. */
+function playerContext(search: string): { fromMatch?: { matchId: string; participantId: number }; previousRiotId?: string } {
+  const params = new URLSearchParams(search);
+  const context: { fromMatch?: { matchId: string; participantId: number }; previousRiotId?: string } = {};
+  const matchId = params.get("partida");
+  const participantId = parseParticipant(`?participant=${params.get("participante") ?? ""}`);
+  if (matchId && isRealMatchId(matchId) && participantId !== null) context.fromMatch = { matchId, participantId };
+  const previous = params.get("antes");
+  if (previous && previous.length <= 40 && parseRiotId(previous)) context.previousRiotId = previous;
+  return context;
 }
 
 function safeDecode(segment: string): string {
@@ -179,8 +202,17 @@ export function routeToPath(route: Route): string {
     }
     case "decision":
       return `/decisions/${route.decisionId}`;
-    case "player":
-      return `/jogador/${encodeURIComponent(route.gameName)}-${encodeURIComponent(route.tagLine)}`;
+    case "player": {
+      const base = `/jogador/${encodeURIComponent(route.gameName)}-${encodeURIComponent(route.tagLine)}`;
+      const params = new URLSearchParams();
+      if (route.fromMatch) {
+        params.set("partida", route.fromMatch.matchId);
+        params.set("participante", String(route.fromMatch.participantId));
+      }
+      if (route.previousRiotId) params.set("antes", route.previousRiotId);
+      const query = params.toString();
+      return query ? `${base}?${query}` : base;
+    }
     case "live":
       return `/jogador/${encodeURIComponent(route.gameName)}-${encodeURIComponent(route.tagLine)}/ao-vivo`;
     case "prototype":

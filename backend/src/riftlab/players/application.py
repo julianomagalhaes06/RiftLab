@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import unicodedata
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -28,6 +29,7 @@ from riftlab.ingestion.infrastructure.riot_account import (
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
+from riftlab.matches.riot_ids import participant_puuid
 from riftlab.players.models import PlayerProfileModel as Profile
 from riftlab.ranked.application import league_observations
 from riftlab.ranked.domain import FLEX_QUEUE, SOLO_QUEUE, account_key, parse_league_entries
@@ -169,10 +171,61 @@ async def lookup_player(
     if not settings.riot_api_key:
         raise PlayerLookupError("RIOT_KEY_MISSING")
 
+    return await _fetch_and_store(
+        factory,
+        settings,
+        lambda client: client.resolve_account(name, tag),
+        transport=transport,
+        now=now,
+        season=season,
+    )
+
+
+async def lookup_player_from_match(
+    factory: SessionFactory,
+    settings: Settings,
+    match_id: str,
+    participant_id: int,
+    *,
+    transport: RiotHttpTransport | None = None,
+    now: datetime | None = None,
+    season: str | None = None,
+) -> dict[str, Any]:
+    """Perfil de um participante de partida importada, pela conta e não pelo nome: o PUUID
+    vem do bruto (lido na hora, nunca guardado) e a Account-V1 by-puuid dá o Riot ID ATUAL.
+    Quem trocou de nome depois da partida continua achável, e um nome antigo que outra pessoa
+    pegou não leva ao perfil errado. Mesmas 3 requisições e o mesmo cache da busca por nome."""
+    puuid = participant_puuid(settings.raw_storage_dir, match_id, participant_id)
+    if puuid is None:
+        raise PlayerLookupError("PLAYER_NOT_FOUND")
+    if not settings.riot_api_key:
+        raise PlayerLookupError("RIOT_KEY_MISSING")
+    return await _fetch_and_store(
+        factory,
+        settings,
+        lambda client: client.resolve_account_by_puuid(puuid),
+        transport=transport,
+        now=now,
+        season=season,
+    )
+
+
+async def _fetch_and_store(
+    factory: SessionFactory,
+    settings: Settings,
+    resolve: Callable[[RiotHttpTransport], Awaitable[tuple[str, str, str]]],
+    *,
+    transport: RiotHttpTransport | None,
+    now: datetime | None,
+    season: str | None,
+) -> dict[str, Any]:
+    """Conta (por Riot ID ou PUUID) + invocador + elo na Riot; grava perfil e elo sob o Riot
+    ID canônico e devolve a visão. 3 requisições no máximo."""
+    now = now or datetime.now(UTC)
     own = transport is None
     client = transport or _transport(settings)
     try:
-        puuid, canonical_name, canonical_tag = await client.resolve_account(name, tag)
+        puuid, canonical_name, canonical_tag = await resolve(client)
         try:
             icon, level = await client.fetch_summoner_by_puuid(puuid)
         except SourceNotFoundError as exc:

@@ -88,6 +88,8 @@ export interface ApiClient {
   getHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   requestHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   lookupPlayer(gameName: string, tagLine: string, refresh?: boolean, signal?: AbortSignal): Promise<PlayerProfile>;
+  /** Participante de partida importada, pela conta (PUUID do bruto) e com o Riot ID atual. */
+  lookupPlayerFromMatch(matchId: string, participantId: number, signal?: AbortSignal): Promise<PlayerProfile>;
   /** Perfil da conta configurada; sem perfil, `profile` nulo e o motivo (CC-1202). */
   getOwnPlayer(signal?: AbortSignal): Promise<OwnPlayer>;
   /** Contas locais (Sprint 2, #10): sessão por cookie HttpOnly. */
@@ -230,6 +232,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     requestHistorySync: (signal) => request("POST", "/api/v1/history/sync", { signal }),
     lookupPlayer: (gameName, tagLine, refresh = false, signal) =>
       request("POST", "/api/v1/players/lookup", { body: { gameName, tagLine, refresh }, signal }),
+    lookupPlayerFromMatch: (matchId, participantId, signal) =>
+      request("POST", "/api/v1/players/lookup-from-match", { body: { matchId, participantId }, signal }),
     getOwnPlayer: (signal) => request("GET", "/api/v1/players/me", { signal }),
     getAuthSession: (signal) => request("GET", "/api/v1/auth/session", { signal }),
     register: (username, password, signal) =>

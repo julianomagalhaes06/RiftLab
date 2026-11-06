@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { api, type MatchSummary } from "../../shared/api/client";
 import { usePagedList } from "../../shared/hooks/usePagedList";
 import { Link } from "../../shared/router/Link";
@@ -7,7 +7,8 @@ import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { championName } from "../matches/format";
 import { ChampionAvatar } from "./ChampionAvatar";
 import { filterLoadedMatches, type OriginFilter, type QueueFilter, type ResultFilter } from "./filter";
-import { HistorySync } from "./HistorySync";
+import { HistorySync, type SyncPending } from "./HistorySync";
+import { SyncPendingBox } from "./SyncPendingBox";
 import { MatchCard } from "./MatchCard";
 import { dayKey, dayLabel, decimal, percent, record, summarizeLoaded } from "./presentation";
 import "./history.css";
@@ -127,6 +128,12 @@ export function HistoryPage() {
   const [origin, setOrigin] = useState<OriginFilter>("RIOT");
   const [result, setResult] = useState<ResultFilter>("ALL");
   const [queue, setQueue] = useState<QueueFilter>("ALL");
+  const [pending, setPending] = useState<SyncPending | null>(null);
+  // Partidas da conta (a sincronização só traz partidas da conta): para saber quando chegaram.
+  const latestIds = useCallback(
+    (signal?: AbortSignal) => api.listMatches({ limit: PAGE_SIZE, scope: "account" }, signal).then((page) => page.items.map((m) => m.matchId)),
+    [],
+  );
   const list = usePagedList<MatchSummary>({
     resetKey: `history-matches-${origin}`,
     fetchPage: (cursor, signal) => api.listMatches({
@@ -151,7 +158,7 @@ export function HistoryPage() {
         <Link to="/importar" className="arrow-link">Importar partida</Link>
       </header>
 
-      <HistorySync onNewMatches={list.refresh} />
+      <HistorySync onNewMatches={list.refresh} latestIds={latestIds} knownIds={() => list.items.map((m) => m.matchId)} onPendingChange={setPending} />
 
       {list.status === "ready" && list.items.length > 0 && <LoadedSummary matches={list.items} />}
 
@@ -173,7 +180,8 @@ export function HistoryPage() {
         ) : null}
       </section>
 
-      {list.status === "loading" && <div className="history-state" role="status" aria-busy="true">Carregando partidas…</div>}
+      {pending ? <SyncPendingBox pending={pending} /> : null}
+      {list.status === "loading" && !pending && <div className="history-state" role="status" aria-busy="true">Carregando partidas…</div>}
       {list.status === "error" && <div className="history-state"><ErrorNotice error={list.error} onRetry={list.reload} retryLabel="Tentar novamente" /></div>}
       {list.status === "ready" && (
         <section aria-labelledby="history-list-heading" className="history-results">
@@ -187,7 +195,7 @@ export function HistoryPage() {
               {list.loadMoreError ? <ErrorNotice error={list.loadMoreError} onRetry={list.loadMore} retryLabel="Tentar carregar mais" /> : null}
               {list.nextCursor !== null && <button className="button button--secondary history-more" type="button" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? "Carregando…" : "Carregar mais partidas"}</button>}
             </>
-          ) : (
+          ) : pending && !list.items.length ? null : (
             <div className="empty-state">
               <h4>{list.items.length ? "Nenhuma partida neste filtro" : "Nenhuma partida importada"}</h4>
               <p>{list.items.length ? "Ajuste a busca ou carregue mais páginas." : origin === "RIOT" ? "Nenhuma partida foi identificada para a conta configurada. Confira a conta e a atualização em Minha posição ou selecione DEMO." : "Importe uma partida concluída ou abra a demonstração para começar."}</p>

@@ -118,3 +118,11 @@
 
 /* F1 (CC-1005): selo da revisão no cartão (chip do padrão; verde quando há compras revistas). */
 .review-badge { width: fit-content; }
+
+/* Espera da atualização no topo da lista (partidas novas entram de uma vez). */
+.sync-pending { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 64px; margin: 0 0 12px; padding: 16px; color: var(--ntext-muted); font-size: .9375rem; }
+.sync-pending__spinner { width: 22px; height: 22px; border: 2.5px solid var(--nline2); border-top-color: var(--accent); border-radius: 50%; animation: sync-spin .8s linear infinite; }
+@keyframes sync-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .sync-pending__spinner { animation-duration: 2.4s; }
+}

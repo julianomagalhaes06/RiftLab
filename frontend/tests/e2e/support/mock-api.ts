@@ -235,6 +235,7 @@ export type RouteKey =
   | "POST /api/v1/history/sync"
   | "GET /api/v1/history/sync"
   | "POST /api/v1/players/lookup"
+  | "POST /api/v1/players/lookup-from-match"
   | "GET /api/v1/players/me"
   | "POST /api/v1/players/live"
   | "POST /api/v1/players/live/status"
@@ -277,6 +278,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["POST /api/v1/history/sync", "POST", /^\/api\/v1\/history\/sync$/],
   ["GET /api/v1/history/sync", "GET", /^\/api\/v1\/history\/sync$/],
   ["POST /api/v1/players/lookup", "POST", /^\/api\/v1\/players\/lookup$/],
+  ["POST /api/v1/players/lookup-from-match", "POST", /^\/api\/v1\/players\/lookup-from-match$/],
   ["GET /api/v1/players/me", "GET", /^\/api\/v1\/players\/me$/],
   ["POST /api/v1/players/live", "POST", /^\/api\/v1\/players\/live$/],
   ["POST /api/v1/players/live/status", "POST", /^\/api\/v1\/players\/live\/status$/],
@@ -467,6 +469,7 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "POST /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
   "GET /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),
   "POST /api/v1/players/lookup": () => ok(playerProfile()),
+  "POST /api/v1/players/lookup-from-match": () => ok(playerProfile()),
   // CC-1202: chip do topo com o perfil da conta configurada e faixa com o catálogo.
   // Sem ícone por padrão: as telas sem rede externa continuam sem pedir nada ao CDN.
   "GET /api/v1/players/me": () => ok({ reason: null, profile: playerProfile({ id: "7a5c3f1e-0000-4000-8000-0000000000aa", gameName: "Conta Própria", profileIconId: null }) }),

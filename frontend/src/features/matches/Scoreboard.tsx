@@ -1,5 +1,5 @@
 import type { MatchDetail, MatchParticipant, MatchTimeline } from "../../shared/api/client";
-import { routeToPath } from "../../shared/router/routes";
+import { isRealMatchId, routeToPath } from "../../shared/router/routes";
 import { useItemName } from "../../shared/hooks/useItemName";
 import { Link } from "../../shared/router/Link";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
@@ -92,7 +92,13 @@ function Row({
         {/* CC-1210: Riot ID como estava na partida, com link para o perfil (busca só no clique). */}
         {participant.gameName && participant.tagLine ? (
           <Link
-            to={routeToPath({ name: "player", gameName: participant.gameName, tagLine: participant.tagLine })}
+            to={routeToPath({
+              name: "player",
+              gameName: participant.gameName,
+              tagLine: participant.tagLine,
+              // O Riot ID da partida pode ter mudado: o perfil é achado pela conta.
+              ...(isRealMatchId(match.matchId) ? { fromMatch: { matchId: match.matchId, participantId: participant.participantId } } : {}),
+            })}
             className="scoreboard__riot-id"
             aria-label={`Perfil de ${participant.gameName}#${participant.tagLine}`}
           >

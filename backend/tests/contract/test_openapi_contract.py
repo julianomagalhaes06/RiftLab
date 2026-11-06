@@ -49,6 +49,7 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/ranked/me",
         "/api/v1/history/sync",
         "/api/v1/players/lookup",
+        "/api/v1/players/lookup-from-match",
         "/api/v1/players/me",
         "/api/v1/players/live",
         "/api/v1/players/live/status",

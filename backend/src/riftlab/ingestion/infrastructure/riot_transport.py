@@ -345,24 +345,13 @@ class RiotHttpTransport:
             "/riot/account/v1/accounts/by-riot-id/"
             f"{quote(game_name, safe='')}/{quote(tag_line, safe='')}"
         )
-        document = _parse_json_body("account", await self._request_raw("account", path))
-        if not isinstance(document, dict):
-            raise SourceSchemaError(
-                code="SCHEMA_UNSUPPORTED", detail="resposta de account sem identidade válida"
-            )
-        puuid, name, tag = (document.get(key) for key in ("puuid", "gameName", "tagLine"))
-        if not (
-            isinstance(puuid, str)
-            and puuid
-            and isinstance(name, str)
-            and name
-            and isinstance(tag, str)
-            and tag
-        ):
-            raise SourceSchemaError(
-                code="SCHEMA_UNSUPPORTED", detail="resposta de account sem identidade válida"
-            )
-        return puuid, name, tag
+        return _account_identity(await self._request_raw("account", path))
+
+    async def resolve_account_by_puuid(self, puuid: str) -> tuple[str, str, str]:
+        """Account-V1 by-puuid: o Riot ID ATUAL da conta (o jogador pode ter trocado de nome
+        depois da partida). Mesmo formato e validação de `resolve_account`."""
+        path = f"/riot/account/v1/accounts/by-puuid/{quote(puuid, safe='')}"
+        return _account_identity(await self._request_raw("account", path))
 
     async def fetch_summoner_by_puuid(self, puuid: str) -> tuple[int, int]:
         """Summoner-V4 por PUUID no host fixo BR1: (profileIconId, summonerLevel)."""
@@ -606,3 +595,25 @@ class RiotHttpTransport:
 
     def _remaining_budget_seconds(self) -> float:
         return self._budget.max_total_seconds - (time.monotonic() - self._started_at)
+
+
+def _account_identity(body: bytes) -> tuple[str, str, str]:
+    """Resposta da Account-V1 → (puuid, gameName, tagLine), todos texto não vazio."""
+    document = _parse_json_body("account", body)
+    if not isinstance(document, dict):
+        raise SourceSchemaError(
+            code="SCHEMA_UNSUPPORTED", detail="resposta de account sem identidade válida"
+        )
+    puuid, name, tag = (document.get(key) for key in ("puuid", "gameName", "tagLine"))
+    if not (
+        isinstance(puuid, str)
+        and puuid
+        and isinstance(name, str)
+        and name
+        and isinstance(tag, str)
+        and tag
+    ):
+        raise SourceSchemaError(
+            code="SCHEMA_UNSUPPORTED", detail="resposta de account sem identidade válida"
+        )
+    return puuid, name, tag

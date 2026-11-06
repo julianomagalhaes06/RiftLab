@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -27,6 +28,7 @@ from riftlab.ingestion.purge import retention
 from riftlab.players import application
 from riftlab.players.application import (
     lookup_player,
+    lookup_player_from_match,
     own_player,
     profile_account,
     purge_player,
@@ -600,3 +602,56 @@ async def test_api_own_player_and_current_catalog(app_client, session_factory, t
                     CatalogVersionModel.sha256.in_([f"synthetic-cc1202-{p}" for p, _ in rows])
                 )
             )
+
+
+@pytest.mark.asyncio
+async def test_lookup_from_match_finds_the_account_after_a_riot_id_change(
+    session_factory, tmp_path, clean
+):
+    """Placar: o Riot ID da partida é antigo; a conta vem do PUUID do bruto e a Account-V1
+    by-puuid devolve o nome atual. O PUUID não sai na resposta nem fica no banco."""
+    settings = _settings(tmp_path)
+    settings.raw_storage_dir = str(tmp_path / "raw")
+    body = json.dumps(
+        {
+            "metadata": {"matchId": NEW_MATCH},
+            "info": {
+                "participants": [
+                    {
+                        "participantId": 3,
+                        "puuid": PUUID,
+                        "riotIdGameName": "Nome Antigo",
+                        "riotIdTagline": "OLD",
+                    }
+                ]
+            },
+        }
+    ).encode()
+    DurableRawMatchStore(Path(settings.raw_storage_dir)).store(
+        NEW_MATCH, "match", body, hashlib.sha256(body).hexdigest()
+    )
+    transport, seen = _transport(riot_id=("Nome Novo", "NEW"))
+
+    view = await lookup_player_from_match(
+        session_factory, settings, NEW_MATCH, 3, transport=transport, now=NOW
+    )
+
+    assert (view["gameName"], view["tagLine"]) == ("Nome Novo", "NEW")
+    assert seen[0].endswith(f"/riot/account/v1/accounts/by-puuid/{PUUID}")  # pela conta
+    assert len(seen) == 3 and PUUID not in json.dumps(view, default=str)
+    async with session_factory() as session:
+        profile = await session.scalar(select(Profile))
+        assert profile is not None
+        assert profile.account_key == account_key_for(settings, "Nome Novo", "NEW")
+
+    # Participante sem bruto (ou sem PUUID): não consulta a Riot.
+    unused, none_seen = _transport()
+    with pytest.raises(PlayerLookupError) as missing:
+        await lookup_player_from_match(
+            session_factory, settings, NEW_MATCH, 7, transport=unused, now=NOW
+        )
+    assert missing.value.code == "PLAYER_NOT_FOUND" and none_seen == []
+
+
+def account_key_for(settings: Settings, name: str, tag: str) -> str:
+    return application._key(settings, name, tag)

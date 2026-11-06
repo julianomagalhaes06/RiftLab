@@ -630,6 +630,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/players/lookup-from-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Perfil de um participante de partida importada, pelo Riot ID atual
+         * @description Para o placar: o Riot ID gravado na partida pode estar desatualizado (o jogador trocou de nome) ou ter passado a outra pessoa. A conta é achada pelo PUUID do bruto da partida (lido na hora, nunca guardado nem devolvido) e a Account-V1 dá o Riot ID atual; depois, como a busca: invocador e elo (3 requisições) e o perfil é guardado.
+         */
+        post: operations["post_player_from_match_api_v1_players_lookup_from_match_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/players/me": {
         parameters: {
             query?: never;
@@ -2212,6 +2232,16 @@ export interface components {
             participantId: number;
             /** Skills */
             skills?: components["schemas"]["TimelineSkillUp"][];
+        };
+        /**
+         * PlayerFromMatch
+         * @description Participante de uma partida importada (o perfil é achado pela conta, não pelo nome).
+         */
+        PlayerFromMatch: {
+            /** Matchid */
+            matchId: string;
+            /** Participantid */
+            participantId: number;
         };
         /**
          * PlayerLiveStatus
@@ -4201,6 +4231,57 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PlayerLookup"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description INVALID_RIOT_ID ou VALIDATION_ERROR. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_player_from_match_api_v1_players_lookup_from_match_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayerFromMatch"];
             };
         };
         responses: {

@@ -3930,6 +3930,28 @@
         "title": "ParticipantTimeline",
         "type": "object"
       },
+      "PlayerFromMatch": {
+        "additionalProperties": false,
+        "description": "Participante de uma partida importada (o perfil é achado pela conta, não pelo nome).",
+        "properties": {
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "participantId": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Participantid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "matchId",
+          "participantId"
+        ],
+        "title": "PlayerFromMatch",
+        "type": "object"
+      },
       "PlayerLiveStatus": {
         "additionalProperties": false,
         "description": "Está jogando agora? (CC-1213). Em partida, a fila, o modo e o início; fora, só o estado.",
@@ -7578,6 +7600,68 @@
           }
         },
         "summary": "Busca um jogador pelo Riot ID (Nome#TAG)",
+        "tags": [
+          "players"
+        ]
+      }
+    },
+    "/api/v1/players/lookup-from-match": {
+      "post": {
+        "description": "Para o placar: o Riot ID gravado na partida pode estar desatualizado (o jogador trocou de nome) ou ter passado a outra pessoa. A conta é achada pelo PUUID do bruto da partida (lido na hora, nunca guardado nem devolvido) e a Account-V1 dá o Riot ID atual; depois, como a busca: invocador e elo (3 requisições) e o perfil é guardado.",
+        "operationId": "post_player_from_match_api_v1_players_lookup_from_match_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerFromMatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "PLAYER_NOT_FOUND ou PLAYER_NOT_ON_PLATFORM."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "INVALID_RIOT_ID ou VALIDATION_ERROR."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "RIOT_KEY_MISSING, RIOT_AUTH_FAILED, RIOT_RATE_LIMITED, UPSTREAM_UNAVAILABLE."
+          }
+        },
+        "summary": "Perfil de um participante de partida importada, pelo Riot ID atual",
         "tags": [
           "players"
         ]

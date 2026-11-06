@@ -14,12 +14,13 @@ from riftlab.history_sync.api import HistorySyncStatus
 from riftlab.history_sync.application import request_sync, sync_status
 from riftlab.players.application import (
     lookup_player,
+    lookup_player_from_match,
     own_player,
     profile_account,
     profile_key,
 )
 from riftlab.players.live import live_game, live_status
-from riftlab.shared.api.common import CamelModel
+from riftlab.shared.api.common import CamelModel, MatchId
 from riftlab.shared.api.matches import ChampionAsset
 from riftlab.shared.errors import NotFoundError, PlayerLookupError
 
@@ -30,6 +31,13 @@ class PlayerLookup(CamelModel):
     game_name: str = Field(min_length=1, max_length=32)
     tag_line: str = Field(min_length=1, max_length=8)
     refresh: bool = False
+
+
+class PlayerFromMatch(CamelModel):
+    """Participante de uma partida importada (o perfil é achado pela conta, não pelo nome)."""
+
+    match_id: MatchId
+    participant_id: int = Field(ge=1, le=10)
 
 
 class PlayerSyncRequest(CamelModel):
@@ -100,6 +108,29 @@ async def post_player_lookup(body: PlayerLookup, request: Request) -> PlayerProf
             body.game_name,
             body.tag_line,
             refresh=body.refresh,
+        )
+    )
+
+
+@router.post(
+    "/lookup-from-match",
+    response_model=PlayerProfile,
+    summary="Perfil de um participante de partida importada, pelo Riot ID atual",
+    description=(
+        "Para o placar: o Riot ID gravado na partida pode estar desatualizado (o jogador trocou "
+        "de nome) ou ter passado a outra pessoa. A conta é achada pelo PUUID do bruto da "
+        "partida (lido na hora, nunca guardado nem devolvido) e a Account-V1 dá o Riot ID atual; "
+        "depois, como a busca: invocador e elo (3 requisições) e o perfil é guardado."
+    ),
+    responses=_ERRORS,
+)
+async def post_player_from_match(body: PlayerFromMatch, request: Request) -> PlayerProfile:
+    return PlayerProfile.model_validate(
+        await lookup_player_from_match(
+            request.app.state.session_factory,
+            request.app.state.settings,
+            body.match_id,
+            body.participant_id,
         )
     )
 

@@ -89,7 +89,15 @@ function renderPage(route: Route): ReactNode {
     case "decision":
       return <DecisionDetailPage key={route.decisionId} decisionId={route.decisionId} />;
     case "player":
-      return <PlayerPage key={`${route.gameName}#${route.tagLine}`} gameName={route.gameName} tagLine={route.tagLine} />;
+      return (
+        <PlayerPage
+          key={`${route.gameName}#${route.tagLine}`}
+          gameName={route.gameName}
+          tagLine={route.tagLine}
+          fromMatch={route.fromMatch ?? null}
+          previousRiotId={route.previousRiotId ?? null}
+        />
+      );
     case "live":
       return <LivePage key={`${route.gameName}#${route.tagLine}`} gameName={route.gameName} tagLine={route.tagLine} />;
     case "notFound":

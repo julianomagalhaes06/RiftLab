@@ -13,7 +13,7 @@ from sqlalchemy import delete
 from riftlab.config import Settings
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.ingestion.models import MatchModel, ParticipantModel
-from riftlab.matches.riot_ids import participant_riot_ids
+from riftlab.matches.riot_ids import participant_puuid, participant_riot_ids
 from riftlab.shared.db import unit_of_work
 
 MATCH = "BR1_9212100001"
@@ -58,6 +58,12 @@ def test_reads_riot_ids_and_skips_invalid(tmp_path: Path) -> None:
     assert participant_riot_ids(str(tmp_path), MATCH) == {1: ("Ana", "BR1")}
     assert participant_riot_ids(str(tmp_path), "DEMO-0008") == {}
     assert participant_riot_ids(str(tmp_path), "BR1_9212100002") == {}  # sem bruto
+    # O PUUID identifica a conta mesmo depois de o jogador trocar de Riot ID.
+    assert participant_puuid(str(tmp_path), MATCH, 1) == "synthetic-p1"
+    assert participant_puuid(str(tmp_path), MATCH, 4) is None  # sem puuid no bruto
+    assert participant_puuid(str(tmp_path), MATCH, 9) is None  # participante inexistente
+    assert participant_puuid(str(tmp_path), "DEMO-0008", 1) is None
+    assert participant_puuid(str(tmp_path), "BR1_9212100002", 1) is None  # sem bruto
     assert participant_riot_ids(str(tmp_path / "nao-existe"), MATCH) == {}
 
 
