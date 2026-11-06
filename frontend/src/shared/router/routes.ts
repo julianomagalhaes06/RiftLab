@@ -3,7 +3,10 @@
  * dependência nova: URL é a fonte da verdade (recarregar, voltar, avançar e deep
  * link funcionam).
  *
- *   / (e /painel)                        painel
+ *   /                                    início público (busca de jogador e vitrine)
+ *   /painel                              painel da conta própria
+ *   /entrar?next=/caminho                entrar (volta ao caminho depois)
+ *   /criar-conta?next=/caminho           criar conta
  *   /importar                            importar por ID ou abrir a demonstração
  *   /imports/:jobId                      progresso de uma importação
  *   /matches/:matchId?participant=N      partida (preparação, participantes, decisões)
@@ -14,6 +17,9 @@
  *   /prototipo                           protótipo ilustrativo do CC-102 (dados fictícios)
  */
 export type Route =
+  | { name: "home" }
+  | { name: "login"; next: string | null }
+  | { name: "register"; next: string | null }
   | { name: "importEntry" }
   | { name: "panel" }
   | { name: "champions" }
@@ -73,10 +79,28 @@ function parseParticipant(search: string): number | null {
   return value >= 1 && value <= MAX_PARTICIPANT_ID ? value : null;
 }
 
+/** Caminho interno para voltar depois de entrar; recusa outro site ("//x", "https:"). */
+export function safeNext(value: string | null): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return null;
+  return value;
+}
+
+/** Entrar e voltar ao caminho atual (ou a `next`) depois do login. */
+export function loginPath(next?: string | null, mode: "login" | "register" = "login"): string {
+  const base = mode === "login" ? "/entrar" : "/criar-conta";
+  const target = safeNext(next ?? null);
+  return target && target !== "/" ? `${base}?next=${encodeURIComponent(target)}` : base;
+}
+
 export function parseRoute(pathname: string, search = ""): Route {
   const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  // CC-903: a entrada é o Painel; /painel continua valendo para links antigos.
-  if (trimmed === "/" || trimmed === "" || trimmed === "/painel") return { name: "panel" };
+  // Início público, como em sites de estatísticas; o Painel da conta fica em /painel.
+  if (trimmed === "/" || trimmed === "") return { name: "home" };
+  if (trimmed === "/painel") return { name: "panel" };
+  if (trimmed === "/entrar" || trimmed === "/criar-conta") {
+    const next = safeNext(new URLSearchParams(search).get("next"));
+    return { name: trimmed === "/entrar" ? "login" : "register", next };
+  }
   if (trimmed === "/importar") return { name: "importEntry" };
   if (trimmed === "/campeoes") return { name: "champions" };
   if (trimmed === "/minha-posicao") return { name: "position" };
@@ -125,10 +149,16 @@ function safeDecode(segment: string): string {
 
 export function routeToPath(route: Route): string {
   switch (route.name) {
+    case "home":
+      return "/";
+    case "login":
+      return loginPath(route.next, "login");
+    case "register":
+      return loginPath(route.next, "register");
     case "importEntry":
       return "/importar";
     case "panel":
-      return "/";
+      return "/painel";
     case "champions":
       return "/campeoes";
     case "position":

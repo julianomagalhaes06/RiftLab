@@ -5,7 +5,10 @@
 /* ---- Tela de entrada ---- */
 .auth-page { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; background: var(--n0); color: var(--ntext); }
 .auth-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 40px; border-bottom: 1px solid var(--nline); }
-.auth-top__brand { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 1.125rem var(--font-display); color: var(--ntext); }
+.auth-top__brand { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 1.125rem var(--font-display); color: var(--ntext); text-decoration: none; }
+.auth-top__back { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-size: .875rem; font-weight: 600; text-decoration: none; }
+.auth-top__back:hover, .auth-hint a:hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 4px; }
+.auth-hint a { color: var(--accent); font-weight: 600; }
 
 .auth-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); grid-template-areas: "hero card" "ladder card"; align-content: center; align-items: center; column-gap: 64px; row-gap: 28px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 56px 40px; }
 .auth-hero { grid-area: hero; align-self: end; }
@@ -62,8 +65,6 @@
 .auth-rules li.is-met { color: var(--ntext); }
 .auth-rules li.is-met svg { opacity: 1; color: var(--accent); }
 
-.auth-divider { display: flex; align-items: center; gap: 12px; margin: 4px 0; color: var(--ntext-subtle); font-size: .75rem; text-transform: lowercase; }
-.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--nline); }
 
 .auth-welcome { display: grid; gap: 12px; justify-items: start; }
 .auth-welcome__badge { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--accent-strong); border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
@@ -106,3 +107,15 @@
 .account-icon { margin: 0; display: grid; justify-items: start; gap: 6px; color: var(--ntext-subtle); font-size: .8125rem; }
 .account-icon img { border: 1px solid var(--portrait-outline); }
 .account-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* Convite para criar conta quando a pessoa sem conta chega a algo que guarda dados dela. */
+.account-gate__card { display: grid; gap: 18px; max-width: 560px; }
+.account-gate__actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.account-gate__actions .button { min-width: 160px; }
+.account-gate__back { margin: 0; }
+.account-gate--inline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 32px; }
+.account-gate--inline h3 { margin: 4px 0 6px; font: 600 1.25rem var(--font-display); }
+.account-gate--inline p { margin: 0; }
+@media (max-width: 700px) {
+  .account-gate__actions .button { flex: 1 1 100%; }
+}

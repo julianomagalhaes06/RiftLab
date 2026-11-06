@@ -26,10 +26,15 @@ import { useAuth } from "../features/auth/authContext";
 import { AuthScreen } from "../features/auth/AuthScreen";
 import { UserMenu } from "../features/auth/UserMenu";
 import { AccountPage } from "../features/auth/AccountPage";
+import { AccountGate } from "../features/auth/AccountGate";
+import { HomePage } from "../features/home/HomePage";
 import "./App.css";
 import "../design/concept-c.css";
 
 const TITLES: Record<Route["name"], string> = {
+  home: "RiftLab — revisão de partidas de League of Legends",
+  login: "Entrar — RiftLab",
+  register: "Criar conta — RiftLab",
   importEntry: "Importar partida — RiftLab",
   panel: "Painel — RiftLab",
   champions: "Campeões — RiftLab",
@@ -46,8 +51,23 @@ const TITLES: Record<Route["name"], string> = {
   notFound: "Página não encontrada — RiftLab",
 };
 
+// Áreas da conta própria: sem conta, o convite para criar uma (a leitura pública segue aberta).
+const ACCOUNT_AREAS: Partial<Record<Route["name"], { title: string; lead: string }>> = {
+  panel: { title: "Painel", lead: "Taxa de vitória, KDA, campeões mais jogados e partidas recentes da sua conta Riot vinculada." },
+  position: { title: "Minha posição", lead: "Seu elo e a evolução da sua posição ranqueada, a partir da conta Riot vinculada." },
+  history: { title: "Histórico", lead: "Suas partidas ranqueadas, atualizadas automaticamente, para estudar cada compra." },
+  account: { title: "Minha conta", lead: "Conta local e vínculo com a sua conta Riot." },
+  importEntry: { title: "Importar partida", lead: "Importe uma partida pelo ID para analisar as compras dela." },
+  import: { title: "Importar partida", lead: "Importe uma partida pelo ID para analisar as compras dela." },
+};
+
 function renderPage(route: Route): ReactNode {
   switch (route.name) {
+    case "home":
+      return <HomePage />;
+    case "login":
+    case "register":
+      return null; // renderizadas fora do layout principal
     case "importEntry":
       return <EntryPage />;
     case "panel":
@@ -88,16 +108,25 @@ function renderPage(route: Route): ReactNode {
 }
 
 function AppShell() {
-  const { checked, authRequired, user } = useAuth();
-  // Até saber da sessão, nenhuma tela dispara chamadas (evita 401 com login exigido).
+  const { checked, user } = useAuth();
+  const { route, navigate } = useRouter();
+  const authRoute = route.name === "login" || route.name === "register" ? route : null;
+  // Já com sessão, /entrar e /criar-conta levam direto ao destino.
+  useEffect(() => {
+    if (checked && user && authRoute) navigate(authRoute.next ?? "/painel", { replace: true });
+  }, [checked, user, authRoute, navigate]);
+  // Até saber da sessão, nenhuma tela dispara chamadas (evita 401 nas áreas da conta).
   if (!checked) return <p className="app-loading" role="status">Carregando o RiftLab…</p>;
-  // Login exigido pelo servidor e sem sessão: só a tela de entrar/criar conta (#10/#14).
-  if (authRequired && !user) return <AuthScreen />;
+  if (authRoute) {
+    return user ? null : <AuthScreen mode={authRoute.name} next={authRoute.next} />;
+  }
   return <AppContent />;
 }
 
 function AppContent() {
   const { route, navigate, href } = useRouter();
+  const { hasAccount } = useAuth();
+  const gate = hasAccount ? undefined : ACCOUNT_AREAS[route.name];
   const mainRef = useRef<HTMLElement>(null);
   // Só o CAMINHO conta: trocar de participante (?participant=N) não devolve o foco ao
   // topo da página, senão quem navega por teclado perderia o lugar a cada seleção.
@@ -133,15 +162,15 @@ function AppContent() {
             </h1>
             <MainNav route={route} />
             <div className="app__tools">
-              <PlayerSearch />
-              <ProfileChip />
+              {route.name === "home" ? null : <PlayerSearch />}
+              {hasAccount ? <ProfileChip /> : null}
               <UserMenu />
             </div>
           </div>
           <ContextStrip />
         </header>
-        <main id="conteudo" ref={mainRef} tabIndex={-1} className="app__main">
-          {renderPage(route)}
+        <main id="conteudo" ref={mainRef} tabIndex={-1} className={route.name === "home" ? "app__main app__main--home" : "app__main"}>
+          {gate ? <AccountGate title={gate.title} lead={gate.lead} /> : renderPage(route)}
         </main>
         <footer className="app__footer">
           <div className="app__footer-row">

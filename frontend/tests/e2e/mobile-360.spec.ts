@@ -212,7 +212,7 @@ test("Painel em 360 px: métricas → partidas → card de elo → campeões, co
           season: "2026", observedAt: "2026-10-16T12:00:00Z", origin: "RIOT_LEAGUE_V4" },
       }),
   });
-  await page.goto("/");
+  await page.goto("/painel");
   await expect(page.getByRole("region", { name: "Seu recorte de partidas" })).toBeVisible();
   const order = await Promise.all([".panel-metrics", ".panel-recent", ".rank-card", ".panel-champions"].map(async (selector) => (await page.locator(selector).boundingBox())?.y ?? -1));
   expect(order.every((y, index) => y >= 0 && (index === 0 || y > order[index - 1]))).toBe(true);

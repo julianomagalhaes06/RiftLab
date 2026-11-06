@@ -122,7 +122,7 @@ test.describe("Importação com falha recuperável (API simulada)", () => {
     await expect(page.getByText(/Não encontramos o que você procurou/)).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/andamento/);
     await page.getByRole("link", { name: "Voltar ao início" }).click();
-    await expect(page.getByRole("heading", { name: "Entenda a partida. Evolua a decisão." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Entenda cada compra/ })).toBeVisible();
   });
 
   test("API fora do ar ao importar: mensagem de rede e botão continua utilizável", async ({ page }) => {

@@ -129,7 +129,7 @@ describe("importação: falha, nova tentativa e espera", () => {
     const polls = api.callsTo("GET", /imports\//).length;
 
     fireEvent.click(screen.getByRole("link", { name: "Voltar ao início" }));
-    await screen.findByRole("heading", { name: "Entenda a partida. Evolua a decisão." });
+    await screen.findByRole("heading", { name: /Entenda cada compra/ });
     await advance(120_000);
 
     expect(api.callsTo("GET", /imports\//).length).toBe(polls);
@@ -380,7 +380,7 @@ describe("URL: deep link, recarregar e voltar/avançar", () => {
 
     expect(await screen.findByRole("heading", { name: "Página não encontrada" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Voltar ao início" }));
-    expect(await screen.findByRole("heading", { name: "Entenda a partida. Evolua a decisão." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
   });
 
   it("voltar e avançar do navegador percorrem as telas", async () => {

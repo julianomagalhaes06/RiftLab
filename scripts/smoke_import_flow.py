@@ -4,8 +4,8 @@
 espera o worker importar e PREPARAR sozinho (catálogo -> reconstrução ->
 extração) e lê a lista/detalhe de decisões. Só biblioteca padrão.
 
-Com login exigido (contas locais, Sprint 2), entra como visitante antes: a sessão vai num
-cookie e toda chamada leva o cabeçalho anti-CSRF `X-RiftLab-Request`.
+Com login exigido (contas locais), cria antes uma conta descartável, porque importar é da
+conta: a sessão vai num cookie e toda chamada leva o cabeçalho anti-CSRF `X-RiftLab-Request`.
 
 Uso: python3 scripts/smoke_import_flow.py [--base-url http://127.0.0.1:8000]
 Sai com código != 0 e uma linha de causa se qualquer etapa falhar."""
@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import http.cookiejar
 import json
+import secrets
 import sys
 import time
 import urllib.error
@@ -83,10 +84,14 @@ def main() -> None:
     if status != 200:
         fail(f"GET /auth/session respondeu {status}: {session}")
     if session.get("authRequired"):
-        status, guest = call("POST", f"{base}/api/v1/auth/guest")
-        if status != 201 or not (guest.get("user") or {}).get("guest"):
-            fail(f"POST /auth/guest respondeu {status}: {guest}")
-        print("login exigido: sessão de visitante aberta")
+        # Importar exige conta: cria uma descartável, só para esta fumaça.
+        name = f"smoke_{secrets.token_hex(5)}"
+        status, created = call(
+            "POST", f"{base}/api/v1/auth/register", {"username": name, "password": secrets.token_urlsafe(16)}
+        )
+        if status != 201 or not created.get("user"):
+            fail(f"POST /auth/register respondeu {status}: {created}")
+        print("login exigido: conta descartável criada para a fumaça")
 
     status, accepted = call("POST", f"{base}/api/v1/imports", {"matchId": MATCH_ID, "mode": "DEMO"})
     if status != 202:

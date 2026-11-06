@@ -7,9 +7,8 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request
 
-from riftlab.auth.middleware import guest_demo_only, is_guest
 from riftlab.errors import ProblemDetail
 from riftlab.ingestion.application import get_import_job, request_import, retry_import
 from riftlab.ingestion.domain import ImportJob
@@ -42,10 +41,8 @@ _INVALID_JOB_ID_RESPONSE = {
         }
     },
 )
-async def create_import(payload: ImportRequest, request: Request) -> ImportJobAccepted | Response:
+async def create_import(payload: ImportRequest, request: Request) -> ImportJobAccepted:
     mode = DomainImportMode(payload.mode.value)
-    if mode == DomainImportMode.RIOT and is_guest(request):
-        return guest_demo_only(request)  # visitante: só a demonstração (card #14)
     if mode == DomainImportMode.RIOT and request.app.state.settings.demo_mode:
         # 422 com código próprio RIOT_KEY_MISSING (errors.py), não 409/500: a
         # requisição em si é inválida para este servidor (nenhuma chave

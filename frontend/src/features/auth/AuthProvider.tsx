@@ -3,7 +3,7 @@ import { AuthContext, type AuthState } from "./authContext";
 import { AUTH_REQUIRED_EVENT, api, type SessionUser } from "../../shared/api/client";
 
 /**
- * Sessão local (Sprint 2, #10/#14). Consulta `/api/v1/auth/session` ao abrir e sempre que
+ * Sessão local (Sprint 2, #10). Consulta `/api/v1/auth/session` ao abrir e sempre que
  * uma resposta 401 AUTH_REQUIRED chega. Falha na consulta não bloqueia a interface: quem
  * decide é o servidor, que continua recusando sem sessão quando o login é exigido.
  */
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const value = useMemo<AuthState>(() => ({
-    checked, authRequired, user, signOut,
+    checked, authRequired, user, signOut, hasAccount: !authRequired || user !== null,
     signedIn: (next) => { setUser(next); setChecked(true); },
   }), [checked, authRequired, user, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

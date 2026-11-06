@@ -26,8 +26,9 @@ function RecentPortrait({ player }: { player: RecentPlayer }) {
 
 /** Busca de jogador pelo Riot ID no topo (CC-1102), com sugestões (CC-1208): perfis já abertos
  * neste navegador cujo Nome#TAG contém o texto e, sem "#", o mesmo nome com a TAG BR1. Padrão
- * combobox: setas escolhem, Enter abre, Esc fecha; sem opção ativa, Enter busca o texto. */
-export function PlayerSearch() {
+ * combobox: setas escolhem, Enter abre, Esc fecha; sem opção ativa, Enter busca o texto.
+ * `variant="hero"`: a busca grande do início. */
+export function PlayerSearch({ variant = "bar" }: { variant?: "bar" | "hero" }) {
   const { navigate } = useRouter();
   const [value, setValue] = useState("");
   const [invalid, setInvalid] = useState(false);
@@ -108,14 +109,14 @@ export function PlayerSearch() {
 
   const optionId = (index: number) => `${listId}-${index}`;
   return (
-    <form className="player-search" role="search" aria-label="Buscar jogador" onSubmit={submit} onBlur={onBlur} noValidate>
+    <form className={variant === "hero" ? "player-search player-search--hero" : "player-search"} role="search" aria-label="Buscar jogador" onSubmit={submit} onBlur={onBlur} noValidate>
       <label className="sr-only" htmlFor={`${hintId}-input`}>Buscar jogador pelo Riot ID</label>
       <input
         id={`${hintId}-input`}
         type="search"
         role="combobox"
         value={value}
-        placeholder="Buscar Nome#TAG"
+        placeholder={variant === "hero" ? "Nome#TAG do jogador" : "Buscar Nome#TAG"}
         autoComplete="off"
         spellCheck={false}
         aria-autocomplete="list"

@@ -13,7 +13,6 @@ import { dayKey, dayLabel, decimal, percent, record, summarizeLoaded } from "./p
 import "./history.css";
 import { count } from "../../shared/text/count";
 import { useDemoNotice } from "../../app/demoNotice";
-import { useAuth } from "../auth/authContext";
 
 const PAGE_SIZE = 20;
 
@@ -124,10 +123,8 @@ export function DayGroups({ matches }: { matches: MatchSummary[] }) {
 }
 
 export function HistoryPage() {
-  // Visitante (Sprint 2, #14): só a demonstração, sem sincronização com a Riot.
-  const guest = useAuth().user?.guest === true;
   const [query, setQuery] = useState("");
-  const [origin, setOrigin] = useState<OriginFilter>(guest ? "DEMO" : "RIOT");
+  const [origin, setOrigin] = useState<OriginFilter>("RIOT");
   const [result, setResult] = useState<ResultFilter>("ALL");
   const [queue, setQueue] = useState<QueueFilter>("ALL");
   const list = usePagedList<MatchSummary>({
@@ -148,15 +145,13 @@ export function HistoryPage() {
         <div>
           <p className="page-head__context">Histórico de partidas importadas</p>
           <h2>Partidas para estudar</h2>
-          <p className="page-head__lead">{guest
-            ? "Como visitante, você vê só as partidas de demonstração. Abra uma partida e estude as compras."
-            : "Partidas da conta configurada. Veja como foi cada partida e abra a análise das suas compras."}</p>
+          <p className="page-head__lead">Partidas da sua conta. Veja como foi cada partida e abra a análise das suas compras.</p>
         </div>
         {/* CC-1202: a importação manual saiu do topo e fica junto das partidas. */}
         <Link to="/importar" className="arrow-link">Importar partida</Link>
       </header>
 
-      {guest ? null : <HistorySync onNewMatches={list.refresh} />}
+      <HistorySync onNewMatches={list.refresh} />
 
       {list.status === "ready" && list.items.length > 0 && <LoadedSummary matches={list.items} />}
 
@@ -171,7 +166,7 @@ export function HistoryPage() {
           {hasLocal ? (
             <FilterGroup<ResultFilter> label="Resultado" value={result} onChange={setResult} options={[["ALL", "Todos"], ["WIN", "Vitórias"], ["LOSS", "Derrotas"]] as const} />
           ) : null}
-          {guest ? null : <FilterGroup<OriginFilter> label="Origem da partida" value={origin} onChange={setOrigin} options={[["ALL", "Minha conta e DEMO"], ["RIOT", "Minha conta"], ["DEMO", "DEMO"]] as const} />}
+          <FilterGroup<OriginFilter> label="Origem da partida" value={origin} onChange={setOrigin} options={[["ALL", "Minha conta e DEMO"], ["RIOT", "Minha conta"], ["DEMO", "DEMO"]] as const} />
         </div>
         {!hasLocal && list.status === "ready" ? (
           <p className="history-controls__limit">Filtro de resultado indisponível: sua conta não foi identificada nas partidas carregadas.</p>

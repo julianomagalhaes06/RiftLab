@@ -20,7 +20,6 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from riftlab.auth.middleware import is_guest
 from riftlab.auth.request_account import own_account
 from riftlab.catalog.infrastructure.catalog_mapping import CatalogMapping, load_catalog_mapping
 from riftlab.catalog.patches import load_persisted_mapping
@@ -115,8 +114,6 @@ async def list_imported_matches(
     ] = None,
 ) -> CursorPage[MatchSummary]:
     settings = request.app.state.settings
-    if is_guest(request):
-        scope, player = "demo", None  # visitante: só as partidas sintéticas (card #14)
     subject = (
         await profile_subject(request.app.state.session_factory, player)
         if player is not None

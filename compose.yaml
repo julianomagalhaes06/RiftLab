@@ -34,7 +34,8 @@ services:
       RIFTLAB_OBJECTIVE_MODEL_URL: ${RIFTLAB_OBJECTIVE_MODEL_URL:-}
       RIFTLAB_OBJECTIVE_MODEL_VERSION: ${RIFTLAB_OBJECTIVE_MODEL_VERSION:-local_model_unversioned}
       RIFTLAB_DEMO_RANKED: ${RIFTLAB_DEMO_RANKED:-false}
-      # Contas locais (Sprint 2, #10/#11): as rotas /api/v1 exigem login (ou visitante).
+      # Contas locais (Sprint 2, #10/#11): leitura pública sem conta; análise, estudo, Painel
+      # e o que é da conta própria exigem login.
       # RIFTLAB_AUTH_REQUIRED=false no .env volta à instalação de uma pessoa, sem login.
       RIFTLAB_AUTH_REQUIRED: ${RIFTLAB_AUTH_REQUIRED:-true}
       # Dentro do container o bind é em todas as interfaces; a porta só é publicada em

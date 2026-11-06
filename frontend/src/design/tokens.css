@@ -59,6 +59,14 @@
   --on-accent: #0e0f13;
   --mark-ink: #0e0f13;
 
+  /* Início (vitrine): véus sobre a splash art para o texto ler bem em qualquer skin (n0 com
+     transparência) e o brilho roxo atrás da busca. */
+  --hero-scrim-clear: rgb(15 16 19 / 0);
+  --hero-scrim: rgb(15 16 19 / .6);
+  --hero-scrim-strong: rgb(15 16 19 / .94);
+  --hero-glow: rgb(139 108 255 / .2);
+  --hero-ink-shadow: rgb(0 0 0 / .65);
+
   /* Resultado. */
   --win: #3dd68c;
   --loss: #f2667a;

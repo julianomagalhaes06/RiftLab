@@ -20,6 +20,9 @@ vitória.
 
 ## Funcionalidades
 
+- **Acesso aberto:** sem conta, qualquer pessoa busca jogadores, abre partidas, acompanha a
+  partida ao vivo e vê os padrões por campeão. A conta local serve para analisar compras e
+  guardar o estudo, o Painel e a posição da conta Riot vinculada.
 - **Conta e histórico:** busca de qualquer jogador por Riot ID (Nome#TAG), com ícone, nível e
   elo, e histórico das partidas ranqueadas atualizado automaticamente.
 - **Revisão da partida:** placar com os nicks dos jogadores, trajeto de compras por ida à loja,

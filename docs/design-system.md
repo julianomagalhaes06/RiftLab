@@ -124,23 +124,57 @@ do `.chip`; a classe antiga `.section` (borda no topo) só fica como divisória 
 de uma superfície (estudo, comparação e reflexão da decisão); moldura em
 `app/App.tsx`, `app/ContextStrip.tsx` e `features/players/ProfileChip.tsx`.
 
+## Início público (`/`)
+
+Primeira tela do site, aberta sem conta (`features/home/HomePage.tsx`, estilo em `home.css`), no
+padrão dos sites de estatísticas do jogo:
+
+- **Vitrine** de largura total (520 a 720 px de altura) com uma splash art oficial do Data Dragon,
+  sorteada a cada carregamento da página entre skins curadas (`features/home/splashes.ts`). Véus
+  de `n0` com transparência (`--hero-scrim*`) garantem a leitura do texto sobre qualquer arte e
+  fundem a base no fundo da página; um brilho roxo discreto (`--hero-glow`) fica atrás da busca.
+  O crédito da skin aparece no canto só depois que a arte carrega; se ela falhar, a vitrine fica
+  no fundo neutro.
+- **Centro:** selo BR1, título em Chakra Petch (até 60 px) com a segunda frase em roxo, uma frase
+  de apoio e a busca grande de jogador (`PlayerSearch variant="hero"`, 58 px, botão roxo
+  embutido). No início, a busca do topo some para não repetir.
+- **Abaixo:** "Aberto para qualquer pessoa", quatro cartões `.surface.surface--pad` (perfil e
+  histórico, revisão da partida, partida ao vivo, campeões), e o bloco "Com conta"
+  (`.surface.surface--rank.brackets`) com o que a conta acrescenta e os botões Criar conta / Já
+  tenho conta (com sessão: Ir para o Painel / Meu histórico).
+- **Celular:** cartões em uma coluna, bloco da conta empilhado, sem rolagem horizontal em 360 px.
+- **Exceção aos princípios 1 e 2, só na vitrine do início:** arte de fundo, véus em gradiente,
+  brilho e o roxo no título, para a primeira impressão do site remeter ao jogo. As demais telas
+  seguem a base neutra.
+
+## Convite para criar conta
+
+Sem conta, as áreas que guardam dados da pessoa (Painel, Minha posição, Histórico, Minha conta,
+Importar) mostram `AccountGate` no lugar da tela, e o detalhe da decisão troca a análise e o
+estudo pela versão `inline` do mesmo convite. Contexto "Disponível com conta", título da área,
+frase do que ela oferece e os botões Criar conta (primário) e Entrar (secundário), que voltam ao
+mesmo endereço depois do login (`?next=`). O menu principal mostra só Início e Campeões; o topo,
+Entrar e Criar conta.
+
 ## Tela de entrada (contas locais)
 
-Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em `auth.css`):
+Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em `auth.css`), em
+`/entrar` e `/criar-conta` (as abas trocam o endereço):
 
-- **Topo** de 64 px só com a marca e o selo BR1; **rodapé** com créditos e o aviso legal da Riot.
+- **Topo** de 64 px com a marca (link para o início) e "Continuar sem conta"; **rodapé** com
+  créditos e o aviso legal da Riot.
 - **Desktop:** duas colunas. À esquerda, contexto (13 px), título em Chakra Petch (40 px), frase e
   três pontos de valor com ícone de check neutro; abaixo, a vitrine com a escada de emblemas
   Ferro → Prata → Ouro → Diamante → Desafiante (`.surface.surface--rank.brackets`). À direita, o
   cartão (`.surface.surface--pad.brackets`) com abas Entrar/Criar conta (`role="tab"`, setas do
-  teclado alternam), campos do formulário, botão primário na largura toda, divisória "ou" e
-  "Entrar como visitante" como botão secundário na largura toda.
+  teclado alternam), campos do formulário, botão primário na largura toda e, abaixo, a lembrança
+  de que perfis e partidas seguem abertos, com o link "Continuar sem conta".
 - **Celular (≤ 960 px):** título curto, cartão logo em seguida e a vitrine no fim; os pontos de
   valor saem. Sem rolagem horizontal em 360 px.
 - **Cadastro:** senha com mostrar/ocultar (`aria-pressed`), requisitos conferidos enquanto a
   pessoa digita (check roxo e texto "atendido/pendente", nunca só cor) e, depois de criar, a
   confirmação "Conta criada" com o próximo passo: "Vincular conta Riot" (primário) ou "Ir para o
-  Painel".
+  Painel"; vinda de outra tela, "Voltar para onde eu estava" passa a ser o primário.
 - **Exceção ao princípio 1, pedida pelo usuário (05/11/2026):** a vitrine usa emblemas de elo
   com o halo do card de elo fora do card de elo, como decoração da marca. Não mostra elo de
   ninguém nem dado fictício. Tudo é local (emblemas em `public/ranked-emblems`): a tela não faz
@@ -165,6 +199,8 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
 ## Ativos
 
 - Retratos e ícones de invocador: Data Dragon da Riot, na versão do catálogo.
+- Splash arts do início: Data Dragon (`cdn/img/champion/splash`, sem versão). Só skins cujo
+  endereço responde; as mais recentes ainda não estão lá.
 - Emblemas de elo: pacote oficial "Ranked Emblems Latest" (`frontend/public/ranked-emblems/`).
 - O rodapé mantém os créditos e o aviso de que o RiftLab não é endossado pela Riot Games.
 

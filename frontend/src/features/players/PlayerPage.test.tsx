@@ -157,7 +157,8 @@ describe("perfil de jogador por Riot ID", () => {
     fireEvent.keyDown(search, { key: "ArrowDown" });
     fireEvent.submit(search);
     expect(window.location.pathname).toBe("/jogador/P%C3%A3o%20de%20Queijo-BR1");
-    expect(search).toHaveValue("");
+    // No início a busca é a grande da vitrine; no perfil, a do topo, que abre vazia.
+    expect(await screen.findByRole("combobox", { name: "Buscar jogador pelo Riot ID" })).toHaveValue("");
   });
 
   it("sugestão de TAG abre Nome#BR1; Limpar apaga as buscas recentes (CC-1208)", async () => {

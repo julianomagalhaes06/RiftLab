@@ -15,8 +15,57 @@ function fill(username: string, password: string) {
   fireEvent.change(screen.getByLabelText("Senha"), { target: { value: password } });
 }
 
-describe("Contas locais (Sprint 2, #10/#14)", () => {
-  it("exige login quando o servidor pede, mostra o erro e entra com a conta", async () => {
+describe("Contas locais: leitura pública e conta para guardar", () => {
+  it("sem conta, abre o início com a busca e oferece entrar ou criar conta", async () => {
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user: null }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(screen.getByRole("search", { name: "Buscar jogador" })).toHaveClass("player-search--hero");
+    // Só a busca da vitrine: a do topo some no início.
+    expect(screen.getAllByRole("search", { name: "Buscar jogador" })).toHaveLength(1);
+    const nav = screen.getByRole("navigation", { name: "Áreas principais" });
+    expect(nav).toHaveTextContent("Início");
+    expect(nav).toHaveTextContent("Campeões");
+    expect(nav).not.toHaveTextContent("Painel");
+    expect(screen.getAllByRole("link", { name: "Entrar" })[0]).toHaveAttribute("href", "/entrar");
+    expect(screen.getAllByRole("link", { name: "Criar conta" })[0]).toHaveAttribute("href", "/criar-conta");
+    // Nenhuma chamada da conta própria sem sessão.
+    expect(mock.callsTo("GET", /^\/api\/v1\/players\/me$/)).toHaveLength(0);
+    expect(mock.callsTo("GET", /^\/api\/v1\/dashboard$/)).toHaveLength(0);
+  });
+
+  it("área da conta sem sessão mostra o convite e volta para ela depois de entrar", async () => {
+    window.history.replaceState(null, "", "/historico");
+    const mock = createMockApi();
+    let session: { authRequired: boolean; user: typeof USER | null } = { authRequired: true, user: null };
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
+    mock.on("POST", /^\/api\/v1\/auth\/login$/, () => {
+      session = { authRequired: true, user: USER };
+      return json(200, session);
+    });
+    mock.on("GET", /^\/api\/v1\/matches$/, () => json(200, { items: [], nextCursor: null }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Histórico" })).toBeInTheDocument();
+    expect(screen.getByText("Disponível com conta")).toBeInTheDocument();
+    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(0);
+    const enter = screen.getAllByRole("link", { name: "Entrar" }).find((link) => link.closest(".account-gate"));
+    expect(enter).toHaveAttribute("href", "/entrar?next=%2Fhistorico");
+    fireEvent.click(enter!);
+
+    expect(await screen.findByRole("heading", { name: "Entrar no RiftLab" })).toBeInTheDocument();
+    fill("jogadora", "senha-correta-1");
+    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    expect(await screen.findByRole("heading", { name: "Partidas para estudar" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/historico");
+  });
+
+  it("entra com a conta, mostra o erro de senha e sai sem perder a navegação", async () => {
+    window.history.replaceState(null, "", "/entrar");
     const mock = createMockApi();
     let session: { authRequired: boolean; user: typeof USER | null } = { authRequired: true, user: null };
     mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
@@ -34,7 +83,8 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Entrar no RiftLab" })).toBeInTheDocument();
-    expect(screen.queryByRole("navigation", { name: "Áreas principais" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Continuar sem conta" })[0]).toHaveAttribute("href", "/");
+    expect(screen.queryByText(/visitante/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Preencha usuário e senha.");
 
@@ -46,7 +96,7 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     fill("jogadora", "senha-correta-1");
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
     expect(await screen.findByRole("link", { name: "Minha conta (jogadora)" })).toHaveAttribute("href", "/conta");
-    expect(screen.queryByRole("heading", { name: "Entrar no RiftLab" })).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/painel");
     // Toda chamada leva o cabeçalho anti-CSRF.
     const login = mock.callsTo("POST", /^\/api\/v1\/auth\/login$/);
     expect(login.at(-1)?.body).toEqual({ username: "jogadora", password: "senha-correta-1" });
@@ -54,11 +104,14 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     expect((init?.headers as Record<string, string>)["X-RiftLab-Request"]).toBe("1");
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
-    expect(await screen.findByRole("heading", { name: "Entrar no RiftLab" })).toBeInTheDocument();
+    // Sem sessão, o Painel vira o convite; a navegação continua.
+    expect(await screen.findByText("Disponível com conta")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Áreas principais" })).toBeInTheDocument();
     expect(mock.callsTo("POST", /^\/api\/v1\/auth\/logout$/)).toHaveLength(1);
   });
 
   it("cria conta pela mesma tela e explica nome em uso", async () => {
+    window.history.replaceState(null, "", "/entrar");
     const mock = createMockApi();
     mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user: null }));
     let attempts = 0;
@@ -68,10 +121,10 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     });
     vi.stubGlobal("fetch", mock.fetch);
     render(<App />);
-    const tab = await screen.findByRole("tab", { name: "Criar conta" });
-    fireEvent.click(tab);
-    expect(tab).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "Criar conta no RiftLab" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("tab", { name: "Criar conta" }));
+    expect(await screen.findByRole("heading", { name: "Criar conta no RiftLab" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Criar conta" })).toHaveAttribute("aria-selected", "true");
+    expect(window.location.pathname).toBe("/criar-conta");
     // Requisitos conferidos enquanto digita, com estado em texto (não só cor).
     expect(screen.getByText(/Senha com pelo menos 10 caracteres/)).toHaveTextContent("(pendente)");
     fill("jogadora", "senha-correta-1");
@@ -84,41 +137,10 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     expect(screen.getByRole("button", { name: "Vincular conta Riot" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ir para o Painel" }));
     expect(await screen.findByRole("button", { name: "Sair" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/painel");
   });
 
-  it("entra como visitante sem cadastro e mostra a página de conta do visitante", async () => {
-    const mock = createMockApi();
-    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user: null }));
-    mock.on("POST", /^\/api\/v1\/auth\/guest$/, () => json(201, {
-      authRequired: true, user: { id: USER.id, username: "visitante-1a2b3c4d", guest: true } }));
-    vi.stubGlobal("fetch", mock.fetch);
-    render(<App />);
-    expect(await screen.findByText(/só a demonstração, com partidas sintéticas, por um dia/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Entrar como visitante" }));
-    const account = await screen.findByRole("link", { name: "Minha conta (visitante)" });
-    expect(account).toHaveTextContent("Visitante");
-    fireEvent.click(account);
-    expect(await screen.findByText(/Você está como visitante/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sair e criar conta" })).toBeInTheDocument();
-    expect(mock.callsTo("GET", /^\/api\/v1\/riot-link$/)).toHaveLength(0);
-  });
-
-  it("no Histórico, o visitante vê só a demonstração e não sincroniza com a Riot", async () => {
-    window.history.replaceState(null, "", "/historico");
-    const mock = createMockApi();
-    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, {
-      authRequired: true, user: { id: USER.id, username: "visitante-1a2b3c4d", guest: true } }));
-    mock.on("GET", /^\/api\/v1\/matches$/, () => json(200, { items: [], nextCursor: null }));
-    vi.stubGlobal("fetch", mock.fetch);
-    render(<App />);
-    expect(await screen.findByText(/Como visitante, você vê só as partidas de demonstração/)).toBeInTheDocument();
-    await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/matches$/).length).toBeGreaterThan(0));
-    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)[0].search.get("scope")).toBe("demo");
-    expect(mock.callsTo("POST", /^\/api\/v1\/history\/sync$/)).toHaveLength(0);
-    expect(screen.queryByRole("group", { name: "Origem da partida" })).not.toBeInTheDocument();
-  });
-
-  it("volta à tela de login quando uma chamada responde AUTH_REQUIRED", async () => {
+  it("sessão que termina no meio do uso troca a área da conta pelo convite", async () => {
     const mock = createMockApi();
     let session: { authRequired: boolean; user: typeof USER | null } = { authRequired: true, user: USER };
     mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
@@ -129,7 +151,7 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     vi.stubGlobal("fetch", mock.fetch);
     window.history.replaceState(null, "", "/historico");
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "Entrar no RiftLab" })).toBeInTheDocument();
+    expect(await screen.findByText("Disponível com conta")).toBeInTheDocument();
     await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/auth\/session$/).length).toBeGreaterThan(1));
   });
 
@@ -139,13 +161,16 @@ describe("Contas locais (Sprint 2, #10/#14)", () => {
     vi.stubGlobal("fetch", mock.fetch);
     render(<App />);
     await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/auth\/session$/)).toHaveLength(1));
-    expect(screen.queryByRole("heading", { name: "Entrar no RiftLab" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Entrar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sair" })).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Áreas principais" })).toHaveTextContent("Painel");
   });
 });
 
 describe("Tela de entrada: abas e senha", () => {
   it("alterna as abas pelo teclado e mostra ou oculta a senha", async () => {
+    window.history.replaceState(null, "", "/entrar");
     const mock = createMockApi();
     mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user: null }));
     vi.stubGlobal("fetch", mock.fetch);

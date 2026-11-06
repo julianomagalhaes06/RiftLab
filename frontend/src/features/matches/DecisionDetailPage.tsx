@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, type DecisionState, type DecisionSummary, type MatchDetail, type MatchParticipant } from "../../shared/api/client";
 import { Link } from "../../shared/router/Link";
+import { AccountGate } from "../auth/AccountGate";
+import { useAuth } from "../auth/authContext";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import {
   describeBudget,
@@ -287,6 +289,7 @@ function teamsOrdered(members: MatchParticipant[]): MatchParticipant[] {
 
 /** Detalhe de uma decisão (/decisions/:id): só informação ANTERIOR à decisão. */
 export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
+  const { hasAccount } = useAuth();
   const load = useDecision(decisionId);
   const ready = load.status === "ready" ? load.decision : null;
   const context = useDecisionContext(ready?.matchId ?? null, ready?.participantId ?? null);
@@ -377,7 +380,15 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
           </div>
           {match ? <TeamContext match={match} participantId={decision.participantId} /> : null}
         </div>
-        {decision.eligible && decision.versions.reconstructionRulesHealth !== "SUSPENDED" ? <DecisionExperience decisionId={decision.decisionId} /> : null}
+        {decision.eligible && decision.versions.reconstructionRulesHealth !== "SUSPENDED" ? (
+          hasAccount ? <DecisionExperience decisionId={decision.decisionId} /> : (
+            <AccountGate
+              inline
+              title="Analise esta compra"
+              lead="Compare o item comprado com até três alternativas, escolha antes de ver a resposta e guarde suas reflexões."
+            />
+          )
+        ) : null}
       </ItemNames>
       <TechnicalDetails decision={decision} />
     </section>

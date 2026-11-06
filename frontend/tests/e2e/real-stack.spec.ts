@@ -36,19 +36,19 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
       }
     });
 
-    // Login exigido por padrão (Sprint 2): cria uma conta pela própria tela. Conta, e não
-    // visitante, porque o roteiro termina removendo a partida (visitante não remove).
+    // Login exigido por padrão: importar é da conta, então a página mostra o convite. Cria a
+    // conta por ele e volta para /importar (o roteiro termina removendo a partida, que também
+    // exige conta).
     await page.goto("/importar");
-    const login = page.getByRole("heading", { name: "Entrar no RiftLab" });
+    const gate = page.getByText("Disponível com conta");
     const ready = page.getByText("Serviço disponível");
-    await expect(login.or(ready)).toBeVisible();
-    if (await login.isVisible()) {
-      await page.getByRole("tab", { name: "Criar conta" }).click();
+    await expect(gate.or(ready)).toBeVisible();
+    if (await gate.isVisible()) {
+      await page.locator(".account-gate").getByRole("link", { name: "Criar conta" }).click();
       await page.getByLabel("Usuário").fill(`e2e_${Date.now()}`);
       await page.getByLabel("Senha", { exact: true }).fill("senha-e2e-stack-1");
       await page.getByRole("button", { name: "Criar conta" }).click();
-      await page.getByRole("button", { name: "Ir para o Painel" }).click();
-      await page.goto("/importar");
+      await page.getByRole("button", { name: "Voltar para onde eu estava" }).click();
     }
 
     // Entrada

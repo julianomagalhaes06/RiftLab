@@ -1,19 +1,30 @@
 import "./auth.css";
 import { useState } from "react";
+import { useRouter } from "../../shared/router/context";
 import { Link } from "../../shared/router/Link";
+import { loginPath } from "../../shared/router/routes";
 import { useAuth } from "./authContext";
 
-/** Usuário da sessão e o botão Sair, no topo (Sprint 2, #14). Sem sessão, não aparece. */
+/** Usuário da sessão e o botão Sair, no topo. Sem sessão e com contas ativas, Entrar e Criar
+ * conta (voltando à página atual). Numa instalação sem login exigido, não aparece. */
 export function UserMenu() {
-  const { user, signOut } = useAuth();
+  const { user, authRequired, signOut } = useAuth();
+  const { href, route } = useRouter();
   const [leaving, setLeaving] = useState(false);
-  if (!user) return null;
+  if (!user) {
+    if (!authRequired) return null;
+    const next = route.name === "home" ? null : href;
+    return (
+      <div className="user-menu user-menu--anonymous">
+        <Link to={loginPath(next)} className="button button--secondary user-menu__out">Entrar</Link>
+        <Link to={loginPath(next, "register")} className="button user-menu__out">Criar conta</Link>
+      </div>
+    );
+  }
   return (
     <div className="user-menu">
       <span className="user-menu__name">
-        {user.guest
-          ? <Link to="/conta" aria-label="Minha conta (visitante)">Visitante</Link>
-          : <Link to="/conta" aria-label={`Minha conta (${user.username})`}>{user.username}</Link>}
+        <Link to="/conta" aria-label={`Minha conta (${user.username})`}>{user.username}</Link>
       </span>
       <button type="button" className="button button--secondary user-menu__out" disabled={leaving}
         onClick={() => { setLeaving(true); void signOut().finally(() => setLeaving(false)); }}>

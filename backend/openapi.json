@@ -5212,13 +5212,7 @@
       },
       "SessionUser": {
         "additionalProperties": false,
-        "description": "`guest`: visitante, restrito à demonstração (card #14).",
         "properties": {
-          "guest": {
-            "default": false,
-            "title": "Guest",
-            "type": "boolean"
-          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -5806,27 +5800,6 @@
         "summary": "Read Report",
         "tags": [
           "analyses"
-        ]
-      }
-    },
-    "/api/v1/auth/guest": {
-      "post": {
-        "operationId": "post_guest_api_v1_auth_guest_post",
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SessionState"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Entra como visitante, só com a demonstração",
-        "tags": [
-          "auth"
         ]
       }
     },

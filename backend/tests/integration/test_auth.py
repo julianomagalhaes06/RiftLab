@@ -12,7 +12,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select, update
 
 from riftlab.api.app import create_app
-from riftlab.auth.application import LoginThrottle, create_guest
+from riftlab.auth.application import LoginThrottle
 from riftlab.auth.models import AuthSessionModel, UserModel
 from riftlab.config import Settings
 from riftlab.shared.db import unit_of_work
@@ -62,7 +62,7 @@ async def test_register_opens_a_session_with_a_protected_cookie(client, names, s
     assert response.status_code == 201, response.text
     assert response.json() == {
         "authRequired": True,
-        "user": {"id": response.json()["user"]["id"], "username": name, "guest": False},
+        "user": {"id": response.json()["user"]["id"], "username": name},
     }
     cookie = response.headers["set-cookie"].lower()
     assert "riftlab_session=" in cookie and "httponly" in cookie and "samesite=strict" in cookie
@@ -207,48 +207,93 @@ async def test_without_auth_required_routes_stay_open(session_factory):
         assert (await c.get("/api/v1/matches")).status_code == 200
 
 
+# Leitura pública: sem conta, a pessoa busca jogadores e abre partidas, como em sites de
+# estatísticas. Os parâmetros de exemplo não existem no banco: o que importa é que a rota não
+# responda 401 (pode responder 404, 422 ou 503 conforme a falta de dado ou de chave da Riot).
+PUBLIC_REQUESTS = (
+    ("GET", "/api/v1/catalog/current", None),
+    ("GET", "/api/v1/champions/patterns", None),
+    ("POST", "/api/v1/players/lookup", {"gameName": "Alguem", "tagLine": "BR1"}),
+    ("POST", "/api/v1/players/live", {"gameName": "Alguem", "tagLine": "BR1"}),
+    ("POST", "/api/v1/players/live/status", {"gameName": "Alguem", "tagLine": "BR1"}),
+    ("GET", f"/api/v1/players/{uuid.UUID(int=1)}/sync", None),
+    ("GET", f"/api/v1/matches?player={uuid.UUID(int=1)}", None),
+    ("GET", "/api/v1/matches/BR1_123", None),
+    ("GET", "/api/v1/matches/BR1_123/review", None),
+    ("GET", "/api/v1/matches/BR1_123/timeline", None),
+    ("GET", "/api/v1/matches/BR1_123/decisions", None),
+    ("POST", "/api/v1/matches/BR1_123/preparation", None),
+    ("GET", f"/api/v1/decisions/{uuid.UUID(int=1)}", None),
+)
+
+# Tudo o que cria ou guarda algo da pessoa, ou é da conta própria, continua exigindo login.
+ACCOUNT_REQUESTS = (
+    ("GET", "/api/v1/matches", None),
+    ("GET", "/api/v1/matches?scope=demo", None),
+    ("POST", "/api/v1/analyses", {}),
+    ("GET", f"/api/v1/analyses/{uuid.UUID(int=1)}", None),
+    ("GET", f"/api/v1/analyses/{uuid.UUID(int=1)}/report", None),
+    ("POST", f"/api/v1/analyses/{uuid.UUID(int=1)}/feedback", {}),
+    ("POST", "/api/v1/learning-attempts", {}),
+    ("GET", "/api/v1/learning-attempts/progress", None),
+    ("POST", "/api/v1/objectives/interpret", {"text": "sobreviver"}),
+    ("GET", "/api/v1/dashboard", None),
+    ("GET", "/api/v1/ranked/me", None),
+    ("GET", "/api/v1/players/me", None),
+    ("GET", "/api/v1/history/sync", None),
+    ("POST", "/api/v1/history/sync", None),
+    ("POST", "/api/v1/imports", {"matchId": "DEMO-0001", "mode": "DEMO"}),
+    ("GET", f"/api/v1/imports/{uuid.UUID(int=1)}", None),
+    ("GET", "/api/v1/matches/BR1_123/purge-preview", None),
+    ("DELETE", "/api/v1/matches/BR1_123?confirm=BR1_123", None),
+    ("GET", "/api/v1/riot-link", None),
+    ("POST", "/api/v1/riot-link/challenge", None),
+)
+
+
 @pytest.mark.asyncio
-async def test_guest_session_is_short_and_limited_to_the_demonstration(client, session_factory):
+@pytest.mark.parametrize(("method", "path", "body"), PUBLIC_REQUESTS)
+async def test_public_reading_works_without_an_account(client, method, path, body):
+    response = await client.request(method, path, json=body, headers=HEADERS)
+    assert response.status_code != 401, response.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("method", "path", "body"), ACCOUNT_REQUESTS)
+async def test_saving_and_own_account_routes_require_login(client, method, path, body):
+    response = await client.request(method, path, json=body, headers=HEADERS)
+    assert (response.status_code, response.json()["code"]) == (401, "AUTH_REQUIRED"), path
+
+
+@pytest.mark.asyncio
+async def test_public_routes_still_need_the_csrf_header_to_change_anything(client):
+    response = await client.post(
+        "/api/v1/players/lookup", json={"gameName": "Alguem", "tagLine": "BR1"}
+    )
+    assert (response.status_code, response.json()["code"]) == (403, "CSRF_HEADER_MISSING")
+
+
+@pytest.mark.asyncio
+async def test_guest_mode_no_longer_exists(client):
     response = await client.post("/api/v1/auth/guest", headers=HEADERS)
-    assert response.status_code == 201
-    user = response.json()["user"]
-    assert user["guest"] is True and user["username"].startswith("visitante-")
-    assert "max-age=86400" in response.headers["set-cookie"].lower()
-    try:
-        for method, path, body in (
-            ("GET", "/api/v1/riot-link", None),
-            ("GET", "/api/v1/matches/BR1_123", None),
-            ("POST", "/api/v1/players/lookup", {"gameName": "Alguem", "tagLine": "BR1"}),
-            ("POST", "/api/v1/imports", {"matchId": "BR1_123", "mode": "RIOT"}),
-            ("DELETE", "/api/v1/matches/DEMO-0008?confirm=DEMO-0008", None),
-        ):
-            blocked = await client.request(method, path, json=body, headers=HEADERS)
-            assert (blocked.status_code, blocked.json()["code"]) == (403, "GUEST_DEMO_ONLY"), path
-        assert (await client.get("/api/v1/players/me")).status_code == 200
-        listing = await client.get("/api/v1/matches", params={"scope": "all", "limit": 100})
-        assert all(m["matchId"].startswith("DEMO-") for m in listing.json()["items"])
-        assert (await client.get("/api/v1/dashboard")).json()["origin"] == "DEMO"
-        # Sem senha: o nome do visitante não entra pelo login.
-        client.cookies.clear()
-        refused = await client.post(
-            "/api/v1/auth/login",
-            json={"username": user["username"], "password": "qualquer-senha-1"},
-            headers=HEADERS,
-        )
-        assert refused.json()["code"] == "INVALID_CREDENTIALS"
-    finally:
-        async with unit_of_work(session_factory) as session:
-            await session.execute(delete(UserModel).where(UserModel.username == user["username"]))
+    assert response.status_code in {404, 405}
 
 
 @pytest.mark.asyncio
-async def test_old_guests_are_removed_when_a_new_one_arrives(session_factory):
-    old, _ = await create_guest(session_factory, now=datetime.now(UTC) - timedelta(days=2))
-    new, _ = await create_guest(session_factory)
-    try:
-        async with session_factory() as session:
-            assert await session.get(UserModel, old.id) is None
-            assert await session.get(UserModel, new.id) is not None
-    finally:
-        async with unit_of_work(session_factory) as session:
-            await session.execute(delete(UserModel).where(UserModel.id == new.id))
+async def test_anonymous_visitor_has_no_own_account_when_login_is_required():
+    """Sem login exigido, a instalação é de uma pessoa e vale a conta do arquivo; com login
+    exigido, quem navega sem conta não herda a conta de ninguém."""
+    from types import SimpleNamespace
+
+    from riftlab.auth.request_account import own_account
+    from riftlab.shared.own_account import CONFIGURED
+
+    def anonymous(required: bool) -> SimpleNamespace:
+        settings = Settings(auth_required=required)
+        return SimpleNamespace(
+            state=SimpleNamespace(user=None),
+            app=SimpleNamespace(state=SimpleNamespace(settings=settings)),
+        )
+
+    assert await own_account(anonymous(True)) is None
+    assert await own_account(anonymous(False)) is CONFIGURED

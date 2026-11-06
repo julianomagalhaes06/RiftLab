@@ -19,8 +19,6 @@ class UserModel(Base):
     username_key: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    # Visitante (card #14): sem senha, só a demonstração, apagado depois de GUEST_LIFETIME.
-    is_guest: Mapped[bool] = mapped_column(nullable=False, default=False, server_default="false")
 
 
 class AuthSessionModel(Base):

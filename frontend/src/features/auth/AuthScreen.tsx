@@ -3,11 +3,14 @@ import { api, type SessionUser } from "../../shared/api/client";
 import { messageForCode } from "../../shared/api/messages";
 import { isApiError } from "../../shared/api/errors";
 import { useRouter } from "../../shared/router/context";
+import { Link } from "../../shared/router/Link";
+import { loginPath } from "../../shared/router/routes";
 import { emblemSrc, type Tier } from "../ranked/tiers";
 import { useAuth } from "./authContext";
 import "./auth.css";
 
-type Mode = "login" | "register";
+export type AuthMode = "login" | "register";
+type Mode = AuthMode;
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
 // Escada decorativa: do Ferro ao Desafiante (só emblemas oficiais locais, sem dado de conta).
@@ -57,16 +60,17 @@ function EyeIcon({ open }: { open: boolean }) {
 }
 
 /**
- * Entrar, criar conta ou entrar como visitante (Sprint 2, contas locais). Mescla padrões de
- * telas de conta de sites do jogo, dentro do padrão Arena: página dividida (vitrine da marca à
- * esquerda, formulário à direita; empilhada no celular), abas Entrar/Criar conta, senha com
- * mostrar/ocultar, requisitos do cadastro conferidos enquanto a pessoa digita, visitante com o
- * mesmo peso visual da entrada e uma confirmação depois do cadastro com o próximo passo.
+ * Entrar ou criar conta (/entrar, /criar-conta). A conta não é exigida para navegar: perfis e
+ * partidas são públicos, e a pessoa chega aqui quando quer analisar ou guardar algo. Por isso
+ * a tela volta para `next` (onde a pessoa estava) e oferece seguir sem conta. Padrão Arena:
+ * página dividida (vitrine à esquerda, formulário à direita; empilhada no celular), abas
+ * Entrar/Criar conta, senha com mostrar/ocultar, requisitos do cadastro conferidos enquanto a
+ * pessoa digita e uma confirmação depois do cadastro com o próximo passo.
  */
-export function AuthScreen() {
+export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) {
   const { signedIn } = useAuth();
   const { navigate } = useRouter();
-  const [mode, setMode] = useState<Mode>("login");
+  const destination = next ?? "/painel";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -91,10 +95,10 @@ export function AuthScreen() {
     if (created) welcomeRef.current?.focus();
   }, [created]);
 
-  function switchMode(next: Mode, focusTab = false) {
-    setMode(next);
+  function switchMode(value: Mode, focusTab = false) {
     setError(null);
-    if (focusTab) document.getElementById(`${tabsId}-${next}`)?.focus();
+    navigate(loginPath(next, value), { replace: true });
+    if (focusTab) document.getElementById(`${tabsId}-${value}`)?.focus();
   }
 
   function onTabKey(event: KeyboardEvent<HTMLButtonElement>) {
@@ -124,7 +128,10 @@ export function AuthScreen() {
       return;
     }
     if (mode === "login") {
-      void run(() => api.login(username.trim(), password), signedIn);
+      void run(() => api.login(username.trim(), password), (user) => {
+        signedIn(user);
+        navigate(destination, { replace: true });
+      });
     } else {
       void run(() => api.register(username.trim(), password), setCreated);
     }
@@ -140,8 +147,8 @@ export function AuthScreen() {
   return (
     <div className="auth-page">
       <header className="auth-top">
-        <p className="auth-top__brand"><span className="app__mark" aria-hidden="true">R</span>RiftLab</p>
-        <span className="chip">BR1</span>
+        <Link to="/" className="auth-top__brand"><span className="app__mark" aria-hidden="true">R</span>RiftLab</Link>
+        <Link to={next ?? "/"} className="auth-top__back">Continuar sem conta</Link>
       </header>
 
       <main id="conteudo" className="auth-main">
@@ -164,12 +171,12 @@ export function AuthScreen() {
             <div className="auth-welcome">
               <span className="auth-welcome__badge"><CheckIcon /></span>
               <h1 id={`${tabsId}-welcome`} ref={welcomeRef} tabIndex={-1}>Conta criada</h1>
-              <p className="muted">Boas-vindas, <strong>{created.username}</strong>. Para ver suas partidas, sua posição e seu Painel, vincule agora sua conta Riot.</p>
-              <button type="button" className="button auth-wide" onClick={() => { signedIn(created); navigate("/conta"); }}>
-                Vincular conta Riot
+              <p className="muted">Boas-vindas, <strong>{created.username}</strong>. Já dá para analisar compras e guardar seus estudos. Para ver seu Painel e sua posição, vincule sua conta Riot.</p>
+              <button type="button" className="button auth-wide" onClick={() => { signedIn(created); navigate(next ?? "/conta", { replace: true }); }}>
+                {next ? "Voltar para onde eu estava" : "Vincular conta Riot"}
               </button>
-              <button type="button" className="button button--secondary auth-wide" onClick={() => { signedIn(created); navigate("/"); }}>
-                Ir para o Painel
+              <button type="button" className="button button--secondary auth-wide" onClick={() => { signedIn(created); navigate(next ? "/conta" : "/painel", { replace: true }); }}>
+                {next ? "Vincular conta Riot" : "Ir para o Painel"}
               </button>
             </div>
           ) : (
@@ -227,12 +234,10 @@ export function AuthScreen() {
                     {sending ? "Enviando…" : copy.submit}
                   </button>
                 </form>
-                <p className="auth-divider"><span>ou</span></p>
-                <button type="button" className="button button--secondary auth-wide" disabled={sending}
-                  onClick={() => void run(() => api.enterAsGuest(), signedIn)}>
-                  Entrar como visitante
-                </button>
-                <p className="auth-hint auth-hint--center">Sem cadastro: só a demonstração, com partidas sintéticas, por um dia.</p>
+                <p className="auth-hint auth-hint--center">
+                  Sem conta, perfis, partidas e partida ao vivo continuam abertos.{" "}
+                  <Link to={next ?? "/"}>Continuar sem conta</Link>
+                </p>
               </div>
             </>
           )}

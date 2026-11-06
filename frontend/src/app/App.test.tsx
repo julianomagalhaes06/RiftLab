@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockApi, json as jsonResponse } from "../test/mockApi";
 import App from "./App";
@@ -55,7 +55,25 @@ describe("App: importar partida", () => {
 });
 
 describe("App: entrada", () => {
-  it("abre o Painel em / sem a faixa DEMO quando não há dados de demonstração", async () => {
+  it("abre o início em / com uma splash art do Data Dragon e o crédito da skin", async () => {
+    stubApi();
+    const { container } = render(<App />);
+
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Início/, current: "page" })).toHaveAttribute("href", "/");
+    const art = container.querySelector<HTMLImageElement>(".home-hero__art");
+    expect(art?.src).toMatch(/^https:\/\/ddragon\.leagueoflegends\.com\/cdn\/img\/champion\/splash\/[A-Za-z]+_\d+\.jpg$/);
+    expect(art).toHaveAttribute("alt", "");
+    // O crédito só aparece quando a arte carrega; se falhar, a vitrine fica no fundo neutro.
+    expect(container.querySelector(".home-hero__credit")).toBeNull();
+    fireEvent.load(art!);
+    expect(container.querySelector(".home-hero__credit")).toHaveTextContent("© Riot Games");
+    fireEvent.error(container.querySelector(".home-hero__art")!);
+    expect(container.querySelector(".home-hero__art")).toBeNull();
+  });
+
+  it("abre o Painel em /painel sem a faixa DEMO quando não há dados de demonstração", async () => {
+    window.history.replaceState(null, "", "/painel");
     stubApi((api) => {
       api.on("GET", /^\/api\/v1\/dashboard$/, () => jsonResponse(503, {}));
       api.on("GET", /^\/api\/v1\/ranked\/me$/, () => jsonResponse(503, {}));
@@ -64,7 +82,7 @@ describe("App: entrada", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Entenda a partida. Evolua a decisão." })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Painel/, current: "page" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: /Painel/, current: "page" })).toHaveAttribute("href", "/painel");
     expect(screen.queryByText(/Partidas DEMO são sintéticas/)).not.toBeInTheDocument();
     // CC-1202: sem perfil da conta (erro), o topo mostra só o selo do servidor.
     expect(document.querySelector(".profile-chip__server")).toHaveTextContent("Servidor BR1");

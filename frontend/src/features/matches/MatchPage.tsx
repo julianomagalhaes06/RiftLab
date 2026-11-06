@@ -4,6 +4,7 @@ import { isAbortError, isApiError } from "../../shared/api/errors";
 import { useAbortScope } from "../../shared/hooks/useAbortScope";
 import { usePolling } from "../../shared/hooks/usePolling";
 import { Link } from "../../shared/router/Link";
+import { useAuth } from "../auth/authContext";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { usePagedList } from "../../shared/hooks/usePagedList";
 import { ItemNames } from "../../shared/ui/ItemNames";
@@ -147,6 +148,7 @@ export function MatchPage({
   participantId: number | null;
   fromHistory?: boolean;
 }) {
+  const { hasAccount } = useAuth();
   const newController = useAbortScope();
   const [preparing, setPreparing] = useState(false);
   useDemoNotice(isDemoMatchId(matchId));
@@ -282,10 +284,13 @@ export function MatchPage({
             </>
           ) : null}
 
-          <details className="surface match-more">
-            <summary>Remover esta partida do RiftLab</summary>
-            <PurgePanel key={match.matchId} matchId={match.matchId} />
-          </details>
+          {/* Remover apaga dado compartilhado: só com conta. */}
+          {hasAccount ? (
+            <details className="surface match-more">
+              <summary>Remover esta partida do RiftLab</summary>
+              <PurgePanel key={match.matchId} matchId={match.matchId} />
+            </details>
+          ) : null}
         </ItemNames>
       ) : null}
 

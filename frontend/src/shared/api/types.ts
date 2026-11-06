@@ -79,23 +79,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/guest": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Entra como visitante, só com a demonstração */
-        post: operations["post_guest_api_v1_auth_guest_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -2667,16 +2650,8 @@ export interface components {
             authRequired: boolean;
             user: components["schemas"]["SessionUser"] | null;
         };
-        /**
-         * SessionUser
-         * @description `guest`: visitante, restrito à demonstração (card #14).
-         */
+        /** SessionUser */
         SessionUser: {
-            /**
-             * Guest
-             * @default false
-             */
-            guest: boolean;
             /** Id */
             id: string;
             /** Username */
@@ -2998,26 +2973,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
-                };
-            };
-        };
-    };
-    post_guest_api_v1_auth_guest_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SessionState"];
                 };
             };
         };

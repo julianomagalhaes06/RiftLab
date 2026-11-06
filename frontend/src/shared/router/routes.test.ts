@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { isDemoMatchId, isMatchId, isRealMatchId, parseRiotId, parseRoute, routeToPath } from "./routes";
+import { isDemoMatchId, isMatchId, isRealMatchId, loginPath, parseRiotId, parseRoute, routeToPath, safeNext } from "./routes";
 
 const UUID = "688bd44d-39b7-4f7b-956b-0fd4a63cfafd";
 
 describe("parseRoute", () => {
   it("reconhece as quatro rotas da jornada e o protótipo", () => {
-    expect(parseRoute("/")).toEqual({ name: "panel" });
+    expect(parseRoute("/")).toEqual({ name: "home" });
     expect(parseRoute("/painel")).toEqual({ name: "panel" });
+    expect(parseRoute("/entrar")).toEqual({ name: "login", next: null });
+    expect(parseRoute("/criar-conta", "?next=%2Fpainel")).toEqual({ name: "register", next: "/painel" });
     expect(parseRoute("/importar")).toEqual({ name: "importEntry" });
     expect(parseRoute("/campeoes")).toEqual({ name: "champions" });
     expect(parseRoute("/minha-posicao")).toEqual({ name: "position" });
@@ -65,6 +67,9 @@ describe("routeToPath", () => {
   it("faz o caminho inverso de parseRoute (ida e volta)", () => {
     const paths = [
       "/",
+      "/painel",
+      "/entrar",
+      "/criar-conta?next=%2Fdecisions%2Fabc",
       "/importar",
       "/campeoes",
       "/minha-posicao",
@@ -80,8 +85,23 @@ describe("routeToPath", () => {
       const [pathname, search = ""] = path.split("?");
       expect(routeToPath(parseRoute(pathname, search ? `?${search}` : ""))).toBe(path);
     }
-    // Endereço antigo do Painel continua abrindo o Painel, com o endereço canônico "/".
-    expect(routeToPath(parseRoute("/painel"))).toBe("/");
+  });
+});
+
+describe("volta depois de entrar", () => {
+  it("aceita só caminhos internos", () => {
+    expect(safeNext("/jogador/Ana-BR1")).toBe("/jogador/Ana-BR1");
+    expect(safeNext("//outro.site/x")).toBeNull();
+    expect(safeNext("/\\outro.site")).toBeNull();
+    expect(safeNext("https://outro.site")).toBeNull();
+    expect(safeNext(null)).toBeNull();
+    expect(parseRoute("/entrar", "?next=https%3A%2F%2Foutro.site")).toEqual({ name: "login", next: null });
+  });
+
+  it("monta o caminho de entrar com o retorno", () => {
+    expect(loginPath("/decisions/x?y=1")).toBe("/entrar?next=%2Fdecisions%2Fx%3Fy%3D1");
+    expect(loginPath("/", "register")).toBe("/criar-conta");
+    expect(loginPath(null)).toBe("/entrar");
   });
 });
 

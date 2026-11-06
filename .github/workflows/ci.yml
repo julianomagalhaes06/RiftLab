@@ -156,8 +156,14 @@ jobs:
           for path in "/matches/DEMO-0008?participant=1" "/imports/688bd44d-39b7-4f7b-956b-0fd4a63cfafd" "/decisions/0f92d8d8-319c-4fa4-bca3-49157a1f9e00" "/prototipo"; do
             curl -sf -H 'Accept: text/html' "http://127.0.0.1:5173$path" | grep -q 'id="root"'
           done
-          # Login exigido por padrão (Sprint 2): sessão de visitante pelo proxy, cookie + cabeçalho.
-          curl -sf -c "$RUNNER_TEMP/riftlab.jar" -X POST -H 'X-RiftLab-Request: 1' http://127.0.0.1:5173/api/v1/auth/guest > /dev/null
+          # Login exigido por padrão: a leitura pública passa pelo proxy sem sessão; a lista da
+          # conta própria recusa sem sessão e responde com uma conta criada pelo proxy (cookie +
+          # cabeçalho anti-CSRF).
+          curl -sf http://127.0.0.1:5173/api/v1/matches/DEMO-0008 | python3 -c 'import json,sys; assert json.load(sys.stdin)["matchId"] == "DEMO-0008"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5173/api/v1/matches)" = 401
+          curl -sf -c "$RUNNER_TEMP/riftlab.jar" -X POST -H 'X-RiftLab-Request: 1' -H 'Content-Type: application/json' \
+            -d "{\"username\":\"ci_$GITHUB_RUN_ID\",\"password\":\"$(openssl rand -hex 16)\"}" \
+            http://127.0.0.1:5173/api/v1/auth/register > /dev/null
           curl -sf -b "$RUNNER_TEMP/riftlab.jar" http://127.0.0.1:5173/api/v1/matches | python3 -c 'import json,sys; assert "items" in json.load(sys.stdin)'
 
       # E2E da demonstração contra a stack REAL: roda AQUI (e não no job `frontend`) porque este
