@@ -68,7 +68,8 @@ Compose: frontend, API, worker e PostgreSQL (portas só em 127.0.0.1; banco sem 
 Jobs (`import_jobs`, tipos IMPORT, PREPARE e PURGE):
 - Estados: QUEUED → RUNNING → SUCCEEDED; RUNNING → RETRY_WAIT → RUNNING; RUNNING → FAILED.
 - Reprocessar uma falha cria nova tentativa vinculada e preserva o histórico.
-- Cada trilha processa um job por vez; uma trilha com trabalho não espera as outras (20 partidas de uma sincronização chegam em cerca de 15 s, e a preparação acompanha logo atrás).
+- Cada trilha processa um job por vez; uma trilha com trabalho não espera as outras.
+- Revisão sob demanda: a sincronização de histórico importa sem preparar, então a lista chega sem disputar o worker com a reconstrução. A preparação vem quando a pessoa pede "Revisar partida" ou, com as filas de importação e preparação vazias, uma por vez no ocioso; um pedido da tela espera no máximo a preparação que já está rodando.
 
 Registro de modelos (CC-405/603):
 - Estados: REGISTERED → ACTIVE → RETIRED, com eventos REGISTER, PROMOTE, RETIRE, ROLLBACK e

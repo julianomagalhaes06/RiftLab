@@ -239,9 +239,12 @@ async def import_real_match(
     match_id: str,
     patch: str,
     purchases: tuple[tuple[int, int], ...] = (),
+    *,
+    prepare_after: bool = True,
 ) -> None:
     """Importa uma partida REAL com transporte HTTP simulado (nunca rede real):
-    o raw fica no `raw_store` local, e a preparação depois só lê esse raw."""
+    o raw fica no `raw_store` local, e a preparação depois só lê esse raw.
+    `prepare_after=False` imita a sincronização de histórico (sem preparação agendada)."""
     async with unit_of_work(session_factory) as session:
         await session.execute(delete(RiotRateLimitModel))
     async with unit_of_work(session_factory) as session:
@@ -251,6 +254,7 @@ async def import_real_match(
                 requested_match_id=match_id,
                 mode=ImportMode.RIOT,
                 state=ImportJobState.QUEUED,
+                prepare_after=prepare_after,
             )
         )
     match_doc, timeline_doc = real_match_docs(match_id, patch, purchases)

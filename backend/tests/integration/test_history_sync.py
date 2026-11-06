@@ -194,6 +194,8 @@ async def test_sync_enqueues_only_new_matches_and_respects_cooldown(
         ).all()
         stored = (await session.scalars(select(Run))).one()
     assert [(job.mode, job.state) for job in jobs] == [("RIOT", "QUEUED")]
+    # Importa sem preparar: a revisão vem sob demanda ou com o worker ocioso.
+    assert [job.prepare_after for job in jobs] == [False]
     # A execução guarda só contagens: nenhum id, puuid ou Riot ID.
     assert PUUID not in str(vars(stored)) and NEW not in str(vars(stored))
 

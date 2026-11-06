@@ -3,10 +3,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import DateTime, String, Update, literal, or_, select, tuple_, update
+from sqlalchemy import DateTime, String, Update, exists, literal, or_, select, tuple_, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from riftlab.ingestion.domain import (
     ACTIVE_IMPORT_JOB_STATES,
@@ -85,6 +86,7 @@ class SqlAlchemyIngestionRepository:
                 error_code=job.error_code,
                 retry_of_job_id=job.retry_of_job_id,
                 kind=job.kind.value,
+                prepare_after=job.prepare_after,
             )
         )
         try:
@@ -272,6 +274,39 @@ class SqlAlchemyIngestionRepository:
         )
         result = await self._session.execute(stmt)
         return {row.requested_match_id: _job_from_row(row) for row in result.scalars()}
+
+    async def has_pending_jobs(self, kinds: tuple[JobKind, ...]) -> bool:
+        """Há job desses tipos na fila ou rodando agora (QUEUED/RUNNING)?"""
+        stmt = select(
+            exists().where(
+                ImportJobModel.kind.in_([kind.value for kind in kinds]),
+                ImportJobModel.state.in_(
+                    [ImportJobState.QUEUED.value, ImportJobState.RUNNING.value]
+                ),
+            )
+        )
+        return bool(await self._session.scalar(stmt))
+
+    async def next_unprepared_match(self) -> tuple[str, ImportMode] | None:
+        """A partida importada mais recente (início do jogo) que nunca teve preparação
+        pedida, com o modo da importação — a próxima da revisão no ocioso."""
+        prepare = aliased(ImportJobModel)
+        stmt = (
+            select(ImportJobModel.match_id, ImportJobModel.mode)
+            .join(MatchModel, MatchModel.match_id == ImportJobModel.match_id)
+            .where(
+                ImportJobModel.kind == JobKind.IMPORT.value,
+                ImportJobModel.state == ImportJobState.SUCCEEDED.value,
+                ~exists().where(
+                    prepare.requested_match_id == ImportJobModel.match_id,
+                    prepare.kind == JobKind.PREPARE.value,
+                ),
+            )
+            .order_by(MatchModel.start_at.desc(), MatchModel.match_id.desc())
+            .limit(1)
+        )
+        row = (await self._session.execute(stmt)).first()
+        return (row.match_id, ImportMode(row.mode)) if row is not None else None
 
     async def enqueue_preparation(
         self,
@@ -514,6 +549,7 @@ def _job_from_row(row: ImportJobModel) -> ImportJob:
         error_code=row.error_code,
         retry_of_job_id=row.retry_of_job_id,
         kind=JobKind(row.kind),
+        prepare_after=row.prepare_after,
     )
 
 

@@ -95,6 +95,8 @@ class ImportJob:
     error_code: str | None = None
     retry_of_job_id: uuid.UUID | None = None
     kind: JobKind = JobKind.IMPORT
+    # IMPORT: agenda a preparação na mesma transação do sucesso (False: revisão sob demanda).
+    prepare_after: bool = True
 
 
 class IngestionRepository(Protocol):

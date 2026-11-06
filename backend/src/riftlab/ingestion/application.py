@@ -65,6 +65,7 @@ async def request_import(
     _after_initial_read: Callable[[], object] | None = None,
     *,
     secret: str | None,
+    prepare_after: bool = True,
 ) -> ImportJob:
     """POST /imports: idempotente. Reaproveita o job mais recente da
     identidade se ainda ativo ou já SUCCEEDED (nunca duplica partida/job
@@ -78,7 +79,8 @@ async def request_import(
     injetável só para teste (barreira determinística da janela de corrida),
     nunca usado em produção. Partida RIOT expurgada levanta MatchPurgedError na
     mesma transação que criaria o job, sob o lock do expurgo (CC-1216); `secret`
-    é o segredo da lápide (RIFTLAB_SUBJECT_HASH_SECRET)."""
+    é o segredo da lápide (RIFTLAB_SUBJECT_HASH_SECRET). `prepare_after=False`
+    (sincronização de histórico) importa sem agendar a preparação."""
     async with unit_of_work(session_factory) as session:
         repo = SqlAlchemyIngestionRepository(session)
         latest = await repo.get_latest_import_job(requested_match_id, mode)
@@ -96,6 +98,7 @@ async def request_import(
         mode=mode,
         state=ImportJobState.QUEUED,
         retry_of_job_id=latest.id if latest is not None else None,
+        prepare_after=prepare_after,
     )
     try:
         async with unit_of_work(session_factory) as session:
@@ -161,6 +164,7 @@ async def retry_import(
         mode=target.mode,
         state=ImportJobState.QUEUED,
         retry_of_job_id=target.id,
+        prepare_after=target.prepare_after,
     )
     try:
         async with unit_of_work(session_factory) as session:
@@ -417,9 +421,12 @@ async def _persist_result(
             raise _LeaseLostDuringPersistError(f"posse do job {job.id} perdida antes de finalizar")
         # CC-205: a preparação (catálogo -> reconstrução -> extração) é
         # enfileirada na MESMA transação do sucesso da importação — tudo ou
-        # nada: nunca há partida importada sem preparação registrada, e nunca
-        # uma preparação de partida que não foi importada.
-        await ingestion_repo.enqueue_preparation(result.match_id, job.mode)
+        # nada: nunca uma preparação de partida que não foi importada. Importação
+        # da sincronização de histórico (`prepare_after=False`) fica sem preparação:
+        # a revisão vem sob demanda (POST /matches/{id}/preparation) ou com o
+        # worker ocioso (`enqueue_idle_preparation`).
+        if job.prepare_after:
+            await ingestion_repo.enqueue_preparation(result.match_id, job.mode)
 
 
 async def process_next_job(

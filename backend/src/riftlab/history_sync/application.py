@@ -357,7 +357,10 @@ async def _run(
             known += 1
             continue
         try:
-            await request_import(factory, match_id, ImportMode.RIOT, secret=secret)
+            # Sem preparar: a lista chega rápido e a revisão vem sob demanda (ou no ocioso).
+            await request_import(
+                factory, match_id, ImportMode.RIOT, secret=secret, prepare_after=False
+            )
         except MatchPurgedError:
             purged += 1  # expurgo pedido não volta por sincronização (CC-603)
             continue

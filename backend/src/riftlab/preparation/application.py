@@ -411,6 +411,22 @@ async def process_next_preparation(
     return True
 
 
+async def enqueue_idle_preparation(session_factory: SessionFactory) -> bool:
+    """Revisão no ocioso: com nenhuma importação nem preparação na fila ou rodando, agenda a
+    preparação de UMA partida importada sem revisão (a mais recente). Assim a importação nunca
+    disputa o worker com a revisão automática, e um pedido de revisão feito na tela espera no
+    máximo a preparação que já está rodando. True se agendou."""
+    async with unit_of_work(session_factory) as session:
+        repo = SqlAlchemyIngestionRepository(session)
+        if await repo.has_pending_jobs((JobKind.IMPORT, JobKind.PREPARE)):
+            return False
+        candidate = await repo.next_unprepared_match()
+        if candidate is None:
+            return False
+        await repo.enqueue_preparation(*candidate)
+    return True
+
+
 async def request_preparation(
     session_factory: SessionFactory, match_id: str, *, scope_path: Path
 ) -> ImportJob:

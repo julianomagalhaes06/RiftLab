@@ -20,7 +20,8 @@ interface PreparationPanelProps {
 
 /**
  * Estado da preparação (catálogo → reconstrução → extração). A região `role="status"`
- * anuncia mudanças; FAILED e NOT_REQUESTED oferecem a ação para (re)preparar.
+ * anuncia mudanças; FAILED e NOT_REQUESTED oferecem a ação para (re)preparar. Partidas da
+ * sincronização de histórico chegam sem preparação: a revisão é pedida aqui, sob demanda.
  */
 export function PreparationPanel({ preparation, busy, onPrepare, requestError }: PreparationPanelProps) {
   const retryAt = formatClock(preparation.retryAt);
@@ -39,7 +40,7 @@ export function PreparationPanel({ preparation, busy, onPrepare, requestError }:
       status = "A preparação da partida falhou.";
       break;
     case "NOT_REQUESTED":
-      status = "Esta partida ainda não foi preparada.";
+      status = "Revise a partida para ver o ouro ao longo do jogo, a fase de rotas, a chance de vitória e cada decisão de compra. Leva poucos segundos.";
       break;
   }
 
@@ -49,7 +50,7 @@ export function PreparationPanel({ preparation, busy, onPrepare, requestError }:
   }
   return (
     <section className="surface match-panel" aria-labelledby="preparation-heading">
-      <h3 id="preparation-heading">Preparação</h3>
+      <h3 id="preparation-heading">{preparation.status === "NOT_REQUESTED" ? "Revisão da partida" : "Preparação"}</h3>
       <div className="progress" role="status" aria-live="polite">
         <p className={`progress__state progress__state--${preparation.status.toLowerCase()}`}>
           {status}
@@ -71,7 +72,7 @@ export function PreparationPanel({ preparation, busy, onPrepare, requestError }:
             ? "Enviando…"
             : preparation.status === "FAILED"
               ? "Tentar preparar novamente"
-              : "Preparar partida"}
+              : "Revisar partida"}
         </button>
       ) : null}
     </section>

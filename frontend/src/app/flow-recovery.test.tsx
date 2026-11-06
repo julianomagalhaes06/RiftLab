@@ -179,7 +179,7 @@ describe("partida: preparação com falha e nova tentativa", () => {
     expect(screen.queryByRole("button", { name: "Tentar preparar novamente" })).not.toBeInTheDocument();
   });
 
-  it("NOT_REQUESTED oferece 'Preparar partida'", async () => {
+  it("NOT_REQUESTED mostra o placar e oferece 'Revisar partida' (revisão sob demanda)", async () => {
     setup("/matches/DEMO-0008", (mock) => {
       mock.on(
         "GET",
@@ -194,8 +194,11 @@ describe("partida: preparação com falha e nova tentativa", () => {
       );
     });
 
-    expect(await screen.findByText("Esta partida ainda não foi preparada.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Preparar partida" }));
+    expect(await screen.findByRole("heading", { name: "Revisão da partida" })).toBeInTheDocument();
+    expect(screen.getByText(/Revise a partida para ver o ouro/)).toBeInTheDocument();
+    // O placar vem da importação: já aparece antes de qualquer revisão.
+    expect(screen.getByRole("heading", { name: "Placar" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Revisar partida" }));
 
     await waitFor(() => expect(status()).toMatch(/Partida pronta/));
   });

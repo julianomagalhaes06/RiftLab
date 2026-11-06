@@ -142,6 +142,11 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
         String, nullable=False, default="IMPORT", server_default="IMPORT"
     )
     state: Mapped[str] = mapped_column(String, nullable=False)
+    # IMPORT: agenda a preparação ao terminar (padrão); a sincronização de histórico importa
+    # sem preparar, e a revisão vem sob demanda ou quando o worker fica ocioso.
+    prepare_after: Mapped[bool] = mapped_column(
+        nullable=False, default=True, server_default=text("true")
+    )
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Token de posse (CC-201): incrementado a cada reserva (fresca, retomada de

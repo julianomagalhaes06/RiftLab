@@ -233,18 +233,20 @@ export function MatchPage({
             requestError={prepareError}
           />
 
+          {/* O placar vem da importação: aparece antes da revisão, que é sob demanda. */}
+          <section aria-labelledby="participants-heading" className="surface match-panel">
+            <h3 id="participants-heading">Placar</h3>
+            <Scoreboard
+              match={match}
+              timeline={timelineState?.timeline ?? null}
+              selected={selectedId}
+              localId={localId}
+              fromHistory={fromHistory}
+            />
+          </section>
+
           {match.preparation.status === "READY" ? (
             <>
-              <section aria-labelledby="participants-heading" className="surface match-panel">
-                <h3 id="participants-heading">Placar</h3>
-                <Scoreboard
-                  match={match}
-                  timeline={timelineState?.timeline ?? null}
-                  selected={selectedId}
-                  localId={localId}
-                  fromHistory={fromHistory}
-                />
-              </section>
               {selectedId === null ? (
                 <p className="muted">Selecione um participante no placar para ver as compras e decisões dele.</p>
               ) : selectedParticipant === null ? (

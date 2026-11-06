@@ -14,7 +14,7 @@ from riftlab.ingestion.application import process_next_job
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 from riftlab.ingestion.purge import process_next_purge
 from riftlab.observability import configure_logging, safe_exception_description
-from riftlab.preparation.application import process_next_preparation
+from riftlab.preparation.application import enqueue_idle_preparation, process_next_preparation
 from riftlab.shared.db import build_session_factory
 
 logger = logging.getLogger("riftlab.worker")
@@ -113,6 +113,8 @@ async def run(settings: Settings | None = None, stop_event: asyncio.Event | None
     importing = (("importacao", lambda: process_next_job(session_factory, raw_store, settings)),)
     preparing = (
         ("preparacao", lambda: process_next_preparation(session_factory, raw_store, settings)),
+        # Sem fila: revisa uma partida importada sem revisão (Campeões usa as decisões).
+        ("preparacao ociosa", lambda: enqueue_idle_preparation(session_factory)),
     )
     maintenance = (
         ("expurgo", lambda: process_next_purge(session_factory, raw_store, settings)),

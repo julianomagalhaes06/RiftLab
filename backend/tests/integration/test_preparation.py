@@ -26,7 +26,7 @@ from pipeline_helpers import (
     unique_patch,
     write_prepare_configs,
 )
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
 from riftlab.api.app import create_app
 from riftlab.catalog.application import resolve_catalog_for_match, sync_catalog
@@ -35,12 +35,18 @@ from riftlab.catalog.infrastructure.curation import CURATION_RULES_VERSION
 from riftlab.catalog.models import CatalogVersionModel
 from riftlab.config import Settings
 from riftlab.decisions.models import DecisionExtractionModel, DecisionPointModel
-from riftlab.ingestion.domain import MAX_TRANSIENT_ATTEMPTS, ImportJob, ImportJobState, JobKind
+from riftlab.ingestion.domain import (
+    MAX_TRANSIENT_ATTEMPTS,
+    ImportJob,
+    ImportJobState,
+    ImportMode,
+    JobKind,
+)
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
-from riftlab.ingestion.models import ImportJobModel
+from riftlab.ingestion.models import ImportJobModel, MatchModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.preparation import application as preparation
-from riftlab.preparation.application import process_next_preparation
+from riftlab.preparation.application import enqueue_idle_preparation, process_next_preparation
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import SourceError, SourceRateLimitedError
 from riftlab.timeline.application import RECONSTRUCTION_ALGORITHM_VERSION
@@ -633,3 +639,79 @@ async def test_preparation_with_a_missing_registry_file_runs_with_every_rule_dis
     async with unit_of_work(session_factory) as session:
         states = await SqlAlchemyTimelineRepository(session).list_decision_states("DEMO-0002", 1)
     assert states and all(state.quality["empiricalRules"] == [] for state in states)
+
+
+# ---------------------------------------------------------------------------
+# Revisão sob demanda e no ocioso (importação da sincronização de histórico)
+# ---------------------------------------------------------------------------
+
+
+async def _hold_import_queue_empty(session_factory) -> None:
+    """Importações abertas de outros testes contariam como fila ocupada."""
+    async with unit_of_work(session_factory) as session:
+        await session.execute(
+            delete(ImportJobModel).where(
+                ImportJobModel.kind == "IMPORT", ImportJobModel.state.in_(["QUEUED", "RUNNING"])
+            )
+        )
+
+
+async def test_lazy_import_stays_unprepared_until_the_review_is_requested(
+    app_client, session_factory, tmp_path, real_match
+) -> None:
+    raw_store = DurableRawMatchStore(tmp_path / "raw")
+    await import_real_match(
+        session_factory, raw_store, real_match, unique_patch(), prepare_after=False
+    )
+
+    assert await _jobs(session_factory, real_match) == []  # nada agendado pela importação
+    detail = (await app_client.get(f"/api/v1/matches/{real_match}")).json()
+    assert detail["preparation"]["status"] == "NOT_REQUESTED"
+
+    requested = await app_client.post(
+        f"/api/v1/matches/{real_match}/preparation", headers={"X-RiftLab-Request": "1"}
+    )
+    assert requested.status_code in (200, 202)
+    [job] = await _jobs(session_factory, real_match)
+    assert job.state == "QUEUED"
+
+
+async def test_idle_preparation_waits_for_the_queues_and_takes_the_newest_match(
+    session_factory, tmp_path, real_match
+) -> None:
+    raw_store = DurableRawMatchStore(tmp_path / "raw")
+    await import_real_match(
+        session_factory, raw_store, real_match, unique_patch(), prepare_after=False
+    )
+    async with unit_of_work(session_factory) as session:  # a mais recente de todas
+        await session.execute(
+            update(MatchModel)
+            .where(MatchModel.match_id == real_match)
+            .values(start_at=datetime.now(UTC) + timedelta(days=3650))
+        )
+    await _hold_import_queue_empty(session_factory)
+
+    # Importação na fila: a revisão automática não disputa o worker com ela.
+    busy = uuid.uuid4()
+    async with unit_of_work(session_factory) as session:
+        await SqlAlchemyIngestionRepository(session).create_import_job(
+            ImportJob(
+                id=busy,
+                requested_match_id=f"BR1_{uuid.uuid4().int % 10**10}",
+                mode=ImportMode.RIOT,
+                state=ImportJobState.QUEUED,
+            )
+        )
+    try:
+        assert await enqueue_idle_preparation(session_factory) is False
+        assert await _jobs(session_factory, real_match) == []
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(delete(ImportJobModel).where(ImportJobModel.id == busy))
+
+    # Filas vazias: agenda uma, a partida mais recente sem revisão.
+    assert await enqueue_idle_preparation(session_factory) is True
+    [job] = await _jobs(session_factory, real_match)
+    assert (job.state, job.mode) == ("QUEUED", "RIOT")
+    # Com essa preparação na fila, não agenda outra (um pedido da tela passa na frente).
+    assert await enqueue_idle_preparation(session_factory) is False
