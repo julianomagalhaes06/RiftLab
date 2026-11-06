@@ -18,6 +18,8 @@ describe("Painel com partidas importadas recentes", () => {
     vi.stubGlobal("fetch", api.fetch);
     render(<App />);
     expect(within(await screen.findByRole("region", { name: "Partidas importadas recentes" })).getByRole("status")).toHaveTextContent("Carregando partidas recentes");
+    // O estado de carregamento pode aparecer antes de a chamada sair: espera a chamada existir.
+    await waitFor(() => expect(release).toBeTypeOf("function"));
     release(json(200, { items: [], nextCursor: null }));
     expect(await screen.findByText("Nenhuma partida importada")).toBeInTheDocument();
   });

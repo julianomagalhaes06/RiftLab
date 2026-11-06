@@ -11,6 +11,9 @@
   position: relative;
   isolation: isolate;
   display: grid;
+  /* Coluna presa à largura da vitrine: sem isso, o tamanho intrínseco do campo de busca
+     alarga a trilha e corta o conteúdo no celular. */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   min-height: clamp(520px, 74vh, 720px);
   padding: 72px 40px 96px;
@@ -46,6 +49,7 @@
 
 .home-hero__inner {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   gap: 18px;
   width: min(100%, 760px);
@@ -91,17 +95,29 @@
 }
 
 /* Busca grande da vitrine (PlayerSearch variant="hero"). */
-.player-search--hero { width: min(100%, 620px); margin-top: 10px; gap: 0; }
+.player-search--hero { width: min(100%, 620px); min-width: 0; margin-top: 10px; gap: 0; }
 .player-search--hero input {
   flex: 1 1 auto;
   width: auto;
   min-width: 0;
   min-height: 58px;
-  padding: 0 72px 0 22px;
+  padding: 0 72px 0 92px;
   border: 1px solid var(--nline-strong);
   background: var(--hero-scrim-strong);
   font-size: 1.0625rem;
   box-shadow: 0 12px 40px var(--hero-ink-shadow);
+}
+.player-search--hero .player-search__region {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 7px;
+  z-index: 1;
+  min-height: 0;
+  padding: 0 12px;
+  border-color: var(--nline2);
+  background: var(--n2);
+  font-size: .9375rem;
 }
 .player-search--hero input:focus { border-color: var(--accent); outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 .player-search--hero .player-search__submit {

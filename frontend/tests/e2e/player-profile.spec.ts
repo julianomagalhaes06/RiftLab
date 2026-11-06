@@ -27,10 +27,11 @@ for (const width of [360, 1280]) {
       });
       await page.goto("/historico");
       const search = page.getByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
-      await search.fill("Jogador Teste");
+      await search.fill("Jogador#X");
       await search.press("Enter");
       await expect(page.getByRole("search", { name: "Buscar jogador" }).getByRole("alert")).toContainText("Nome#TAG");
-      await search.fill("Jogador Teste#BR1");
+      // Só o nome: Enter usa a TAG padrão do servidor selecionado (BR → #BR1).
+      await search.fill("Jogador Teste");
       await search.press("Enter");
       await expect(page).toHaveURL(/\/jogador\/Jogador%20Teste-BR1$/);
       await expect(page.getByText(/Nível 321/)).toBeVisible();

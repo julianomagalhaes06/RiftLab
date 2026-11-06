@@ -131,8 +131,9 @@
   .recent-row__time { grid-column: 1; grid-row: 2; }
   .recent-row__action { grid-column: 2; grid-row: 1 / 3; }
 }
-/* Topo em larguras menores: menos respiro, depois só o retrato no chip, depois abas sem ícone. */
-@media (max-width: 1360px) {
+/* Topo em larguras menores: menos respiro, depois só o retrato no chip, depois abas sem ícone.
+   1480 px: com o seletor de servidor na busca, o espaçamento cheio só cabe acima de 1440. */
+@media (max-width: 1480px) {
   .main-nav { margin-left: 16px; gap: 0; }
   .app .main-nav__link { padding: 0 10px; }
   .app__topbar .player-search input { width: 160px; }

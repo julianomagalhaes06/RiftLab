@@ -1,6 +1,7 @@
 import type { PlayerProfile } from "../../shared/api/client";
 import { parseRiotId } from "../../shared/router/routes";
 import { betterRank, isTier, type Tier } from "../ranked/tiers";
+import { DEFAULT_REGION, resolveRiotId, type Region } from "./regions";
 
 /** Buscas recentes de jogador (CC-1208), como as do OP.GG: ficam só neste navegador
  * (localStorage), nunca no servidor. O banco guarda só HMACs de terceiros (CC-1103); a API da
@@ -18,8 +19,6 @@ export type RecentPlayer = {
 const KEY = "riftlab:recent-players:v1";
 const LIMIT = 8;
 const SHOWN = 5;
-/** TAG sugerida quando o texto não tem "#": a mais comum no servidor BR. */
-export const DEFAULT_TAG = "BR1";
 
 const keyOf = (player: { gameName: string; tagLine: string }) =>
   `${player.gameName}#${player.tagLine}`.toLocaleLowerCase("pt-BR");
@@ -96,9 +95,10 @@ export function matchRecentPlayers(query: string, recent: RecentPlayer[]): Recen
   return (text ? recent.filter((player) => keyOf(player).includes(text)) : recent).slice(0, SHOWN);
 }
 
-/** "Nome" sem "#" vira "Nome#BR1", se o nome for válido; com "#", nenhuma sugestão. */
-export function tagSuggestion(query: string): { gameName: string; tagLine: string } | null {
+/** "Nome" (ou "Nome#") vira "Nome#TAG padrão do servidor", se o nome for válido; com TAG
+ * digitada, nenhuma sugestão. */
+export function tagSuggestion(query: string, region: Region = DEFAULT_REGION): { gameName: string; tagLine: string } | null {
   const text = query.trim();
-  if (!text || text.includes("#")) return null;
-  return parseRiotId(`${text}#${DEFAULT_TAG}`);
+  const name = text.endsWith("#") ? text.slice(0, -1) : text;
+  return name.includes("#") ? null : resolveRiotId(name, region);
 }

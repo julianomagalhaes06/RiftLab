@@ -61,8 +61,9 @@ describe("buscas recentes de jogador (CC-1208)", () => {
     expect(() => rememberPlayer(profile("Fate Sealed"))).not.toThrow();
   });
 
-  it("sem # sugere a TAG BR1; com # ou nome inválido, nada", () => {
+  it("sem TAG sugere a TAG padrão do servidor (BR1); com TAG ou nome inválido, nada", () => {
     expect(tagSuggestion(" Fate Sealed ")).toEqual({ gameName: "Fate Sealed", tagLine: "BR1" });
+    expect(tagSuggestion("Fate Sealed#")).toEqual({ gameName: "Fate Sealed", tagLine: "BR1" });
     expect(tagSuggestion("Fate#BR1")).toBeNull();
     expect(tagSuggestion("")).toBeNull();
     expect(tagSuggestion("x".repeat(17))).toBeNull();

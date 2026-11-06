@@ -1,7 +1,7 @@
 /* CC-1102: busca e perfil de jogador por Riot ID. */
 .player-search { position: relative; display: flex; gap: var(--space-1); align-items: center; }
 .player-search input {
-  width: 13rem;
+  width: 10rem;
   min-height: 36px;
   padding: 0 var(--space-2);
   border: 1px solid var(--nline);
@@ -10,6 +10,35 @@
   color: var(--ntext);
 }
 .player-search input[aria-invalid="true"] { border-color: var(--loss); }
+/* Seletor de servidor (como nos sites de estatísticas): a sigla visível e, por cima, o select
+   nativo transparente, que mantém teclado, leitor de tela e a lista do sistema. */
+.player-search__region {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--nline);
+  border-radius: var(--radius-sm);
+  background: var(--n1);
+  color: var(--ntext);
+  font: 600 .8125rem var(--font-display);
+  letter-spacing: .04em;
+}
+.player-search__region select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font: 1rem var(--font-body);
+}
+.player-search__region:hover { border-color: var(--nline-strong); }
+.player-search__region:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.player-search__region-caret { color: var(--ntext-subtle); }
 .player-search__hint {
   position: absolute;
   top: calc(100% + 4px);

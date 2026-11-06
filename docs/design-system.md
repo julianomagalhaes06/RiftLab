@@ -138,6 +138,11 @@ padrão dos sites de estatísticas do jogo:
 - **Centro:** selo BR1, título em Chakra Petch (até 60 px) com a segunda frase em roxo, uma frase
   de apoio e a busca grande de jogador (`PlayerSearch variant="hero"`, 58 px, botão roxo
   embutido). No início, a busca do topo some para não repetir.
+- **Servidor na busca** (início e topo): seletor à esquerda do campo, como nos sites de
+  estatísticas, com a sigla visível e o `select` nativo transparente por cima (teclado e leitor
+  de tela intactos). Só o BR está ativo; as outras regiões aparecem como "em breve"
+  (`features/players/regions.ts`), porque o backend fala só com os hosts da Riot do BR. Digitar
+  só o nome e apertar Enter busca com a TAG padrão do servidor escolhido (BR → `#BR1`).
 - **Abaixo:** "Aberto para qualquer pessoa", quatro cartões `.surface.surface--pad` (perfil e
   histórico, revisão da partida, partida ao vivo, campeões), e o bloco "Com conta"
   (`.surface.surface--rank.brackets`) com o que a conta acrescenta e os botões Criar conta / Já

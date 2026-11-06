@@ -53,12 +53,15 @@ describe("perfil de jogador por Riot ID", () => {
       );
     });
     const search = await screen.findByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
-    fireEvent.change(search, { target: { value: "Nome sem tag" } });
+    // TAG digitada inválida: avisa sem sair da página.
+    fireEvent.change(search, { target: { value: "Nome#X" } });
     fireEvent.submit(search);
     const form = screen.getByRole("search", { name: "Buscar jogador" });
-    expect(await within(form).findByRole("alert")).toHaveTextContent("Use o formato Nome#TAG");
+    expect(await within(form).findByRole("alert")).toHaveTextContent("se quiser, a TAG: Nome#TAG");
 
-    fireEvent.change(search, { target: { value: "Pão de Queijo#BR1" } });
+    // Só o nome: Enter busca com a TAG padrão do servidor escolhido (BR → #BR1), como no op.gg.
+    expect(within(form).getByRole("combobox", { name: "Servidor" })).toHaveValue("BR");
+    fireEvent.change(search, { target: { value: "Pão de Queijo" } });
     fireEvent.submit(search);
     expect(window.location.pathname).toBe("/jogador/P%C3%A3o%20de%20Queijo-BR1");
     expect(await screen.findByText(/Nível 321/)).toBeInTheDocument();
@@ -147,7 +150,7 @@ describe("perfil de jogador por Riot ID", () => {
     // Recente que contém o texto e, sem "#", o mesmo texto com a TAG BR1.
     expect(options.map((option) => option.textContent)).toEqual([
       "Pão de Queijo #BR1Nível 321 · Ouro II",
-      "#Buscar queijo #BR1TAG mais comum no servidor BR",
+      "#Buscar queijo #BR1TAG padrão do servidor Brasil",
     ]);
     fireEvent.keyDown(search, { key: "ArrowDown" });
     expect(search).toHaveAttribute("aria-activedescendant", options[0].id);

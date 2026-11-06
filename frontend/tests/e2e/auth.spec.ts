@@ -53,6 +53,13 @@ test("sem conta em 360px: início com a busca e convite nas áreas da conta", as
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Entenda cada compra/ })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Buscar jogador pelo Riot ID" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Servidor" })).toHaveValue("BR");
+  // A vitrine corta o que passa da largura (overflow hidden): o conteúdo tem de caber nela.
+  for (const selector of [".home-hero__inner", ".player-search--hero"]) {
+    const box = await page.locator(selector).boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(360);
+  }
   const nav = page.getByRole("navigation", { name: "Áreas principais" });
   await expect(nav).toContainText("Início");
   await expect(nav).not.toContainText("Painel");
