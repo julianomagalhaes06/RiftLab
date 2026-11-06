@@ -10,8 +10,10 @@ import { active, syncMessage } from "./syncMessage";
  */
 
 const ACTIVE_POLL_MS = 2000;
-const REFRESH_EVERY_MS = 5000;
-const REFRESH_TIMES = 12;
+// O worker importa várias partidas em paralelo (um histórico de 20 em poucos segundos): a lista
+// recarrega a cada 2,5 s por um minuto, tempo de sobra também para a preparação das revisões.
+const REFRESH_EVERY_MS = 2500;
+const REFRESH_TIMES = 24;
 
 interface SyncCalls {
   /** `manual`: pedido pelo botão Atualizar (não pela abertura da tela). */

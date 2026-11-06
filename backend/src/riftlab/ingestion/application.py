@@ -31,6 +31,7 @@ from riftlab.ingestion.domain import (
 )
 from riftlab.ingestion.infrastructure.demo_source import DemoMatchSource
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore, RawStoreCorruptedError
+from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_source import LocalRawMatchSource, RiotMatchSource
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import SubjectHashSecretMissingError
@@ -53,6 +54,8 @@ from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 SessionFactory = async_sessionmaker[AsyncSession]
 
 logger = logging.getLogger("riftlab.worker")
+# Um limitador por processo para todas as importações da Riot (worker com várias em paralelo).
+_IMPORT_RATE_LIMITER = RiotRateLimiter()
 
 
 async def request_import(
@@ -253,6 +256,9 @@ async def _load_from_source(
     client = riot_client_factory()
     try:
         transport = RiotHttpTransport(
+            # Importações simultâneas do worker dividem as janelas da chave (20/s, 100/2 min,
+            # aprendidas dos headers): o paralelismo nunca passa do limite por conta própria.
+            rate_limiter=_IMPORT_RATE_LIMITER,
             api_key=settings.riot_api_key or "",
             # max_attempts_per_request=1: o job é o único dono do retry
             # transitório (ver módulo riot_source) — nenhum sleep/retry em

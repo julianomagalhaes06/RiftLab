@@ -63,12 +63,12 @@ flowchart LR
 
 ## Processos
 
-Compose: frontend, API, worker e PostgreSQL (portas só em 127.0.0.1; banco sem porta publicada); armazenamento local em volume para dados/artifacts. API e worker usam a mesma imagem e código. Jobs duráveis no banco, reservados com transação curta e SKIP LOCKED; chamadas de rede fora da transação. Lease de 120 s, heartbeat 30 s; recuperação de lease vencido, cinco tentativas transitórias com backoff exponencial/jitter e teto 15 min, Retry-After prevalece. 401/403 e payload incompatível são falhas permanentes, não repetidas indefinidamente. Um worker de ingestão inicial; limitador central conservador por chave/rota e respeito aos headers de rate limit. Paralelizar workers requer coordenação do limitador.
+Compose: frontend, API, worker e PostgreSQL (portas só em 127.0.0.1; banco sem porta publicada); armazenamento local em volume para dados/artifacts. API e worker usam a mesma imagem e código. Jobs duráveis no banco, reservados com transação curta e SKIP LOCKED; chamadas de rede fora da transação. Lease de 120 s, heartbeat 30 s; recuperação de lease vencido, cinco tentativas transitórias com backoff exponencial/jitter e teto 15 min, Retry-After prevalece. 401/403 e payload incompatível são falhas permanentes, não repetidas indefinidamente. Um processo de worker, com trilhas concorrentes no mesmo laço: `RIFTLAB_WORKER_IMPORT_CONCURRENCY` importações em paralelo (padrão 4), uma trilha de preparação e uma de manutenção (expurgo, sincronização de histórico, patch publicado). As importações dividem um limitador da Riot no processo, que respeita as janelas e contagens dos headers de rate limit e o Retry-After. Vários processos de worker exigiriam coordenar esse limitador entre eles.
 
 Jobs (`import_jobs`, tipos IMPORT, PREPARE e PURGE):
 - Estados: QUEUED → RUNNING → SUCCEEDED; RUNNING → RETRY_WAIT → RUNNING; RUNNING → FAILED.
 - Reprocessar uma falha cria nova tentativa vinculada e preserva o histórico.
-- O worker processa no máximo um job de cada tipo por ciclo.
+- Cada trilha processa um job por vez; uma trilha com trabalho não espera as outras (20 partidas de uma sincronização chegam em cerca de 15 s, e a preparação acompanha logo atrás).
 
 Registro de modelos (CC-405/603):
 - Estados: REGISTERED → ACTIVE → RETIRED, com eventos REGISTER, PROMOTE, RETIRE, ROLLBACK e

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -97,6 +98,10 @@ class Settings(BaseSettings):
     # uso: processar um job já toca o heartbeat, não é preciso um timer
     # separado (CC-201).
     worker_poll_interval_seconds: float = 2.0
+    # Importações simultâneas no worker: cada uma espera a Riot (partida + timeline) quase o
+    # tempo todo, então várias em paralelo trazem um histórico de 20 partidas em segundos, em
+    # vez de uma a uma. As chamadas dividem um limitador da Riot no processo (janelas da chave).
+    worker_import_concurrency: int = Field(default=4, ge=1, le=16)
     # Patch atual do jogo (versions.json público): renovado pelo worker só no modo real.
     published_patch_refresh_seconds: float = 6 * 3600.0
     # CC-901: sincronização do histórico da conta própria ao abrir a aba Histórico.

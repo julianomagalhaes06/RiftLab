@@ -112,15 +112,14 @@ async def test_worker_loop_runs_preparation_each_cycle_and_survives_its_failure(
 
 async def test_recurring_import_failure_never_starves_preparation(tmp_path, monkeypatch) -> None:
     """CC-205 (N1): uma exceção inesperada RECORRENTE do lado de importação não pode
-    pular a preparação em nenhum ciclo — cada passo tem seu próprio tratamento, e
-    cada falha é logada (sanitizada) com a etapa que a produziu."""
+    impedir a preparação, que corre na própria trilha; cada falha é logada (sanitizada)
+    com a etapa que a produziu, e a importação continua sendo tentada."""
     logged_calls: list[tuple[str, tuple[object, ...]]] = []
     monkeypatch.setattr(
         worker_main.logger, "error", lambda msg, *args: logged_calls.append((msg, args))
     )
     stop_event = asyncio.Event()
     calls = {"imports": 0, "preparations": 0}
-    prepared_ids: list[int] = []
 
     async def always_failing_import(session_factory, raw_store, settings) -> bool:
         calls["imports"] += 1
@@ -128,11 +127,11 @@ async def test_recurring_import_failure_never_starves_preparation(tmp_path, monk
 
     async def working_preparation(session_factory, raw_store, settings) -> bool:
         calls["preparations"] += 1
-        prepared_ids.append(calls["preparations"])
+        await asyncio.sleep(0)
         if calls["preparations"] >= 4:
             stop_event.set()
             return False
-        return True  # há trabalho: o próximo ciclo não espera
+        return True  # há trabalho: a trilha segue sem esperar
 
     monkeypatch.setattr(worker_main, "process_next_job", always_failing_import)
     monkeypatch.setattr(worker_main, "process_next_preparation", working_preparation)
@@ -145,10 +144,56 @@ async def test_recurring_import_failure_never_starves_preparation(tmp_path, monk
 
     await asyncio.wait_for(worker_main.run(settings, stop_event=stop_event), timeout=5)
 
-    assert calls["preparations"] == 4  # atendida em TODOS os ciclos apesar do import quebrado
-    assert calls["imports"] == calls["preparations"]  # e o import continua sendo tentado
-    assert len(logged_calls) == calls["imports"]  # uma falha logada por ciclo
+    assert calls["preparations"] == 4  # atendida apesar do import quebrado
+    assert calls["imports"] >= 1  # e o import continua sendo tentado
+    assert len(logged_calls) == calls["imports"]  # uma falha logada por tentativa
     for msg, args in logged_calls:
         full_text = msg % args
         assert SENTINEL not in full_text and "RuntimeError" in full_text
         assert "etapa=importacao" in full_text
+
+
+async def test_imports_run_in_parallel_and_preparation_does_not_wait_for_them(
+    tmp_path, monkeypatch
+) -> None:
+    """Histórico de várias partidas: até `worker_import_concurrency` importações esperam a
+    Riot ao mesmo tempo, e a preparação avança enquanto elas estão em voo."""
+    stop_event = asyncio.Event()
+    release = asyncio.Event()
+    state = {"in_flight": 0, "peak": 0, "imports": 0, "prepared_while_importing": 0}
+
+    async def slow_import(session_factory, raw_store, settings) -> bool:
+        if release.is_set():
+            return False
+        state["imports"] += 1
+        state["in_flight"] += 1
+        state["peak"] = max(state["peak"], state["in_flight"])
+        await release.wait()  # resposta da Riot ainda não chegou
+        state["in_flight"] -= 1
+        return True
+
+    async def preparation(session_factory, raw_store, settings) -> bool:
+        await asyncio.sleep(0)
+        if state["in_flight"]:
+            state["prepared_while_importing"] += 1
+        if state["prepared_while_importing"] >= 3:
+            release.set()
+            stop_event.set()
+            return False
+        return True
+
+    monkeypatch.setattr(worker_main, "process_next_job", slow_import)
+    monkeypatch.setattr(worker_main, "process_next_preparation", preparation)
+    monkeypatch.setattr(worker_main, "process_next_purge", _no_purge)
+    settings = Settings(
+        raw_storage_dir=str(tmp_path / "raw"),
+        worker_heartbeat_path=str(tmp_path / "heartbeat"),
+        worker_poll_interval_seconds=0.01,
+        worker_import_concurrency=3,
+    )
+
+    await asyncio.wait_for(worker_main.run(settings, stop_event=stop_event), timeout=5)
+
+    assert state["peak"] == 3  # três importações em voo juntas, nunca mais que o limite
+    assert state["prepared_while_importing"] >= 3  # a preparação não esperou por elas
+    assert state["in_flight"] == 0  # todas terminaram o passo antes de o worker sair
