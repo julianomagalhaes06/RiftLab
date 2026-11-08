@@ -23,6 +23,8 @@ vitória.
 - **Acesso aberto:** sem conta, qualquer pessoa busca jogadores, abre partidas, acompanha a
   partida ao vivo e vê os padrões por campeão. A conta local serve para analisar compras e
   guardar o estudo, o Painel e a posição da conta Riot vinculada.
+- **Conta por e-mail:** cadastro confirmado por um código enviado ao e-mail e recuperação de
+  senha pelo mesmo caminho.
 - **Conta e histórico:** busca de qualquer jogador por Riot ID (Nome#TAG), com ícone, nível e
   elo, e histórico das partidas ranqueadas atualizado automaticamente.
 - **Revisão da partida:** placar com os nicks dos jogadores, trajeto de compras por ida à loja,
@@ -66,6 +68,13 @@ demonstração separada e mantém o modelo como opção experimental.
 
 Para conectar o modelo às partidas e à interface habituais, usar o
 [guia da LLM no ambiente normal](docs/llm-ambiente-normal.md).
+
+## E-mails da conta
+
+No ambiente com Docker Compose, os códigos de confirmação e de recuperação de senha vão para
+o Mailpit, uma caixa de entrada local em http://127.0.0.1:8025: nada sai da máquina. Para enviar
+de verdade, preencha as variáveis `RIFTLAB_SMTP_*` no `.env`; o `.env.example` traz o exemplo do
+Gmail com senha de app.
 
 ## Documentação
 

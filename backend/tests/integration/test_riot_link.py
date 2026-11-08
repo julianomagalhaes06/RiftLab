@@ -9,11 +9,12 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 import pytest_asyncio
+from auth_helpers import create_verified_user, sign_in, unique_email
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 
 from riftlab.api.app import create_app
-from riftlab.auth import application, riot_link
+from riftlab.auth import riot_link
 from riftlab.auth.models import RiotLinkChallengeModel, RiotLinkModel, UserModel
 from riftlab.auth.riot_link import RiotLinkError
 from riftlab.config import Settings
@@ -52,14 +53,9 @@ async def users(session_factory) -> AsyncIterator[list[uuid.UUID]]:
     created: list[uuid.UUID] = []
 
     async def make() -> uuid.UUID:
-        user, _ = await application.register(
-            session_factory,
-            f"link_{uuid.uuid4().hex[:10]}",
-            "senha-sintetica-1",
-            lifetime=timedelta(days=1),
-        )
-        created.append(user.id)
-        return user.id
+        user_id = await create_verified_user(session_factory, unique_email("link"))
+        created.append(user_id)
+        return user_id
 
     make_users = [await make(), await make()]
     yield make_users
@@ -186,10 +182,8 @@ async def test_routes_require_a_session_even_without_mandatory_login(session_fac
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://127.0.0.1") as c:
             response = await c.get("/api/v1/riot-link")
             assert (response.status_code, response.json()["code"]) == (401, "AUTH_REQUIRED")
-            name = f"link_{uuid.uuid4().hex[:10]}"
-            await c.post(
-                "/api/v1/auth/register", json={"username": name, "password": "senha-sintetica-1"}
-            )
+            name = unique_email("link")
+            await sign_in(c, session_factory, name)
             try:
                 assert (await c.get("/api/v1/riot-link")).json() == {
                     "state": "NONE",
@@ -203,4 +197,4 @@ async def test_routes_require_a_session_even_without_mandatory_login(session_fac
                 assert (verify.status_code, verify.json()["code"]) == (503, "RIOT_KEY_MISSING")
             finally:
                 async with unit_of_work(session_factory) as session:
-                    await session.execute(delete(UserModel).where(UserModel.username == name))
+                    await session.execute(delete(UserModel).where(UserModel.email == name))

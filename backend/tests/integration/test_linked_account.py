@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
+from auth_helpers import sign_in, unique_email
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select
 
@@ -63,22 +64,23 @@ async def env(session_factory, tmp_path) -> AsyncIterator[dict]:
     names: list[str] = []
     async with app.router.lifespan_context(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://127.0.0.1") as c:
-            yield {"client": c, "names": names, "linked": linked_name, "keys": keys}
+            yield {
+                "client": c,
+                "factory": session_factory,
+                "names": names,
+                "linked": linked_name,
+                "keys": keys,
+            }
     async with unit_of_work(session_factory) as session:
         await session.execute(delete(Run).where(Run.account_key.in_(keys)))
         await session.execute(delete(Observation).where(Observation.account_key.in_(keys)))
-        await session.execute(delete(UserModel).where(UserModel.username.in_(names)))
+        await session.execute(delete(UserModel).where(UserModel.email.in_(names)))
 
 
 async def _login(env: dict) -> uuid.UUID:
-    name = f"conta_{uuid.uuid4().hex[:10]}"
-    env["names"].append(name)
-    response = await env["client"].post(
-        "/api/v1/auth/register",
-        json={"username": name, "password": "senha-sintetica-1"},
-        headers=HEADERS,
-    )
-    return uuid.UUID(response.json()["user"]["id"])
+    email = unique_email()
+    env["names"].append(email)
+    return await sign_in(env["client"], env["factory"], email)
 
 
 @pytest.mark.asyncio

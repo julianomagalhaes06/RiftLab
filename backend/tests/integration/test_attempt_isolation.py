@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from auth_helpers import sign_in
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 from test_analyses import _decisions
@@ -40,12 +41,7 @@ async def test_attempts_belong_to_their_user(app_client, session_factory, tmp_pa
                 AsyncClient(transport=transport, base_url="http://127.0.0.1") as bia,
             ):
                 for client, name in zip((ana, bia), names, strict=True):
-                    registered = await client.post(
-                        "/api/v1/auth/register",
-                        json={"username": name, "password": "senha-sintetica-1"},
-                        headers=HEADERS,
-                    )
-                    assert registered.status_code == 201
+                    await sign_in(client, session_factory, name)
                 created = await _attempt(ana, decision["decisionId"], HEADERS)
                 assert created.status_code == 201, created.text
                 attempt = created.json()["attemptId"]
@@ -117,4 +113,4 @@ async def test_attempts_belong_to_their_user(app_client, session_factory, tmp_pa
         assert (await app_client.get(f"/api/v1/learning-attempts/{legacy}")).status_code == 200
     finally:
         async with unit_of_work(session_factory) as session:
-            await session.execute(delete(UserModel).where(UserModel.username.in_(names)))
+            await session.execute(delete(UserModel).where(UserModel.email.in_(names)))

@@ -71,7 +71,7 @@ export function AccountPage() {
   return (
     <section className="area-page account-page" aria-labelledby="account-heading">
       <header className="page-head">
-        <p className="page-head__context">Conta local · {user.username}</p>
+        <p className="page-head__context">Conta local · {user.email}</p>
         <h2 id="account-heading">Minha conta</h2>
         <p className="page-head__lead">Vincule sua conta Riot para que Minha posição, Painel e Histórico usem as suas partidas.</p>
       </header>

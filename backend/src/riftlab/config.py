@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     auth_session_days: int = 7
     # Só com HTTPS: o compose local serve HTTP em loopback.
     auth_cookie_secure: bool = False
+    # E-mails da conta (código de confirmação e de recuperação de senha). O compose aponta para o
+    # Mailpit local; para enviar de verdade pelo Gmail, ver `.env.example`.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_starttls: bool = False
+    smtp_from: str = "RiftLab <no-reply@riftlab.local>"
+    smtp_timeout_seconds: float = 10.0
 
     database_url: str = "postgresql+asyncpg://riftlab:riftlab@db:5432/riftlab"
     database_ready_timeout_seconds: float = 2.0

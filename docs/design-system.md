@@ -164,7 +164,7 @@ Entrar e Criar conta.
 ## Tela de entrada (contas locais)
 
 Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em `auth.css`), em
-`/entrar` e `/criar-conta` (as abas trocam o endereço):
+`/entrar`, `/criar-conta` e `/esqueci-senha` (as abas trocam o endereço):
 
 - **Topo** de 64 px com a marca (link para o início) e "Continuar sem conta"; **rodapé** com
   créditos e o aviso legal da Riot.
@@ -176,6 +176,10 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
   de que perfis e partidas seguem abertos, com o link "Continuar sem conta".
 - **Celular (≤ 960 px):** título curto, cartão logo em seguida e a vitrine no fim; os pontos de
   valor saem. Sem rolagem horizontal em 360 px.
+- **Código por e-mail:** depois do cadastro, o cartão troca para "Confirme seu e-mail" (mesmo
+  layout, sem abas), com o campo de 6 dígitos (`inputMode="numeric"`, `one-time-code`), reenvio
+  com contagem de 60 s e "Corrigir o e-mail". "Esqueci minha senha" usa o mesmo passo, com a
+  senha nova e os mesmos requisitos. O foco acompanha o título a cada passo.
 - **Cadastro:** senha com mostrar/ocultar (`aria-pressed`), requisitos conferidos enquanto a
   pessoa digita (check roxo e texto "atendido/pendente", nunca só cor) e, depois de criar, a
   confirmação "Conta criada" com o próximo passo: "Vincular conta Riot" (primário) ou "Ir para o

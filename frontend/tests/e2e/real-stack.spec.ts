@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Demonstração ponta a ponta contra a stack REAL (api + worker + PostgreSQL +
@@ -7,6 +7,21 @@ import { expect, test } from "@playwright/test";
  * (`npm run test:e2e:stack`) com E2E_BASE_URL apontando para o frontend da stack
  * (ex.: http://127.0.0.1:5173). Sem E2E_BASE_URL falha em vez de passar em branco.
  */
+/** Código enviado ao e-mail, lido na API do Mailpit do compose. */
+async function codeFromMailpit(page: Page, email: string): Promise<string> {
+  const base = process.env.E2E_MAILPIT_URL ?? "http://127.0.0.1:8025";
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const found = await (await page.request.get(`${base}/api/v1/search`, { params: { query: `to:"${email}"`, limit: 1 } })).json();
+    if (found.messages?.length) {
+      const message = await (await page.request.get(`${base}/api/v1/message/${found.messages[0].ID}`)).json();
+      const code = /\b[0-9]{6}\b/.exec(message.Text as string);
+      if (code) return code[0];
+    }
+    await page.waitForTimeout(500);
+  }
+  throw new Error("nenhum código chegou ao Mailpit");
+}
+
 test.describe("Demonstração ponta a ponta na stack real", () => {
   test.beforeAll(() => {
     if (!process.env.E2E_BASE_URL) {
@@ -45,9 +60,12 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(gate.or(ready)).toBeVisible();
     if (await gate.isVisible()) {
       await page.locator(".account-gate").getByRole("link", { name: "Criar conta" }).click();
-      await page.getByLabel("Usuário").fill(`e2e_${Date.now()}`);
-      await page.getByLabel("Senha", { exact: true }).fill("senha-e2e-stack-1");
+      const email = `e2e_${Date.now()}@example.test`;
+      await page.getByLabel("E-mail").fill(email);
+      await page.getByLabel("Senha", { exact: true }).fill("Senha-E2e-Stack-1");
       await page.getByRole("button", { name: "Criar conta" }).click();
+      await page.getByLabel("Código de 6 dígitos").fill(await codeFromMailpit(page, email));
+      await page.getByRole("button", { name: "Confirmar e-mail" }).click();
       await page.getByRole("button", { name: "Voltar para onde eu estava" }).click();
     }
 

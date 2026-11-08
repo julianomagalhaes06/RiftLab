@@ -3,6 +3,10 @@
 # banco de desenvolvimento nem dados reais. Sem chave da Riot e sem segredo: a
 # demonstração não consulta a Riot nem o Data Dragon (patch DEMO-1 sem mapeamento).
 services:
+  # Sem login na demonstração: nenhum e-mail a receber.
+  mailpit:
+    profiles: ["desligado"]
+
   api:
     environment:
       RIFTLAB_RIOT_API_KEY: ""
@@ -10,6 +14,7 @@ services:
       RIFTLAB_DEMO_RANKED: "true"
       # A demonstração da defesa abre direto, sem login (contas locais: Sprint 2).
       RIFTLAB_AUTH_REQUIRED: "false"
+      RIFTLAB_SMTP_HOST: ""
   worker:
     environment:
       RIFTLAB_RIOT_API_KEY: ""

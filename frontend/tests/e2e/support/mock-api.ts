@@ -231,6 +231,10 @@ export type RouteKey =
   | "GET /api/v1/auth/session"
   | "POST /api/v1/auth/login"
   | "POST /api/v1/auth/register"
+  | "POST /api/v1/auth/verify-email"
+  | "POST /api/v1/auth/resend-code"
+  | "POST /api/v1/auth/password/forgot"
+  | "POST /api/v1/auth/password/reset"
   | "POST /api/v1/auth/logout"
   | "POST /api/v1/history/sync"
   | "GET /api/v1/history/sync"
@@ -274,6 +278,10 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/auth/session", "GET", /^\/api\/v1\/auth\/session$/],
   ["POST /api/v1/auth/login", "POST", /^\/api\/v1\/auth\/login$/],
   ["POST /api/v1/auth/register", "POST", /^\/api\/v1\/auth\/register$/],
+  ["POST /api/v1/auth/verify-email", "POST", /^\/api\/v1\/auth\/verify-email$/],
+  ["POST /api/v1/auth/resend-code", "POST", /^\/api\/v1\/auth\/resend-code$/],
+  ["POST /api/v1/auth/password/forgot", "POST", /^\/api\/v1\/auth\/password\/forgot$/],
+  ["POST /api/v1/auth/password/reset", "POST", /^\/api\/v1\/auth\/password\/reset$/],
   ["POST /api/v1/auth/logout", "POST", /^\/api\/v1\/auth\/logout$/],
   ["POST /api/v1/history/sync", "POST", /^\/api\/v1\/history\/sync$/],
   ["GET /api/v1/history/sync", "GET", /^\/api\/v1\/history\/sync$/],
@@ -463,7 +471,11 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   // Sprint 2 (#10): sem login exigido por padrão, como numa instalação de uma pessoa.
   "GET /api/v1/auth/session": () => ok({ authRequired: false, user: null }),
   "POST /api/v1/auth/login": () => problem(401, "INVALID_CREDENTIALS"),
-  "POST /api/v1/auth/register": () => problem(409, "USERNAME_TAKEN"),
+  "POST /api/v1/auth/register": () => ok({ status: "CODE_SENT" }, 202),
+  "POST /api/v1/auth/verify-email": () => ok({ authRequired: false, user: { id: "00000000-0000-4000-8000-000000000000", email: "e2e@example.test" } }),
+  "POST /api/v1/auth/resend-code": () => ok({ status: "CODE_SENT" }, 202),
+  "POST /api/v1/auth/password/forgot": () => ok({ status: "CODE_SENT" }, 202),
+  "POST /api/v1/auth/password/reset": () => ({ status: 204, body: "" }),
   "POST /api/v1/auth/logout": () => ({ status: 204, body: "" }),
   // CC-901: sem chave da Riot (como na demonstração), a aba Histórico não sincroniza.
   "POST /api/v1/history/sync": () => ok(historySync({ state: "UNAVAILABLE", reason: "RIOT_KEY_MISSING" })),

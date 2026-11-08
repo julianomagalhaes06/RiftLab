@@ -48,10 +48,13 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
 
   // --- contas locais (Sprint 2, #10) ---
   AUTH_REQUIRED: "Sua sessão terminou. Entre de novo para continuar.",
-  INVALID_CREDENTIALS: "Usuário ou senha incorretos.",
-  USERNAME_TAKEN: "Esse nome de usuário já está em uso. Escolha outro.",
-  INVALID_USERNAME: "Use de 3 a 32 caracteres: letras, números, ponto, hífen ou sublinhado.",
-  INVALID_PASSWORD: "A senha precisa ter de 10 a 128 caracteres.",
+  INVALID_CREDENTIALS: "E-mail ou senha incorretos.",
+  INVALID_EMAIL: "Confira o endereço de e-mail.",
+  INVALID_PASSWORD: "A senha precisa ter pelo menos 8 caracteres, com uma letra maiúscula e um símbolo.",
+  EMAIL_NOT_VERIFIED: "Confirme seu e-mail para entrar.",
+  INVALID_CODE: "Código inválido ou vencido. Confira os dígitos ou peça um novo.",
+  CODE_RATE_LIMITED: "Muitos pedidos de código seguidos. Aguarde antes de tentar de novo.",
+  EMAIL_NOT_CONFIGURED: "Este servidor não tem envio de e-mail configurado.",
   LOGIN_RATE_LIMITED: "Muitas tentativas seguidas. Aguarde alguns minutos antes de tentar de novo.",
   CSRF_HEADER_MISSING: "A requisição não veio da interface do RiftLab e foi recusada.",
   NO_CHALLENGE: "Peça um ícone para comprovar a conta antes de verificar.",

@@ -35,6 +35,7 @@ const TITLES: Record<Route["name"], string> = {
   home: "RiftLab — revisão de partidas de League of Legends",
   login: "Entrar — RiftLab",
   register: "Criar conta — RiftLab",
+  forgot: "Redefinir senha — RiftLab",
   importEntry: "Importar partida — RiftLab",
   panel: "Painel — RiftLab",
   champions: "Campeões — RiftLab",
@@ -67,6 +68,7 @@ function renderPage(route: Route): ReactNode {
       return <HomePage />;
     case "login":
     case "register":
+    case "forgot":
       return null; // renderizadas fora do layout principal
     case "importEntry":
       return <EntryPage />;
@@ -118,7 +120,7 @@ function renderPage(route: Route): ReactNode {
 function AppShell() {
   const { checked, user } = useAuth();
   const { route, navigate } = useRouter();
-  const authRoute = route.name === "login" || route.name === "register" ? route : null;
+  const authRoute = route.name === "login" || route.name === "register" || route.name === "forgot" ? route : null;
   // Já com sessão, /entrar e /criar-conta levam direto ao destino.
   useEffect(() => {
     if (checked && user && authRoute) navigate(authRoute.next ?? "/painel", { replace: true });

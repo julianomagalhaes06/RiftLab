@@ -92,10 +92,11 @@
 
 /* ---- Menu do usuário no topo ---- */
 .user-menu { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.user-menu__name { color: var(--ntext-muted); font-size: .875rem; max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* O e-mail é longo: é ele quem encolhe (com reticências), nunca o botão ao lado. */
+.user-menu__name { flex: 0 1 auto; min-width: 4ch; color: var(--ntext-muted); font-size: .875rem; max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-menu__name a { color: inherit; text-decoration: none; }
 .user-menu__name a:hover { color: var(--ntext); text-decoration: underline; }
-.user-menu__out { min-height: 36px; padding: 0 12px; }
+.user-menu__out { flex: none; min-height: 36px; padding: 0 12px; white-space: nowrap; }
 
 /* ---- Minha conta ---- */
 .account-card { display: grid; gap: 12px; max-width: 640px; }
@@ -119,3 +120,12 @@
 @media (max-width: 700px) {
   .account-gate__actions .button { flex: 1 1 100%; }
 }
+
+/* Código por e-mail e avisos do fluxo de conta. */
+.auth-code { letter-spacing: .35em; font: 600 1.25rem var(--font-display); text-align: center; }
+.auth-code-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; }
+.auth-link { min-height: 44px; padding: 0; border: 0; background: none; color: var(--accent); font: 600 .875rem var(--font-body); cursor: pointer; }
+.auth-link:hover:not(:disabled) { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 4px; }
+.auth-link:disabled { color: var(--ntext-subtle); cursor: default; }
+.auth-link:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.auth-notice { margin: 0; padding: 10px 12px; border: 1px solid var(--accent-strong); border-radius: var(--radius-sm); background: var(--accent-surface); color: var(--ntext); font-size: .875rem; line-height: 1.4; }

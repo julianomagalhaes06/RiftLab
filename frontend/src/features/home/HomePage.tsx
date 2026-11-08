@@ -108,7 +108,7 @@ export function HomePage() {
 
       <section className="home-account surface surface--rank brackets" aria-labelledby="home-account">
         <div className="home-account__copy">
-          <p className="home-section__kicker">{user ? `Conta ${user.username}` : "Com conta"}</p>
+          <p className="home-section__kicker">{user ? "Sua conta" : "Com conta"}</p>
           <h3 id="home-account">
             {user ? "Continue de onde parou" : "Analise suas compras e guarde o que aprendeu"}
           </h3>
@@ -131,7 +131,7 @@ export function HomePage() {
             <>
               <Link to={loginPath(null, "register")} className="button home-account__button">Criar conta</Link>
               <Link to={loginPath(null)} className="button button--secondary home-account__button">Já tenho conta</Link>
-              <p className="home-account__note">A conta fica nesta instalação do RiftLab. Não pedimos e-mail.</p>
+              <p className="home-account__note">A conta fica nesta instalação do RiftLab e usa seu e-mail só para confirmar o acesso.</p>
             </>
           )}
         </div>

@@ -9,18 +9,21 @@ import { emblemSrc, type Tier } from "../ranked/tiers";
 import { useAuth } from "./authContext";
 import "./auth.css";
 
-export type AuthMode = "login" | "register";
+export type AuthMode = "login" | "register" | "forgot";
 type Mode = AuthMode;
+type TabMode = Exclude<Mode, "forgot">;
+/** Passo: formulário principal; código de confirmação; código + senha nova da recuperação. */
+type Step = "form" | "verify" | "reset";
 
-const USERNAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
 // Escada decorativa: do Ferro ao Desafiante (só emblemas oficiais locais, sem dado de conta).
 const LADDER: readonly Tier[] = ["IRON", "SILVER", "GOLD", "DIAMOND", "CHALLENGER"];
+const RESEND_SECONDS = 60;
 
 const COPY: Record<Mode, { tab: string; title: string; lead: string; heroTitle: string; heroLead: string; submit: string }> = {
   login: {
     tab: "Entrar",
     title: "Entrar no RiftLab",
-    lead: "Use sua conta local para continuar de onde parou.",
+    lead: "Use seu e-mail para continuar de onde parou.",
     heroTitle: "Entenda suas compras. Decida melhor na próxima.",
     heroLead: "Revise cada compra de item com o contexto daquele momento da partida.",
     submit: "Entrar",
@@ -28,10 +31,18 @@ const COPY: Record<Mode, { tab: string; title: string; lead: string; heroTitle: 
   register: {
     tab: "Criar conta",
     title: "Criar conta no RiftLab",
-    lead: "A conta fica nesta instalação. Depois, vincule sua conta Riot pelo ícone de perfil.",
+    lead: "Enviamos um código para confirmar seu e-mail. Depois, vincule sua conta Riot pelo ícone de perfil.",
     heroTitle: "Crie sua conta e comece pela sua última partida.",
     heroLead: "Seus estudos, reflexões e sua posição ficam separados das outras contas.",
     submit: "Criar conta",
+  },
+  forgot: {
+    tab: "Redefinir senha",
+    title: "Redefinir a senha",
+    lead: "Informe o e-mail da conta. Enviamos um código para você criar uma senha nova.",
+    heroTitle: "Volte para as suas partidas.",
+    heroLead: "Um código no seu e-mail basta para criar uma senha nova.",
+    submit: "Enviar código",
   },
 };
 
@@ -59,44 +70,93 @@ function EyeIcon({ open }: { open: boolean }) {
   );
 }
 
+function passwordRules(password: string) {
+  return [
+    { ok: password.length >= 8 && password.length <= 128, text: "Pelo menos 8 caracteres" },
+    { ok: /\p{Lu}/u.test(password), text: "Uma letra maiúscula" },
+    { ok: /[^\p{L}\p{N}\s]/u.test(password), text: "Um símbolo, como ! @ # ou -" },
+  ];
+}
+
+function PasswordRules({ id, password }: { id: string; password: string }) {
+  return (
+    <ul id={id} className="auth-rules" aria-label="Requisitos da senha">
+      {passwordRules(password).map((rule) => (
+        <li key={rule.text} className={rule.ok ? "is-met" : undefined}>
+          <CheckIcon />
+          <span>{rule.text}<span className="sr-only">{rule.ok ? " (atendido)" : " (pendente)"}</span></span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
- * Entrar ou criar conta (/entrar, /criar-conta). A conta não é exigida para navegar: perfis e
- * partidas são públicos, e a pessoa chega aqui quando quer analisar ou guardar algo. Por isso
- * a tela volta para `next` (onde a pessoa estava) e oferece seguir sem conta. Padrão Arena:
- * página dividida (vitrine à esquerda, formulário à direita; empilhada no celular), abas
- * Entrar/Criar conta, senha com mostrar/ocultar, requisitos do cadastro conferidos enquanto a
- * pessoa digita e uma confirmação depois do cadastro com o próximo passo.
+ * Entrar, criar conta e redefinir a senha (/entrar, /criar-conta, /esqueci-senha). A conta não é
+ * exigida para navegar: a pessoa chega aqui quando quer analisar ou guardar algo, por isso a tela
+ * volta para `next` e oferece seguir sem conta. O cadastro só abre a sessão depois do código
+ * enviado por e-mail; a senha digitada fica em memória até lá, porque confirmar também a exige.
+ * Padrão Arena: página dividida (vitrine à esquerda, formulário à direita; empilhada no celular).
  */
 export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) {
   const { signedIn } = useAuth();
   const { navigate } = useRouter();
   const destination = next ?? "/painel";
-  const [username, setUsername] = useState("");
+  const [step, setStep] = useState<Step>("form");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [created, setCreated] = useState<SessionUser | null>(null);
+  const [fromRegister, setFromRegister] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const welcomeRef = useRef<HTMLHeadingElement>(null);
+  const firstStep = useRef(true);
   const tabsId = useId();
-  const userId = useId();
+  const emailId = useId();
   const passwordId = useId();
+  const codeId = useId();
   const errorId = useId();
   const rulesId = useId();
-  const userHintId = useId();
   const copy = COPY[mode];
+  const address = email.trim();
 
   useEffect(() => {
-    document.title = (created ? "Conta criada" : copy.tab) + " — RiftLab";
-  }, [copy.tab, created]);
+    document.title = (created ? "Conta criada" : step === "verify" ? "Confirmar e-mail" : copy.tab) + " — RiftLab";
+  }, [copy.tab, created, step]);
 
   useEffect(() => {
     if (created) welcomeRef.current?.focus();
   }, [created]);
 
-  function switchMode(value: Mode, focusTab = false) {
+  // Troca de passo: o foco acompanha o título novo (teclado e leitor de tela).
+  useEffect(() => {
+    if (firstStep.current) {
+      firstStep.current = false;
+      return;
+    }
+    headingRef.current?.focus();
+  }, [step]);
+
+  // Contagem do intervalo de reenvio do código.
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = window.setTimeout(() => setResendIn((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendIn]);
+
+  function clearMessages() {
     setError(null);
+    setNotice(null);
+  }
+
+  function switchMode(value: TabMode, focusTab = false) {
+    clearMessages();
+    setStep("form");
     navigate(loginPath(next, value), { replace: true });
     if (focusTab) document.getElementById(`${tabsId}-${value}`)?.focus();
   }
@@ -108,41 +168,145 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
     }
   }
 
-  async function run(action: () => Promise<{ user?: SessionUser | null }>, onUser: (user: SessionUser) => void) {
+  /** Roda o pedido; devolve o código de erro da API (ou null) depois de mostrar a mensagem. */
+  async function run(action: () => Promise<void>, silence: readonly string[] = []): Promise<string | null> {
     setSending(true);
-    setError(null);
+    clearMessages();
     try {
-      const session = await action();
-      if (session.user) onUser(session.user);
+      await action();
+      return null;
     } catch (caught) {
-      setError(isApiError(caught) ? messageForCode(caught.code) : "Não foi possível entrar agora. Tente de novo.");
+      const failure = isApiError(caught) ? caught.code : null;
+      if (!failure || !silence.includes(failure)) {
+        setError(failure ? messageForCode(failure) : "Não foi possível concluir agora. Tente de novo.");
+      }
+      return failure;
     } finally {
       setSending(false);
     }
   }
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!username.trim() || !password) {
-      setError("Preencha usuário e senha.");
+  function goToCode(target: Step) {
+    setCode("");
+    setResendIn(RESEND_SECONDS);
+    setStep(target);
+  }
+
+  async function submitForm() {
+    if (mode === "forgot") {
+      if (!address) return setError("Informe seu e-mail.");
+      await run(async () => {
+        await api.forgotPassword(address);
+        setPassword("");
+        goToCode("reset");
+      });
       return;
     }
-    if (mode === "login") {
-      void run(() => api.login(username.trim(), password), (user) => {
-        signedIn(user);
-        navigate(destination, { replace: true });
+    if (!address || !password) return setError("Preencha e-mail e senha.");
+    if (mode === "register") {
+      await run(async () => {
+        await api.register(address, password);
+        setFromRegister(true);
+        goToCode("verify");
       });
-    } else {
-      void run(() => api.register(username.trim(), password), setCreated);
+      return;
+    }
+    const failure = await run(async () => {
+      const session = await api.login(address, password);
+      if (session.user) {
+        signedIn(session.user);
+        navigate(destination, { replace: true });
+      }
+    }, ["EMAIL_NOT_VERIFIED"]);
+    if (failure === "EMAIL_NOT_VERIFIED") {
+      // Conta criada e não confirmada: manda outro código (o servidor respeita o intervalo).
+      setFromRegister(false);
+      goToCode("verify");
+      setNotice("Confirme seu e-mail para entrar.");
+      await api.resendCode(address).catch(() => undefined);
     }
   }
 
-  const name = username.trim();
-  const rules = [
-    { ok: name.length >= 3 && name.length <= 32, text: "Usuário com 3 a 32 caracteres" },
-    { ok: name.length > 0 && USERNAME_PATTERN.test(name), text: "Só letras, números, ponto, hífen ou sublinhado" },
-    { ok: password.length >= 10 && password.length <= 128, text: "Senha com pelo menos 10 caracteres" },
-  ];
+  async function submitVerify() {
+    if (code.length !== 6) return setError("Digite os 6 dígitos do código.");
+    await run(async () => {
+      const session = await api.verifyEmail(address, code, password);
+      if (!session.user) return;
+      if (fromRegister) {
+        setCreated(session.user);
+      } else {
+        signedIn(session.user);
+        navigate(destination, { replace: true });
+      }
+    });
+  }
+
+  async function submitReset() {
+    if (code.length !== 6) return setError("Digite os 6 dígitos do código.");
+    if (!password) return setError("Crie a senha nova.");
+    const failure = await run(() => api.resetPassword(address, code, password));
+    if (failure === null) {
+      setPassword("");
+      setCode("");
+      setStep("form");
+      navigate(loginPath(next), { replace: true });
+      setNotice("Senha alterada. Entre com a senha nova.");
+    }
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    clearMessages();
+    void (step === "verify" ? submitVerify() : step === "reset" ? submitReset() : submitForm());
+  }
+
+  function resend() {
+    void run(async () => {
+      await (step === "verify" ? api.resendCode(address) : api.forgotPassword(address));
+      setResendIn(RESEND_SECONDS);
+      setNotice("Se puder ser enviado, um código novo chega em instantes. Confira também o spam.");
+    });
+  }
+
+  function back() {
+    clearMessages();
+    setCode("");
+    setStep("form");
+  }
+
+  const passwordField = (label: string, autoComplete: string, describedBy: string | undefined) => (
+    <>
+      <label htmlFor={passwordId} className="form__label">{label}</label>
+      <div className="auth-password">
+        <input id={passwordId} className="form__input" name="password" type={showPassword ? "text" : "password"}
+          autoComplete={autoComplete} value={password}
+          onChange={(event) => setPassword(event.target.value)} aria-invalid={error !== null}
+          aria-describedby={describedBy} />
+        <button type="button" className="auth-password__toggle" aria-controls={passwordId} aria-pressed={showPassword}
+          aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowPassword(!showPassword)}>
+          <EyeIcon open={!showPassword} />
+        </button>
+      </div>
+    </>
+  );
+  const errorLine = error ? <p id={errorId} className="form__error" role="alert">{error}</p> : null;
+  const noticeLine = notice ? <p className="auth-notice" role="status">{notice}</p> : null;
+  const codeField = (
+    <>
+      <label htmlFor={codeId} className="form__label">Código de 6 dígitos</label>
+      <input id={codeId} className="form__input auth-code" name="code" inputMode="numeric" autoComplete="one-time-code"
+        maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+        aria-invalid={error !== null} aria-describedby={error ? errorId : undefined} />
+    </>
+  );
+  const codeActions = (
+    <div className="auth-code-actions">
+      <button type="button" className="auth-link" onClick={resend} disabled={sending || resendIn > 0}>
+        {resendIn > 0 ? `Reenviar código em ${resendIn} s` : "Reenviar código"}
+      </button>
+      <button type="button" className="auth-link" onClick={back} disabled={sending}>Corrigir o e-mail</button>
+    </div>
+  );
 
   return (
     <div className="auth-page">
@@ -171,7 +335,7 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
             <div className="auth-welcome">
               <span className="auth-welcome__badge"><CheckIcon /></span>
               <h1 id={`${tabsId}-welcome`} ref={welcomeRef} tabIndex={-1}>Conta criada</h1>
-              <p className="muted">Boas-vindas, <strong>{created.username}</strong>. Já dá para analisar compras e guardar seus estudos. Para ver seu Painel e sua posição, vincule sua conta Riot.</p>
+              <p className="muted">E-mail <strong>{created.email}</strong> confirmado. Já dá para analisar compras e guardar seus estudos. Para ver seu Painel e sua posição, vincule sua conta Riot.</p>
               <button type="button" className="button auth-wide" onClick={() => { signedIn(created); navigate(next ?? "/conta", { replace: true }); }}>
                 {next ? "Voltar para onde eu estava" : "Vincular conta Riot"}
               </button>
@@ -179,61 +343,75 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
                 {next ? "Vincular conta Riot" : "Ir para o Painel"}
               </button>
             </div>
+          ) : step !== "form" ? (
+            <div className="auth-panel">
+              <h1 id={`${tabsId}-heading`} ref={headingRef} tabIndex={-1}>{step === "verify" ? "Confirme seu e-mail" : "Crie uma senha nova"}</h1>
+              <p className="muted">
+                {step === "verify" ? "Enviamos um código de 6 dígitos para " : "Se houver uma conta, enviamos um código de 6 dígitos para "}
+                <strong>{address}</strong>. Ele vale por 15 minutos.
+              </p>
+              {noticeLine}
+              <form className="form auth-form" onSubmit={submit} noValidate>
+                {codeField}
+                {step === "reset" ? (
+                  <>
+                    {passwordField("Senha nova", "new-password", rulesId)}
+                    <PasswordRules id={rulesId} password={password} />
+                  </>
+                ) : null}
+                {errorLine}
+                <button type="submit" className="button auth-wide" disabled={sending}>
+                  {sending ? "Enviando…" : step === "verify" ? "Confirmar e-mail" : "Salvar senha nova"}
+                </button>
+              </form>
+              {codeActions}
+            </div>
           ) : (
             <>
-              <div className="segmented auth-tabs" role="tablist" aria-label="Acesso ao RiftLab">
-                {(["login", "register"] as const).map((value) => (
-                  <button
-                    key={value}
-                    id={`${tabsId}-${value}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === value}
-                    aria-controls={`${tabsId}-panel`}
-                    tabIndex={mode === value ? 0 : -1}
-                    onClick={() => switchMode(value)}
-                    onKeyDown={onTabKey}
-                  >
-                    {COPY[value].tab}
-                  </button>
-                ))}
-              </div>
-              <div id={`${tabsId}-panel`} role="tabpanel" aria-labelledby={`${tabsId}-${mode}`} className="auth-panel">
+              {mode !== "forgot" ? (
+                <div className="segmented auth-tabs" role="tablist" aria-label="Acesso ao RiftLab">
+                  {(["login", "register"] as const).map((value) => (
+                    <button
+                      key={value}
+                      id={`${tabsId}-${value}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={mode === value}
+                      aria-controls={`${tabsId}-panel`}
+                      tabIndex={mode === value ? 0 : -1}
+                      onClick={() => switchMode(value)}
+                      onKeyDown={onTabKey}
+                    >
+                      {COPY[value].tab}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div id={`${tabsId}-panel`} role={mode !== "forgot" ? "tabpanel" : undefined} aria-labelledby={mode !== "forgot" ? `${tabsId}-${mode}` : undefined} className="auth-panel">
                 <h1 id={`${tabsId}-heading`} ref={headingRef} tabIndex={-1}>{copy.title}</h1>
                 <p className="muted">{copy.lead}</p>
+                {noticeLine}
                 <form className="form auth-form" onSubmit={submit} noValidate>
-                  <label htmlFor={userId} className="form__label">Usuário</label>
-                  <input id={userId} className="form__input" name="username" autoComplete="username"
-                    autoCapitalize="none" spellCheck={false} value={username}
-                    onChange={(event) => setUsername(event.target.value)} aria-invalid={error !== null}
-                    aria-describedby={[mode === "register" ? userHintId : "", error ? errorId : ""].filter(Boolean).join(" ") || undefined} />
-                  {mode === "register" ? <p id={userHintId} className="auth-hint">É com este nome que você entra. Ele não aparece para outras pessoas.</p> : null}
-                  <label htmlFor={passwordId} className="form__label">Senha</label>
-                  <div className="auth-password">
-                    <input id={passwordId} className="form__input" name="password" type={showPassword ? "text" : "password"}
-                      autoComplete={mode === "login" ? "current-password" : "new-password"} value={password}
-                      onChange={(event) => setPassword(event.target.value)} aria-invalid={error !== null}
-                      aria-describedby={[mode === "register" ? rulesId : "", error ? errorId : ""].filter(Boolean).join(" ") || undefined} />
-                    <button type="button" className="auth-password__toggle" aria-controls={passwordId} aria-pressed={showPassword}
-                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"} onClick={() => setShowPassword(!showPassword)}>
-                      <EyeIcon open={!showPassword} />
-                    </button>
-                  </div>
-                  {mode === "register" ? (
-                    <ul id={rulesId} className="auth-rules" aria-label="Requisitos da conta">
-                      {rules.map((rule) => (
-                        <li key={rule.text} className={rule.ok ? "is-met" : undefined}>
-                          <CheckIcon />
-                          <span>{rule.text}<span className="sr-only">{rule.ok ? " (atendido)" : " (pendente)"}</span></span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {error ? <p id={errorId} className="form__error" role="alert">{error}</p> : null}
+                  <label htmlFor={emailId} className="form__label">E-mail</label>
+                  <input id={emailId} className="form__input" name="email" type="email" autoComplete="email"
+                    autoCapitalize="none" spellCheck={false} value={email}
+                    onChange={(event) => setEmail(event.target.value)} aria-invalid={error !== null}
+                    aria-describedby={error ? errorId : undefined} />
+                  {mode !== "forgot"
+                    ? passwordField("Senha", mode === "login" ? "current-password" : "new-password",
+                      [mode === "register" ? rulesId : "", error ? errorId : ""].filter(Boolean).join(" ") || undefined)
+                    : null}
+                  {mode === "register" ? <PasswordRules id={rulesId} password={password} /> : null}
+                  {errorLine}
                   <button type="submit" className="button auth-wide" disabled={sending}>
                     {sending ? "Enviando…" : copy.submit}
                   </button>
                 </form>
+                {mode === "login" ? (
+                  <p className="auth-hint auth-hint--center"><Link to={loginPath(next, "forgot")}>Esqueci minha senha</Link></p>
+                ) : mode === "forgot" ? (
+                  <p className="auth-hint auth-hint--center"><Link to={loginPath(next)}>Voltar para entrar</Link></p>
+                ) : null}
                 <p className="auth-hint auth-hint--center">
                   Sem conta, perfis, partidas e partida ao vivo continuam abertos.{" "}
                   <Link to={next ?? "/"}>Continuar sem conta</Link>

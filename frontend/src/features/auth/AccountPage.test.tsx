@@ -8,7 +8,7 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-const USER = { id: "11111111-1111-4111-8111-111111111111", username: "jogadora" };
+const USER = { id: "11111111-1111-4111-8111-111111111111", email: "jogadora@example.test" };
 const PENDING = { state: "PENDING", gameName: "Jogadora", tagLine: "BR1", iconId: 7,
   expiresAt: "2026-11-04T12:10:00Z", linkedAt: null };
 

@@ -8,11 +8,17 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-const USER = { id: "11111111-1111-4111-8111-111111111111", username: "jogadora" };
+const USER = { id: "11111111-1111-4111-8111-111111111111", email: "jogadora@example.test" };
+const CODE_SENT = { status: "CODE_SENT" };
+const PASSWORD = "Senha-Correta-1";
 
-function fill(username: string, password: string) {
-  fireEvent.change(screen.getByLabelText("Usuário"), { target: { value: username } });
+function fill(email: string, password: string) {
+  fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: email } });
   fireEvent.change(screen.getByLabelText("Senha"), { target: { value: password } });
+}
+
+function typeCode(code: string) {
+  fireEvent.change(screen.getByLabelText("Código de 6 dígitos"), { target: { value: code } });
 }
 
 describe("Contas locais: leitura pública e conta para guardar", () => {
@@ -58,7 +64,7 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     fireEvent.click(enter!);
 
     expect(await screen.findByRole("heading", { name: "Entrar no RiftLab" })).toBeInTheDocument();
-    fill("jogadora", "senha-correta-1");
+    fill("jogadora@example.test", PASSWORD);
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
     expect(await screen.findByRole("heading", { name: "Partidas para estudar" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/historico");
@@ -71,7 +77,7 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
     mock.on("POST", /^\/api\/v1\/auth\/login$/, ({ body }) => {
       const { password } = body as { password: string };
-      if (password !== "senha-correta-1") return problem(401, "INVALID_CREDENTIALS");
+      if (password !== PASSWORD) return problem(401, "INVALID_CREDENTIALS");
       session = { authRequired: true, user: USER };
       return json(200, session);
     });
@@ -86,20 +92,20 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(screen.getAllByRole("link", { name: "Continuar sem conta" })[0]).toHaveAttribute("href", "/");
     expect(screen.queryByText(/visitante/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Preencha usuário e senha.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Preencha e-mail e senha.");
 
-    fill("jogadora", "senha-errada-1");
+    fill("jogadora@example.test", "Senha-Errada-1");
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
-    expect(await screen.findByText("Usuário ou senha incorretos.")).toBeInTheDocument();
+    expect(await screen.findByText("E-mail ou senha incorretos.")).toBeInTheDocument();
     expect(screen.getByLabelText("Senha")).toHaveAttribute("aria-invalid", "true");
 
-    fill("jogadora", "senha-correta-1");
+    fill("jogadora@example.test", PASSWORD);
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
-    expect(await screen.findByRole("link", { name: "Minha conta (jogadora)" })).toHaveAttribute("href", "/conta");
+    expect(await screen.findByRole("link", { name: "Minha conta (jogadora@example.test)" })).toHaveAttribute("href", "/conta");
     expect(window.location.pathname).toBe("/painel");
     // Toda chamada leva o cabeçalho anti-CSRF.
     const login = mock.callsTo("POST", /^\/api\/v1\/auth\/login$/);
-    expect(login.at(-1)?.body).toEqual({ username: "jogadora", password: "senha-correta-1" });
+    expect(login.at(-1)?.body).toEqual({ email: "jogadora@example.test", password: PASSWORD });
     const init = mock.fetch.mock.calls.find(([url]) => String(url).endsWith("/api/v1/auth/login"))?.[1];
     expect((init?.headers as Record<string, string>)["X-RiftLab-Request"]).toBe("1");
 
@@ -110,34 +116,120 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(mock.callsTo("POST", /^\/api\/v1\/auth\/logout$/)).toHaveLength(1);
   });
 
-  it("cria conta pela mesma tela e explica nome em uso", async () => {
+  it("cria a conta, confirma o e-mail pelo código e só então abre a sessão", async () => {
     window.history.replaceState(null, "", "/entrar");
     const mock = createMockApi();
-    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user: null }));
-    let attempts = 0;
-    mock.on("POST", /^\/api\/v1\/auth\/register$/, () => {
-      attempts += 1;
-      return attempts === 1 ? problem(409, "USERNAME_TAKEN") : json(201, { authRequired: true, user: USER });
+    let session: { authRequired: boolean; user: typeof USER | null } = { authRequired: true, user: null };
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
+    mock.on("POST", /^\/api\/v1\/auth\/register$/, () => json(202, CODE_SENT));
+    mock.on("POST", /^\/api\/v1\/auth\/resend-code$/, () => json(202, CODE_SENT));
+    mock.on("POST", /^\/api\/v1\/auth\/verify-email$/, ({ body }) => {
+      if ((body as { code: string }).code !== "123456") return problem(422, "INVALID_CODE");
+      session = { authRequired: true, user: USER };
+      return json(200, session);
     });
     vi.stubGlobal("fetch", mock.fetch);
     render(<App />);
     fireEvent.click(await screen.findByRole("tab", { name: "Criar conta" }));
     expect(await screen.findByRole("heading", { name: "Criar conta no RiftLab" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Criar conta" })).toHaveAttribute("aria-selected", "true");
     expect(window.location.pathname).toBe("/criar-conta");
     // Requisitos conferidos enquanto digita, com estado em texto (não só cor).
-    expect(screen.getByText(/Senha com pelo menos 10 caracteres/)).toHaveTextContent("(pendente)");
-    fill("jogadora", "senha-correta-1");
+    expect(screen.getByText(/Pelo menos 8 caracteres/)).toHaveTextContent("(pendente)");
+    expect(screen.getByText(/Uma letra maiúscula/)).toHaveTextContent("(pendente)");
+    fill("jogadora@example.test", "Abcdef1!");
+    expect(screen.getByText(/Pelo menos 8 caracteres/)).toHaveTextContent("(atendido)");
+    expect(screen.getByText(/Uma letra maiúscula/)).toHaveTextContent("(atendido)");
+    expect(screen.getByText(/Um símbolo/)).toHaveTextContent("(atendido)");
     fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
-    expect(await screen.findByText("Esse nome de usuário já está em uso. Escolha outro.")).toBeInTheDocument();
-    expect(screen.getByText(/Senha com pelo menos 10 caracteres/)).toHaveTextContent("(atendido)");
-    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
-    // Depois do cadastro: confirmação com o próximo passo (vincular a conta Riot ou ir ao Painel).
+
+    const heading = await screen.findByRole("heading", { name: "Confirme seu e-mail" });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(screen.getByText("jogadora@example.test")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reenviar código em \d+ s/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Sair" })).not.toBeInTheDocument();
+    expect(mock.callsTo("POST", /auth\/register$/)[0].body).toEqual({ email: "jogadora@example.test", password: "Abcdef1!" });
+
+    const field = screen.getByLabelText("Código de 6 dígitos");
+    expect(field).toHaveAttribute("autocomplete", "one-time-code");
+    typeCode("12a34");
+    expect(field).toHaveValue("1234"); // só dígitos
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar e-mail" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Digite os 6 dígitos");
+
+    typeCode("999999");
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar e-mail" }));
+    expect(await screen.findByText(/Código inválido ou vencido/)).toBeInTheDocument();
+
+    typeCode("123456");
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar e-mail" }));
     expect(await screen.findByRole("heading", { name: "Conta criada" })).toHaveFocus();
-    expect(screen.getByRole("button", { name: "Vincular conta Riot" })).toBeInTheDocument();
+    // A confirmação leva a senha do cadastro junto com o código.
+    expect(mock.callsTo("POST", /verify-email$/).at(-1)?.body).toEqual({ email: "jogadora@example.test", code: "123456", password: "Abcdef1!" });
     fireEvent.click(screen.getByRole("button", { name: "Ir para o Painel" }));
     expect(await screen.findByRole("button", { name: "Sair" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/painel");
+  });
+
+  it("login de conta não confirmada vai para o código, reenviado, e depois entra", async () => {
+    window.history.replaceState(null, "", "/entrar?next=%2Fconta");
+    const mock = createMockApi();
+    let session: { authRequired: boolean; user: typeof USER | null } = { authRequired: true, user: null };
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
+    mock.on("GET", /^\/api\/v1\/riot-link$/, () => json(200, { state: "NONE" }));
+    mock.on("POST", /^\/api\/v1\/auth\/login$/, () => problem(403, "EMAIL_NOT_VERIFIED"));
+    mock.on("POST", /^\/api\/v1\/auth\/resend-code$/, () => json(202, CODE_SENT));
+    mock.on("POST", /^\/api\/v1\/auth\/verify-email$/, () => {
+      session = { authRequired: true, user: USER };
+      return json(200, session);
+    });
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    await screen.findByRole("heading", { name: "Entrar no RiftLab" });
+    fill("jogadora@example.test", PASSWORD);
+    fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    expect(await screen.findByRole("heading", { name: "Confirme seu e-mail" })).toBeInTheDocument();
+    await waitFor(() => expect(mock.callsTo("POST", /resend-code$/)).toHaveLength(1));
+    expect(screen.getByRole("status")).toHaveTextContent("Confirme seu e-mail para entrar.");
+    typeCode("123456");
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar e-mail" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/conta"));
+    // Quem já tinha conta não vê a tela de boas-vindas do cadastro.
+    expect(screen.queryByRole("heading", { name: "Conta criada" })).not.toBeInTheDocument();
+  });
+
+  it("esqueci minha senha: pede o código, troca a senha e volta para entrar", async () => {
+    window.history.replaceState(null, "", "/entrar");
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user: null }));
+    mock.on("POST", /^\/api\/v1\/auth\/password\/forgot$/, () => json(202, CODE_SENT));
+    let tries = 0;
+    mock.on("POST", /^\/api\/v1\/auth\/password\/reset$/, () => {
+      tries += 1;
+      return tries === 1 ? problem(422, "INVALID_CODE") : new Response(null, { status: 204 });
+    });
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("link", { name: "Esqueci minha senha" }));
+    expect(await screen.findByRole("heading", { name: "Redefinir a senha" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/esqueci-senha");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "jogadora@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar código" }));
+
+    expect(await screen.findByRole("heading", { name: "Crie uma senha nova" })).toBeInTheDocument();
+    expect(screen.getByText(/Se houver uma conta/)).toBeInTheDocument();
+    typeCode("000000");
+    fireEvent.change(screen.getByLabelText("Senha nova"), { target: { value: "Senha-Nova-2" } });
+    expect(screen.getByText(/Um símbolo/)).toHaveTextContent("(atendido)");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar senha nova" }));
+    expect(await screen.findByText(/Código inválido ou vencido/)).toBeInTheDocument();
+
+    typeCode("123456");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar senha nova" }));
+    expect(await screen.findByText("Senha alterada. Entre com a senha nova.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Entrar no RiftLab" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/entrar");
+    expect(mock.callsTo("POST", /password\/reset$/).at(-1)?.body).toEqual({ email: "jogadora@example.test", code: "123456", newPassword: "Senha-Nova-2" });
   });
 
   it("sessão que termina no meio do uso troca a área da conta pelo convite", async () => {

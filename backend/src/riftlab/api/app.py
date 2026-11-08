@@ -19,6 +19,7 @@ from riftlab.api.routes.objectives import router as objectives_router
 from riftlab.auth.api import router as auth_router
 from riftlab.auth.application import LoginThrottle
 from riftlab.auth.link_api import router as riot_link_router
+from riftlab.auth.mailer import Mailer, build_mailer
 from riftlab.auth.middleware import AuthMiddleware
 from riftlab.catalog.api import router as catalog_router
 from riftlab.config import Settings, get_settings
@@ -34,7 +35,7 @@ from riftlab.shared.db import build_session_factory
 logger = logging.getLogger("riftlab.api")
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
 
@@ -44,6 +45,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.db_engine = db.build_engine(settings.database_url)
         app.state.session_factory = build_session_factory(app.state.db_engine)
         app.state.login_throttle = LoginThrottle()
+        # Códigos errados, e pedidos que mandam e-mail (contra enxurrada na caixa de alguém).
+        app.state.code_throttle = LoginThrottle(per_user=10, per_ip=30, code="CODE_RATE_LIMITED")
+        app.state.mail_throttle = LoginThrottle(
+            per_user=5, per_ip=20, window_seconds=3600.0, code="CODE_RATE_LIMITED"
+        )
+        app.state.mailer = mailer if mailer is not None else build_mailer(settings)
         logger.info("riftlab api iniciada modo=%s", "DEMO" if settings.demo_mode else "REAL")
         try:
             yield

@@ -46,7 +46,7 @@ export function AccountGate({
       <div className="account-gate__card surface surface--pad brackets">
         <p className="muted">
           Sem conta, você continua buscando jogadores e abrindo partidas. A conta fica nesta
-          instalação do RiftLab e não pede e-mail.
+          instalação do RiftLab e usa seu e-mail só para confirmar o acesso.
         </p>
         {actions}
         <p className="account-gate__back"><Link to="/">Voltar ao início</Link></p>

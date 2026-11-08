@@ -88,7 +88,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Entra com usuário e senha */
+        /** Entra com e-mail e senha */
         post: operations["post_login_api_v1_auth_login_post"];
         delete?: never;
         options?: never;
@@ -113,6 +113,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password/forgot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Envia o código para redefinir a senha
+         * @description A resposta é a mesma exista ou não conta com o e-mail.
+         */
+        post: operations["post_forgot_password_api_v1_auth_password_forgot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Troca a senha com o código e encerra todas as sessões da conta */
+        post: operations["post_reset_password_api_v1_auth_password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/register": {
         parameters: {
             query?: never;
@@ -122,8 +159,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cria a conta local e abre a sessão */
+        /**
+         * Cria a conta e envia o código de confirmação
+         * @description A resposta é a mesma se o e-mail já tiver conta: nesse caso, ele recebe um aviso.
+         */
         post: operations["post_register_api_v1_auth_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/resend-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reenvia o código de confirmação */
+        post: operations["post_resend_code_api_v1_auth_resend_code_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -141,6 +198,23 @@ export interface paths {
         get: operations["get_session_api_v1_auth_session_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/verify-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirma o e-mail com o código e abre a sessão */
+        post: operations["post_verify_email_api_v1_auth_verify_email_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1137,12 +1211,24 @@ export interface components {
              */
             until: string;
         };
+        /**
+         * CodeSent
+         * @description Sempre igual: não diz se a conta existe nem se um e-mail saiu de fato.
+         */
+        CodeSent: {
+            /**
+             * Status
+             * @default CODE_SENT
+             * @constant
+             */
+            status: "CODE_SENT";
+        };
         /** Credentials */
         Credentials: {
+            /** Email */
+            email: string;
             /** Password */
             password: string;
-            /** Username */
-            username: string;
         };
         /** CursorPage[DecisionStateSummary] */
         CursorPage_DecisionStateSummary_: {
@@ -1415,6 +1501,11 @@ export interface components {
             scopeVersion: string;
             /** Selectionversion */
             selectionVersion: string;
+        };
+        /** EmailOnly */
+        EmailOnly: {
+            /** Email */
+            email: string;
         };
         /**
          * FeedbackRequest
@@ -2502,6 +2593,15 @@ export interface components {
          * @enum {string}
          */
         ReportFormat: "json" | "html";
+        /** ResetPassword */
+        ResetPassword: {
+            /** Code */
+            code: string;
+            /** Email */
+            email: string;
+            /** Newpassword */
+            newPassword: string;
+        };
         /** ReviewCounts */
         ReviewCounts: {
             /** Alternative */
@@ -2673,7 +2773,7 @@ export interface components {
         };
         /**
          * SessionState
-         * @description `authRequired`: o servidor exige login nas rotas da aplicação.
+         * @description `authRequired`: o servidor exige login nas áreas da conta.
          */
         SessionState: {
             /** Authrequired */
@@ -2682,10 +2782,10 @@ export interface components {
         };
         /** SessionUser */
         SessionUser: {
+            /** Email */
+            email: string;
             /** Id */
             id: string;
-            /** Username */
-            username: string;
         };
         /** TimelineGoldFrame */
         TimelineGoldFrame: {
@@ -2787,6 +2887,15 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VerifyEmail */
+        VerifyEmail: {
+            /** Code */
+            code: string;
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
         };
     };
     responses: never;
@@ -3036,6 +3145,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description E-mail não confirmado */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -3072,6 +3188,82 @@ export interface operations {
             };
         };
     };
+    post_forgot_password_api_v1_auth_password_forgot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailOnly"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Muitos pedidos */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_reset_password_api_v1_auth_password_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPassword"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Código inválido ou senha fraca */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Muitos pedidos */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_register_api_v1_auth_register_post: {
         parameters: {
             query?: never;
@@ -3086,23 +3278,63 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            201: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionState"];
+                    "application/json": components["schemas"]["CodeSent"];
                 };
             };
-            /** @description Nome em uso */
-            409: {
+            /** @description Dados inválidos */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Dados inválidos */
+            /** @description Muitos pedidos */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_resend_code_api_v1_auth_resend_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailOnly"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSent"];
+                };
+            };
+            /** @description Validation Error */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Muitos pedidos */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3127,6 +3359,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SessionState"];
                 };
+            };
+        };
+    };
+    post_verify_email_api_v1_auth_verify_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyEmail"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionState"];
+                };
+            };
+            /** @description Código inválido */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Muitos pedidos */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

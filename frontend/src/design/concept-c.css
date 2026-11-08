@@ -142,6 +142,10 @@
 @media (max-width: 1240px) {
   .profile-chip__text { display: none; }
 }
+/* Com sessão aberta, o menu inteiro e o e-mail não cabem numa linha: as ferramentas descem. */
+@media (max-width: 1180px) {
+  .app__topbar { height: auto; min-height: 64px; flex-wrap: wrap; row-gap: 4px; padding-top: 6px; padding-bottom: 6px; }
+}
 @media (max-width: 1100px) {
   .main-nav { margin-left: 8px; }
   .app .main-nav__link { padding: 0 8px; }

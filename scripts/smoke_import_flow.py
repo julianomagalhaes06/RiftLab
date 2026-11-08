@@ -4,8 +4,9 @@
 espera o worker importar e PREPARAR sozinho (catálogo -> reconstrução ->
 extração) e lê a lista/detalhe de decisões. Só biblioteca padrão.
 
-Com login exigido (contas locais), cria antes uma conta descartável, porque importar é da
-conta: a sessão vai num cookie e toda chamada leva o cabeçalho anti-CSRF `X-RiftLab-Request`.
+Com login exigido (contas locais), cria antes uma conta descartável e a confirma com o código
+lido no Mailpit, porque importar é da conta: a sessão vai num cookie e toda chamada leva o
+cabeçalho anti-CSRF `X-RiftLab-Request`.
 
 Uso: python3 scripts/smoke_import_flow.py [--base-url http://127.0.0.1:8000]
 Sai com código != 0 e uma linha de causa se qualquer etapa falhar."""
@@ -21,6 +22,8 @@ import time
 import urllib.error
 import urllib.request
 from typing import Any
+
+from mailpit_code import wait_for_code
 
 MATCH_ID = "DEMO-0008"
 PARTICIPANT_ID = 1
@@ -76,6 +79,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--mailpit-url", default="http://127.0.0.1:8025")
     args = parser.parse_args()
     base = args.base_url.rstrip("/")
     deadline = time.monotonic() + args.timeout
@@ -85,12 +89,17 @@ def main() -> None:
         fail(f"GET /auth/session respondeu {status}: {session}")
     if session.get("authRequired"):
         # Importar exige conta: cria uma descartável, só para esta fumaça.
-        name = f"smoke_{secrets.token_hex(5)}"
-        status, created = call(
-            "POST", f"{base}/api/v1/auth/register", {"username": name, "password": secrets.token_urlsafe(16)}
-        )
-        if status != 201 or not created.get("user"):
+        email = f"smoke_{secrets.token_hex(5)}@example.test"
+        password = f"Aa-{secrets.token_urlsafe(16)}"
+        status, created = call("POST", f"{base}/api/v1/auth/register", {"email": email, "password": password})
+        if status != 202:
             fail(f"POST /auth/register respondeu {status}: {created}")
+        code = wait_for_code(email, args.mailpit_url.rstrip("/"))
+        status, confirmed = call(
+            "POST", f"{base}/api/v1/auth/verify-email", {"email": email, "code": code, "password": password}
+        )
+        if status != 200 or not confirmed.get("user"):
+            fail(f"POST /auth/verify-email respondeu {status}: {confirmed}")
         print("login exigido: conta descartável criada para a fumaça")
 
     status, accepted = call("POST", f"{base}/api/v1/imports", {"matchId": MATCH_ID, "mode": "DEMO"})

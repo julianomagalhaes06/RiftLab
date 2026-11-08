@@ -8,6 +8,7 @@ describe("parseRoute", () => {
     expect(parseRoute("/")).toEqual({ name: "home" });
     expect(parseRoute("/painel")).toEqual({ name: "panel" });
     expect(parseRoute("/entrar")).toEqual({ name: "login", next: null });
+    expect(parseRoute("/esqueci-senha", "?next=%2Fconta")).toEqual({ name: "forgot", next: "/conta" });
     expect(parseRoute("/criar-conta", "?next=%2Fpainel")).toEqual({ name: "register", next: "/painel" });
     expect(parseRoute("/importar")).toEqual({ name: "importEntry" });
     expect(parseRoute("/campeoes")).toEqual({ name: "champions" });
@@ -69,6 +70,7 @@ describe("routeToPath", () => {
       "/",
       "/painel",
       "/entrar",
+      "/esqueci-senha",
       "/criar-conta?next=%2Fdecisions%2Fabc",
       "/importar",
       "/campeoes",

@@ -3,22 +3,41 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Uuid
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from riftlab.shared.db import Base
 
 
 class UserModel(Base):
-    """Conta local. `username_key` (casefold) garante unicidade sem depender de maiúsculas."""
+    """Conta local por e-mail (em minúsculas, único). Sem `email_verified_at`, não entra."""
 
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    username: Mapped[str] = mapped_column(String(32), nullable=False)
-    username_key: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AuthEmailCodeModel(Base):
+    """Código enviado por e-mail: no máximo um vivo por conta e finalidade (VERIFY ou RESET).
+    O banco guarda só o hash; errar demais ou vencer apaga o código."""
+
+    __tablename__ = "auth_email_codes"
+    __table_args__ = (CheckConstraint("purpose IN ('VERIFY','RESET')", name="purpose_valid"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    purpose: Mapped[str] = mapped_column(String(16), primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class AuthSessionModel(Base):

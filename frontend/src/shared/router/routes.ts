@@ -7,6 +7,7 @@
  *   /painel                              painel da conta própria
  *   /entrar?next=/caminho                entrar (volta ao caminho depois)
  *   /criar-conta?next=/caminho           criar conta
+ *   /esqueci-senha?next=/caminho         redefinir a senha por código no e-mail
  *   /importar                            importar por ID ou abrir a demonstração
  *   /imports/:jobId                      progresso de uma importação
  *   /matches/:matchId?participant=N      partida (preparação, participantes, decisões)
@@ -23,6 +24,7 @@ export type Route =
   | { name: "home" }
   | { name: "login"; next: string | null }
   | { name: "register"; next: string | null }
+  | { name: "forgot"; next: string | null }
   | { name: "importEntry" }
   | { name: "panel" }
   | { name: "champions" }
@@ -97,8 +99,8 @@ export function safeNext(value: string | null): string | null {
 }
 
 /** Entrar e voltar ao caminho atual (ou a `next`) depois do login. */
-export function loginPath(next?: string | null, mode: "login" | "register" = "login"): string {
-  const base = mode === "login" ? "/entrar" : "/criar-conta";
+export function loginPath(next?: string | null, mode: "login" | "register" | "forgot" = "login"): string {
+  const base = mode === "login" ? "/entrar" : mode === "register" ? "/criar-conta" : "/esqueci-senha";
   const target = safeNext(next ?? null);
   return target && target !== "/" ? `${base}?next=${encodeURIComponent(target)}` : base;
 }
@@ -108,9 +110,9 @@ export function parseRoute(pathname: string, search = ""): Route {
   // Início público, como em sites de estatísticas; o Painel da conta fica em /painel.
   if (trimmed === "/" || trimmed === "") return { name: "home" };
   if (trimmed === "/painel") return { name: "panel" };
-  if (trimmed === "/entrar" || trimmed === "/criar-conta") {
+  if (trimmed === "/entrar" || trimmed === "/criar-conta" || trimmed === "/esqueci-senha") {
     const next = safeNext(new URLSearchParams(search).get("next"));
-    return { name: trimmed === "/entrar" ? "login" : "register", next };
+    return { name: trimmed === "/entrar" ? "login" : trimmed === "/criar-conta" ? "register" : "forgot", next };
   }
   if (trimmed === "/importar") return { name: "importEntry" };
   if (trimmed === "/campeoes") return { name: "champions" };
@@ -178,6 +180,8 @@ export function routeToPath(route: Route): string {
       return loginPath(route.next, "login");
     case "register":
       return loginPath(route.next, "register");
+    case "forgot":
+      return loginPath(route.next, "forgot");
     case "importEntry":
       return "/importar";
     case "panel":

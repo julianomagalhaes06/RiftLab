@@ -45,6 +45,7 @@ export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
 export type SessionState = Schemas["SessionState"];
 export type SessionUser = Schemas["SessionUser"];
+export type CodeSent = Schemas["CodeSent"];
 export type RiotLinkState = Schemas["RiotLinkState"];
 
 /** Evento global: uma resposta 401 AUTH_REQUIRED pede para a interface rever a sessão. */
@@ -94,8 +95,13 @@ export interface ApiClient {
   getOwnPlayer(signal?: AbortSignal): Promise<OwnPlayer>;
   /** Contas locais (Sprint 2, #10): sessão por cookie HttpOnly. */
   getAuthSession(signal?: AbortSignal): Promise<SessionState>;
-  register(username: string, password: string, signal?: AbortSignal): Promise<SessionState>;
-  login(username: string, password: string, signal?: AbortSignal): Promise<SessionState>;
+  /** Cria a conta e manda o código; a resposta é a mesma se o e-mail já tiver conta. */
+  register(email: string, password: string, signal?: AbortSignal): Promise<CodeSent>;
+  login(email: string, password: string, signal?: AbortSignal): Promise<SessionState>;
+  verifyEmail(email: string, code: string, password: string, signal?: AbortSignal): Promise<SessionState>;
+  resendCode(email: string, signal?: AbortSignal): Promise<CodeSent>;
+  forgotPassword(email: string, signal?: AbortSignal): Promise<CodeSent>;
+  resetPassword(email: string, code: string, newPassword: string, signal?: AbortSignal): Promise<void>;
   logout(signal?: AbortSignal): Promise<void>;
   /** Vínculo da conta Riot pelo desafio do ícone (#12). */
   getRiotLink(signal?: AbortSignal): Promise<RiotLinkState>;
@@ -236,10 +242,18 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
       request("POST", "/api/v1/players/lookup-from-match", { body: { matchId, participantId }, signal }),
     getOwnPlayer: (signal) => request("GET", "/api/v1/players/me", { signal }),
     getAuthSession: (signal) => request("GET", "/api/v1/auth/session", { signal }),
-    register: (username, password, signal) =>
-      request("POST", "/api/v1/auth/register", { body: { username, password }, signal }),
-    login: (username, password, signal) =>
-      request("POST", "/api/v1/auth/login", { body: { username, password }, signal }),
+    register: (email, password, signal) =>
+      request("POST", "/api/v1/auth/register", { body: { email, password }, signal }),
+    login: (email, password, signal) =>
+      request("POST", "/api/v1/auth/login", { body: { email, password }, signal }),
+    verifyEmail: (email, code, password, signal) =>
+      request("POST", "/api/v1/auth/verify-email", { body: { email, code, password }, signal }),
+    resendCode: (email, signal) =>
+      request("POST", "/api/v1/auth/resend-code", { body: { email }, signal }),
+    forgotPassword: (email, signal) =>
+      request("POST", "/api/v1/auth/password/forgot", { body: { email }, signal }),
+    resetPassword: (email, code, newPassword, signal) =>
+      request("POST", "/api/v1/auth/password/reset", { body: { email, code, newPassword }, signal }),
     logout: (signal) => request("POST", "/api/v1/auth/logout", { signal }),
     getRiotLink: (signal) => request("GET", "/api/v1/riot-link", { signal }),
     startRiotLink: (gameName, tagLine, signal) =>

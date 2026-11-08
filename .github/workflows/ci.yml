@@ -161,9 +161,15 @@ jobs:
           # cabeçalho anti-CSRF).
           curl -sf http://127.0.0.1:5173/api/v1/matches/DEMO-0008 | python3 -c 'import json,sys; assert json.load(sys.stdin)["matchId"] == "DEMO-0008"'
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5173/api/v1/matches)" = 401
-          curl -sf -c "$RUNNER_TEMP/riftlab.jar" -X POST -H 'X-RiftLab-Request: 1' -H 'Content-Type: application/json' \
-            -d "{\"username\":\"ci_$GITHUB_RUN_ID\",\"password\":\"$(openssl rand -hex 16)\"}" \
+          EMAIL="ci_$GITHUB_RUN_ID@example.test"
+          PASSWORD="Aa-$(openssl rand -hex 16)"
+          curl -sf -X POST -H 'X-RiftLab-Request: 1' -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
             http://127.0.0.1:5173/api/v1/auth/register > /dev/null
+          CODE="$(python3 scripts/mailpit_code.py "$EMAIL")"
+          curl -sf -c "$RUNNER_TEMP/riftlab.jar" -X POST -H 'X-RiftLab-Request: 1' -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"code\":\"$CODE\",\"password\":\"$PASSWORD\"}" \
+            http://127.0.0.1:5173/api/v1/auth/verify-email > /dev/null
           curl -sf -b "$RUNNER_TEMP/riftlab.jar" http://127.0.0.1:5173/api/v1/matches | python3 -c 'import json,sys; assert "items" in json.load(sys.stdin)'
 
       # E2E da demonstração contra a stack REAL: roda AQUI (e não no job `frontend`) porque este
