@@ -55,6 +55,9 @@
 
 .auth-password { position: relative; }
 .auth-password .form__input { width: 100%; padding-right: 48px; }
+/* O Edge põe o próprio olho no campo de senha: fica só o nosso botão, igual em todo navegador. */
+.auth-password .form__input::-ms-reveal,
+.auth-password .form__input::-ms-clear { display: none; }
 .auth-password__toggle { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ntext-muted); cursor: pointer; }
 .auth-password__toggle:hover { color: var(--ntext); background: var(--n2); }
 .auth-password__toggle:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
