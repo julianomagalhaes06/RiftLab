@@ -16,7 +16,8 @@ from sqlalchemy import delete, select, update
 from riftlab.api.app import create_app
 from riftlab.auth import mailer as mailer_module
 from riftlab.auth.application import LoginThrottle
-from riftlab.auth.mailer import OutgoingEmail, SmtpMailer, deliver, render
+from riftlab.auth.email_template import render
+from riftlab.auth.mailer import OutgoingEmail, SmtpMailer, deliver
 from riftlab.auth.models import AuthEmailCodeModel, AuthSessionModel, UserModel
 from riftlab.config import Settings
 from riftlab.shared.db import unit_of_work
@@ -414,7 +415,8 @@ async def test_smtp_as_gmail_uses_starttls_and_app_password_without_spaces(monke
     assert _FakeSmtp.message["To"] == "pessoa@example.test"
     assert _FakeSmtp.message["From"] == "RiftLab <conta@gmail.example>"
     assert "123456" not in _FakeSmtp.message["Subject"]
-    assert "123456" in _FakeSmtp.message.get_content()
+    assert "123456" in _FakeSmtp.message.get_body(("plain",)).get_content()
+    assert "123456" in _FakeSmtp.message.get_body(("html",)).get_content()
 
 
 @pytest.mark.asyncio
@@ -426,8 +428,22 @@ async def test_smtp_as_mailpit_has_no_tls_or_login(monkeypatch):
 
 
 def test_notice_email_has_no_code():
-    subject, body = render(OutgoingEmail("pessoa@example.test", "ALREADY_REGISTERED"))
-    assert "None" not in subject + body and "Esqueci minha senha" in body
+    email = render("ALREADY_REGISTERED", None)
+    assert "None" not in email.subject + email.text + email.html
+    assert "Esqueci minha senha" in email.text and "Esqueci minha senha" in email.html
+
+
+@pytest.mark.parametrize("kind", ["VERIFY", "RESET"])
+def test_code_email_is_self_contained_html_without_leaking_the_code_in_previews(kind):
+    email = render(kind, "123456")
+    assert "123456" in email.text and "123456" in email.html
+    assert "123456" not in email.subject
+    # A prévia da caixa de entrada é o primeiro texto do corpo: o código não pode estar nela.
+    preview = email.html.split('<div style="display:none', 1)[1].split("</div>", 1)[0]
+    assert "123456" not in preview
+    # Clientes de e-mail: sem imagem, link, script ou folha de estilo externos.
+    for forbidden in ("<img", "<link", "<script", "<style", "<a ", "http://", "https://"):
+        assert forbidden not in email.html, forbidden
 
 
 @pytest.mark.asyncio

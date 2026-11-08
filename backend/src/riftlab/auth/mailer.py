@@ -15,13 +15,12 @@ import ssl
 from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
-from typing import Literal, Protocol
+from typing import Protocol
 
+from riftlab.auth.email_template import EmailKind, render
 from riftlab.config import Settings
 
 logger = logging.getLogger("riftlab.api")
-
-EmailKind = Literal["VERIFY", "RESET", "ALREADY_REGISTERED"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,29 +32,6 @@ class OutgoingEmail:
 
 class Mailer(Protocol):
     async def send(self, email: OutgoingEmail) -> None: ...
-
-
-def render(email: OutgoingEmail) -> tuple[str, str]:
-    """(assunto, texto). O código fica só no corpo, fora das prévias do assunto."""
-    minutes = "O código vale por 15 minutos."
-    ignore = "Se não foi você, ignore este e-mail."
-    if email.kind == "VERIFY":
-        return (
-            "Confirme seu e-mail no RiftLab",
-            f"Seu código de confirmação do RiftLab é:\n\n{email.code}\n\n{minutes}\n{ignore}\n",
-        )
-    if email.kind == "RESET":
-        return (
-            "Redefina sua senha no RiftLab",
-            f"Seu código para redefinir a senha do RiftLab é:\n\n{email.code}\n\n{minutes}\n"
-            f"{ignore} Sua senha continua a mesma.\n",
-        )
-    return (
-        "Sua conta no RiftLab",
-        "Alguém tentou criar uma conta no RiftLab com este e-mail, mas ele já tem conta.\n\n"
-        'Se foi você, entre normalmente ou use "Esqueci minha senha" na tela de entrada.\n'
-        f"{ignore}\n",
-    )
 
 
 class SmtpMailer:
@@ -77,14 +53,15 @@ class SmtpMailer:
             smtp.send_message(message)
 
     async def send(self, email: OutgoingEmail) -> None:
-        subject, body = render(email)
+        rendered = render(email.kind, email.code)
         message = EmailMessage()
-        message["Subject"] = subject
+        message["Subject"] = rendered.subject
         message["From"] = self._settings.smtp_from
         message["To"] = email.to
         message["Date"] = formatdate(localtime=False)
         message["Message-ID"] = make_msgid(domain="riftlab.local")
-        message.set_content(body)
+        message.set_content(rendered.text)
+        message.add_alternative(rendered.html, subtype="html")
         await asyncio.to_thread(self._deliver, message)
 
 

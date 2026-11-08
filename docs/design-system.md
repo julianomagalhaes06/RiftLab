@@ -152,6 +152,14 @@ padrão dos sites de estatísticas do jogo:
   brilho e o roxo no título, para a primeira impressão do site remeter ao jogo. As demais telas
   seguem a base neutra.
 
+## E-mails da conta
+
+Confirmação, recuperação de senha e aviso de conta existente (`auth/email_template.py`), com a
+mesma identidade do site: fundo `n0`, cartão `n1` de borda `nline` com filete roxo no topo, marca
+RiftLab e, em destaque, o código em superfície roxa. Cliente de e-mail não garante fonte própria,
+`clip-path` nem SVG: o HTML usa tabelas e estilo inline, com fonte do sistema e sem imagem ou
+link. O texto puro vai junto, e o código nunca aparece no assunto nem na prévia da caixa.
+
 ## Convite para criar conta
 
 Sem conta, as áreas que guardam dados da pessoa (Painel, Minha posição, Histórico, Minha conta,
