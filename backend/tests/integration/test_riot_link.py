@@ -80,7 +80,7 @@ async def test_icon_challenge_links_the_account_only_with_the_requested_icon(
     assert state["state"] == "PENDING"
     assert (state["gameName"], state["tagLine"]) == ("Jogadora", "BR1")
     assert state["iconId"] in range(0, 29) and state["iconId"] != 5
-    assert state["expiresAt"] == NOW + timedelta(minutes=10)
+    assert state["expiresAt"] == NOW + timedelta(minutes=20)
     assert riot.requests == 2
 
     with pytest.raises(RiotLinkError, match="ICON_MISMATCH"):
@@ -157,7 +157,7 @@ async def test_expired_or_missing_challenge_asks_for_a_new_icon(session_factory,
             SETTINGS,
             users[0],
             transport=riot.transport(),
-            now=NOW + timedelta(minutes=10),
+            now=NOW + timedelta(minutes=20),
         )
     assert riot.requests == before  # expirado: nenhuma consulta à Riot
     async with session_factory() as session:

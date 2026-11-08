@@ -122,6 +122,10 @@
 .account-steps { margin: 0; padding-left: 20px; color: var(--ntext-muted); line-height: 1.6; }
 .account-icon { margin: 0; display: grid; justify-items: center; gap: 8px; color: var(--ntext-subtle); font-size: .8125rem; }
 .account-icon img { border: 1px solid var(--portrait-outline); }
+.account-auto { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 12px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); color: var(--ntext-muted); font-size: .875rem; line-height: 1.4; }
+.account-auto__spinner { flex: none; width: 16px; height: 16px; border: 2px solid var(--nline2); border-top-color: var(--accent); border-radius: 50%; animation: account-spin .9s linear infinite; }
+@keyframes account-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .account-auto__spinner { animation-duration: 2.7s; } }
 .account-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* Convite para criar conta quando a pessoa sem conta chega a algo que guarda dados dela. */

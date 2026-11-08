@@ -1,10 +1,17 @@
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { api, type RiotLinkState } from "../../shared/api/client";
 import { isApiError } from "../../shared/api/errors";
 import { messageForCode } from "../../shared/api/messages";
 import { parseRiotId } from "../../shared/router/routes";
 import { useAuth } from "./authContext";
 import "./auth.css";
+
+/** A Riot leva alguns minutos para mostrar o ícone novo: a tela confere sozinha, sem gastar cota
+ * com cliques repetidos (cada conferência são 2 chamadas). Prazo do desafio: 20 min. */
+const AUTO_CHECK_MS = 30_000;
+const AUTO_CHECK_MIN_GAP_MS = 10_000;
+/** Respostas que não encerram a conferência automática: ainda não apareceu, ou falha passageira. */
+const KEEP_CHECKING = new Set(["ICON_MISMATCH", "RIOT_RATE_LIMITED", "UPSTREAM_UNAVAILABLE"]);
 
 const iconUrl = (version: string | null, icon: number) =>
   version ? `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${icon}.png` : null;
@@ -38,6 +45,12 @@ export function AccountPage() {
   const [busy, setBusy] = useState(false);
   const inputId = useId();
   const errorId = useId();
+  const checking = useRef(false);
+  const lastCheck = useRef(0);
+  // Conferência automática encerrada para este desafio (prazo vencido, erro permanente).
+  const [stoppedFor, setStoppedFor] = useState<string | null>(null);
+  const challenge = link?.state === "PENDING" ? (link.expiresAt ?? null) : null;
+  const autoChecking = challenge !== null && stoppedFor !== challenge;
 
   useEffect(() => {
     if (!user) return;
@@ -48,6 +61,51 @@ export function AccountPage() {
     api.getCatalogCurrent(controller.signal).then((catalog) => setVersion(catalog.dataDragonVersion ?? null)).catch(() => undefined);
     return () => controller.abort();
   }, [user]);
+
+  // Desafio em andamento: confere a cada 30 s. Com a aba oculta, espera, e confere ao voltar.
+  useEffect(() => {
+    if (!autoChecking) return;
+    const controller = new AbortController();
+    const check = () => {
+      if (document.hidden || checking.current) return;
+      checking.current = true;
+      lastCheck.current = Date.now();
+      api.verifyRiotLink(controller.signal)
+        .then((next) => {
+          setError(null);
+          setLink(next);
+        })
+        .catch((caught: unknown) => {
+          if (controller.signal.aborted) return;
+          if (!isApiError(caught) || KEEP_CHECKING.has(caught.code)) return;
+          setStoppedFor(challenge);
+          setError(messageForCode(caught.code));
+        })
+        .finally(() => {
+          checking.current = false;
+        });
+    };
+    const onVisible = () => {
+      if (!document.hidden && Date.now() - lastCheck.current >= AUTO_CHECK_MIN_GAP_MS) check();
+    };
+    lastCheck.current = Date.now();
+    const timer = window.setInterval(check, AUTO_CHECK_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      controller.abort();
+    };
+  }, [autoChecking, challenge]);
+
+  function verifyNow() {
+    if (checking.current) return; // a conferência automática já está a caminho
+    checking.current = true;
+    lastCheck.current = Date.now();
+    void run(() => api.verifyRiotLink()).finally(() => {
+      checking.current = false;
+    });
+  }
 
   async function run(action: () => Promise<RiotLinkState | void>) {
     setBusy(true);
@@ -110,15 +168,21 @@ export function AccountPage() {
             <h3>Comprove que a conta é sua</h3>
             <ol className="account-steps">
               <li>No cliente do League of Legends, troque o ícone de perfil de <strong>{link.gameName}#{link.tagLine}</strong> para o ícone abaixo.</li>
-              <li>Volte aqui e selecione <strong>Verificar ícone</strong> até as {clock(link.expiresAt)}.</li>
+              <li>Deixe esta página aberta até as {clock(link.expiresAt)}: o vínculo é concluído assim que a Riot mostrar o ícone novo.</li>
             </ol>
             <figure className="account-icon">
               {iconSrc ? <img src={iconSrc} alt={`Ícone de perfil número ${icon}`} width={96} height={96} referrerPolicy="no-referrer" /> : null}
               <figcaption>Ícone inicial nº {icon}</figcaption>
             </figure>
+            {autoChecking ? (
+              <p className="account-auto">
+                <span className="account-auto__spinner" aria-hidden="true" />
+                <span>Conferindo sozinho a cada 30 segundos. A Riot pode levar alguns minutos para atualizar o ícone.</span>
+              </p>
+            ) : null}
             <div className="account-actions">
-              <button type="button" className="button" disabled={busy} onClick={() => void run(() => api.verifyRiotLink())}>
-                {busy ? "Verificando…" : "Verificar ícone"}
+              <button type="button" className="button" disabled={busy} onClick={verifyNow}>
+                {busy ? "Verificando…" : "Verificar agora"}
               </button>
               <button type="button" className="button button--secondary" disabled={busy}
                 onClick={() => void run(() => api.startRiotLink(link.gameName ?? "", link.tagLine ?? ""))}>

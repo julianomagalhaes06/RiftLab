@@ -40,7 +40,7 @@ from riftlab.shared.errors import (
 
 SessionFactory = async_sessionmaker[AsyncSession]
 STARTER_ICONS = range(0, 29)
-CHALLENGE_TTL = timedelta(minutes=10)
+CHALLENGE_TTL = timedelta(minutes=20)
 _LIMITER = RiotRateLimiter()
 
 

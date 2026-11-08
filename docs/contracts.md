@@ -372,7 +372,7 @@ Autenticação própria, sem login da Riot (RSO exige chave de produção).
 Comprova a posse do Riot ID sem RSO, com a chave de desenvolvimento. Todas as rotas exigem sessão (`AUTH_REQUIRED` 401), mesmo sem `RIFTLAB_AUTH_REQUIRED`.
 
 - `GET /api/v1/riot-link` → `RiotLinkState {state: NONE|PENDING|LINKED, gameName, tagLine, iconId, expiresAt, linkedAt}`.
-- `POST /api/v1/riot-link/challenge {gameName, tagLine}`: Account-V1 e Summoner-V4 (2 requisições); sorteia um ícone inicial (0 a 28) diferente do atual, válido por 10 min, e substitui o desafio anterior. Conta Riot já vinculada a outro usuário ⇒ `ACCOUNT_ALREADY_LINKED` 409.
+- `POST /api/v1/riot-link/challenge {gameName, tagLine}`: Account-V1 e Summoner-V4 (2 requisições); sorteia um ícone inicial (0 a 28) diferente do atual, válido por 20 min (a Riot leva alguns minutos para mostrar o ícone novo; a tela confere sozinha a cada 30 s, com a aba visível), e substitui o desafio anterior. Conta Riot já vinculada a outro usuário ⇒ `ACCOUNT_ALREADY_LINKED` 409.
 - `POST /api/v1/riot-link/verify`: confere o ícone (2 requisições). Igual ⇒ grava o vínculo e apaga o desafio; diferente ⇒ `ICON_MISMATCH` 409 e o desafio continua; vencido ⇒ `CHALLENGE_EXPIRED` 409 sem consultar a Riot; sem desafio ⇒ `NO_CHALLENGE` 409.
 - `DELETE /api/v1/riot-link` (204): desfaz o vínculo e o desafio.
 - Erros da Riot e de configuração seguem a busca de jogadores (`PLAYER_NOT_FOUND`, `RIOT_KEY_MISSING`, `SECRET_MISSING`, `RIOT_RATE_LIMITED` etc.).
