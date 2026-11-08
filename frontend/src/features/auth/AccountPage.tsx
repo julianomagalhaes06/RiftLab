@@ -12,6 +12,21 @@ const iconUrl = (version: string | null, icon: number) =>
 const clock = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
 
+function PanelHead({ email, lead }: { email?: string; lead: string }) {
+  return (
+    <header className="account-panel__head">
+      <span className="account-panel__badge" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+        </svg>
+      </span>
+      <h2 id="account-heading">Minha conta</h2>
+      {email ? <p className="account-panel__email" title={email}>{email}</p> : null}
+      <p className="muted">{lead}</p>
+    </header>
+  );
+}
+
 /** Conta local e vínculo da conta Riot pelo desafio do ícone (Sprint 2, #12). */
 export function AccountPage() {
   const { user } = useAuth();
@@ -60,8 +75,9 @@ export function AccountPage() {
   if (!user) {
     return (
       <section className="area-page account-page" aria-labelledby="account-heading">
-        <h2 id="account-heading">Minha conta</h2>
-        <p className="muted">Este ambiente não usa contas locais. A conta Riot vem da configuração da instalação.</p>
+        <div className="account-panel surface surface--rank brackets">
+          <PanelHead lead="Este ambiente não usa contas locais. A conta Riot vem da configuração da instalação." />
+        </div>
       </section>
     );
   }
@@ -70,18 +86,23 @@ export function AccountPage() {
   const iconSrc = icon != null ? iconUrl(version, icon) : null;
   return (
     <section className="area-page account-page" aria-labelledby="account-heading">
-      <header className="page-head">
-        <p className="page-head__context">Conta local · {user.email}</p>
-        <h2 id="account-heading">Minha conta</h2>
-        <p className="page-head__lead">Vincule sua conta Riot para que Minha posição, Painel e Histórico usem as suas partidas.</p>
-      </header>
-      <div className="account-card surface surface--pad" aria-live="polite">
+      <div className="account-panel surface surface--rank brackets">
+        <PanelHead
+          email={user.email}
+          lead={link?.state === "LINKED"
+            ? "Minha posição, Painel e Histórico usam as partidas desta conta Riot."
+            : "Vincule sua conta Riot para que Minha posição, Painel e Histórico usem as suas partidas."}
+        />
+      <div className="account-card" aria-live="polite">
         {failed ? <p role="alert">Não foi possível consultar o vínculo agora.</p>
           : !link ? <p role="status">Carregando o vínculo…</p>
           : link.state === "LINKED" ? <>
-            <h3>Conta Riot vinculada</h3>
-            <p className="account-card__riot">{link.gameName}#{link.tagLine}</p>
-            <p className="muted">Vinculada em {new Date(link.linkedAt ?? "").toLocaleString("pt-BR")}.</p>
+            <div className="account-linked">
+              <span className="chip chip--win">Vinculada</span>
+              <h3>Conta Riot vinculada</h3>
+              <p className="account-card__riot">{link.gameName}<span>#{link.tagLine}</span></p>
+              <p className="muted">Vinculada em {new Date(link.linkedAt ?? "").toLocaleString("pt-BR")}.</p>
+            </div>
             <button type="button" className="button button--secondary" disabled={busy} onClick={() => void run(async () => { await api.unlinkRiot(); })}>
               {busy ? "Desvinculando…" : "Desvincular conta"}
             </button>
@@ -115,6 +136,7 @@ export function AccountPage() {
             </form>
           </>}
         {error ? <p id={errorId} className="form__error" role="alert">{error}</p> : null}
+      </div>
       </div>
     </section>
   );

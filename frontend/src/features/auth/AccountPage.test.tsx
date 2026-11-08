@@ -46,7 +46,7 @@ describe("Minha conta: vínculo pelo ícone de perfil (Sprint 2, #12)", () => {
     expect(await screen.findByText(/ainda não é o pedido/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Verificar ícone" }));
     expect(await screen.findByRole("heading", { name: "Conta Riot vinculada" })).toBeInTheDocument();
-    expect(screen.getByText("Jogadora#BR1")).toBeInTheDocument();
+    expect(document.querySelector(".account-card__riot")).toHaveTextContent("Jogadora#BR1");
 
     fireEvent.click(screen.getByRole("button", { name: "Desvincular conta" }));
     expect(await screen.findByRole("heading", { name: "Vincular conta Riot" })).toBeInTheDocument();

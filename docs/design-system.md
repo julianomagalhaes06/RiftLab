@@ -22,6 +22,15 @@ No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitiv
 4. **Nada fictício na interface real.** O protótipo usa dados ilustrativos; o produto mostra só o
    que veio da API. Sem dado, a área mostra o estado vazio, nunca um exemplo.
 
+## Temas
+
+Dois temas com os mesmos papéis de token: escuro (`:root`, padrão) e claro
+(`:root[data-theme="light"]`), trocados pelo seletor de sol e lua no topo (`shared/theme`). A
+escolha fica no navegador e é aplicada antes da primeira pintura, por um script em `index.html`.
+Toda combinação de texto e fundo do claro tem contraste conferido em `tokens.test.ts`. Duas
+áreas ficam escuras nos dois temas: o card de elo, uma placa de metal cujo bloco de tokens repete
+os valores escuros, e a vitrine do início, com texto sobre a arte (`--hero-*`).
+
 ## Tokens
 
 | Papel | Token | Valor |
@@ -159,6 +168,12 @@ mesma identidade do site: fundo `n0`, cartão `n1` de borda `nline` com filete r
 RiftLab e, em destaque, o código em superfície roxa. Cliente de e-mail não garante fonte própria,
 `clip-path` nem SVG: o HTML usa tabelas e estilo inline, com fonte do sistema e sem imagem ou
 link. O texto puro vai junto, e o código nunca aparece no assunto nem na prévia da caixa.
+
+## Minha conta
+
+Um quadro único e centralizado na área da página (`.account-panel`, até 520 px, chanfro de elo
+e colchetes), sem ser modal: cabeçalho com selo, título e e-mail, um filete, e abaixo o estado do
+vínculo (formulário do Riot ID, desafio do ícone ou conta vinculada).
 
 ## Convite para criar conta
 

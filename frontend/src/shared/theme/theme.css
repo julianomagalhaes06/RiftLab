@@ -1,0 +1,6 @@
+/* Seletor de tema (sol e lua) no topo do site e da tela de entrar. */
+.theme-toggle { flex: none; display: inline-flex; align-items: center; gap: 2px; min-height: 36px; padding: 3px; border: 1px solid var(--nline2); border-radius: 999px; background: var(--n1); cursor: pointer; }
+.theme-toggle:hover { border-color: var(--nline-strong); }
+.theme-toggle:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.theme-toggle__side { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--ntext-subtle); }
+.theme-toggle__side.is-active { background: var(--accent-strong); color: var(--on-accent); }

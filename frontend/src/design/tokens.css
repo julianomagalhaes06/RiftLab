@@ -1,6 +1,6 @@
 /* Tokens visuais do RiftLab (CC-903): a única fonte de cores, espaços, raios e tipografia.
    As folhas de estilo das telas só usam var(--…); cor literal fora daqui falha no teste
-   `tokens.test.ts`. Tema escuro único. */
+   `tokens.test.ts`. Dois temas: escuro (`:root`, padrão) e claro (`[data-theme="light"]`). */
 
 @font-face {
   font-family: Inter;
@@ -66,6 +66,11 @@
   --hero-scrim-strong: rgb(15 16 19 / .94);
   --hero-glow: rgb(139 108 255 / .2);
   --hero-ink-shadow: rgb(0 0 0 / .65);
+  /* Texto sobre a arte: a vitrine continua escura nos dois temas. */
+  --hero-end: #0f1013;
+  --hero-ink: #ecedef;
+  --hero-ink-muted: #b4b8c1;
+  --hero-accent: #b8a6ff;
 
   /* Resultado. */
   --win: #3dd68c;
@@ -148,4 +153,93 @@
   --radius-md: 0.25rem;
   --font-body: Inter, sans-serif;
   --font-display: 'Chakra Petch', Inter, sans-serif;
+}
+
+/* Tema claro: mesmos papéis, valores próprios, contraste conferido em `tokens.test.ts`. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --n0: #f4f5f8;
+  --n1: #ffffff;
+  --n2: #eceef3;
+  --nline: #dde0e7;
+  --nline2: #c9ced8;
+  --nline-soft: #e8eaef;
+  --nline-strong: #757b87;
+  --ntext: #16181d;
+  --ntext-muted: #474d59;
+  --ntext-subtle: #5f6571;
+  --on-color: #ffffff;
+  --portrait-outline: #c9ced8;
+
+  --accent: #5c38d6;
+  --accent-strong: #6a45e0;
+  --accent-hover: #4a29b8;
+  --accent-fill-hover: #5734c7;
+  --accent-surface: #efeaff;
+  --accent-select: rgb(106 69 224 / .08);
+  --accent-ring: rgb(106 69 224 / .2);
+  --on-accent: #ffffff;
+
+  --win: #0a7a47;
+  --loss: #c42a42;
+  --win-surface: #dff5ea;
+  --loss-surface: #fde7eb;
+  --live: #c42a42;
+  --live-glow: rgb(196 42 66 / .35);
+  --win-tint: rgba(10, 122, 71, .1);
+  --loss-tint: rgba(196, 42, 66, .1);
+  --win-tint-soft: rgba(10, 122, 71, .08);
+  --loss-tint-soft: rgba(196, 42, 66, .08);
+  --shadow-soft: rgb(22 24 29 / .1);
+
+  --color-available-bg: #dff5ea;
+  --color-degraded: #7f5a05;
+  --color-degraded-bg: #fbf0d9;
+  --color-unavailable-bg: #fde7eb;
+  --color-loading: #3550a6;
+  --color-loading-bg: #e4eafa;
+  --color-warning: #7f5a05;
+  --color-warning-bg: #fbf0d9;
+
+  --team-blue: #2563c9;
+  --team-red: #c9344c;
+  --chart-grid: #e1e4ea;
+
+  --tier-iron-text: #6b615d;
+  --tier-bronze-text: #8f5232;
+  --tier-silver-text: #56626f;
+  --tier-gold-text: #7f5a05;
+  --tier-platinum-text: #16716a;
+  --tier-emerald-text: #12713f;
+  --tier-diamond-text: #3757c4;
+  --tier-master-text: #7a34ad;
+  --tier-grandmaster-text: #b02e2e;
+  --tier-challenger-text: #1a68a6;
+  --tier-none-text: #5f6571;
+}
+
+/* O card de elo é uma placa de metal: fica escuro nos dois temas, com os valores do tema escuro. */
+:root[data-theme="light"] .rank-card {
+  --n0: #0f1013;
+  --n1: #16181d;
+  --n2: #1c1f25;
+  --nline: #262a32;
+  --nline2: #343944;
+  --nline-soft: #1f2228;
+  --nline-strong: #656b76;
+  --ntext: #ecedef;
+  --ntext-muted: #b4b8c1;
+  --ntext-subtle: #8c919b;
+  --tier-iron-text: #c9bfbb;
+  --tier-bronze-text: #e4a07e;
+  --tier-silver-text: #c9d3dd;
+  --tier-gold-text: #f2b84b;
+  --tier-platinum-text: #6fd3c8;
+  --tier-emerald-text: #5cd795;
+  --tier-diamond-text: #a3b8ff;
+  --tier-master-text: #d19bf2;
+  --tier-grandmaster-text: #f28a8a;
+  --tier-challenger-text: #93cefa;
+  --tier-none-text: #b4b8c1;
 }

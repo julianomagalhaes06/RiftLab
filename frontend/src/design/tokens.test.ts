@@ -47,7 +47,17 @@ describe("tokens visuais", () => {
 /** CC-1201: as combinações do padrão Arena mantêm o contraste AA (texto ≥ 4,5:1; borda de
  * controle ≥ 3:1). Lê os valores direto de tokens.css. */
 const tokenSheet = Object.entries(sheets).find(([path]) => path.endsWith("/design/tokens.css"))?.[1] ?? "";
-const hex = Object.fromEntries([...tokenSheet.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})\b/gi)].map((m) => [m[1], m[2]]));
+const hexIn = (block: string) => Object.fromEntries([...block.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})\b/gi)].map((m) => [m[1], m[2]]));
+const LIGHT = ':root[data-theme="light"] {';
+const PLATE = ':root[data-theme="light"] .rank-card {';
+const blockAt = (selector: string) => {
+  const start = tokenSheet.indexOf(selector);
+  return start < 0 ? "" : tokenSheet.slice(start, tokenSheet.indexOf("}", start));
+};
+const darkHex = hexIn(tokenSheet.slice(0, tokenSheet.indexOf(LIGHT)));
+const lightHex = { ...darkHex, ...hexIn(blockAt(LIGHT)) };
+const plateHex = hexIn(blockAt(PLATE));
+const hex = darkHex;
 
 function luminance(value: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => {
@@ -57,8 +67,8 @@ function luminance(value: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-function contrast(fg: string, bg: string): number {
-  const [a, b] = [luminance(hex[fg]), luminance(hex[bg])].sort((x, y) => y - x);
+function contrast(fg: string, bg: string, palette: Record<string, string> = hex): number {
+  const [a, b] = [luminance(palette[fg]), luminance(palette[bg])].sort((x, y) => y - x);
   return (a + 0.05) / (b + 0.05);
 }
 
@@ -88,5 +98,39 @@ describe("contraste do padrão Arena", () => {
     expect(hex[fg], fg).toBeDefined();
     expect(hex[bg], bg).toBeDefined();
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(minimum);
+  });
+});
+
+describe("contraste do tema claro", () => {
+  it.each<Pair>([
+    ...["ntext", "ntext-muted", "ntext-subtle", "accent", "win", "loss"].flatMap((fg) =>
+      ["n0", "n1", "n2"].map((bg): Pair => [fg, bg, 4.5])),
+    ["on-accent", "accent-strong", 4.5],
+    ["on-accent", "accent-fill-hover", 4.5],
+    ["accent", "accent-surface", 4.5],
+    ["accent", "n1", 4.5],
+    ["win", "win-surface", 4.5],
+    ["loss", "loss-surface", 4.5],
+    ["color-degraded", "color-degraded-bg", 4.5],
+    ["color-loading", "color-loading-bg", 4.5],
+    ["color-warning", "color-warning-bg", 4.5],
+    ["nline-strong", "n0", 3],
+    ["nline-strong", "n1", 3],
+    ["team-blue", "n1", 3],
+    ["team-red", "n1", 3],
+    ...TIERS.map((tier): Pair => [`tier-${tier}-text`, "n1", 4.5]),
+  ])("%s sobre %s ≥ %s:1", (fg, bg, minimum) => {
+    expect(lightHex[fg], fg).toBeDefined();
+    expect(contrast(fg, bg, lightHex)).toBeGreaterThanOrEqual(minimum);
+  });
+
+  it("a placa de elo repete os valores do tema escuro, nos dois temas igual", () => {
+    expect(Object.keys(plateHex).length).toBeGreaterThan(15);
+    for (const [name, value] of Object.entries(plateHex)) expect(value, name).toBe(darkHex[name]);
+  });
+
+  it("todo token de cor do tema escuro que muda de papel tem par definido", () => {
+    expect(Object.keys(hexIn(blockAt(LIGHT))).length).toBeGreaterThan(40);
+    for (const name of Object.keys(hexIn(blockAt(LIGHT)))) expect(darkHex[name], name).toBeDefined();
   });
 });

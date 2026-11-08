@@ -27,6 +27,7 @@ import { AuthScreen } from "../features/auth/AuthScreen";
 import { UserMenu } from "../features/auth/UserMenu";
 import { AccountPage } from "../features/auth/AccountPage";
 import { AccountGate } from "../features/auth/AccountGate";
+import { ThemeToggle } from "../shared/theme/ThemeToggle";
 import { HomePage } from "../features/home/HomePage";
 import "./App.css";
 import "../design/concept-c.css";
@@ -174,6 +175,7 @@ function AppContent() {
             <div className="app__tools">
               {route.name === "home" ? null : <PlayerSearch />}
               {hasAccount ? <ProfileChip /> : null}
+              <ThemeToggle />
               <UserMenu />
             </div>
           </div>

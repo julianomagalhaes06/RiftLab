@@ -6,6 +6,7 @@
 .auth-page { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; background: var(--n0); color: var(--ntext); }
 .auth-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 40px; border-bottom: 1px solid var(--nline); }
 .auth-top__brand { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 1.125rem var(--font-display); color: var(--ntext); text-decoration: none; }
+.auth-top__tools { display: flex; align-items: center; gap: 16px; }
 .auth-top__back { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-size: .875rem; font-weight: 600; text-decoration: none; }
 .auth-top__back:hover, .auth-hint a:hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 4px; }
 .auth-hint a { color: var(--accent); font-weight: 600; }
@@ -102,15 +103,26 @@
 .user-menu__out { flex: none; min-height: 36px; padding: 0 12px; white-space: nowrap; }
 
 /* ---- Minha conta ---- */
-.account-card { display: grid; gap: 12px; max-width: 640px; }
-.account-card h3 { margin: 0; }
-.account-card .form { display: grid; gap: 8px; max-width: 360px; }
-.account-card .form .button { justify-self: start; }
-.account-card__riot { margin: 0; font-family: var(--font-display); font-size: 1.25rem; color: var(--ntext); }
+/* Minha conta: um quadro único, centralizado na área da página. */
+.account-page { display: grid; place-items: center; min-height: min(640px, 60vh); }
+.account-panel { display: grid; gap: 22px; width: min(100%, 520px); padding: 36px 40px; }
+.account-panel__head { display: grid; justify-items: center; gap: 6px; padding-bottom: 22px; border-bottom: 1px solid var(--nline); text-align: center; }
+.account-panel__head h2 { margin: 6px 0 0; font: 600 1.625rem/1.2 var(--font-display); color: var(--ntext); }
+.account-panel__head .muted { margin: 4px 0 0; line-height: 1.5; }
+.account-panel__badge { display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid var(--accent-strong); border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
+.account-panel__email { max-width: 100%; margin: 0; overflow: hidden; color: var(--ntext-subtle); font-size: .875rem; text-overflow: ellipsis; white-space: nowrap; }
+.account-card { display: grid; gap: 16px; }
+.account-card h3 { margin: 0; font: 600 1.125rem var(--font-display); color: var(--ntext); }
+.account-card .muted { margin: 0; line-height: 1.5; }
+.account-card .form { display: grid; gap: 8px; }
+.account-card .form .button, .account-card > .button { width: 100%; }
+.account-linked { display: grid; justify-items: center; gap: 8px; text-align: center; }
+.account-card__riot { margin: 0; font: 600 1.5rem var(--font-display); color: var(--ntext); overflow-wrap: anywhere; }
+.account-card__riot span { color: var(--ntext-subtle); font-weight: 500; }
 .account-steps { margin: 0; padding-left: 20px; color: var(--ntext-muted); line-height: 1.6; }
-.account-icon { margin: 0; display: grid; justify-items: start; gap: 6px; color: var(--ntext-subtle); font-size: .8125rem; }
+.account-icon { margin: 0; display: grid; justify-items: center; gap: 8px; color: var(--ntext-subtle); font-size: .8125rem; }
 .account-icon img { border: 1px solid var(--portrait-outline); }
-.account-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.account-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* Convite para criar conta quando a pessoa sem conta chega a algo que guarda dados dela. */
 .account-gate__card { display: grid; gap: 18px; max-width: 560px; }
@@ -132,3 +144,9 @@
 .auth-link:disabled { color: var(--ntext-subtle); cursor: default; }
 .auth-link:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .auth-notice { margin: 0; padding: 10px 12px; border: 1px solid var(--accent-strong); border-radius: var(--radius-sm); background: var(--accent-surface); color: var(--ntext); font-size: .875rem; line-height: 1.4; }
+
+@media (max-width: 700px) {
+  .account-page { place-items: start center; }
+  .account-panel { padding: 28px 22px; }
+  .account-actions { grid-template-columns: 1fr; }
+}
