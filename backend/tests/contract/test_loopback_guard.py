@@ -142,3 +142,42 @@ async def test_route_csp_keeps_its_policy_and_gains_frame_ancestors() -> None:
     assert response.headers["content-security-policy"] == (
         "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
     )
+
+
+NAVIGATION = {
+    "Sec-Fetch-Site": "cross-site",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Dest": "document",
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider", ["google", "discord"])
+async def test_return_from_the_social_provider_is_not_refused(api: FastAPI, provider: str) -> None:
+    # Sem o cookie da tentativa, a própria rota recusa e manda de volta à tela de entrar.
+    response = await get(
+        api, f"/api/v1/auth/social/{provider}/callback?state=x&code=y", **NAVIGATION
+    )
+    assert response.status_code != 403, response.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("path", "headers"),
+    [
+        ("/api/v1/auth/social/google/callback", {**NAVIGATION, "Sec-Fetch-Dest": "iframe"}),
+        (
+            "/api/v1/auth/social/google/callback",
+            {**NAVIGATION, "Sec-Fetch-Dest": "image", "Sec-Fetch-Mode": "no-cors"},
+        ),
+        ("/api/v1/auth/social/google/callback", {"Sec-Fetch-Site": "cross-site"}),
+        ("/api/v1/auth/social/outro/callback", NAVIGATION),
+        ("/api/v1/auth/social/google/start", NAVIGATION),
+        ("/api/v1/matches/BR1_1", NAVIGATION),
+    ],
+)
+async def test_only_the_full_page_return_escapes_the_cross_site_guard(
+    api: FastAPI, path: str, headers: dict[str, str]
+) -> None:
+    response = await get(api, path, **headers)
+    assert (response.status_code, response.json()["code"]) == (403, "CROSS_SITE_REQUEST")
