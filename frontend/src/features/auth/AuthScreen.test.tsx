@@ -110,8 +110,10 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect((init?.headers as Record<string, string>)["X-RiftLab-Request"]).toBe("1");
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
-    // Sem sessão, o Painel vira o convite; a navegação continua.
-    expect(await screen.findByText("Disponível com conta")).toBeInTheDocument();
+    // Sair leva ao início, com a navegação de quem não tem conta.
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+    expect(screen.queryByText("Disponível com conta")).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Áreas principais" })).toBeInTheDocument();
     expect(mock.callsTo("POST", /^\/api\/v1\/auth\/logout$/)).toHaveLength(1);
   });

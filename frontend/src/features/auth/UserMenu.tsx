@@ -6,10 +6,11 @@ import { loginPath } from "../../shared/router/routes";
 import { useAuth } from "./authContext";
 
 /** Usuário da sessão e o botão Sair, no topo. Sem sessão e com contas ativas, Entrar e Criar
- * conta (voltando à página atual). Numa instalação sem login exigido, não aparece. */
+ * conta (voltando à página atual). Numa instalação sem login exigido, não aparece. Sair leva
+ * ao início, de qualquer página. */
 export function UserMenu() {
   const { user, authRequired, signOut } = useAuth();
-  const { href, route } = useRouter();
+  const { href, route, navigate } = useRouter();
   const [leaving, setLeaving] = useState(false);
   if (!user) {
     if (!authRequired) return null;
@@ -27,7 +28,14 @@ export function UserMenu() {
         <Link to="/conta" aria-label={`Minha conta (${user.email})`} title={user.email}>{user.name ?? user.email}</Link>
       </span>
       <button type="button" className="button button--secondary user-menu__out" disabled={leaving}
-        onClick={() => { setLeaving(true); void signOut().finally(() => setLeaving(false)); }}>
+        onClick={() => {
+          setLeaving(true);
+          // Sair é uma escolha: volta ao início, em vez de cair no convite da área da conta.
+          void signOut().finally(() => {
+            setLeaving(false);
+            navigate("/", { replace: true });
+          });
+        }}>
         {leaving ? "Saindo…" : "Sair"}
       </button>
     </div>

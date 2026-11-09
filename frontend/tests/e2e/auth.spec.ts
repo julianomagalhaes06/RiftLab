@@ -37,8 +37,9 @@ for (const width of [1280, 360]) {
     await expect(page.getByRole("link", { name: "Minha conta (jogadora@example.test)" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Áreas principais" })).toBeVisible();
     await page.getByRole("button", { name: "Sair" }).click();
-    // Sair não tranca o site: o Painel vira o convite e o topo volta a oferecer Entrar.
-    await expect(page.getByText("Disponível com conta")).toBeVisible();
+    // Sair leva ao início, e o topo volta a oferecer Entrar.
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: /Entenda cada compra/ })).toBeVisible();
     await expect(page.locator(".user-menu").getByRole("link", { name: "Entrar" })).toBeVisible();
   });
 }
