@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AuthContext, type AuthState } from "./authContext";
-import { AUTH_REQUIRED_EVENT, api, type SessionUser } from "../../shared/api/client";
+import { AUTH_REQUIRED_EVENT, api, type SessionUser, type SocialProvider } from "../../shared/api/client";
 
 /**
  * Sessão local (Sprint 2, #10). Consulta `/api/v1/auth/session` ao abrir e sempre que
@@ -11,11 +11,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [socialProviders, setSocialProviders] = useState<readonly SocialProvider[]>([]);
 
   const refresh = useCallback((signal?: AbortSignal) => {
     api.getAuthSession(signal).then((session) => {
       setAuthRequired(session.authRequired);
       setUser(session.user ?? null);
+      setSocialProviders(session.socialProviders ?? []);
     }).catch(() => {
       if (!signal?.aborted) setAuthRequired(false);
     }).finally(() => {
@@ -44,8 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const value = useMemo<AuthState>(() => ({
-    checked, authRequired, user, signOut, hasAccount: !authRequired || user !== null,
+    checked, authRequired, user, socialProviders, signOut, hasAccount: !authRequired || user !== null,
     signedIn: (next) => { setUser(next); setChecked(true); },
-  }), [checked, authRequired, user, signOut]);
+  }), [checked, authRequired, user, socialProviders, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

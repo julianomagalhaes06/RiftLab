@@ -203,7 +203,12 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
   layout, sem abas), com o campo de 6 dígitos (`inputMode="numeric"`, `one-time-code`), reenvio
   com contagem de 60 s e "Corrigir o e-mail". "Esqueci minha senha" usa o mesmo passo, com a
   senha nova e os mesmos requisitos. O foco acompanha o título a cada passo.
-- **Cadastro:** senha com mostrar/ocultar (`aria-pressed`), requisitos conferidos enquanto a
+- **Login social:** em Entrar e Criar conta, acima do formulário, um botão secundário por
+  provedor configurado (largura dividida igualmente) e o separador "ou com e-mail". Os logos são
+  imagens da marca de cada serviço (`public/brand`), como os emblemas. Sem provedor, a tela mostra
+  só o formulário.
+- **Cadastro:** nome, e-mail, senha e confirmar senha; o mostrar/ocultar vale para os dois campos
+  de senha. Senha com mostrar/ocultar (`aria-pressed`), requisitos conferidos enquanto a
   pessoa digita (check roxo e texto "atendido/pendente", nunca só cor) e, depois de criar, a
   confirmação "Conta criada" com o próximo passo: "Vincular conta Riot" (primário) ou "Ir para o
   Painel"; vinda de outra tela, "Voltar para onde eu estava" passa a ser o primário.

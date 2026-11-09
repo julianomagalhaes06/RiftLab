@@ -80,7 +80,9 @@ async def _post(client: AsyncClient, path: str, body: dict):
 
 
 async def _register(client: AsyncClient, email: str, password: str = PASSWORD):
-    return await _post(client, "register", {"email": email, "password": password})
+    return await _post(
+        client, "register", {"name": "Jogadora", "email": email, "password": password}
+    )
 
 
 async def _verified(client: AsyncClient, mail: FakeMailer, email: str):
@@ -133,7 +135,8 @@ async def test_register_confirms_by_code_before_any_session(client, mail, emails
     assert confirmed.status_code == 200
     assert confirmed.json() == {
         "authRequired": True,
-        "user": {"id": str(user_id), "email": email},
+        "user": {"id": str(user_id), "email": email, "name": "Jogadora"},
+        "socialProviders": [],
     }
     cookie = confirmed.headers["set-cookie"].lower()
     assert "httponly" in cookie and "samesite=strict" in cookie and "path=/" in cookie
@@ -468,7 +471,11 @@ async def test_protection_requires_session_and_csrf_header_but_not_for_health(cl
     assert (response.status_code, response.json()["code"]) == (401, "AUTH_REQUIRED")
     assert response.headers["content-type"].startswith("application/problem+json")
     assert (await client.get("/health/live")).status_code == 200
-    assert (await client.get("/api/v1/auth/session")).json() == {"authRequired": True, "user": None}
+    assert (await client.get("/api/v1/auth/session")).json() == {
+        "authRequired": True,
+        "user": None,
+        "socialProviders": [],
+    }
     no_header = await client.post(
         "/api/v1/auth/login", json={"email": "qualquer@example.test", "password": PASSWORD}
     )
@@ -506,7 +513,11 @@ def test_throttle_window_slides_and_success_clears_the_user_count():
 @pytest.mark.asyncio
 async def test_without_auth_required_routes_stay_open(session_factory):
     async for c in _client(Settings(auth_required=False)):
-        assert (await c.get("/api/v1/auth/session")).json() == {"authRequired": False, "user": None}
+        assert (await c.get("/api/v1/auth/session")).json() == {
+            "authRequired": False,
+            "user": None,
+            "socialProviders": [],
+        }
         assert (await c.get("/api/v1/matches")).status_code == 200
 
 

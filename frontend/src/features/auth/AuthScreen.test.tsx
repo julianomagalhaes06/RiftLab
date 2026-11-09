@@ -141,13 +141,21 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(screen.getByText(/Uma letra maiúscula/)).toHaveTextContent("(atendido)");
     expect(screen.getByText(/Um símbolo/)).toHaveTextContent("(atendido)");
     fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Informe seu nome.");
+    fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "  Jogadora " } });
+    fireEvent.change(screen.getByLabelText("Confirmar senha"), { target: { value: "Abcdef1?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    expect(await screen.findByText("As senhas não são iguais.")).toBeInTheDocument();
+    expect(mock.callsTo("POST", /auth\/register$/)).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("Confirmar senha"), { target: { value: "Abcdef1!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
 
     const heading = await screen.findByRole("heading", { name: "Confirme seu e-mail" });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText("jogadora@example.test")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reenviar código em \d+ s/ })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Sair" })).not.toBeInTheDocument();
-    expect(mock.callsTo("POST", /auth\/register$/)[0].body).toEqual({ email: "jogadora@example.test", password: "Abcdef1!" });
+    expect(mock.callsTo("POST", /auth\/register$/)[0].body).toEqual({ name: "Jogadora", email: "jogadora@example.test", password: "Abcdef1!" });
 
     const field = screen.getByLabelText("Código de 6 dígitos");
     expect(field).toHaveAttribute("autocomplete", "one-time-code");
@@ -257,6 +265,55 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(screen.queryByRole("link", { name: "Entrar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sair" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Áreas principais" })).toHaveTextContent("Painel");
+  });
+});
+
+describe("Login social e nome da conta", () => {
+  function withSession(session: Record<string, unknown>) {
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+  }
+
+  it("mostra só os provedores configurados e leva o destino junto", async () => {
+    window.history.replaceState(null, "", "/entrar?next=%2Fhistorico");
+    withSession({ authRequired: true, user: null, socialProviders: ["google"] });
+    const google = await screen.findByRole("link", { name: "Continuar com Google" });
+    expect(google).toHaveAttribute("href", "/api/v1/auth/social/google/start?next=%2Fhistorico");
+    expect(screen.queryByRole("link", { name: "Continuar com Discord" })).not.toBeInTheDocument();
+    expect(screen.getByText("ou com e-mail")).toBeInTheDocument();
+  });
+
+  it("sem provedor configurado, fica só o formulário", async () => {
+    window.history.replaceState(null, "", "/criar-conta");
+    withSession({ authRequired: true, user: null, socialProviders: [] });
+    await screen.findByRole("heading", { name: "Criar conta no RiftLab" });
+    expect(screen.queryByRole("link", { name: /Continuar com (Google|Discord)/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("ou com e-mail")).not.toBeInTheDocument();
+  });
+
+  it("redefinir a senha não oferece login social", async () => {
+    window.history.replaceState(null, "", "/esqueci-senha");
+    withSession({ authRequired: true, user: null, socialProviders: ["google", "discord"] });
+    await screen.findByRole("heading", { name: "Redefinir a senha" });
+    expect(screen.queryByRole("link", { name: "Continuar com Google" })).not.toBeInTheDocument();
+  });
+
+  it("avisa o motivo da volta sem sucesso e limpa o endereço", async () => {
+    window.history.replaceState(null, "", "/entrar?social=cancelado&next=%2Fhistorico");
+    withSession({ authRequired: true, user: null, socialProviders: ["discord"] });
+    expect(await screen.findByText(/^Login cancelado\./)).toHaveAttribute("role", "status");
+    await waitFor(() => expect(window.location.search).toBe("?next=%2Fhistorico"));
+    // O aviso não marca os campos como errados.
+    expect(screen.getByLabelText("Senha")).toHaveAttribute("aria-invalid", "false");
+  });
+
+  it("o menu mostra o nome e cai no e-mail quando a conta não tem nome", async () => {
+    window.history.replaceState(null, "", "/entrar");
+    withSession({ authRequired: true, user: { ...USER, name: "Jogadora" }, socialProviders: [] });
+    expect(await screen.findByRole("link", { name: "Minha conta (jogadora@example.test)" })).toHaveTextContent("Jogadora");
+    expect(screen.getByRole("link", { name: "Minha conta (jogadora@example.test)" })).not.toHaveTextContent("example.test");
   });
 });
 

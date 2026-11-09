@@ -49,6 +49,7 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // --- contas locais (Sprint 2, #10) ---
   AUTH_REQUIRED: "Sua sessão terminou. Entre de novo para continuar.",
   INVALID_CREDENTIALS: "E-mail ou senha incorretos.",
+  INVALID_NAME: "Use de 2 a 40 caracteres no nome.",
   INVALID_EMAIL: "Confira o endereço de e-mail.",
   INVALID_PASSWORD: "A senha precisa ter pelo menos 8 caracteres, com uma letra maiúscula e um símbolo.",
   EMAIL_NOT_VERIFIED: "Confirme seu e-mail para entrar.",

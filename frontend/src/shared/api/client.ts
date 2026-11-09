@@ -45,6 +45,7 @@ export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
 export type SessionState = Schemas["SessionState"];
 export type SessionUser = Schemas["SessionUser"];
+export type SocialProvider = Schemas["SessionState"]["socialProviders"][number];
 export type CodeSent = Schemas["CodeSent"];
 export type RiotLinkState = Schemas["RiotLinkState"];
 
@@ -96,7 +97,7 @@ export interface ApiClient {
   /** Contas locais (Sprint 2, #10): sessão por cookie HttpOnly. */
   getAuthSession(signal?: AbortSignal): Promise<SessionState>;
   /** Cria a conta e manda o código; a resposta é a mesma se o e-mail já tiver conta. */
-  register(email: string, password: string, signal?: AbortSignal): Promise<CodeSent>;
+  register(name: string, email: string, password: string, signal?: AbortSignal): Promise<CodeSent>;
   login(email: string, password: string, signal?: AbortSignal): Promise<SessionState>;
   verifyEmail(email: string, code: string, password: string, signal?: AbortSignal): Promise<SessionState>;
   resendCode(email: string, signal?: AbortSignal): Promise<CodeSent>;
@@ -242,8 +243,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
       request("POST", "/api/v1/players/lookup-from-match", { body: { matchId, participantId }, signal }),
     getOwnPlayer: (signal) => request("GET", "/api/v1/players/me", { signal }),
     getAuthSession: (signal) => request("GET", "/api/v1/auth/session", { signal }),
-    register: (email, password, signal) =>
-      request("POST", "/api/v1/auth/register", { body: { email, password }, signal }),
+    register: (name, email, password, signal) =>
+      request("POST", "/api/v1/auth/register", { body: { name, email, password }, signal }),
     login: (email, password, signal) =>
       request("POST", "/api/v1/auth/login", { body: { email, password }, signal }),
     verifyEmail: (email, code, password, signal) =>

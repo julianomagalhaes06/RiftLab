@@ -57,8 +57,10 @@ for (const width of [1280, 360]) {
       },
     });
     await page.goto("/criar-conta");
+    await page.getByLabel("Nome", { exact: true }).fill("Jogadora");
     await page.getByLabel("E-mail").fill("jogadora@example.test");
     await page.getByLabel("Senha", { exact: true }).fill("Abcdef1!");
+    await page.getByLabel("Confirmar senha", { exact: true }).fill("Abcdef1!");
     await page.keyboard.press("Enter");
     await expect(page.getByRole("heading", { name: "Confirme seu e-mail" })).toBeFocused();
     const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

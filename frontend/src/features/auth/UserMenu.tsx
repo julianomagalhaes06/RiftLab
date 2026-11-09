@@ -24,7 +24,7 @@ export function UserMenu() {
   return (
     <div className="user-menu">
       <span className="user-menu__name">
-        <Link to="/conta" aria-label={`Minha conta (${user.email})`} title={user.email}>{user.email}</Link>
+        <Link to="/conta" aria-label={`Minha conta (${user.email})`} title={user.email}>{user.name ?? user.email}</Link>
       </span>
       <button type="button" className="button button--secondary user-menu__out" disabled={leaving}
         onClick={() => { setLeaving(true); void signOut().finally(() => setLeaving(false)); }}>

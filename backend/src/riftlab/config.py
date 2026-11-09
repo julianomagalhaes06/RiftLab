@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     smtp_starttls: bool = False
     smtp_from: str = "RiftLab <no-reply@riftlab.local>"
     smtp_timeout_seconds: float = 10.0
+    # Login social (opcional): cada provedor só aparece com id e segredo; ver `.env.example`.
+    # `public_url` é o endereço que o navegador usa, base do retorno cadastrado no provedor.
+    public_url: str = "http://127.0.0.1:5173"
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    discord_client_id: str | None = None
+    discord_client_secret: str | None = None
 
     database_url: str = "postgresql+asyncpg://riftlab:riftlab@db:5432/riftlab"
     database_ready_timeout_seconds: float = 2.0

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { api, type SessionUser } from "../../shared/api/client";
+import { api, type SessionUser, type SocialProvider } from "../../shared/api/client";
 import { messageForCode } from "../../shared/api/messages";
 import { isApiError } from "../../shared/api/errors";
 import { useRouter } from "../../shared/router/context";
@@ -53,6 +53,35 @@ const POINTS = [
   ["Acompanhe sua evolução", "Elo da sua conta, estudos e reflexões no mesmo lugar."],
 ] as const;
 
+const SOCIAL_LABELS: Record<SocialProvider, string> = { google: "Google", discord: "Discord" };
+/** Motivos com que a API devolve a pessoa a esta tela depois de um login social. */
+const SOCIAL_NOTICES: Readonly<Record<string, string>> = {
+  cancelado: "Login cancelado. Escolha outra forma de entrar.",
+  falhou: "Não foi possível entrar por esse serviço agora. Tente de novo.",
+  email: "Esse serviço não confirmou o seu e-mail. Confirme o e-mail lá ou use o formulário abaixo.",
+  indisponivel: "Esse login não está disponível neste servidor.",
+};
+
+function SocialLogin({ providers, next }: { providers: readonly SocialProvider[]; next: string | null }) {
+  if (providers.length === 0) return null;
+  const query = next ? `?next=${encodeURIComponent(next)}` : "";
+  return (
+    <div className="auth-social">
+      <div className="auth-social__buttons">
+        {providers.map((provider) => (
+          // Link comum: a API redireciona para o provedor, e a página inteira precisa ir junto.
+          <a key={provider} className="button button--secondary auth-social__button"
+            href={`/api/v1/auth/social/${provider}/start${query}`} aria-label={`Continuar com ${SOCIAL_LABELS[provider]}`}>
+            <img src={`/brand/${provider}.svg`} alt="" width="20" height="20" />
+            {SOCIAL_LABELS[provider]}
+          </a>
+        ))}
+      </div>
+      <p className="auth-social__or">ou com e-mail</p>
+    </div>
+  );
+}
+
 function CheckIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
@@ -100,16 +129,20 @@ function PasswordRules({ id, password }: { id: string; password: string }) {
  * Padrão Arena: página dividida (vitrine à esquerda, formulário à direita; empilhada no celular).
  */
 export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) {
-  const { signedIn } = useAuth();
+  const { signedIn, socialProviders } = useAuth();
   const { navigate } = useRouter();
   const destination = next ?? "/painel";
   const [step, setStep] = useState<Step>("form");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(
+    () => SOCIAL_NOTICES[new URLSearchParams(window.location.search).get("social") ?? ""] ?? null,
+  );
   const [sending, setSending] = useState(false);
   const [created, setCreated] = useState<SessionUser | null>(null);
   const [fromRegister, setFromRegister] = useState(false);
@@ -118,8 +151,10 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
   const welcomeRef = useRef<HTMLHeadingElement>(null);
   const firstStep = useRef(true);
   const tabsId = useId();
+  const nameId = useId();
   const emailId = useId();
   const passwordId = useId();
+  const confirmationId = useId();
   const codeId = useId();
   const errorId = useId();
   const rulesId = useId();
@@ -133,6 +168,14 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
   useEffect(() => {
     if (created) welcomeRef.current?.focus();
   }, [created]);
+
+  // O aviso da volta do login social aparece uma vez: recarregar a página não o repete.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("social")) return;
+    url.searchParams.delete("social");
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
 
   // Troca de passo: o foco acompanha o título novo (teclado e leitor de tela).
   useEffect(() => {
@@ -203,10 +246,12 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
       });
       return;
     }
+    if (mode === "register" && !name.trim()) return setError("Informe seu nome.");
     if (!address || !password) return setError("Preencha e-mail e senha.");
     if (mode === "register") {
+      if (password !== confirmation) return setError("As senhas não são iguais.");
       await run(async () => {
-        await api.register(address, password);
+        await api.register(name.trim(), address, password);
         setFromRegister(true);
         goToCode("verify");
       });
@@ -395,7 +440,16 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
                 <h1 id={`${tabsId}-heading`} ref={headingRef} tabIndex={-1}>{copy.title}</h1>
                 <p className="muted">{copy.lead}</p>
                 {noticeLine}
+                {mode !== "forgot" ? <SocialLogin providers={socialProviders} next={next} /> : null}
                 <form className="form auth-form" onSubmit={submit} noValidate>
+                  {mode === "register" ? (
+                    <>
+                      <label htmlFor={nameId} className="form__label">Nome</label>
+                      <input id={nameId} className="form__input" name="name" type="text" autoComplete="name"
+                        maxLength={40} value={name} onChange={(event) => setName(event.target.value)}
+                        aria-invalid={error !== null} aria-describedby={error ? errorId : undefined} />
+                    </>
+                  ) : null}
                   <label htmlFor={emailId} className="form__label">E-mail</label>
                   <input id={emailId} className="form__input" name="email" type="email" autoComplete="email"
                     autoCapitalize="none" spellCheck={false} value={email}
@@ -405,7 +459,16 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
                     ? passwordField("Senha", mode === "login" ? "current-password" : "new-password",
                       [mode === "register" ? rulesId : "", error ? errorId : ""].filter(Boolean).join(" ") || undefined)
                     : null}
-                  {mode === "register" ? <PasswordRules id={rulesId} password={password} /> : null}
+                  {mode === "register" ? (
+                    <>
+                      <PasswordRules id={rulesId} password={password} />
+                      <label htmlFor={confirmationId} className="form__label">Confirmar senha</label>
+                      <input id={confirmationId} className="form__input" name="password-confirmation"
+                        type={showPassword ? "text" : "password"} autoComplete="new-password" value={confirmation}
+                        onChange={(event) => setConfirmation(event.target.value)} aria-invalid={error !== null}
+                        aria-describedby={error ? errorId : undefined} />
+                    </>
+                  ) : null}
                   {errorLine}
                   <button type="submit" className="button auth-wide" disabled={sending}>
                     {sending ? "Enviando…" : copy.submit}
