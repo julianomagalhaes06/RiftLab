@@ -56,14 +56,10 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     vi.stubGlobal("fetch", mock.fetch);
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Histórico" })).toBeInTheDocument();
-    expect(screen.getByText("Disponível com conta")).toBeInTheDocument();
-    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(0);
-    const enter = screen.getAllByRole("link", { name: "Entrar" }).find((link) => link.closest(".account-gate"));
-    expect(enter).toHaveAttribute("href", "/entrar?next=%2Fhistorico");
-    fireEvent.click(enter!);
-
+    // Sem sessão, a área da conta vai direto para a tela de entrar, guardando o destino.
     expect(await screen.findByRole("heading", { name: "Entrar no RiftLab" })).toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe("/entrar?next=%2Fhistorico");
+    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(0);
     fill("jogadora@example.test", PASSWORD);
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
     expect(await screen.findByRole("heading", { name: "Partidas para estudar" })).toBeInTheDocument();
@@ -113,7 +109,7 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     // Sair leva ao início, com a navegação de quem não tem conta.
     expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/");
-    expect(screen.queryByText("Disponível com conta")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Entrar no RiftLab" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Áreas principais" })).toBeInTheDocument();
     expect(mock.callsTo("POST", /^\/api\/v1\/auth\/logout$/)).toHaveLength(1);
   });
@@ -242,7 +238,7 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(mock.callsTo("POST", /password\/reset$/).at(-1)?.body).toEqual({ email: "jogadora@example.test", code: "123456", newPassword: "Senha-Nova-2" });
   });
 
-  it("sessão que termina no meio do uso troca a área da conta pelo convite", async () => {
+  it("sessão que termina no meio do uso leva ao início", async () => {
     const mock = createMockApi();
     let session: { authRequired: boolean; user: typeof USER | null } = { authRequired: true, user: USER };
     mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
@@ -253,7 +249,8 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     vi.stubGlobal("fetch", mock.fetch);
     window.history.replaceState(null, "", "/historico");
     render(<App />);
-    expect(await screen.findByText("Disponível com conta")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
     await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/auth\/session$/).length).toBeGreaterThan(1));
   });
 

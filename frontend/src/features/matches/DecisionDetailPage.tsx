@@ -383,7 +383,6 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         {decision.eligible && decision.versions.reconstructionRulesHealth !== "SUSPENDED" ? (
           hasAccount ? <DecisionExperience decisionId={decision.decisionId} /> : (
             <AccountGate
-              inline
               title="Analise esta compra"
               lead="Compare o item comprado com até três alternativas, escolha antes de ver a resposta e guarde suas reflexões."
             />

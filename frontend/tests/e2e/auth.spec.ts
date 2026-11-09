@@ -117,8 +117,8 @@ test("sem conta em 360px: início com a busca e convite nas áreas da conta", as
   expect(scroll).toBeLessThanOrEqual(0);
 
   await page.goto("/minha-posicao");
-  await expect(page.getByText("Disponível com conta")).toBeVisible();
-  await expect(page.locator(".account-gate").getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/criar-conta?next=%2Fminha-posicao");
+  await expect(page.getByRole("heading", { name: "Entrar no RiftLab" })).toBeVisible();
+  await expect(page).toHaveURL(/\/entrar\?next=%2Fminha-posicao$/);
   scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
 });

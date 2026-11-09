@@ -175,14 +175,13 @@ Um quadro único e centralizado na área da página (`.account-panel`, até 520 
 e colchetes), sem ser modal: cabeçalho com selo, título e e-mail, um filete, e abaixo o estado do
 vínculo (formulário do Riot ID, desafio do ícone ou conta vinculada).
 
-## Convite para criar conta
+## Sem conta
 
-Sem conta, as áreas que guardam dados da pessoa (Painel, Minha posição, Histórico, Minha conta,
-Importar) mostram `AccountGate` no lugar da tela, e o detalhe da decisão troca a análise e o
-estudo pela versão `inline` do mesmo convite. Contexto "Disponível com conta", título da área,
-frase do que ela oferece e os botões Criar conta (primário) e Entrar (secundário), que voltam ao
-mesmo endereço depois do login (`?next=`). O menu principal mostra só Início e Campeões; o topo,
-Entrar e Criar conta.
+As áreas da conta (Painel, Minha posição, Histórico, Minha conta, Importar) levam quem não tem
+sessão direto à tela de entrar, que volta ao mesmo endereço depois do login (`?next=`). O menu
+principal mostra só Início e Campeões; o topo, Entrar e Criar conta. Sair, ou a sessão terminar
+no meio do uso, leva ao início. Numa página pública, o detalhe da decisão troca a análise e o
+estudo pelo convite `AccountGate` ("Disponível com conta", com Criar conta e Entrar).
 
 ## Tela de entrada (contas locais)
 

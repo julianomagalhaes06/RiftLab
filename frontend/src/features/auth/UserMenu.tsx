@@ -10,7 +10,7 @@ import { useAuth } from "./authContext";
  * ao início, de qualquer página. */
 export function UserMenu() {
   const { user, authRequired, signOut } = useAuth();
-  const { href, route, navigate } = useRouter();
+  const { href, route } = useRouter();
   const [leaving, setLeaving] = useState(false);
   if (!user) {
     if (!authRequired) return null;
@@ -28,14 +28,7 @@ export function UserMenu() {
         <Link to="/conta" aria-label={`Minha conta (${user.email})`} title={user.email}>{user.name ?? user.email}</Link>
       </span>
       <button type="button" className="button button--secondary user-menu__out" disabled={leaving}
-        onClick={() => {
-          setLeaving(true);
-          // Sair é uma escolha: volta ao início, em vez de cair no convite da área da conta.
-          void signOut().finally(() => {
-            setLeaving(false);
-            navigate("/", { replace: true });
-          });
-        }}>
+        onClick={() => { setLeaving(true); void signOut().finally(() => setLeaving(false)); }}>
         {leaving ? "Saindo…" : "Sair"}
       </button>
     </div>

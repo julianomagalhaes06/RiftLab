@@ -13,7 +13,7 @@ import { Link } from "../shared/router/Link";
 import { RouterProvider } from "../shared/router/RouterProvider";
 import { DemoNoticeProvider } from "./DemoNotice";
 import { ContextStrip } from "./ContextStrip";
-import type { Route } from "../shared/router/routes";
+import { loginPath, type Route } from "../shared/router/routes";
 import { PanelPage, PositionPage } from "./AreaPages";
 import { ChampionsPage } from "../features/champions/ChampionsPage";
 import { MainNav } from "./MainNav";
@@ -26,7 +26,6 @@ import { useAuth } from "../features/auth/authContext";
 import { AuthScreen } from "../features/auth/AuthScreen";
 import { UserMenu } from "../features/auth/UserMenu";
 import { AccountPage } from "../features/auth/AccountPage";
-import { AccountGate } from "../features/auth/AccountGate";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
 import { HomePage } from "../features/home/HomePage";
 import "./App.css";
@@ -53,15 +52,8 @@ const TITLES: Record<Route["name"], string> = {
   notFound: "Página não encontrada — RiftLab",
 };
 
-// Áreas da conta própria: sem conta, o convite para criar uma (a leitura pública segue aberta).
-const ACCOUNT_AREAS: Partial<Record<Route["name"], { title: string; lead: string }>> = {
-  panel: { title: "Painel", lead: "Taxa de vitória, KDA, campeões mais jogados e partidas recentes da sua conta Riot vinculada." },
-  position: { title: "Minha posição", lead: "Seu elo e a evolução da sua posição ranqueada, a partir da conta Riot vinculada." },
-  history: { title: "Histórico", lead: "Suas partidas ranqueadas, atualizadas automaticamente, para estudar cada compra." },
-  account: { title: "Minha conta", lead: "Conta local e vínculo com a sua conta Riot." },
-  importEntry: { title: "Importar partida", lead: "Importe uma partida pelo ID para analisar as compras dela." },
-  import: { title: "Importar partida", lead: "Importe uma partida pelo ID para analisar as compras dela." },
-};
+// Áreas da conta própria: sem sessão, vão direto para entrar ou criar conta (e voltam depois).
+const ACCOUNT_AREAS: ReadonlySet<Route["name"]> = new Set(["panel", "position", "history", "account", "importEntry", "import"]);
 
 function renderPage(route: Route): ReactNode {
   switch (route.name) {
@@ -137,7 +129,10 @@ function AppShell() {
 function AppContent() {
   const { route, navigate, href } = useRouter();
   const { hasAccount } = useAuth();
-  const gate = hasAccount ? undefined : ACCOUNT_AREAS[route.name];
+  const needsLogin = !hasAccount && ACCOUNT_AREAS.has(route.name);
+  useEffect(() => {
+    if (needsLogin) navigate(loginPath(href), { replace: true });
+  }, [needsLogin, href, navigate]);
   const mainRef = useRef<HTMLElement>(null);
   // Só o CAMINHO conta: trocar de participante (?participant=N) não devolve o foco ao
   // topo da página, senão quem navega por teclado perderia o lugar a cada seleção.
@@ -182,7 +177,7 @@ function AppContent() {
           <ContextStrip />
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className={route.name === "home" ? "app__main app__main--home" : "app__main"}>
-          {gate ? <AccountGate title={gate.title} lead={gate.lead} /> : renderPage(route)}
+          {needsLogin ? null : renderPage(route)}
         </main>
         <footer className="app__footer">
           <div className="app__footer-row">

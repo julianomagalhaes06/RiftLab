@@ -136,13 +136,11 @@
 .account-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* Convite para criar conta quando a pessoa sem conta chega a algo que guarda dados dela. */
-.account-gate__card { display: grid; gap: 18px; max-width: 560px; }
 .account-gate__actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .account-gate__actions .button { min-width: 160px; }
-.account-gate__back { margin: 0; }
-.account-gate--inline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 32px; }
-.account-gate--inline h3 { margin: 4px 0 6px; font: 600 1.25rem var(--font-display); }
-.account-gate--inline p { margin: 0; }
+.account-gate { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 32px; }
+.account-gate h3 { margin: 4px 0 6px; font: 600 1.25rem var(--font-display); }
+.account-gate p { margin: 0; }
 @media (max-width: 700px) {
   .account-gate__actions .button { flex: 1 1 100%; }
 }

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "../../shared/router/context";
 import { AuthContext, type AuthState } from "./authContext";
 import { AUTH_REQUIRED_EVENT, api, type SessionUser, type SocialProvider } from "../../shared/api/client";
 
@@ -13,22 +14,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [socialProviders, setSocialProviders] = useState<readonly SocialProvider[]>([]);
 
-  const refresh = useCallback((signal?: AbortSignal) => {
+  const { navigate } = useRouter();
+  const hadUser = useRef(false);
+  useEffect(() => {
+    hadUser.current = user !== null;
+  }, [user]);
+
+  // `expired`: uma chamada voltou 401. Se havia sessão e ela acabou, a pessoa volta ao início.
+  const refresh = useCallback((signal?: AbortSignal, expired = false) => {
     api.getAuthSession(signal).then((session) => {
       setAuthRequired(session.authRequired);
       setUser(session.user ?? null);
+      if (expired && !session.user && hadUser.current) navigate("/", { replace: true });
       setSocialProviders(session.socialProviders ?? []);
     }).catch(() => {
       if (!signal?.aborted) setAuthRequired(false);
     }).finally(() => {
       if (!signal?.aborted) setChecked(true);
     });
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const controller = new AbortController();
     refresh(controller.signal);
-    const onExpired = () => refresh();
+    const onExpired = () => refresh(undefined, true);
     window.addEventListener(AUTH_REQUIRED_EVENT, onExpired);
     return () => {
       controller.abort();
@@ -40,10 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.logout();
     } finally {
+      // Na mesma atualização: sair de uma área da conta vai ao início, não à tela de entrar.
       setUser(null);
+      navigate("/", { replace: true });
       refresh();
     }
-  }, [refresh]);
+  }, [refresh, navigate]);
 
   const value = useMemo<AuthState>(() => ({
     checked, authRequired, user, socialProviders, signOut, hasAccount: !authRequired || user !== null,
