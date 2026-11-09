@@ -71,6 +71,7 @@ describe("routeToPath", () => {
       "/painel",
       "/entrar",
       "/esqueci-senha",
+      "/boas-vindas",
       "/criar-conta?next=%2Fdecisions%2Fabc",
       "/importar",
       "/campeoes",

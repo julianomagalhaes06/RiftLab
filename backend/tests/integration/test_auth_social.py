@@ -164,7 +164,7 @@ async def test_primeira_entrada_cria_conta_confirmada_sem_senha(
     response = await _finish(client, state)
 
     assert response.status_code == 302
-    assert response.headers["location"] == "/conta"
+    assert response.headers["location"] == "/boas-vindas"
     assert provider.token_requests[0]["code"] == ["codigo"]
     assert provider.token_requests[0]["client_secret"] == ["segredo-google"]
     user = await _session_user(client)
@@ -197,7 +197,7 @@ async def test_discord_usa_o_nome_global_e_o_e_mail_confirmado(
         "verified": True,
     }
     state = await _begin(client, "discord")
-    assert (await _finish(client, state, "discord")).headers["location"] == "/conta"
+    assert (await _finish(client, state, "discord")).headers["location"] == "/boas-vindas"
     stored = await _user(session_factory, email)
     assert stored is not None
     assert stored.display_name == "Jogadora Discord"
@@ -328,7 +328,7 @@ async def test_identidade_vale_mesmo_com_outro_e_mail_no_provedor(
 async def test_destino_fora_do_site_e_ignorado(client, provider, emails, target) -> None:
     provider.profile = _google(_email(emails))
     response = await _finish(client, await _begin(client, target=target))
-    assert response.headers["location"] == "/conta"
+    assert response.headers["location"] == "/boas-vindas"
 
 
 @pytest.mark.asyncio
@@ -350,3 +350,13 @@ async def test_cadastro_guarda_o_nome_e_recusa_nome_invalido(
     stored = await _user(session_factory, email)
     assert stored is not None
     assert stored.display_name == "Ana Lima"
+
+
+def test_new_account_mark_keeps_the_query_of_the_return_page():
+    from riftlab.auth.api import _with_created_mark
+
+    assert _with_created_mark("/matches/BR1_1") == "/matches/BR1_1?conta=nova"
+    assert (
+        _with_created_mark("/matches/BR1_1?participant=3")
+        == "/matches/BR1_1?participant=3&conta=nova"
+    )

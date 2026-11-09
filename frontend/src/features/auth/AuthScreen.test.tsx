@@ -171,9 +171,9 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(await screen.findByRole("heading", { name: "Conta criada" })).toHaveFocus();
     // A confirmação leva a senha do cadastro junto com o código.
     expect(mock.callsTo("POST", /verify-email$/).at(-1)?.body).toEqual({ email: "jogadora@example.test", code: "123456", password: "Abcdef1!" });
-    fireEvent.click(screen.getByRole("button", { name: "Ir para o Painel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
     expect(await screen.findByRole("button", { name: "Sair" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/painel");
+    expect(window.location.pathname).toBe("/");
   });
 
   it("login de conta não confirmada vai para o código, reenviado, e depois entra", async () => {
@@ -313,6 +313,57 @@ describe("Login social e nome da conta", () => {
     withSession({ authRequired: true, user: { ...USER, name: "Jogadora" }, socialProviders: [] });
     expect(await screen.findByRole("link", { name: "Minha conta (jogadora@example.test)" })).toHaveTextContent("Jogadora");
     expect(screen.getByRole("link", { name: "Minha conta (jogadora@example.test)" })).not.toHaveTextContent("example.test");
+  });
+});
+
+describe("Login social e conta nova", () => {
+  function setup(path: string, session: { authRequired: boolean; user: typeof USER | null; socialProviders?: string[] }) {
+    window.history.replaceState(null, "", path);
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
+    mock.on("GET", /^\/api\/v1\/riot-link$/, () => json(200, { state: "NONE" }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    return mock;
+  }
+
+  it.each(["/entrar", "/criar-conta"])("em %s, os botões sociais ficam uma vez só, acima das abas", async (path) => {
+    setup(path, { authRequired: true, user: null, socialProviders: ["google", "discord"] });
+    const google = await screen.findByRole("link", { name: "Continuar com Google" });
+    expect(screen.getAllByRole("link", { name: /Continuar com (Google|Discord)/ })).toHaveLength(2);
+    const tabs = screen.getByRole("tablist", { name: "Acesso ao RiftLab" });
+    expect(google.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("conta nova sem destino vê as boas-vindas, e Agora não vai à home", async () => {
+    setup("/boas-vindas", { authRequired: true, user: USER });
+    expect(await screen.findByRole("heading", { name: "Conta criada" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Vincular conta Riot" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("Vincular conta Riot, nas boas-vindas, abre Minha conta", async () => {
+    setup("/boas-vindas", { authRequired: true, user: USER });
+    fireEvent.click(await screen.findByRole("button", { name: "Vincular conta Riot" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/conta"));
+  });
+
+  it("boas-vindas sem sessão vai à home", async () => {
+    setup("/boas-vindas", { authRequired: true, user: null });
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("conta nova que veio de uma página volta a ela com um aviso, e a marca sai do endereço", async () => {
+    setup("/campeoes?conta=nova", { authRequired: true, user: USER });
+    const notice = await screen.findByText(/Sua conta foi criada/);
+    expect(screen.getByRole("link", { name: "vincule sua conta Riot" })).toHaveAttribute("href", "/conta");
+    await waitFor(() => expect(window.location.search).toBe(""));
+    expect(window.location.pathname).toBe("/campeoes");
+    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    expect(notice).not.toBeInTheDocument();
   });
 });
 

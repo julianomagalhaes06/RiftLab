@@ -71,9 +71,9 @@ function SocialLogin({ providers, next }: { providers: readonly SocialProvider[]
         {providers.map((provider) => (
           // Link comum: a API redireciona para o provedor, e a página inteira precisa ir junto.
           <a key={provider} className="button button--secondary auth-social__button"
-            href={`/api/v1/auth/social/${provider}/start${query}`} aria-label={`Continuar com ${SOCIAL_LABELS[provider]}`}>
+            href={`/api/v1/auth/social/${provider}/start${query}`}>
             <img src={`/brand/${provider}.svg`} alt="" width="20" height="20" />
-            {SOCIAL_LABELS[provider]}
+            Continuar com {SOCIAL_LABELS[provider]}
           </a>
         ))}
       </div>
@@ -128,7 +128,7 @@ function PasswordRules({ id, password }: { id: string; password: string }) {
  * enviado por e-mail; a senha digitada fica em memória até lá, porque confirmar também a exige.
  * Padrão Arena: página dividida (vitrine à esquerda, formulário à direita; empilhada no celular).
  */
-export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) {
+export function AuthScreen({ mode, next, welcome = null }: { mode: Mode; next: string | null; welcome?: SessionUser | null }) {
   const { signedIn, socialProviders } = useAuth();
   const { navigate } = useRouter();
   const destination = next ?? "/painel";
@@ -144,7 +144,7 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
     () => SOCIAL_NOTICES[new URLSearchParams(window.location.search).get("social") ?? ""] ?? null,
   );
   const [sending, setSending] = useState(false);
-  const [created, setCreated] = useState<SessionUser | null>(null);
+  const [created, setCreated] = useState<SessionUser | null>(welcome);
   const [fromRegister, setFromRegister] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -388,8 +388,8 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
               <button type="button" className="button auth-wide" onClick={() => { signedIn(created); navigate(next ?? "/conta", { replace: true }); }}>
                 {next ? "Voltar para onde eu estava" : "Vincular conta Riot"}
               </button>
-              <button type="button" className="button button--secondary auth-wide" onClick={() => { signedIn(created); navigate(next ? "/conta" : "/painel", { replace: true }); }}>
-                {next ? "Vincular conta Riot" : "Ir para o Painel"}
+              <button type="button" className="button button--secondary auth-wide" onClick={() => { signedIn(created); navigate(next ? "/conta" : "/", { replace: true }); }}>
+                {next ? "Vincular conta Riot" : "Agora não"}
               </button>
             </div>
           ) : step !== "form" ? (
@@ -417,6 +417,8 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
             </div>
           ) : (
             <>
+              {/* Vale para entrar e para criar conta: fica acima das abas, uma vez só. */}
+              {mode !== "forgot" ? <SocialLogin providers={socialProviders} next={next} /> : null}
               {mode !== "forgot" ? (
                 <div className="segmented auth-tabs" role="tablist" aria-label="Acesso ao RiftLab">
                   {(["login", "register"] as const).map((value) => (
@@ -440,7 +442,6 @@ export function AuthScreen({ mode, next }: { mode: Mode; next: string | null }) 
                 <h1 id={`${tabsId}-heading`} ref={headingRef} tabIndex={-1}>{copy.title}</h1>
                 <p className="muted">{copy.lead}</p>
                 {noticeLine}
-                {mode !== "forgot" ? <SocialLogin providers={socialProviders} next={next} /> : null}
                 <form className="form auth-form" onSubmit={submit} noValidate>
                   {mode === "register" ? (
                     <>

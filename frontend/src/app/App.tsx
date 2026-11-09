@@ -27,6 +27,7 @@ import { AuthScreen } from "../features/auth/AuthScreen";
 import { UserMenu } from "../features/auth/UserMenu";
 import { AccountPage } from "../features/auth/AccountPage";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
+import { AccountCreatedNotice } from "../features/auth/AccountCreatedNotice";
 import { HomePage } from "../features/home/HomePage";
 import "./App.css";
 import "../design/concept-c.css";
@@ -36,6 +37,7 @@ const TITLES: Record<Route["name"], string> = {
   login: "Entrar — RiftLab",
   register: "Criar conta — RiftLab",
   forgot: "Redefinir senha — RiftLab",
+  welcome: "Conta criada — RiftLab",
   importEntry: "Importar partida — RiftLab",
   panel: "Painel — RiftLab",
   champions: "Campeões — RiftLab",
@@ -62,6 +64,7 @@ function renderPage(route: Route): ReactNode {
     case "login":
     case "register":
     case "forgot":
+    case "welcome":
       return null; // renderizadas fora do layout principal
     case "importEntry":
       return <EntryPage />;
@@ -117,11 +120,15 @@ function AppShell() {
   // Já com sessão, /entrar e /criar-conta levam direto ao destino.
   useEffect(() => {
     if (checked && user && authRoute) navigate(authRoute.next ?? "/painel", { replace: true });
-  }, [checked, user, authRoute, navigate]);
+    if (checked && !user && route.name === "welcome") navigate("/", { replace: true });
+  }, [checked, user, authRoute, route.name, navigate]);
   // Até saber da sessão, nenhuma tela dispara chamadas (evita 401 nas áreas da conta).
   if (!checked) return <p className="app-loading" role="status">Carregando o RiftLab…</p>;
   if (authRoute) {
     return user ? null : <AuthScreen mode={authRoute.name} next={authRoute.next} />;
+  }
+  if (route.name === "welcome") {
+    return user ? <AuthScreen mode="register" next={null} welcome={user} /> : null;
   }
   return <AppContent />;
 }
@@ -177,6 +184,7 @@ function AppContent() {
           <ContextStrip />
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className={route.name === "home" ? "app__main app__main--home" : "app__main"}>
+          <AccountCreatedNotice />
           {needsLogin ? null : renderPage(route)}
         </main>
         <footer className="app__footer">

@@ -46,7 +46,6 @@
 .auth-panel { display: grid; gap: 12px; }
 .auth-panel h1, .auth-welcome h1 { margin: 4px 0 0; font: 600 1.5rem var(--font-display); color: var(--ntext); }
 .auth-panel h1:focus, .auth-welcome h1:focus { outline: none; }
-.auth-panel h1:focus-visible, .auth-welcome h1:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 .auth-panel > .muted, .auth-welcome > .muted { margin: 0; line-height: 1.5; }
 .auth-form { display: grid; gap: 8px; margin-top: 4px; }
 .auth-wide { width: 100%; }
@@ -64,8 +63,8 @@
 .auth-password__toggle:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
 
 /* Login social: os logos são imagens da marca de cada provedor; o resto usa os tokens. */
-.auth-social { display: grid; gap: 12px; margin-top: 4px; }
-.auth-social__buttons { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.auth-social { display: grid; gap: 14px; }
+.auth-social__buttons { display: grid; gap: 8px; }
 .auth-social__button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; text-decoration: none; }
 .auth-social__or { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--ntext-subtle); font-size: .8125rem; }
 .auth-social__or::before, .auth-social__or::after { content: ""; flex: 1; height: 1px; background: var(--nline); }
@@ -159,3 +158,8 @@
   .account-panel { padding: 28px 22px; }
   .account-actions { grid-template-columns: 1fr; }
 }
+
+/* Aviso de conta recém-criada ao voltar à página de origem. */
+.account-created { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 16px; }
+.account-created p { margin: 0; }
+.account-created .button { min-height: 36px; padding: 0 12px; }

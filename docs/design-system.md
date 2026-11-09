@@ -188,6 +188,10 @@ estudo pelo convite `AccountGate` ("Disponível com conta", com Criar conta e En
 Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em `auth.css`), em
 `/entrar`, `/criar-conta` e `/esqueci-senha` (as abas trocam o endereço):
 
+- **Login social:** "Continuar com Google" e "Continuar com Discord" ficam uma vez só, no alto do
+  cartão e acima das abas, porque servem para entrar e para criar conta; as abas tratam só de
+  e-mail e senha. Conta nova vai à tela "Conta criada" (`/boas-vindas`) ou, vinda de uma página,
+  volta a ela com um aviso curto.
 - **Topo** de 64 px com a marca (link para o início) e "Continuar sem conta"; **rodapé** com
   créditos e o aviso legal da Riot.
 - **Desktop:** duas colunas. À esquerda, contexto (13 px), título em Chakra Petch (40 px), frase e
@@ -209,8 +213,8 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
 - **Cadastro:** nome, e-mail, senha e confirmar senha; o mostrar/ocultar vale para os dois campos
   de senha. Senha com mostrar/ocultar (`aria-pressed`), requisitos conferidos enquanto a
   pessoa digita (check roxo e texto "atendido/pendente", nunca só cor) e, depois de criar, a
-  confirmação "Conta criada" com o próximo passo: "Vincular conta Riot" (primário) ou "Ir para o
-  Painel"; vinda de outra tela, "Voltar para onde eu estava" passa a ser o primário.
+  confirmação "Conta criada" com o próximo passo: "Vincular conta Riot" (primário) ou "Agora não",
+  que leva ao início; vinda de outra tela, "Voltar para onde eu estava" passa a ser o primário.
 - **Exceção ao princípio 1, pedida pelo usuário (05/11/2026):** a vitrine usa emblemas de elo
   com o halo do card de elo fora do card de elo, como decoração da marca. Não mostra elo de
   ninguém nem dado fictício. Tudo é local (emblemas em `public/ranked-emblems`): a tela não faz

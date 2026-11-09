@@ -6,7 +6,7 @@ import logging
 import secrets
 from datetime import timedelta
 from typing import Any, Literal
-from urllib.parse import quote, unquote, urlencode
+from urllib.parse import quote, unquote, urlencode, urlsplit, urlunsplit
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Query, Request, Response
@@ -316,6 +316,12 @@ async def post_login(
     return _session_state(request, user)
 
 
+def _with_created_mark(target: str) -> str:
+    parts = urlsplit(target)
+    query = "&".join(item for item in (parts.query, "conta=nova") if item)
+    return urlunsplit(("", "", parts.path, query, parts.fragment))
+
+
 def _social_failure(reason: str, target: str | None) -> RedirectResponse:
     """Volta à tela de entrada com o motivo, que a interface traduz."""
     query = {"social": reason, **({"next": target} if target else {})}
@@ -402,8 +408,12 @@ async def get_social_callback(
         )
     except AuthError:
         return _social_failure("falhou", target)
-    # Conta nova sem destino vai para Minha conta, onde se vincula a conta Riot.
-    response = RedirectResponse(target or ("/conta" if created else "/painel"), status_code=302)
+    # Conta nova: boas-vindas ou, se veio de uma página, de volta a ela com um aviso curto.
+    if created:
+        destination = _with_created_mark(target) if target else "/boas-vindas"
+    else:
+        destination = target or "/painel"
+    response = RedirectResponse(destination, status_code=302)
     response.delete_cookie(SOCIAL_COOKIE, path=SOCIAL_COOKIE_PATH)
     _set_cookie(request, response, token)
     return response
