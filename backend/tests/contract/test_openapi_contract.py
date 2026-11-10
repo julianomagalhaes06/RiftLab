@@ -77,6 +77,8 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/auth/password/forgot",
         "/api/v1/auth/password/reset",
         "/api/v1/auth/logout",
+        "/api/v1/auth/social/{provider}/start",
+        "/api/v1/auth/social/{provider}/callback",
         "/api/v1/riot-link",
         "/api/v1/riot-link/challenge",
         "/api/v1/riot-link/verify",

@@ -4,13 +4,12 @@ import { active } from "../history/syncMessage";
 import "./ranked.css";
 import { preferredQueue } from "./preferredQueue";
 import { RankCard, type RankCardChange } from "./RankCard";
-import { TIER_NAMES, TIER_ORDER, emblemSrc, isTier, type Tier } from "./tiers";
-import { count } from "../../shared/text/count";
+import { isTier } from "./tiers";
 
 const reasonNames: Record<string, string> = {
   ACCOUNT_OR_SECRET_MISSING: "Configure a conta local e o segredo de vínculo para consultar sua posição.",
   ACCOUNT_NOT_LINKED: "Vincule sua conta Riot em Minha conta (no seu nome, no topo) para ver sua posição.",
-  NO_OBSERVATION: "Ainda não há observação desta fila. Com a chave da Riot configurada, ela é consultada ao abrir esta tela.",
+  NO_OBSERVATION: "Ainda não há observação desta fila. Com a chave da Riot configurada, ela é consultada ao abrir o Painel.",
   RIOT_KEY_MISSING: "A chave da Riot está ausente. A última posição observada continua visível.",
   OBSERVATION_OLD: "Esta observação tem mais de 24 horas.",
   RIOT_AUTH_FAILED: "A atualização falhou por autenticação na Riot. A posição anterior foi preservada.",
@@ -18,48 +17,6 @@ const reasonNames: Record<string, string> = {
   SCHEMA_UNSUPPORTED: "A resposta da Riot não pôde ser validada. A posição anterior foi preservada.",
   UPSTREAM_UNAVAILABLE: "A Riot não respondeu. A posição anterior foi preservada.",
 };
-function ChangeLine({ data }: { data: RankedMe["change"] }) {
-  if (!data) return <p>Uma segunda observação da mesma temporada permitirá comparar a evolução.</p>;
-  const since = new Date(data.since).toLocaleString("pt-BR");
-  const until = new Date(data.until).toLocaleString("pt-BR");
-  let text = "Variação não comparável entre estas observações.";
-  if (data.kind === "CORRECTION") text = "Os contadores foram corrigidos; variação não comparável.";
-  if (data.kind === "TRANSITION") text = "Houve mudança de elo ou divisão; PDL bruto não é comparável.";
-  if (data.kind === "SAME_DIVISION") {
-    const value = data.leaguePointsDelta ?? 0;
-    text = `${value > 0 ? "+" : ""}${value} PDL desde a observação anterior, na mesma divisão.`;
-  }
-  const association = data.ownMatchAssociation === "ONE"
-    ? "Uma partida própria concluída da fila foi encontrada nesse intervalo; a variação não é atribuída à partida."
-    : "A variação cobre o intervalo de atualizações, sem atribuição a uma partida.";
-  return <div className="my-rank__change"><p className="my-rank__delta">{text}</p><p>{association}</p><small>De {since} até {until}.</small></div>;
-}
-
-/** Regras do PDL e a escada de elos, com o elo atual marcado (texto, não só cor). */
-function LpRules({ current }: { current: Tier | null }) {
-  return (
-    <section className="my-rank__aside surface surface--pad" aria-labelledby="my-rank-rules">
-      <h3 id="my-rank-rules">Como funciona o PDL</h3>
-      <ul className="my-rank__rules">
-        <li>De Ferro a Diamante, cada divisão vai de 0 a 100 PDL, de IV a I.</li>
-        <li>Ao chegar a 100 PDL, a promoção acontece e o excedente segue para a divisão seguinte.</li>
-        <li>Mestre, Grão-Mestre e Desafiante não têm divisões, e o PDL não tem teto.</li>
-        <li>A posição é consultada na Riot ao abrir esta tela, o Painel ou o Histórico, com um intervalo mínimo entre consultas.</li>
-        <li>A variação entre observações não é atribuída a uma partida importada.</li>
-      </ul>
-      <ol className="tier-ladder" aria-label="Elos, do menor ao maior">
-        {TIER_ORDER.map((tier) => (
-          <li key={tier} className={tier === current ? "tier-ladder__step is-current" : "tier-ladder__step"} data-tier={tier === current ? tier : undefined} aria-current={tier === current ? "true" : undefined}>
-            <img src={emblemSrc(tier)} alt="" width="44" height="44" />
-            <span>{TIER_NAMES[tier]}</span>
-            {tier === current ? <small>seu elo</small> : null}
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
 /** Faixa de variação do card (CC-1203): ganho, perda ou o motivo de não comparar. */
 function changeStrip(data: RankedMe["change"]): RankCardChange {
   if (!data) return { tone: "neutral", text: "Uma segunda observação permitirá comparar" };
@@ -114,7 +71,8 @@ function useRankRefresh(): { updating: boolean; round: number } {
   return { updating, round };
 }
 
-export function MyRank({ compact = false }: { compact?: boolean }) {
+/** Card de elo da conta própria no Painel, com Solo/Duo e Flex separados. */
+export function MyRank() {
   const [selection, setSelection] = useState<RankedQueue | null>(null);
   const [results, setResults] = useState<Partial<Record<RankedQueue, { data?: RankedMe; failed?: boolean }>>>({});
   const queueId = useId();
@@ -138,11 +96,11 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
   const queueLabel = queue === "RANKED_SOLO_5x5" ? "Solo/Duo" : "Flex";
   const position = data?.position;
   const tier = position?.state === "READY" && isTier(position.tier) ? position.tier : null;
-  const headingId = `my-rank-heading-${compact ? "panel" : "page"}`;
+  const headingId = "my-rank-heading-panel";
   return (
-    <div className={`my-rank ${compact ? "my-rank--compact" : ""}`}>
+    <div className="my-rank my-rank--compact">
       <RankCard
-        size={compact ? "compact" : "large"}
+        size="compact"
         heading={<h3 id={headingId}>Minha posição</h3>}
         controls={
           <div className="rank-card__controls">
@@ -166,31 +124,6 @@ export function MyRank({ compact = false }: { compact?: boolean }) {
         {data?.status === "STALE" && !updating && <p className="rank-card__note" role="status">Última posição observada. {reasonNames[data.reason ?? ""] ?? "Atualização indisponível."}</p>}
         {position?.origin === "DEMO_FICTITIOUS" && <p className="rank-card__note" role="note">Elo fictício de demonstração: não foi consultado na Riot e não pertence a nenhuma conta.</p>}
       </RankCard>
-      {!compact ? (
-        <div className="my-rank__side">
-          {position ? (
-            <section className="my-rank__aside surface surface--pad" aria-labelledby="my-rank-observation">
-              <h3 id="my-rank-observation">Observação</h3>
-              <dl className="my-rank__facts">
-                <div><dt>Fila</dt><dd>{queueLabel}</dd></div>
-                <div><dt>Temporada</dt><dd>{position.season}</dd></div>
-                <div><dt>Origem</dt><dd>{position.origin === "DEMO_FICTITIOUS" ? "Demonstração (fictício)" : "Riot League-V4"}</dd></div>
-                <div><dt>Horário</dt><dd>{new Date(position.observedAt).toLocaleString("pt-BR")}</dd></div>
-                {tier && position.wins != null && position.losses != null ? (
-                  <div><dt>Partidas</dt><dd className="my-rank__record">{count(position.wins, "vitória", "vitórias")} · {count(position.losses, "derrota", "derrotas")} na fila</dd></div>
-                ) : null}
-              </dl>
-            </section>
-          ) : null}
-          {tier ? (
-            <section className="my-rank__aside surface surface--pad" aria-labelledby="my-rank-change">
-              <h3 id="my-rank-change">Variação</h3>
-              <ChangeLine data={data?.change ?? null} />
-            </section>
-          ) : null}
-          <LpRules current={tier} />
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import "./theme.css";
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(currentTheme);
   const light = theme === "light";
-  const icon = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true as const };
+  const icon = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true as const };
   return (
     <button
       type="button"

@@ -46,12 +46,20 @@ services:
       RIFTLAB_AUTH_REQUIRED: ${RIFTLAB_AUTH_REQUIRED:-true}
       # E-mails da conta: por padrão vão para o Mailpit local (http://127.0.0.1:8025) e não
       # saem da máquina. Para enviar de verdade pelo Gmail, ver .env.example.
+      # Partidas sintéticas e telas ilustrativas: só no ambiente de demonstração.
+      RIFTLAB_DEMO_DATA_ENABLED: ${RIFTLAB_DEMO_DATA_ENABLED:-false}
       RIFTLAB_SMTP_HOST: ${RIFTLAB_SMTP_HOST:-mailpit}
       RIFTLAB_SMTP_PORT: ${RIFTLAB_SMTP_PORT:-1025}
       RIFTLAB_SMTP_USERNAME: ${RIFTLAB_SMTP_USERNAME:-}
       RIFTLAB_SMTP_PASSWORD: ${RIFTLAB_SMTP_PASSWORD:-}
       RIFTLAB_SMTP_STARTTLS: ${RIFTLAB_SMTP_STARTTLS:-false}
       RIFTLAB_SMTP_FROM: ${RIFTLAB_SMTP_FROM:-RiftLab <no-reply@riftlab.local>}
+      # Login social (opcional): cada botão só aparece com id e segredo. Ver .env.example.
+      RIFTLAB_PUBLIC_URL: ${RIFTLAB_PUBLIC_URL:-http://127.0.0.1:5173}
+      RIFTLAB_GOOGLE_CLIENT_ID: ${RIFTLAB_GOOGLE_CLIENT_ID:-}
+      RIFTLAB_GOOGLE_CLIENT_SECRET: ${RIFTLAB_GOOGLE_CLIENT_SECRET:-}
+      RIFTLAB_DISCORD_CLIENT_ID: ${RIFTLAB_DISCORD_CLIENT_ID:-}
+      RIFTLAB_DISCORD_CLIENT_SECRET: ${RIFTLAB_DISCORD_CLIENT_SECRET:-}
       # Dentro do container o bind é em todas as interfaces; a porta só é publicada em
       # 127.0.0.1. O proxy do frontend chega com Host `api` (CC-1215).
       RIFTLAB_API_HOST: 0.0.0.0

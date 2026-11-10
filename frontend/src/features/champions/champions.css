@@ -51,3 +51,5 @@
   .champion-stats { grid-template-columns: 1fr; gap: 12px; }
   .champions-roster button { padding: 0 14px 0 16px; }
 }
+/* Contorno de 1 px na imagem do item, como no retrato de campeão. */
+.pattern-item img { outline: 1px solid var(--portrait-outline); outline-offset: -1px; }

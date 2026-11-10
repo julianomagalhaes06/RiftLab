@@ -127,6 +127,9 @@ jobs:
   compose-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # O smoke e o roteiro da stack real usam a partida sintética.
+    env:
+      RIFTLAB_DEMO_DATA_ENABLED: "true"
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

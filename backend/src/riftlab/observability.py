@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 import traceback
 import uuid
@@ -83,6 +84,26 @@ def quiet_http_client_logs() -> None:
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
+_SOCIAL_CALLBACK_QUERY = re.compile(r"(/api/v1/auth/social/[a-z]+/callback)\?\S*")
+
+
+class _SocialCallbackQueryFilter(logging.Filter):
+    """O log de acesso do Uvicorn traz a URL inteira; no retorno do login social, ela leva o
+    código de autorização e o `state`, que não podem ir para o log."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.args, tuple):
+            record.args = tuple(
+                _SOCIAL_CALLBACK_QUERY.sub(r"\1", arg) if isinstance(arg, str) else arg
+                for arg in record.args
+            )
+        return True
+
+
+# Instância única: `addFilter` ignora a repetida quando a aplicação é criada de novo.
+_SOCIAL_CALLBACK_FILTER = _SocialCallbackQueryFilter()
+
+
 def configure_logging(level: str) -> None:
     """Logs estruturados em JSON com requestId; nunca inclui payload bruto,
     DSN ou segredo — chamadores devem logar apenas identificadores e codigos."""
@@ -92,6 +113,7 @@ def configure_logging(level: str) -> None:
     handler = logging.StreamHandler(stream=sys.stdout)
     handler.setFormatter(_JsonLogFormatter())
     root.handlers = [handler]
+    logging.getLogger("uvicorn.access").addFilter(_SOCIAL_CALLBACK_FILTER)
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):

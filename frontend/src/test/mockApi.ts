@@ -45,6 +45,7 @@ export function problem(status: number, code: string, detail = "detalhe do servi
 export function createMockApi() {
   const routes: Route[] = [
     { method: "GET", pattern: /^\/health\/live$/, respond: () => json(200, { status: "UP" }) },
+    { method: "GET", pattern: /^\/api\/v1\/auth\/session$/, respond: () => json(200, { authRequired: false, user: null, demoEnabled: true }) },
     {
       method: "GET",
       pattern: /^\/health\/ready$/,

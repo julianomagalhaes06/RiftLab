@@ -37,8 +37,9 @@ for (const width of [1280, 360]) {
     await expect(page.getByRole("link", { name: "Minha conta (jogadora@example.test)" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Áreas principais" })).toBeVisible();
     await page.getByRole("button", { name: "Sair" }).click();
-    // Sair não tranca o site: o Painel vira o convite e o topo volta a oferecer Entrar.
-    await expect(page.getByText("Disponível com conta")).toBeVisible();
+    // Sair leva ao início, e o topo volta a oferecer Entrar.
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: /Entenda cada compra/ })).toBeVisible();
     await expect(page.locator(".user-menu").getByRole("link", { name: "Entrar" })).toBeVisible();
   });
 }
@@ -57,8 +58,10 @@ for (const width of [1280, 360]) {
       },
     });
     await page.goto("/criar-conta");
+    await page.getByLabel("Nome", { exact: true }).fill("Jogadora");
     await page.getByLabel("E-mail").fill("jogadora@example.test");
     await page.getByLabel("Senha", { exact: true }).fill("Abcdef1!");
+    await page.getByLabel("Confirmar senha", { exact: true }).fill("Abcdef1!");
     await page.keyboard.press("Enter");
     await expect(page.getByRole("heading", { name: "Confirme seu e-mail" })).toBeFocused();
     const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -113,9 +116,10 @@ test("sem conta em 360px: início com a busca e convite nas áreas da conta", as
   let scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
 
+  // O endereço antigo de Minha posição leva ao Painel, que pede login.
   await page.goto("/minha-posicao");
-  await expect(page.getByText("Disponível com conta")).toBeVisible();
-  await expect(page.locator(".account-gate").getByRole("link", { name: "Criar conta" })).toHaveAttribute("href", "/criar-conta?next=%2Fminha-posicao");
+  await expect(page.getByRole("heading", { name: "Entrar no RiftLab" })).toBeVisible();
+  await expect(page).toHaveURL(/\/entrar\?next=%2Fpainel$/);
   scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
 });

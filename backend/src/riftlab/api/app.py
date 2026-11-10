@@ -4,6 +4,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 
 from riftlab import db
@@ -35,7 +36,12 @@ from riftlab.shared.db import build_session_factory
 logger = logging.getLogger("riftlab.api")
 
 
-def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    mailer: Mailer | None = None,
+    social_transport: httpx.AsyncBaseTransport | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
 
@@ -51,6 +57,7 @@ def create_app(settings: Settings | None = None, *, mailer: Mailer | None = None
             per_user=5, per_ip=20, window_seconds=3600.0, code="CODE_RATE_LIMITED"
         )
         app.state.mailer = mailer if mailer is not None else build_mailer(settings)
+        app.state.social_transport = social_transport
         logger.info("riftlab api iniciada modo=%s", "DEMO" if settings.demo_mode else "REAL")
         try:
             yield

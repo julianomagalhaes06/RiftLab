@@ -70,8 +70,9 @@ Espaço e forma: chanfro `--cut` 8 px (superfícies), `--cut-chip` 6 px (retrato
 
 ## Moldura
 
-- **Topo** (64 px, linha `nline` embaixo): marca (hexágono roxo + "RiftLab"); quatro abas com
-  ícone de 18 px (Painel, Campeões, Minha posição, Histórico), ativa em `ntext` 600 com ícone
+- **Topo** (64 px, linha `nline` embaixo): marca (hexágono roxo + "RiftLab"); abas com
+  ícone de 18 px (Início, Painel, Campeões, Histórico; a antiga aba Minha posição saiu em
+  09/11/2026 e o elo ficou no card do Painel), ativa em `ntext` 600 com ícone
   `accent` e barra de 2 px `accent-strong` embaixo; busca Nome#TAG compacta; chip do perfil da
   conta configurada: selo "BR1", ícone de invocador chanfrado (32 px), Riot ID e, abaixo, emblema
   mini + elo e PDL na cor `text` do elo.
@@ -121,8 +122,8 @@ sempre com contorno `accent` de 3 px.
   divisões · PDL sem teto" e mostram o PDL acumulado.
 
 No código: card de elo em `features/ranked/RankCard.tsx` (estilo em `rank-card.css`), elos e
-escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; Minha posição
-(card grande, observação, variação e escada de elos) em `features/ranked/MyRank.tsx`; página do
+escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; card de elo
+da conta no Painel (Solo/Duo e Flex) em `features/ranked/MyRank.tsx`; página do
 jogador (cabeçalho e um card de elo por fila) em `features/players/PlayerPage.tsx`; Histórico
 (card de métricas, filtros `.segmented` e uma superfície por partida com `.result-bar` no artigo)
 em `features/history/`; Campeões (lista como "Campeões em foco", escolhido com `.is-selected`) em
@@ -142,6 +143,9 @@ padrão dos sites de estatísticas do jogo:
   sorteada a cada carregamento da página entre skins curadas (`features/home/splashes.ts`). Véus
   de `n0` com transparência (`--hero-scrim*`) garantem a leitura do texto sobre qualquer arte e
   fundem a base no fundo da página; um brilho roxo discreto (`--hero-glow`) fica atrás da busca.
+  Atrás do selo e do título, um véu mais forte (`--hero-scrim-heavy`, .78) e o texto do selo numa
+  pílula escura (`--hero-scrim-strong`): medido nas 51 artes da lista, todo texto passa de 4,5:1
+  (título, texto grande, de 3:1), e `ui-polish.spec.ts` confere o pior caso, arte toda branca.
   O crédito da skin aparece no canto só depois que a arte carrega; se ela falhar, a vitrine fica
   no fundo neutro.
 - **Centro:** selo BR1, título em Chakra Petch (até 60 px) com a segunda frase em roxo, uma frase
@@ -175,20 +179,30 @@ Um quadro único e centralizado na área da página (`.account-panel`, até 520 
 e colchetes), sem ser modal: cabeçalho com selo, título e e-mail, um filete, e abaixo o estado do
 vínculo (formulário do Riot ID, desafio do ícone ou conta vinculada).
 
-## Convite para criar conta
+## Sem conta
 
-Sem conta, as áreas que guardam dados da pessoa (Painel, Minha posição, Histórico, Minha conta,
-Importar) mostram `AccountGate` no lugar da tela, e o detalhe da decisão troca a análise e o
-estudo pela versão `inline` do mesmo convite. Contexto "Disponível com conta", título da área,
-frase do que ela oferece e os botões Criar conta (primário) e Entrar (secundário), que voltam ao
-mesmo endereço depois do login (`?next=`). O menu principal mostra só Início e Campeões; o topo,
-Entrar e Criar conta.
+As áreas da conta (Painel, Histórico, Minha conta, Importar) levam quem não tem
+sessão direto à tela de entrar, que volta ao mesmo endereço depois do login (`?next=`). O menu
+principal mostra só Início e Campeões; o topo, Entrar e Criar conta. Sair, ou a sessão terminar
+no meio do uso, leva ao início. Numa página pública, o detalhe da decisão troca a análise e o
+estudo pelo convite `AccountGate` ("Disponível com conta", com Criar conta e Entrar).
+
+## Painel sem vínculo
+
+Conta sem vínculo Riot vê no Painel só um quadro centralizado (`.panel-link`) com o convite para
+vincular: sem filtros, métricas ou lista de partidas. O Painel mostra apenas partidas da própria
+conta; identificadores técnicos como `BR1_…` não aparecem como título.
 
 ## Tela de entrada (contas locais)
 
 Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em `auth.css`), em
 `/entrar`, `/criar-conta` e `/esqueci-senha` (as abas trocam o endereço):
 
+- **Login social:** "Continuar com Google" e "Continuar com Discord" ficam uma vez só, no alto do
+  cartão e acima das abas, porque servem para entrar e para criar conta; as abas tratam só de
+  e-mail e senha. Conta nova vai à tela "Conta criada" (`/boas-vindas`) ou, vinda de uma página,
+  volta a ela com um cartão flutuante no canto (`AccountCreatedNotice`), que não desloca a página
+  e só sai por ação da pessoa.
 - **Topo** de 64 px com a marca (link para o início) e "Continuar sem conta"; **rodapé** com
   créditos e o aviso legal da Riot.
 - **Desktop:** duas colunas. À esquerda, contexto (13 px), título em Chakra Petch (40 px), frase e
@@ -203,10 +217,15 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
   layout, sem abas), com o campo de 6 dígitos (`inputMode="numeric"`, `one-time-code`), reenvio
   com contagem de 60 s e "Corrigir o e-mail". "Esqueci minha senha" usa o mesmo passo, com a
   senha nova e os mesmos requisitos. O foco acompanha o título a cada passo.
-- **Cadastro:** senha com mostrar/ocultar (`aria-pressed`), requisitos conferidos enquanto a
+- **Login social:** em Entrar e Criar conta, acima do formulário, um botão secundário por
+  provedor configurado (largura dividida igualmente) e o separador "ou com e-mail". Os logos são
+  imagens da marca de cada serviço (`public/brand`), como os emblemas. Sem provedor, a tela mostra
+  só o formulário.
+- **Cadastro:** nome, e-mail, senha e confirmar senha; o mostrar/ocultar vale para os dois campos
+  de senha. Senha com mostrar/ocultar (`aria-pressed`), requisitos conferidos enquanto a
   pessoa digita (check roxo e texto "atendido/pendente", nunca só cor) e, depois de criar, a
-  confirmação "Conta criada" com o próximo passo: "Vincular conta Riot" (primário) ou "Ir para o
-  Painel"; vinda de outra tela, "Voltar para onde eu estava" passa a ser o primário.
+  confirmação "Conta criada" com o próximo passo: "Vincular conta Riot" (primário) ou "Agora não",
+  que leva ao início; vinda de outra tela, "Voltar para onde eu estava" passa a ser o primário.
 - **Exceção ao princípio 1, pedida pelo usuário (05/11/2026):** a vitrine usa emblemas de elo
   com o halo do card de elo fora do card de elo, como decoração da marca. Não mostra elo de
   ninguém nem dado fictício. Tudo é local (emblemas em `public/ranked-emblems`): a tela não faz
@@ -227,6 +246,23 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
   `aria-hidden`. O recorte chanfrado corta contornos; itens que encostam na borda da superfície
   usam contorno de foco interno.
 - `prefers-reduced-motion` desliga transições.
+
+## Polimento e movimento
+
+Revisão com as skills better-ui e ui-ux-pro-max (09/11/2026), conferida em
+`tests/e2e/ui-polish.spec.ts`:
+
+- Controle visualmente menor que 44 px (seletor de tema, mostrar senha, chip de decisão) ganha um
+  `::after` transparente até 44 px. O `::after` parte de dentro da borda: com borda de 1 px, o
+  recuo é 1 px maior.
+- Ao clicar, botões, abas segmentadas, seletor de tema, busca e chips encolhem para `scale: 0.96`
+  em 150 ms (`cubic-bezier(0.2, 0, 0, 1)`). Só `scale` tem transição; cores mudam na hora, para a
+  troca de tema não animar a página inteira. Movimento reduzido desliga a escala.
+- Ícones de 24 unidades usam traço 1.8.
+- Imagens de item recebem o mesmo contorno de 1 px do retrato (`--portrait-outline`).
+- Cartão flutuante entra em 0,28 s (12 px) e sai em 0,2 s (8 px), ambos `ease-out`.
+- O card de elo segue escuro no tema claro e redefine também os apelidos `--color-*`, que
+  são resolvidos na raiz.
 
 ## Ativos
 

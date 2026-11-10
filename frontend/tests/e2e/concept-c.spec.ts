@@ -29,7 +29,6 @@ for (const width of [1280, 1440, 360, 390]) {
 
     for (const [label, heading] of [
       ["Campeões", "Padrões de compra por campeão"],
-      ["Minha posição", "Classificação da conta própria"],
       ["Histórico", "Partidas para estudar"],
     ]) {
       const link = nav.getByRole("link", { name: new RegExp(label) });

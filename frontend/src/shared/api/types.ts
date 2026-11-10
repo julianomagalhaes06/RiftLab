@@ -204,6 +204,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/social/{provider}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recebe a volta do provedor e abre a sessão */
+        get: operations["get_social_callback_api_v1_auth_social__provider__callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/social/{provider}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Leva a pessoa ao login do provedor */
+        get: operations["get_social_start_api_v1_auth_social__provider__start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/verify-email": {
         parameters: {
             query?: never;
@@ -2587,6 +2621,15 @@ export interface components {
              */
             status: string;
         };
+        /** Registration */
+        Registration: {
+            /** Email */
+            email: string;
+            /** Name */
+            name: string;
+            /** Password */
+            password: string;
+        };
         /**
          * ReportFormat
          * @description docs/contracts.md: GET .../report | format=json ou html.
@@ -2773,11 +2816,19 @@ export interface components {
         };
         /**
          * SessionState
-         * @description `authRequired`: o servidor exige login nas áreas da conta.
+         * @description `authRequired`: o servidor exige login nas áreas da conta. `socialProviders`: os logins
+         *     sociais configurados neste servidor.
          */
         SessionState: {
             /** Authrequired */
             authRequired: boolean;
+            /**
+             * Demoenabled
+             * @default false
+             */
+            demoEnabled: boolean;
+            /** Socialproviders */
+            socialProviders: ("google" | "discord")[];
             user: components["schemas"]["SessionUser"] | null;
         };
         /** SessionUser */
@@ -2786,6 +2837,8 @@ export interface components {
             email: string;
             /** Id */
             id: string;
+            /** Name */
+            name: string | null;
         };
         /** TimelineGoldFrame */
         TimelineGoldFrame: {
@@ -3273,7 +3326,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Credentials"];
+                "application/json": components["schemas"]["Registration"];
             };
         };
         responses: {
@@ -3358,6 +3411,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionState"];
+                };
+            };
+        };
+    };
+    get_social_callback_api_v1_auth_social__provider__callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path: {
+                provider: "google" | "discord";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_social_start_api_v1_auth_social__provider__start_get: {
+        parameters: {
+            query?: {
+                next?: string | null;
+            };
+            header?: never;
+            path: {
+                provider: "google" | "discord";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

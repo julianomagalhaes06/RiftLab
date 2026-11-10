@@ -72,6 +72,6 @@ describe("Painel da conta própria", () => {
     const region = screen.getByRole("region", { name: "Seu recorte de partidas" });
     expect(within(region).queryByText("Taxa de vitória")).not.toBeInTheDocument();
     expect(within(region).getByText("Decisões revistas")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Partidas importadas recentes" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Partidas importadas recentes" })).not.toBeInTheDocument();
   });
 });

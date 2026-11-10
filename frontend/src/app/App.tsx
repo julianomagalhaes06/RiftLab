@@ -13,8 +13,8 @@ import { Link } from "../shared/router/Link";
 import { RouterProvider } from "../shared/router/RouterProvider";
 import { DemoNoticeProvider } from "./DemoNotice";
 import { ContextStrip } from "./ContextStrip";
-import type { Route } from "../shared/router/routes";
-import { PanelPage, PositionPage } from "./AreaPages";
+import { LEGACY_POSITION_PATH, isDemoMatchId, loginPath, type Route } from "../shared/router/routes";
+import { PanelPage } from "./AreaPages";
 import { ChampionsPage } from "../features/champions/ChampionsPage";
 import { MainNav } from "./MainNav";
 import { PlayerPage } from "../features/players/PlayerPage";
@@ -26,8 +26,8 @@ import { useAuth } from "../features/auth/authContext";
 import { AuthScreen } from "../features/auth/AuthScreen";
 import { UserMenu } from "../features/auth/UserMenu";
 import { AccountPage } from "../features/auth/AccountPage";
-import { AccountGate } from "../features/auth/AccountGate";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
+import { AccountCreatedNotice } from "../features/auth/AccountCreatedNotice";
 import { HomePage } from "../features/home/HomePage";
 import "./App.css";
 import "../design/concept-c.css";
@@ -37,10 +37,10 @@ const TITLES: Record<Route["name"], string> = {
   login: "Entrar — RiftLab",
   register: "Criar conta — RiftLab",
   forgot: "Redefinir senha — RiftLab",
+  welcome: "Conta criada — RiftLab",
   importEntry: "Importar partida — RiftLab",
   panel: "Painel — RiftLab",
   champions: "Campeões — RiftLab",
-  position: "Minha posição — RiftLab",
   account: "Minha conta — RiftLab",
   history: "Histórico — RiftLab",
   historyMatch: "Contexto da partida — RiftLab",
@@ -53,15 +53,8 @@ const TITLES: Record<Route["name"], string> = {
   notFound: "Página não encontrada — RiftLab",
 };
 
-// Áreas da conta própria: sem conta, o convite para criar uma (a leitura pública segue aberta).
-const ACCOUNT_AREAS: Partial<Record<Route["name"], { title: string; lead: string }>> = {
-  panel: { title: "Painel", lead: "Taxa de vitória, KDA, campeões mais jogados e partidas recentes da sua conta Riot vinculada." },
-  position: { title: "Minha posição", lead: "Seu elo e a evolução da sua posição ranqueada, a partir da conta Riot vinculada." },
-  history: { title: "Histórico", lead: "Suas partidas ranqueadas, atualizadas automaticamente, para estudar cada compra." },
-  account: { title: "Minha conta", lead: "Conta local e vínculo com a sua conta Riot." },
-  importEntry: { title: "Importar partida", lead: "Importe uma partida pelo ID para analisar as compras dela." },
-  import: { title: "Importar partida", lead: "Importe uma partida pelo ID para analisar as compras dela." },
-};
+// Áreas da conta própria: sem sessão, vão direto para entrar ou criar conta (e voltam depois).
+const ACCOUNT_AREAS: ReadonlySet<Route["name"]> = new Set(["panel", "history", "account", "importEntry", "import"]);
 
 function renderPage(route: Route): ReactNode {
   switch (route.name) {
@@ -70,6 +63,7 @@ function renderPage(route: Route): ReactNode {
     case "login":
     case "register":
     case "forgot":
+    case "welcome":
       return null; // renderizadas fora do layout principal
     case "importEntry":
       return <EntryPage />;
@@ -77,8 +71,6 @@ function renderPage(route: Route): ReactNode {
       return <PanelPage />;
     case "champions":
       return <ChampionsPage />;
-    case "position":
-      return <PositionPage />;
     case "account":
       return <AccountPage />;
     case "history":
@@ -125,19 +117,32 @@ function AppShell() {
   // Já com sessão, /entrar e /criar-conta levam direto ao destino.
   useEffect(() => {
     if (checked && user && authRoute) navigate(authRoute.next ?? "/painel", { replace: true });
-  }, [checked, user, authRoute, navigate]);
+    if (checked && !user && route.name === "welcome") navigate("/", { replace: true });
+  }, [checked, user, authRoute, route.name, navigate]);
   // Até saber da sessão, nenhuma tela dispara chamadas (evita 401 nas áreas da conta).
   if (!checked) return <p className="app-loading" role="status">Carregando o RiftLab…</p>;
   if (authRoute) {
     return user ? null : <AuthScreen mode={authRoute.name} next={authRoute.next} />;
+  }
+  if (route.name === "welcome") {
+    return user ? <AuthScreen mode="register" next={null} welcome={user} /> : null;
   }
   return <AppContent />;
 }
 
 function AppContent() {
   const { route, navigate, href } = useRouter();
-  const { hasAccount } = useAuth();
-  const gate = hasAccount ? undefined : ACCOUNT_AREAS[route.name];
+  const { hasAccount, demoEnabled } = useAuth();
+  const needsLogin = !hasAccount && ACCOUNT_AREAS.has(route.name);
+  // Fora do ambiente de demonstração, o que é sintético simplesmente não existe.
+  const hidden = !demoEnabled && (route.name === "prototype"
+    || ((route.name === "match" || route.name === "historyMatch") && isDemoMatchId(route.matchId)));
+  const legacyPosition = href.split("?")[0] === LEGACY_POSITION_PATH;
+  useEffect(() => {
+    // A antiga aba Minha posição virou o card de elo do Painel; links guardados continuam valendo.
+    if (legacyPosition) navigate("/painel", { replace: true });
+    else if (needsLogin) navigate(loginPath(href), { replace: true });
+  }, [legacyPosition, needsLogin, href, navigate]);
   const mainRef = useRef<HTMLElement>(null);
   // Só o CAMINHO conta: trocar de participante (?participant=N) não devolve o foco ao
   // topo da página, senão quem navega por teclado perderia o lugar a cada seleção.
@@ -145,16 +150,16 @@ function AppContent() {
   const firstRender = useRef(true);
 
   useEffect(() => {
-    document.title = TITLES[route.name];
+    document.title = TITLES[hidden ? "notFound" : route.name];
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
     // Navegação por link: leva o foco ao conteúdo novo (teclado/leitor de tela).
     mainRef.current?.focus();
-  }, [pathKey, route.name]);
+  }, [pathKey, route.name, hidden]);
 
-  if (route.name === "prototype") {
+  if (route.name === "prototype" && demoEnabled) {
     return <ReviewPrototype onExit={() => navigate("/")} />;
   }
 
@@ -182,7 +187,8 @@ function AppContent() {
           <ContextStrip />
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className={route.name === "home" ? "app__main app__main--home" : "app__main"}>
-          {gate ? <AccountGate title={gate.title} lead={gate.lead} /> : renderPage(route)}
+          <AccountCreatedNotice />
+          {needsLogin ? null : renderPage(hidden ? { name: "notFound", path: href.split("?")[0] } : route)}
         </main>
         <footer className="app__footer">
           <div className="app__footer-row">

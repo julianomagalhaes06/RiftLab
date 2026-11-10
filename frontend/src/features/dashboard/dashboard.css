@@ -4,7 +4,7 @@
 .panel-head > div:first-child { max-width: 760px; }
 .panel-filters { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: flex-end; gap: 8px 10px; max-width: 520px; }
 .panel-filters label { display: grid; gap: 4px; color: var(--ntext-subtle); font-size: .75rem; font-weight: 500; }
-.panel-filters select { min-height: 36px; font-size: .8125rem; }
+.panel-filters select { min-height: 44px; font-size: .8125rem; }
 .panel-filters__hint { flex-basis: 100%; margin: 0; color: var(--ntext-subtle); font-size: .75rem; line-height: 1.4; text-align: right; }
 
 .panel-grid { display: grid; grid-template-columns: minmax(0, 880fr) minmax(320px, 456fr); gap: 24px; align-items: start; }
@@ -89,3 +89,11 @@
   .panel-recent__foot { padding: 4px 16px; }
   .panel-champion { padding: 0 16px; min-height: 60px; }
 }
+
+/* Conta sem vínculo: um quadro único e centralizado no lugar do Painel. */
+.panel-link { display: grid; justify-items: center; gap: 10px; width: min(100%, 520px); margin: clamp(24px, 8vh, 80px) auto; padding: 40px; text-align: center; }
+.panel-link .page-head__context { margin: 6px 0 0; }
+.panel-link h2 { margin: 0; font: 600 1.625rem/1.2 var(--font-display); color: var(--ntext); }
+.panel-link .muted { margin: 0 0 8px; line-height: 1.5; }
+.panel-link__badge { display: grid; place-items: center; width: 56px; height: 56px; border: 1px solid var(--accent-strong); border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
+@media (max-width: 700px) { .panel-link { padding: 30px 22px; } }

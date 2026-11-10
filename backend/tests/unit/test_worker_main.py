@@ -20,6 +20,11 @@ async def _no_purge(session_factory, raw_store, settings) -> bool:
     return False
 
 
+async def _no_sync(session_factory, settings) -> bool:
+    """Trilha de manutenção: sem banco neste teste, nenhuma sincronização a fazer."""
+    return False
+
+
 async def _no_idle(session_factory) -> bool:
     """Revisão no ocioso: sem banco neste teste, nada a agendar."""
     return False
@@ -57,6 +62,7 @@ async def test_worker_loop_survives_unexpected_exception_and_logs_safely(
     monkeypatch.setattr(worker_main, "process_next_preparation", fake_process_next_preparation)
     monkeypatch.setattr(worker_main, "process_next_purge", _no_purge)  # CC-603
     monkeypatch.setattr(worker_main, "enqueue_idle_preparation", _no_idle)
+    monkeypatch.setattr(worker_main, "process_next_history_sync", _no_sync)
 
     settings = Settings(
         raw_storage_dir=str(tmp_path / "raw"),
@@ -102,6 +108,7 @@ async def test_worker_loop_runs_preparation_each_cycle_and_survives_its_failure(
     monkeypatch.setattr(worker_main, "process_next_preparation", fake_process_next_preparation)
     monkeypatch.setattr(worker_main, "process_next_purge", _no_purge)  # CC-603
     monkeypatch.setattr(worker_main, "enqueue_idle_preparation", _no_idle)
+    monkeypatch.setattr(worker_main, "process_next_history_sync", _no_sync)
     settings = Settings(
         raw_storage_dir=str(tmp_path / "raw"),
         worker_heartbeat_path=str(tmp_path / "heartbeat"),
@@ -144,6 +151,7 @@ async def test_recurring_import_failure_never_starves_preparation(tmp_path, monk
     monkeypatch.setattr(worker_main, "process_next_preparation", working_preparation)
     monkeypatch.setattr(worker_main, "process_next_purge", _no_purge)  # CC-603
     monkeypatch.setattr(worker_main, "enqueue_idle_preparation", _no_idle)
+    monkeypatch.setattr(worker_main, "process_next_history_sync", _no_sync)
     settings = Settings(
         raw_storage_dir=str(tmp_path / "raw"),
         worker_heartbeat_path=str(tmp_path / "heartbeat"),
@@ -194,6 +202,7 @@ async def test_imports_run_in_parallel_and_preparation_does_not_wait_for_them(
     monkeypatch.setattr(worker_main, "process_next_preparation", preparation)
     monkeypatch.setattr(worker_main, "process_next_purge", _no_purge)
     monkeypatch.setattr(worker_main, "enqueue_idle_preparation", _no_idle)
+    monkeypatch.setattr(worker_main, "process_next_history_sync", _no_sync)
     settings = Settings(
         raw_storage_dir=str(tmp_path / "raw"),
         worker_heartbeat_path=str(tmp_path / "heartbeat"),

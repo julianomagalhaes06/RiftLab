@@ -39,7 +39,7 @@ for (const width of [360, 1280]) {
     await page.route("https://**/*", (route) => route.abort());
     await page.setViewportSize({ width, height: 900 });
     await mockApi(page);
-    for (const path of ["/", "/painel", "/historico", "/campeoes", "/minha-posicao", "/historico/DEMO-0008?participant=1", `/decisions/${DECISION_1}`]) {
+    for (const path of ["/", "/painel", "/historico", "/campeoes", "/historico/DEMO-0008?participant=1", `/decisions/${DECISION_1}`]) {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
       expect(await unreadableButtons(page), path).toEqual([]);

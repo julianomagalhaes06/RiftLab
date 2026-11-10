@@ -114,6 +114,8 @@ async def list_imported_matches(
     ] = None,
 ) -> CursorPage[MatchSummary]:
     settings = request.app.state.settings
+    if not settings.demo_data_enabled:
+        scope = "account"  # fora do ambiente de demonstração: só as partidas da própria conta
     subject = (
         await profile_subject(request.app.state.session_factory, player)
         if player is not None

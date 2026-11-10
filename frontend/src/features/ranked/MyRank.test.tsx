@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe("Minha posição por fila", () => {
+describe("Card de elo por fila", () => {
   it("abre automaticamente na Flex quando só ela possui classificação", async () => {
     mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, search.get("queue") === "RANKED_FLEX_SR"
       ? rank("RANKED_FLEX_SR") : { ...rank(), status: "UNRANKED", position: { ...rank().position,
@@ -29,9 +29,9 @@ describe("Minha posição por fila", () => {
     expect(screen.getByLabelText("Fila ranqueada")).toHaveValue("RANKED_FLEX_SR");
     expect(screen.getByText("Seleção automática · melhor classificação disponível")).toBeInTheDocument();
   });
-  it.each([false, true])("separa Solo/Duo e Flex, inclusive no card compacto (%s)", async (compact) => {
+  it("separa Solo/Duo e Flex no card do Painel", async () => {
     mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, rank(search.get("queue")!)));
-    render(<MyRank compact={compact} />);
+    render(<MyRank />);
     await screen.findByText("Elo Platina IV, 75 de 100 PDL");
     expect(screen.getByLabelText("Fila ranqueada")).toHaveValue("RANKED_FLEX_SR");
     fireEvent.change(screen.getByLabelText("Fila ranqueada"), { target: { value: "RANKED_SOLO_5x5" } });
@@ -99,7 +99,7 @@ describe("card de elo (CC-1203)", () => {
       ? { ...rank(), position: { ...rank().position, division: "III", leaguePoints: 76 },
         change: { since: "2026-10-15T12:00:00Z", until: "2026-10-16T12:00:00Z", kind: "SAME_DIVISION", leaguePointsDelta: 22, ownMatchAssociation: "ONE" } }
       : { status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }));
-    const { container } = render(<MyRank compact />);
+    const { container } = render(<MyRank />);
     await screen.findByText("Elo Ouro III, 76 de 100 PDL");
     expect(container.querySelector(".rank-card")).toHaveAttribute("data-tier", "GOLD");
     expect([...container.querySelectorAll(".rank-plate")].map((plate) => plate.className)).toEqual([
@@ -115,7 +115,7 @@ describe("card de elo (CC-1203)", () => {
     mock.on("GET", /^\/api\/v1\/ranked\/me$/, ({ search }) => json(200, search.get("queue") === "RANKED_SOLO_5x5"
       ? { ...rank(), position: { ...rank().position, tier: "MASTER", division: "I", leaguePoints: 312 } }
       : { ...rank("RANKED_FLEX_SR"), position: { ...rank("RANKED_FLEX_SR").position, tier: "DIAMOND", division: "I", leaguePoints: 90 } }));
-    const { container } = render(<MyRank compact />);
+    const { container } = render(<MyRank />);
     await screen.findByText("Elo Mestre, 312 PDL");
     expect(container.querySelector(".rank-card__plates")).toBeNull();
     expect(screen.getByText("Elos do topo não têm divisões.")).toBeInTheDocument();
@@ -125,7 +125,7 @@ describe("card de elo (CC-1203)", () => {
   });
 });
 
-describe("Minha posição atualizada pela sincronização da conta", () => {
+describe("Card de elo atualizado pela sincronização da conta", () => {
   const sync = { listed: 0, newEnqueued: 0, alreadyKnown: 0, skippedPurged: 0 };
   const unranked = () => ({ ...rank(), status: "STALE", reason: "OBSERVATION_OLD", position: { ...rank().position,
     state: "UNRANKED", tier: null, division: null, leaguePoints: null, wins: null, losses: null } });
@@ -163,7 +163,7 @@ describe("Minha posição atualizada pela sincronização da conta", () => {
   });
 });
 
-describe("Minha posição com contas locais (Sprint 2, #13)", () => {
+describe("Card de elo com contas locais (Sprint 2, #13)", () => {
   it("orienta o vínculo quando o usuário ainda não tem conta Riot vinculada", async () => {
     mock.on("GET", /^\/api\/v1\/ranked\/me$/, () => json(200, { status: "UNAVAILABLE", reason: "ACCOUNT_NOT_LINKED", position: null, change: null }));
     render(<MyRank />);

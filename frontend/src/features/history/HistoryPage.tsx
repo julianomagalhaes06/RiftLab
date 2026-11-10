@@ -14,6 +14,7 @@ import { dayKey, dayLabel, decimal, percent, record, summarizeLoaded } from "./p
 import "./history.css";
 import { count } from "../../shared/text/count";
 import { useDemoNotice } from "../../app/demoNotice";
+import { useAuth } from "../auth/authContext";
 
 const PAGE_SIZE = 20;
 
@@ -40,13 +41,14 @@ function FilterGroup<T extends string | number>({
 }
 
 function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
+  const { demoEnabled } = useAuth();
   const summary = summarizeLoaded(matches);
   const demoCount = matches.filter((match) => isDemoMatchId(match.matchId)).length;
   if (!summary.games) {
     return (
       <section className="history-summary surface surface--pad" aria-label="Resumo das páginas carregadas">
         <strong>{count(matches.length, "partida carregada", "partidas carregadas")}</strong>
-        <span>{matches.length - demoCount} RIOT · {demoCount} DEMO</span>
+        {demoEnabled ? <span>{matches.length - demoCount} RIOT · {demoCount} DEMO</span> : null}
         <p>Sua conta não foi identificada nas partidas carregadas; resultado e KDA dependem da observação de elo da conta configurada.</p>
       </section>
     );
@@ -124,6 +126,7 @@ export function DayGroups({ matches }: { matches: MatchSummary[] }) {
 }
 
 export function HistoryPage() {
+  const { user, demoEnabled } = useAuth();
   const [query, setQuery] = useState("");
   const [origin, setOrigin] = useState<OriginFilter>("RIOT");
   const [result, setResult] = useState<ResultFilter>("ALL");
@@ -173,7 +176,7 @@ export function HistoryPage() {
           {hasLocal ? (
             <FilterGroup<ResultFilter> label="Resultado" value={result} onChange={setResult} options={[["ALL", "Todos"], ["WIN", "Vitórias"], ["LOSS", "Derrotas"]] as const} />
           ) : null}
-          <FilterGroup<OriginFilter> label="Origem da partida" value={origin} onChange={setOrigin} options={[["ALL", "Minha conta e DEMO"], ["RIOT", "Minha conta"], ["DEMO", "DEMO"]] as const} />
+          {demoEnabled ? <FilterGroup<OriginFilter> label="Origem da partida" value={origin} onChange={setOrigin} options={[["ALL", "Minha conta e DEMO"], ["RIOT", "Minha conta"], ["DEMO", "DEMO"]] as const} /> : null}
         </div>
         {!hasLocal && list.status === "ready" ? (
           <p className="history-controls__limit">Filtro de resultado indisponível: sua conta não foi identificada nas partidas carregadas.</p>
@@ -198,8 +201,8 @@ export function HistoryPage() {
           ) : pending && !list.items.length ? null : (
             <div className="empty-state">
               <h4>{list.items.length ? "Nenhuma partida neste filtro" : "Nenhuma partida importada"}</h4>
-              <p>{list.items.length ? "Ajuste a busca ou carregue mais páginas." : origin === "RIOT" ? "Nenhuma partida foi identificada para a conta configurada. Confira a conta e a atualização em Minha posição ou selecione DEMO." : "Importe uma partida concluída ou abra a demonstração para começar."}</p>
-              <Link to="/importar">Importar ou abrir demonstração</Link>
+              <p>{list.items.length ? "Ajuste a busca ou carregue mais páginas." : origin === "RIOT" ? (user ? "Suas partidas ranqueadas aparecem aqui quando sua conta Riot estiver vinculada." : "Nenhuma partida foi identificada para a conta configurada. Confira a conta e a atualização em Minha posição.") : "Importe uma partida concluída para começar."}</p>
+              {user && origin === "RIOT" && !list.items.length ? <Link to="/conta">Ir para Minha conta</Link> : null}
               {list.nextCursor !== null && <button className="button button--secondary" type="button" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? "Carregando…" : "Carregar mais partidas"}</button>}
             </div>
           )}

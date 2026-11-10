@@ -55,14 +55,16 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     // conta por ele e volta para /importar (o roteiro termina removendo a partida, que também
     // exige conta).
     await page.goto("/importar");
-    const gate = page.getByText("Disponível com conta");
+    const gate = page.getByRole("tab", { name: "Criar conta" });
     const ready = page.getByText("Serviço disponível");
     await expect(gate.or(ready)).toBeVisible();
     if (await gate.isVisible()) {
-      await page.locator(".account-gate").getByRole("link", { name: "Criar conta" }).click();
+      await gate.click();
       const email = `e2e_${Date.now()}@example.test`;
+      await page.getByLabel("Nome", { exact: true }).fill("Jogadora E2E");
       await page.getByLabel("E-mail").fill(email);
       await page.getByLabel("Senha", { exact: true }).fill("Senha-E2e-Stack-1");
+      await page.getByLabel("Confirmar senha", { exact: true }).fill("Senha-E2e-Stack-1");
       await page.getByRole("button", { name: "Criar conta" }).click();
       await page.getByLabel("Código de 6 dígitos").fill(await codeFromMailpit(page, email));
       await page.getByRole("button", { name: "Confirmar e-mail" }).click();

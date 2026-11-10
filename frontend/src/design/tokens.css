@@ -64,6 +64,8 @@
   --hero-scrim-clear: rgb(15 16 19 / 0);
   --hero-scrim: rgb(15 16 19 / .6);
   --hero-scrim-strong: rgb(15 16 19 / .94);
+  /* Atrás do título e do selo: com .78, mesmo sobre arte branca o roxo do título passa de 3:1. */
+  --hero-scrim-heavy: rgb(15 16 19 / .78);
   --hero-glow: rgb(139 108 255 / .2);
   --hero-ink-shadow: rgb(0 0 0 / .65);
   /* Texto sobre a arte: a vitrine continua escura nos dois temas. */
@@ -85,6 +87,7 @@
   --win-tint-soft: rgba(61, 214, 140, .10);
   --loss-tint-soft: rgba(242, 102, 122, .10);
   --shadow-soft: rgb(0 0 0 / .16);
+  --toast-shadow: rgb(0 0 0 / .55);
   --sheen: rgb(255 255 255 / .38);
   --sheen-soft: rgb(255 255 255 / .14);
   --shade: rgb(0 0 0 / .35);
@@ -192,6 +195,7 @@
   --win-tint-soft: rgba(10, 122, 71, .08);
   --loss-tint-soft: rgba(196, 42, 66, .08);
   --shadow-soft: rgb(22 24 29 / .1);
+  --toast-shadow: rgb(22 24 29 / .2);
 
   --color-available-bg: #dff5ea;
   --color-degraded: #7f5a05;
@@ -242,4 +246,12 @@
   --tier-grandmaster-text: #f28a8a;
   --tier-challenger-text: #93cefa;
   --tier-none-text: #b4b8c1;
+  /* Os apelidos semânticos são resolvidos na raiz; aqui voltam a apontar para os tons escuros
+     (sem isso o seletor de fila do card herdava o texto escuro do tema claro e sumia). */
+  --color-bg: var(--n0);
+  --color-surface: var(--n0);
+  --color-surface-alt: var(--n1);
+  --color-text: var(--ntext);
+  --color-muted: var(--ntext-muted);
+  --color-border: var(--nline);
 }

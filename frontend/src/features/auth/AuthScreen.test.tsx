@@ -56,14 +56,10 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     vi.stubGlobal("fetch", mock.fetch);
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "Histórico" })).toBeInTheDocument();
-    expect(screen.getByText("Disponível com conta")).toBeInTheDocument();
-    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(0);
-    const enter = screen.getAllByRole("link", { name: "Entrar" }).find((link) => link.closest(".account-gate"));
-    expect(enter).toHaveAttribute("href", "/entrar?next=%2Fhistorico");
-    fireEvent.click(enter!);
-
+    // Sem sessão, a área da conta vai direto para a tela de entrar, guardando o destino.
     expect(await screen.findByRole("heading", { name: "Entrar no RiftLab" })).toBeInTheDocument();
+    expect(window.location.pathname + window.location.search).toBe("/entrar?next=%2Fhistorico");
+    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(0);
     fill("jogadora@example.test", PASSWORD);
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
     expect(await screen.findByRole("heading", { name: "Partidas para estudar" })).toBeInTheDocument();
@@ -110,8 +106,10 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect((init?.headers as Record<string, string>)["X-RiftLab-Request"]).toBe("1");
 
     fireEvent.click(screen.getByRole("button", { name: "Sair" }));
-    // Sem sessão, o Painel vira o convite; a navegação continua.
-    expect(await screen.findByText("Disponível com conta")).toBeInTheDocument();
+    // Sair leva ao início, com a navegação de quem não tem conta.
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+    expect(screen.queryByRole("heading", { name: "Entrar no RiftLab" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Áreas principais" })).toBeInTheDocument();
     expect(mock.callsTo("POST", /^\/api\/v1\/auth\/logout$/)).toHaveLength(1);
   });
@@ -141,13 +139,21 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(screen.getByText(/Uma letra maiúscula/)).toHaveTextContent("(atendido)");
     expect(screen.getByText(/Um símbolo/)).toHaveTextContent("(atendido)");
     fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Informe seu nome.");
+    fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "  Jogadora " } });
+    fireEvent.change(screen.getByLabelText("Confirmar senha"), { target: { value: "Abcdef1?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
+    expect(await screen.findByText("As senhas não são iguais.")).toBeInTheDocument();
+    expect(mock.callsTo("POST", /auth\/register$/)).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("Confirmar senha"), { target: { value: "Abcdef1!" } });
+    fireEvent.click(screen.getByRole("button", { name: "Criar conta" }));
 
     const heading = await screen.findByRole("heading", { name: "Confirme seu e-mail" });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByText("jogadora@example.test")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reenviar código em \d+ s/ })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Sair" })).not.toBeInTheDocument();
-    expect(mock.callsTo("POST", /auth\/register$/)[0].body).toEqual({ email: "jogadora@example.test", password: "Abcdef1!" });
+    expect(mock.callsTo("POST", /auth\/register$/)[0].body).toEqual({ name: "Jogadora", email: "jogadora@example.test", password: "Abcdef1!" });
 
     const field = screen.getByLabelText("Código de 6 dígitos");
     expect(field).toHaveAttribute("autocomplete", "one-time-code");
@@ -165,9 +171,9 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(await screen.findByRole("heading", { name: "Conta criada" })).toHaveFocus();
     // A confirmação leva a senha do cadastro junto com o código.
     expect(mock.callsTo("POST", /verify-email$/).at(-1)?.body).toEqual({ email: "jogadora@example.test", code: "123456", password: "Abcdef1!" });
-    fireEvent.click(screen.getByRole("button", { name: "Ir para o Painel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
     expect(await screen.findByRole("button", { name: "Sair" })).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/painel");
+    expect(window.location.pathname).toBe("/");
   });
 
   it("login de conta não confirmada vai para o código, reenviado, e depois entra", async () => {
@@ -232,7 +238,7 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(mock.callsTo("POST", /password\/reset$/).at(-1)?.body).toEqual({ email: "jogadora@example.test", code: "123456", newPassword: "Senha-Nova-2" });
   });
 
-  it("sessão que termina no meio do uso troca a área da conta pelo convite", async () => {
+  it("sessão que termina no meio do uso leva ao início", async () => {
     const mock = createMockApi();
     let session: { authRequired: boolean; user: typeof USER | null } = { authRequired: true, user: USER };
     mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
@@ -243,7 +249,8 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     vi.stubGlobal("fetch", mock.fetch);
     window.history.replaceState(null, "", "/historico");
     render(<App />);
-    expect(await screen.findByText("Disponível com conta")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
     await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/auth\/session$/).length).toBeGreaterThan(1));
   });
 
@@ -257,6 +264,154 @@ describe("Contas locais: leitura pública e conta para guardar", () => {
     expect(screen.queryByRole("link", { name: "Entrar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sair" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Áreas principais" })).toHaveTextContent("Painel");
+  });
+});
+
+describe("Login social e nome da conta", () => {
+  function withSession(session: Record<string, unknown>) {
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+  }
+
+  it("mostra só os provedores configurados e leva o destino junto", async () => {
+    window.history.replaceState(null, "", "/entrar?next=%2Fhistorico");
+    withSession({ authRequired: true, user: null, socialProviders: ["google"] });
+    const google = await screen.findByRole("link", { name: "Continuar com Google" });
+    expect(google).toHaveAttribute("href", "/api/v1/auth/social/google/start?next=%2Fhistorico");
+    expect(screen.queryByRole("link", { name: "Continuar com Discord" })).not.toBeInTheDocument();
+    expect(screen.getByText("ou com e-mail")).toBeInTheDocument();
+  });
+
+  it("sem provedor configurado, fica só o formulário", async () => {
+    window.history.replaceState(null, "", "/criar-conta");
+    withSession({ authRequired: true, user: null, socialProviders: [] });
+    await screen.findByRole("heading", { name: "Criar conta no RiftLab" });
+    expect(screen.queryByRole("link", { name: /Continuar com (Google|Discord)/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("ou com e-mail")).not.toBeInTheDocument();
+  });
+
+  it("redefinir a senha não oferece login social", async () => {
+    window.history.replaceState(null, "", "/esqueci-senha");
+    withSession({ authRequired: true, user: null, socialProviders: ["google", "discord"] });
+    await screen.findByRole("heading", { name: "Redefinir a senha" });
+    expect(screen.queryByRole("link", { name: "Continuar com Google" })).not.toBeInTheDocument();
+  });
+
+  it("avisa o motivo da volta sem sucesso e limpa o endereço", async () => {
+    window.history.replaceState(null, "", "/entrar?social=cancelado&next=%2Fhistorico");
+    withSession({ authRequired: true, user: null, socialProviders: ["discord"] });
+    expect(await screen.findByText(/^Login cancelado\./)).toHaveAttribute("role", "status");
+    await waitFor(() => expect(window.location.search).toBe("?next=%2Fhistorico"));
+    // O aviso não marca os campos como errados.
+    expect(screen.getByLabelText("Senha")).toHaveAttribute("aria-invalid", "false");
+  });
+
+  it("o menu mostra o nome e cai no e-mail quando a conta não tem nome", async () => {
+    window.history.replaceState(null, "", "/entrar");
+    withSession({ authRequired: true, user: { ...USER, name: "Jogadora" }, socialProviders: [] });
+    expect(await screen.findByRole("link", { name: "Minha conta (jogadora@example.test)" })).toHaveTextContent("Jogadora");
+    expect(screen.getByRole("link", { name: "Minha conta (jogadora@example.test)" })).not.toHaveTextContent("example.test");
+  });
+});
+
+describe("Login social e conta nova", () => {
+  function setup(path: string, session: { authRequired: boolean; user: typeof USER | null; socialProviders?: string[] }) {
+    window.history.replaceState(null, "", path);
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, session));
+    mock.on("GET", /^\/api\/v1\/riot-link$/, () => json(200, { state: "NONE" }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    return mock;
+  }
+
+  it.each(["/entrar", "/criar-conta"])("em %s, os botões sociais ficam uma vez só, acima das abas", async (path) => {
+    setup(path, { authRequired: true, user: null, socialProviders: ["google", "discord"] });
+    const google = await screen.findByRole("link", { name: "Continuar com Google" });
+    expect(screen.getAllByRole("link", { name: /Continuar com (Google|Discord)/ })).toHaveLength(2);
+    const tabs = screen.getByRole("tablist", { name: "Acesso ao RiftLab" });
+    expect(google.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("conta nova sem destino vê as boas-vindas, e Agora não vai à home", async () => {
+    setup("/boas-vindas", { authRequired: true, user: USER });
+    expect(await screen.findByRole("heading", { name: "Conta criada" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Vincular conta Riot" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("Vincular conta Riot, nas boas-vindas, abre Minha conta", async () => {
+    setup("/boas-vindas", { authRequired: true, user: USER });
+    fireEvent.click(await screen.findByRole("button", { name: "Vincular conta Riot" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/conta"));
+  });
+
+  it("boas-vindas sem sessão vai à home", async () => {
+    setup("/boas-vindas", { authRequired: true, user: null });
+    expect(await screen.findByRole("heading", { name: /Entenda cada compra/ })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("conta nova que veio de uma página volta a ela com um aviso, e a marca sai do endereço", async () => {
+    setup("/campeoes?conta=nova", { authRequired: true, user: USER });
+    const notice = await screen.findByText("Conta criada");
+    expect(screen.getByRole("link", { name: "Vincular agora" })).toHaveAttribute("href", "/conta");
+    await waitFor(() => expect(window.location.search).toBe(""));
+    expect(window.location.pathname).toBe("/campeoes");
+    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
+    // Sai com uma animação curta (200 ms) e então deixa a página.
+    expect(notice.closest(".account-toast")).toHaveClass("account-toast--leaving");
+    await waitFor(() => expect(notice).not.toBeInTheDocument());
+  });
+});
+
+describe("Site sem demonstração", () => {
+  function setup(path: string, user: typeof USER | null = USER) {
+    window.history.replaceState(null, "", path);
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user, demoEnabled: false }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    return mock;
+  }
+  const noRank = { status: "UNAVAILABLE", reason: "ACCOUNT_NOT_LINKED", position: null, change: null };
+
+  it("conta sem vínculo vê só o convite no Painel, sem partida nenhuma", async () => {
+    const mock = setup("/painel");
+    mock.on("GET", /^\/api\/v1\/ranked\/me$/, () => json(200, noRank));
+    mock.on("GET", /^\/api\/v1\/dashboard$/, () => json(200, { origin: "REAL", status: "IDENTITY_UNAVAILABLE", window: 20, queue: 420, queueSelection: "AUTO", queues: [], totalMatches: 0, sampledMatches: 0, wins: 0, losses: 0, winSamples: 0, winRate: null, kda: null, kdaSamples: 0, distinctChampions: 0, champions: [], recentMatches: [], progress: { attempts: 0, revealed: 0, reflections: 0, matches: 0 } }));
+    const heading = await screen.findByRole("heading", { name: "Vincule sua conta Riot" });
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Vincular conta Riot" })).toHaveAttribute("href", "/conta");
+    expect(screen.queryByLabelText("Origem")).not.toBeInTheDocument();
+    expect(screen.queryByText(/BR1_/)).not.toBeInTheDocument();
+    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(0);
+  });
+
+  it("Importar não oferece demonstração nem protótipo", async () => {
+    setup("/importar");
+    expect(await screen.findByRole("heading", { name: "Analisar uma partida" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explorar demonstração" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/protótipo/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Partidas DEMO/)).not.toBeInTheDocument();
+  });
+
+  it("Histórico não tem filtro de origem e pede só as partidas da conta", async () => {
+    const mock = setup("/historico");
+    mock.on("GET", /^\/api\/v1\/matches$/, () => json(200, { items: [], nextCursor: null }));
+    expect(await screen.findByRole("heading", { name: "Partidas para estudar" })).toBeInTheDocument();
+    await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/matches$/).length).toBeGreaterThan(0));
+    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)[0].search.get("scope")).toBe("account");
+    expect(screen.queryByRole("group", { name: "Origem da partida" })).not.toBeInTheDocument();
+  });
+
+  it("o protótipo com dados ilustrativos não abre", async () => {
+    setup("/prototipo", null);
+    expect(await screen.findByRole("heading", { name: "Página não encontrada" })).toBeInTheDocument();
   });
 });
 

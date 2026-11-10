@@ -205,6 +205,37 @@ body {
   cursor: not-allowed;
 }
 
+/* Retorno tátil ao clicar (better-ui): escala 0,96 em 150 ms. Só `scale` transiciona; cores
+   mudam na hora, para a troca de tema não disparar transições na página inteira. */
+.button:not(.button--link),
+.segmented > button,
+.theme-toggle,
+.player-search__submit,
+.auth-password__toggle,
+.app .decision-chip {
+  transition-property: scale;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+.button:not(.button--link):active:not(:disabled),
+.segmented > button:active:not(:disabled),
+.theme-toggle:active,
+.player-search__submit:active:not(:disabled),
+.auth-password__toggle:active,
+.app .decision-chip:active {
+  scale: 0.96;
+}
+@media (prefers-reduced-motion: reduce) {
+  .button:not(.button--link):active:not(:disabled),
+  .segmented > button:active:not(:disabled),
+  .theme-toggle:active,
+  .player-search__submit:active:not(:disabled),
+  .auth-password__toggle:active,
+  .app .decision-chip:active {
+    scale: none;
+  }
+}
+
 .button--secondary,
 .app a.button--secondary {
   background: transparent;

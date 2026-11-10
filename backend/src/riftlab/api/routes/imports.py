@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 
-from riftlab.errors import ProblemDetail
+from riftlab.errors import ProblemDetail, problem_response
 from riftlab.ingestion.application import get_import_job, request_import, retry_import
 from riftlab.ingestion.domain import ImportJob
 from riftlab.ingestion.domain import ImportMode as DomainImportMode
@@ -41,8 +41,16 @@ _INVALID_JOB_ID_RESPONSE = {
         }
     },
 )
-async def create_import(payload: ImportRequest, request: Request) -> ImportJobAccepted:
+async def create_import(payload: ImportRequest, request: Request) -> ImportJobAccepted | Response:
     mode = DomainImportMode(payload.mode.value)
+    if mode == DomainImportMode.DEMO and not request.app.state.settings.demo_data_enabled:
+        return problem_response(
+            request,
+            status_code=422,
+            code="DEMO_DISABLED",
+            title="Demonstração indisponível",
+            detail="A demonstração só existe no ambiente próprio dela.",
+        )
     if mode == DomainImportMode.RIOT and request.app.state.settings.demo_mode:
         # 422 com código próprio RIOT_KEY_MISSING (errors.py), não 409/500: a
         # requisição em si é inválida para este servidor (nenhuma chave

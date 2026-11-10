@@ -228,7 +228,7 @@ describe("importar partida: formulário de partida real", () => {
 
     const alert = await screen.findByText(/este ambiente não tem chave da Riot configurada/);
     expect(alert).toBeInTheDocument();
-    expect(screen.getByText(/Explore a demonstração/)).toBeInTheDocument();
+    expect(screen.getByText(/Configure a chave Development/)).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent("RIOT mode indisponível sem chave");
     expect(screen.getByRole("button", { name: "Analisar partida" })).toBeEnabled();
   });

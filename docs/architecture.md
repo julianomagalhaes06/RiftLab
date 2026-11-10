@@ -49,7 +49,7 @@ chave da Riot.
 
 ```mermaid
 flowchart LR
-  UI[Frontend React<br/>Painel · Campeões · Minha posição · Histórico · Estudo] -->|/api/v1| API[API FastAPI]
+  UI[Frontend React<br/>Início · Painel · Campeões · Histórico · Estudo] -->|/api/v1| API[API FastAPI]
   API --> DB[(PostgreSQL<br/>import_jobs · matches · timeline · decisões<br/>análises · tentativas · julgamentos<br/>registro ML · lápides)]
   W[Worker<br/>importação · preparação · expurgo] --> DB
   W --> RAW[(Armazenamento bruto<br/>endereçado por conteúdo)]
@@ -93,7 +93,7 @@ Rotas reais:
 | `/` (e `/painel`) | Painel |
 | `/importar` | importar por ID ou abrir a demonstração; as partidas importadas ficam no Histórico |
 | `/campeoes` | Campeões (marcador; o guia por campeão do CC-307 não foi construído) |
-| `/minha-posicao` | Minha posição |
+| `/minha-posicao` | endereço antigo: redireciona para `/painel`, onde fica o card de elo |
 | `/historico` | Histórico |
 | `/historico/:matchId` | contexto da partida, a partir do Histórico |
 | `/imports/:jobId` | progresso da importação |

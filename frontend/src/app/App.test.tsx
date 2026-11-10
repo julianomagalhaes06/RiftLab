@@ -23,7 +23,7 @@ describe("App: importar partida", () => {
   it("mostra RiftLab, a demonstração e a faixa DEMO antes do health resolver", async () => {
     // Só a sessão responde (sem login exigido); o resto, incluindo o health, fica pendente.
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => String(input).endsWith("/api/v1/auth/session")
-      ? Promise.resolve(new Response(JSON.stringify({ authRequired: false, user: null }), { headers: { "content-type": "application/json" } }))
+      ? Promise.resolve(new Response(JSON.stringify({ authRequired: false, user: null, demoEnabled: true }), { headers: { "content-type": "application/json" } }))
       : new Promise(() => {})));
 
     render(<App />);

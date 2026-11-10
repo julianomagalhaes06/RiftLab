@@ -46,7 +46,6 @@
 .auth-panel { display: grid; gap: 12px; }
 .auth-panel h1, .auth-welcome h1 { margin: 4px 0 0; font: 600 1.5rem var(--font-display); color: var(--ntext); }
 .auth-panel h1:focus, .auth-welcome h1:focus { outline: none; }
-.auth-panel h1:focus-visible, .auth-welcome h1:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 .auth-panel > .muted, .auth-welcome > .muted { margin: 0; line-height: 1.5; }
 .auth-form { display: grid; gap: 8px; margin-top: 4px; }
 .auth-wide { width: 100%; }
@@ -60,8 +59,17 @@
 .auth-password .form__input::-ms-reveal,
 .auth-password .form__input::-ms-clear { display: none; }
 .auth-password__toggle { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: inline-grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ntext-muted); cursor: pointer; }
+/* Visual de 36 px dentro do campo; a área de toque chega a 44 px. */
+.auth-password__toggle::after { content: ""; position: absolute; inset: -4px; }
 .auth-password__toggle:hover { color: var(--ntext); background: var(--n2); }
 .auth-password__toggle:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
+
+/* Login social: os logos são imagens da marca de cada provedor; o resto usa os tokens. */
+.auth-social { display: grid; gap: 14px; }
+.auth-social__buttons { display: grid; gap: 8px; }
+.auth-social__button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; text-decoration: none; }
+.auth-social__or { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--ntext-subtle); font-size: .8125rem; }
+.auth-social__or::before, .auth-social__or::after { content: ""; flex: 1; height: 1px; background: var(--nline); }
 
 .auth-rules { display: grid; gap: 6px; margin: 4px 0 0; padding: 0; list-style: none; }
 .auth-rules li { display: flex; align-items: center; gap: 8px; color: var(--ntext-subtle); font-size: .8125rem; }
@@ -129,13 +137,11 @@
 .account-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 /* Convite para criar conta quando a pessoa sem conta chega a algo que guarda dados dela. */
-.account-gate__card { display: grid; gap: 18px; max-width: 560px; }
 .account-gate__actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .account-gate__actions .button { min-width: 160px; }
-.account-gate__back { margin: 0; }
-.account-gate--inline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 32px; }
-.account-gate--inline h3 { margin: 4px 0 6px; font: 600 1.25rem var(--font-display); }
-.account-gate--inline p { margin: 0; }
+.account-gate { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 32px; }
+.account-gate h3 { margin: 4px 0 6px; font: 600 1.25rem var(--font-display); }
+.account-gate p { margin: 0; }
 @media (max-width: 700px) {
   .account-gate__actions .button { flex: 1 1 100%; }
 }
@@ -153,4 +159,33 @@
   .account-page { place-items: start center; }
   .account-panel { padding: 28px 22px; }
   .account-actions { grid-template-columns: 1fr; }
+}
+
+/* Cartão flutuante de conta recém-criada. A sombra fica no invólucro: o chanfro da superfície
+   é um clip-path, que cortaria um box-shadow. */
+.account-toast { position: fixed; right: 24px; bottom: 24px; z-index: 30; width: min(380px, calc(100vw - 32px)); filter: drop-shadow(0 12px 32px var(--toast-shadow)); animation: account-toast-in .28s ease-out; }
+.account-toast__card { --surface-line: var(--nline2); display: flex; align-items: flex-start; gap: 14px; padding: 20px; }
+.account-toast__badge { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--accent-strong); border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
+.account-toast__body { display: grid; gap: 4px; min-width: 0; }
+.account-toast__body strong { font: 600 1.0625rem var(--font-display); color: var(--ntext); }
+.account-toast__body p { margin: 0; color: var(--ntext-muted); font-size: .9375rem; line-height: 1.45; }
+.account-toast__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.account-toast__actions .button { min-height: 44px; padding: 0 14px; font-size: .9375rem; }
+@keyframes account-toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+/* Saída mais curta e mais discreta que a entrada (better-ui): 8 px e 200 ms. */
+.account-toast--leaving { animation: account-toast-out .2s ease-out forwards; pointer-events: none; }
+@keyframes account-toast-out { to { opacity: 0; transform: translateY(8px); } }
+/* No celular, acima da barra fixa de navegação. */
+@media (max-width: 960px) {
+  .account-toast { right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
+/* Telas estreitas: sem o ícone, os botões cabem numa linha e o cartão não cobre a busca. */
+@media (max-width: 700px) {
+  .account-toast__badge { display: none; }
+  .account-toast__card { padding: 16px 18px; }
+  .account-toast__actions .button { flex: 1 1 0; white-space: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .account-toast { animation: none; }
+  .account-toast--leaving { opacity: 0; }
 }

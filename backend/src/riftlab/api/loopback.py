@@ -6,13 +6,17 @@ middleware reforça essa premissa contra o que chega ao loopback sem ser o opera
 - `Host` fora da lista configurada (DNS rebinding, conexão vinda da rede local) → 400;
 - `Sec-Fetch-Site` `cross-site`/`same-site` (página de outro site no navegador do operador:
   `<object>`, `<img>`, formulário, navegação) → 403. Ausente (CLI, curl, testes) ou
-  `same-origin`/`none` (a própria SPA, pelo proxy do Vite; endereço digitado) passa;
+  `same-origin`/`none` (a própria SPA, pelo proxy do Vite; endereço digitado) passa. A única
+  exceção é o retorno do login social: o Google e o Discord devolvem o navegador numa navegação
+  de página inteira, que chega marcada como de outro site; ali, quem barra retorno forjado é o
+  `state` ligado ao cookie da tentativa;
 - toda resposta sai com anti-framing (`X-Frame-Options`, `frame-ancestors`) e `nosniff`,
   somando `frame-ancestors` a uma CSP que a rota já tenha definido (relatório HTML).
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable, Iterable
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -24,6 +28,17 @@ from riftlab.errors import problem_response
 
 CROSS_SITE = frozenset({"cross-site", "same-site"})
 FRAME_ANCESTORS = "frame-ancestors 'none'"
+_SOCIAL_CALLBACK = re.compile(r"/api/v1/auth/social/(?:google|discord)/callback")
+
+
+def _is_social_return(request: Request) -> bool:
+    """Volta do provedor: GET de documento inteiro (nunca `<img>`, `fetch` ou `<iframe>`)."""
+    return (
+        request.method == "GET"
+        and request.headers.get("sec-fetch-mode", "").lower() == "navigate"
+        and request.headers.get("sec-fetch-dest", "").lower() == "document"
+        and _SOCIAL_CALLBACK.fullmatch(request.url.path) is not None
+    )
 
 
 def host_name(header: str) -> str:
@@ -63,7 +78,9 @@ class LoopbackGuardMiddleware(BaseHTTPMiddleware):
                     detail="A API só atende pelo endereço local da estação.",
                 )
             )
-        if request.headers.get("sec-fetch-site", "").lower() in CROSS_SITE:
+        if request.headers.get(
+            "sec-fetch-site", ""
+        ).lower() in CROSS_SITE and not _is_social_return(request):
             return _protect(
                 problem_response(
                     request,

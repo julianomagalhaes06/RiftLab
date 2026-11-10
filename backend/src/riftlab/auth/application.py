@@ -9,6 +9,10 @@ Cadastro, reenvio e "esqueci minha senha" respondem igual exista ou não a conta
 o e-mail é a rota, em segundo plano. O código tem 6 dígitos, vale 15 minutos, aguenta 5
 tentativas e fica só como hash. Confirmar o e-mail também exige a senha do cadastro: sem isso,
 quem cadastrasse primeiro um e-mail alheio poderia ver a própria senha ativada pelo dono.
+
+O login social (`social_login`) só recebe e-mail confirmado pelo provedor. Pelo mesmo motivo do
+parágrafo acima, um cadastro local ainda não confirmado perde a senha quando o dono do e-mail
+chega pelo provedor.
 """
 
 from __future__ import annotations
@@ -31,7 +35,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from riftlab.auth.mailer import OutgoingEmail
-from riftlab.auth.models import AuthEmailCodeModel, AuthSessionModel, UserModel
+from riftlab.auth.models import (
+    AuthEmailCodeModel,
+    AuthSessionModel,
+    AuthSocialIdentityModel,
+    UserModel,
+)
 from riftlab.shared.db import unit_of_work
 
 SessionFactory = async_sessionmaker[AsyncSession]
@@ -39,6 +48,7 @@ EMAIL_MAX = 254
 EMAIL_PATTERN = re.compile(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$")
 CODE_PATTERN = re.compile(r"^[0-9]{6}$")
 PASSWORD_MIN, PASSWORD_MAX = 8, 128
+NAME_MIN, NAME_MAX = 2, 40
 CODE_LIFETIME = timedelta(minutes=15)
 CODE_RESEND_AFTER = timedelta(seconds=60)
 CODE_MAX_ATTEMPTS = 5
@@ -63,6 +73,11 @@ class AuthError(Exception):
 class AuthUser:
     id: uuid.UUID
     email: str
+    name: str | None = None
+
+
+def _auth_user(user: UserModel) -> AuthUser:
+    return AuthUser(user.id, user.email, user.display_name)
 
 
 def token_hash(token: str) -> str:
@@ -86,6 +101,14 @@ def validate_password(password: str) -> None:
         or not any(not c.isalnum() and not c.isspace() for c in password)
     ):
         raise AuthError("INVALID_PASSWORD")
+
+
+def clean_name(raw: str) -> str:
+    """Nome com os espaços normalizados; de 2 a 40 caracteres, sem caracteres de controle."""
+    name = " ".join(raw.split())
+    if not NAME_MIN <= len(name) <= NAME_MAX or not name.isprintable():
+        raise AuthError("INVALID_NAME")
+    return name
 
 
 async def _new_session(
@@ -155,12 +178,16 @@ async def _consume_code(
     return False
 
 
-async def register(factory: SessionFactory, email: str, password: str) -> OutgoingEmail | None:
+async def register(
+    factory: SessionFactory, email: str, password: str, name: str
+) -> OutgoingEmail | None:
     """Cria a conta não confirmada e prepara o código. O que volta é o e-mail a enviar, sem
     dizer ao chamador se a conta existia: confirmada ⇒ aviso de conta existente; ainda não
-    confirmada ⇒ a senha nova vale e sai outro código (respeitado o intervalo de reenvio)."""
+    confirmada ⇒ o nome e a senha novos valem e sai outro código (respeitado o intervalo de
+    reenvio)."""
     email = normalize_email(email)
     validate_email(email)
+    name = clean_name(name)
     validate_password(password)
     password_hash = await asyncio.to_thread(_HASHER.hash, password)
     now = datetime.now(UTC)
@@ -174,13 +201,15 @@ async def register(factory: SessionFactory, email: str, password: str) -> Outgoi
             )
             user = await _user_by_email(session, email)
             if user is None:
-                user = UserModel(email=email, password_hash=password_hash, created_at=now)
+                user = UserModel(
+                    email=email, password_hash=password_hash, display_name=name, created_at=now
+                )
                 session.add(user)
                 await session.flush()
             elif user.email_verified_at is not None:
                 return OutgoingEmail(email, "ALREADY_REGISTERED")
             else:
-                user.password_hash = password_hash
+                user.password_hash, user.display_name = password_hash, name
             code = await _issue_code(session, user.id, VERIFY, now)
     except IntegrityError:
         return None  # outro pedido criou a mesma conta agora; o e-mail é o dele
@@ -188,12 +217,13 @@ async def register(factory: SessionFactory, email: str, password: str) -> Outgoi
 
 
 async def _password_matches(user: UserModel | None, password: str) -> bool:
-    stored = user.password_hash if user is not None else _DUMMY_HASH
+    # Conta sem senha local (só login social) custa o mesmo que senha errada e nunca confere.
+    stored = user.password_hash if user is not None else None
     try:
-        await asyncio.to_thread(_HASHER.verify, stored, password)
+        await asyncio.to_thread(_HASHER.verify, stored or _DUMMY_HASH, password)
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
-    return user is not None
+    return stored is not None
 
 
 async def login(
@@ -209,7 +239,7 @@ async def login(
         raise AuthError("EMAIL_NOT_VERIFIED")
     now = datetime.now(UTC)
     async with unit_of_work(factory) as session:
-        if _HASHER.check_needs_rehash(user.password_hash):
+        if user.password_hash and _HASHER.check_needs_rehash(user.password_hash):
             fresh = await session.get(UserModel, user.id)
             if fresh is not None:
                 fresh.password_hash = await asyncio.to_thread(_HASHER.hash, password)
@@ -220,7 +250,59 @@ async def login(
             )
         )
         token = await _new_session(session, user.id, lifetime, now)
-    return AuthUser(user.id, user.email), token
+    return _auth_user(user), token
+
+
+async def social_login(
+    factory: SessionFactory,
+    provider: str,
+    subject: str,
+    email: str,
+    name: str | None,
+    *,
+    lifetime: timedelta,
+) -> tuple[AuthUser, str, bool]:
+    """Abre a sessão de quem voltou do provedor com o e-mail confirmado. Devolve o usuário, o
+    token e se a conta acabou de nascer. A identidade já ligada vale mesmo com outro e-mail;
+    sem ela, a conta é achada pelo e-mail e, sem conta, criada já confirmada e sem senha."""
+    email = normalize_email(email)
+    validate_email(email)
+    now = datetime.now(UTC)
+    created = False
+    try:
+        async with unit_of_work(factory) as session:
+            identity = await session.get(AuthSocialIdentityModel, (provider, subject))
+            user = await session.get(UserModel, identity.user_id) if identity else None
+            if user is None:
+                user = await _user_by_email(session, email)
+                if user is None:
+                    user = UserModel(email=email, email_verified_at=now, created_at=now)
+                    session.add(user)
+                    await session.flush()
+                    created = True
+                elif user.email_verified_at is None:
+                    # Quem digitou essa senha pode não ser o dono do e-mail, que chegou agora.
+                    user.password_hash, user.email_verified_at = None, now
+                    await session.execute(
+                        delete(AuthEmailCodeModel).where(AuthEmailCodeModel.user_id == user.id)
+                    )
+                user.display_name = user.display_name or name
+                session.add(
+                    AuthSocialIdentityModel(
+                        provider=provider, subject=subject, user_id=user.id, created_at=now
+                    )
+                )
+            await session.execute(
+                delete(AuthSessionModel).where(
+                    AuthSessionModel.user_id == user.id, AuthSessionModel.expires_at <= now
+                )
+            )
+            token = await _new_session(session, user.id, lifetime, now)
+            opened = _auth_user(user)
+    except IntegrityError as exc:
+        # Dois retornos simultâneos na primeira entrada: quem perdeu tenta de novo e acha a conta.
+        raise AuthError("SOCIAL_FAILED") from exc
+    return opened, token, created
 
 
 async def verify_email(
@@ -241,10 +323,7 @@ async def verify_email(
             and await _consume_code(session, user, VERIFY, code, now)
         ):
             user.email_verified_at = now
-            opened = (
-                AuthUser(user.id, user.email),
-                await _new_session(session, user.id, lifetime, now),
-            )
+            opened = (_auth_user(user), await _new_session(session, user.id, lifetime, now))
     # Fora do bloco: a tentativa errada precisa ser gravada antes de recusar.
     if opened is None:
         raise AuthError("INVALID_CODE")
@@ -303,7 +382,7 @@ async def user_for_token(factory: SessionFactory, token: str | None) -> AuthUser
     async with factory() as session:
         row = (
             await session.execute(
-                select(UserModel.id, UserModel.email)
+                select(UserModel.id, UserModel.email, UserModel.display_name)
                 .join(AuthSessionModel, AuthSessionModel.user_id == UserModel.id)
                 .where(
                     AuthSessionModel.token_hash == token_hash(token),
@@ -311,7 +390,7 @@ async def user_for_token(factory: SessionFactory, token: str | None) -> AuthUser
                 )
             )
         ).first()
-    return AuthUser(row.id, row.email) if row else None
+    return AuthUser(row.id, row.email, row.display_name) if row else None
 
 
 async def logout(factory: SessionFactory, token: str | None) -> None:

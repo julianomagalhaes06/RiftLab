@@ -6,7 +6,8 @@ import { loginPath } from "../../shared/router/routes";
 import { useAuth } from "./authContext";
 
 /** Usuário da sessão e o botão Sair, no topo. Sem sessão e com contas ativas, Entrar e Criar
- * conta (voltando à página atual). Numa instalação sem login exigido, não aparece. */
+ * conta (voltando à página atual). Numa instalação sem login exigido, não aparece. Sair leva
+ * ao início, de qualquer página. */
 export function UserMenu() {
   const { user, authRequired, signOut } = useAuth();
   const { href, route } = useRouter();
@@ -24,7 +25,7 @@ export function UserMenu() {
   return (
     <div className="user-menu">
       <span className="user-menu__name">
-        <Link to="/conta" aria-label={`Minha conta (${user.email})`} title={user.email}>{user.email}</Link>
+        <Link to="/conta" aria-label={`Minha conta (${user.email})`} title={user.email}>{user.name ?? user.email}</Link>
       </span>
       <button type="button" className="button button--secondary user-menu__out" disabled={leaving}
         onClick={() => { setLeaving(true); void signOut().finally(() => setLeaving(false)); }}>

@@ -8,6 +8,7 @@
  *   /entrar?next=/caminho                entrar (volta ao caminho depois)
  *   /criar-conta?next=/caminho           criar conta
  *   /esqueci-senha?next=/caminho         redefinir a senha por código no e-mail
+ *   /boas-vindas                         conta recém-criada pelo Google ou Discord
  *   /importar                            importar por ID ou abrir a demonstração
  *   /imports/:jobId                      progresso de uma importação
  *   /matches/:matchId?participant=N      partida (preparação, participantes, decisões)
@@ -25,10 +26,10 @@ export type Route =
   | { name: "login"; next: string | null }
   | { name: "register"; next: string | null }
   | { name: "forgot"; next: string | null }
+  | { name: "welcome" }
   | { name: "importEntry" }
   | { name: "panel" }
   | { name: "champions" }
-  | { name: "position" }
   | { name: "account" }
   | { name: "history" }
   | { name: "historyMatch"; matchId: string; participantId: number | null }
@@ -105,18 +106,22 @@ export function loginPath(next?: string | null, mode: "login" | "register" | "fo
   return target && target !== "/" ? `${base}?next=${encodeURIComponent(target)}` : base;
 }
 
+/** Endereço da antiga aba Minha posição: abre o Painel, onde o card de elo ficou. */
+export const LEGACY_POSITION_PATH = "/minha-posicao";
+
 export function parseRoute(pathname: string, search = ""): Route {
   const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   // Início público, como em sites de estatísticas; o Painel da conta fica em /painel.
   if (trimmed === "/" || trimmed === "") return { name: "home" };
   if (trimmed === "/painel") return { name: "panel" };
+  if (trimmed === "/boas-vindas") return { name: "welcome" };
   if (trimmed === "/entrar" || trimmed === "/criar-conta" || trimmed === "/esqueci-senha") {
     const next = safeNext(new URLSearchParams(search).get("next"));
     return { name: trimmed === "/entrar" ? "login" : trimmed === "/criar-conta" ? "register" : "forgot", next };
   }
   if (trimmed === "/importar") return { name: "importEntry" };
   if (trimmed === "/campeoes") return { name: "champions" };
-  if (trimmed === "/minha-posicao") return { name: "position" };
+  if (trimmed === LEGACY_POSITION_PATH) return { name: "panel" };
   if (trimmed === "/conta") return { name: "account" };
   if (trimmed === "/historico") return { name: "history" };
   const parts = trimmed.split("/").slice(1).map(safeDecode);
@@ -182,14 +187,14 @@ export function routeToPath(route: Route): string {
       return loginPath(route.next, "register");
     case "forgot":
       return loginPath(route.next, "forgot");
+    case "welcome":
+      return "/boas-vindas";
     case "importEntry":
       return "/importar";
     case "panel":
       return "/painel";
     case "champions":
       return "/campeoes";
-    case "position":
-      return "/minha-posicao";
     case "account":
       return "/conta";
     case "history":

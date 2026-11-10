@@ -91,7 +91,9 @@ def main() -> None:
         # Importar exige conta: cria uma descartável, só para esta fumaça.
         email = f"smoke_{secrets.token_hex(5)}@example.test"
         password = f"Aa-{secrets.token_urlsafe(16)}"
-        status, created = call("POST", f"{base}/api/v1/auth/register", {"email": email, "password": password})
+        status, created = call(
+            "POST", f"{base}/api/v1/auth/register", {"name": "Fumaça", "email": email, "password": password}
+        )
         if status != 202:
             fail(f"POST /auth/register respondeu {status}: {created}")
         code = wait_for_code(email, args.mailpit_url.rstrip("/"))

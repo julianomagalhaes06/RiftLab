@@ -4678,6 +4678,36 @@
         "title": "ReadyStatus",
         "type": "object"
       },
+      "Registration": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "name"
+        ],
+        "title": "Registration",
+        "type": "object"
+      },
       "ReportFormat": {
         "description": "docs/contracts.md: GET .../report | format=json ou html.",
         "enum": [
@@ -5268,11 +5298,27 @@
       },
       "SessionState": {
         "additionalProperties": false,
-        "description": "`authRequired`: o servidor exige login nas áreas da conta.",
+        "description": "`authRequired`: o servidor exige login nas áreas da conta. `socialProviders`: os logins\nsociais configurados neste servidor.",
         "properties": {
           "authRequired": {
             "title": "Authrequired",
             "type": "boolean"
+          },
+          "demoEnabled": {
+            "default": false,
+            "title": "Demoenabled",
+            "type": "boolean"
+          },
+          "socialProviders": {
+            "items": {
+              "enum": [
+                "google",
+                "discord"
+              ],
+              "type": "string"
+            },
+            "title": "Socialproviders",
+            "type": "array"
           },
           "user": {
             "anyOf": [
@@ -5287,7 +5333,8 @@
         },
         "required": [
           "authRequired",
-          "user"
+          "user",
+          "socialProviders"
         ],
         "title": "SessionState",
         "type": "object"
@@ -5302,11 +5349,23 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
         "required": [
           "id",
-          "email"
+          "email",
+          "name"
         ],
         "title": "SessionUser",
         "type": "object"
@@ -6062,7 +6121,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Credentials"
+                "$ref": "#/components/schemas/Registration"
               }
             }
           },
@@ -6152,6 +6211,148 @@
           }
         },
         "summary": "Sessão atual",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/social/{provider}/callback": {
+      "get": {
+        "operationId": "get_social_callback_api_v1_auth_social__provider__callback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "google",
+                "discord"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recebe a volta do provedor e abre a sessão",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/social/{provider}/start": {
+      "get": {
+        "operationId": "get_social_start_api_v1_auth_social__provider__start_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "google",
+                "discord"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Leva a pessoa ao login do provedor",
         "tags": [
           "auth"
         ]
