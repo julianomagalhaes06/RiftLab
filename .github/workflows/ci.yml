@@ -149,11 +149,34 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build das imagens
-        run: docker compose build
+      # Cache das camadas no GitHub Actions: o bake lê o próprio compose.yaml e grava as imagens com
+      # os nomes que o Compose usa (riftlab-<serviço>), então o `up` não monta de novo. O token do
+      # cache fica só dentro da action, longe dos passos que rodam dependências de terceiros.
+      - name: Preparar o Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build das imagens (com cache das camadas)
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        with:
+          source: .
+          files: compose.yaml
+          load: true
+          provenance: false
+          set: |
+            api.tags=riftlab-api
+            worker.tags=riftlab-worker
+            frontend.tags=riftlab-frontend
+            api.cache-from=type=gha,scope=backend
+            worker.cache-from=type=gha,scope=backend
+            api.cache-to=type=gha,scope=backend,mode=max
+            frontend.cache-from=type=gha,scope=frontend
+            frontend.cache-to=type=gha,scope=frontend,mode=max
+
+      - name: Conferir que o Compose usa as imagens montadas
+        run: docker image inspect riftlab-api riftlab-worker riftlab-frontend --format '{{.RepoTags}}'
 
       - name: Subir stack completa
-        run: docker compose up -d --wait
+        run: docker compose up -d --wait --no-build
 
       - name: Verificar live/ready/frontend saudaveis
         run: |
