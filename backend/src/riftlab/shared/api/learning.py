@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
@@ -133,3 +134,22 @@ class LearningProgress(CamelModel):
 
     study: LearningProgressCounts
     transfer: LearningProgressCounts
+
+
+class LearningAttemptSummary(CamelModel):
+    """Uma linha da listagem (biblioteca de decisões, minha evolução): só o que
+    identifica e data a tentativa, sem o conteúdo pedagógico (contexto, opções,
+    pistas) — quem quiser isso abre `GET /{attemptId}` ou `/decisao/{decisionId}`.
+    `reflection` fica de fora de propósito: é texto do usuário, não um resumo."""
+
+    attempt_id: UUID
+    decision_id: UUID
+    match_id: str
+    participant_id: int
+    status: LearningAttemptState
+    mode: Literal["STUDY", "TRANSFER"]
+    skipped: bool
+    has_reflection: bool
+    analysis_id: UUID | None = None
+    created_at: datetime
+    revealed_at: datetime | None = None

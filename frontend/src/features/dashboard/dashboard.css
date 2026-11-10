@@ -20,6 +20,7 @@
 .panel-metrics__secondary::before { content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--nline); }
 .panel-metrics__secondary .metric-secondary:only-child { grid-column: 1 / -1; }
 .panel-metrics__champions { display: flex; align-items: center; gap: 6px; }
+.panel-metrics__study-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0; padding: 0 28px 18px; }
 .panel-metrics__faces { display: inline-flex; gap: 4px; margin-left: 6px; }
 .panel-metrics__source { margin: 0; padding: 14px 28px 0; color: var(--ntext-subtle); font-size: .8125rem; }
 .panel-metrics__state { margin: 0; padding: 26px 28px 22px; display: grid; gap: 8px; justify-items: start; color: var(--ntext-muted); line-height: 1.5; }

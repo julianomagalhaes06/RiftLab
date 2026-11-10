@@ -183,6 +183,10 @@ export function Dashboard() {
                     </span>
                   </p> : null}
                 </div>
+                <p className="panel-metrics__study-links">
+                  <Link to="/estudo/biblioteca" className="arrow-link">Biblioteca de decisões</Link>
+                  <Link to="/estudo/evolucao" className="arrow-link">Minha evolução</Link>
+                </p>
               </>}
           </section>
 

@@ -15,6 +15,8 @@ describe("parseRoute", () => {
     expect(parseRoute("/minha-posicao")).toEqual({ name: "panel" });
     expect(parseRoute("/conta")).toEqual({ name: "account" });
     expect(parseRoute("/historico")).toEqual({ name: "history" });
+    expect(parseRoute("/estudo/biblioteca")).toEqual({ name: "decisionLibrary" });
+    expect(parseRoute("/estudo/evolucao")).toEqual({ name: "myEvolution" });
     expect(parseRoute("/historico/DEMO-0008", "?participant=3")).toEqual({
       name: "historyMatch", matchId: "DEMO-0008", participantId: 3,
     });
@@ -76,6 +78,8 @@ describe("routeToPath", () => {
       "/importar",
       "/campeoes",
       "/historico",
+      "/estudo/biblioteca",
+      "/estudo/evolucao",
       "/historico/DEMO-0008?participant=3",
       `/imports/${UUID}`,
       "/matches/DEMO-0008",

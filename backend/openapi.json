@@ -943,6 +943,34 @@
         "title": "CursorPage[DecisionStateSummary]",
         "type": "object"
       },
+      "CursorPage_LearningAttemptSummary_": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LearningAttemptSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[LearningAttemptSummary]",
+        "type": "object"
+      },
       "CursorPage_MatchSummary_": {
         "additionalProperties": false,
         "properties": {
@@ -2421,6 +2449,91 @@
         ],
         "title": "LearningAttemptState",
         "type": "string"
+      },
+      "LearningAttemptSummary": {
+        "additionalProperties": false,
+        "description": "Uma linha da listagem (biblioteca de decisões, minha evolução): só o que\nidentifica e data a tentativa, sem o conteúdo pedagógico (contexto, opções,\npistas) — quem quiser isso abre `GET /{attemptId}` ou `/decisao/{decisionId}`.\n`reflection` fica de fora de propósito: é texto do usuário, não um resumo.",
+        "properties": {
+          "analysisId": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analysisid"
+          },
+          "attemptId": {
+            "format": "uuid",
+            "title": "Attemptid",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "decisionId": {
+            "format": "uuid",
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "hasReflection": {
+            "title": "Hasreflection",
+            "type": "boolean"
+          },
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "STUDY",
+              "TRANSFER"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "participantId": {
+            "title": "Participantid",
+            "type": "integer"
+          },
+          "revealedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revealedat"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LearningAttemptState"
+          }
+        },
+        "required": [
+          "attemptId",
+          "decisionId",
+          "matchId",
+          "participantId",
+          "status",
+          "mode",
+          "skipped",
+          "hasReflection",
+          "createdAt"
+        ],
+        "title": "LearningAttemptSummary",
+        "type": "object"
       },
       "LearningProgress": {
         "additionalProperties": false,
@@ -6843,6 +6956,66 @@
       }
     },
     "/api/v1/learning-attempts": {
+      "get": {
+        "description": "Biblioteca de decisões / minha evolução: só as tentativas do dono da sessão,\nmais recente primeiro. Metadado de localização e tempo, sem o conteúdo\npedagógico (ver GET /{attemptId}).",
+        "operationId": "list_own_attempts_api_v1_learning_attempts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_LearningAttemptSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Own Attempts",
+        "tags": [
+          "learning"
+        ]
+      },
       "post": {
         "operationId": "post_attempt_api_v1_learning_attempts_post",
         "parameters": [

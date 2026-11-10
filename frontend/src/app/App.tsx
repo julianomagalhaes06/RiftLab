@@ -3,6 +3,8 @@ import "../design/arena.css";
 import { useEffect, useRef, type ReactNode } from "react";
 import { DecisionDetailPage } from "../features/matches/DecisionDetailPage";
 import { HistoryPage } from "../features/history/HistoryPage";
+import { DecisionLibraryPage } from "../features/study/DecisionLibraryPage";
+import { MyEvolutionPage } from "../features/study/MyEvolutionPage";
 import { EntryPage } from "../features/imports/EntryPage";
 import { ImportProgressPage } from "../features/imports/ImportProgressPage";
 import { MatchPage } from "../features/matches/MatchPage";
@@ -43,6 +45,8 @@ const TITLES: Record<Route["name"], string> = {
   champions: "Campeões — RiftLab",
   account: "Minha conta — RiftLab",
   history: "Histórico — RiftLab",
+  decisionLibrary: "Biblioteca de decisões — RiftLab",
+  myEvolution: "Minha evolução — RiftLab",
   historyMatch: "Contexto da partida — RiftLab",
   import: "Importação — RiftLab",
   match: "Partida — RiftLab",
@@ -54,7 +58,15 @@ const TITLES: Record<Route["name"], string> = {
 };
 
 // Áreas da conta própria: sem sessão, vão direto para entrar ou criar conta (e voltam depois).
-const ACCOUNT_AREAS: ReadonlySet<Route["name"]> = new Set(["panel", "history", "account", "importEntry", "import"]);
+const ACCOUNT_AREAS: ReadonlySet<Route["name"]> = new Set([
+  "panel",
+  "history",
+  "account",
+  "importEntry",
+  "import",
+  "decisionLibrary",
+  "myEvolution",
+]);
 
 function renderPage(route: Route): ReactNode {
   switch (route.name) {
@@ -75,6 +87,10 @@ function renderPage(route: Route): ReactNode {
       return <AccountPage />;
     case "history":
       return <HistoryPage />;
+    case "decisionLibrary":
+      return <DecisionLibraryPage />;
+    case "myEvolution":
+      return <MyEvolutionPage />;
     case "historyMatch":
       return <MatchPage key={route.matchId} matchId={route.matchId} participantId={route.participantId} fromHistory />;
     case "import":

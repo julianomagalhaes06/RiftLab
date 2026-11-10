@@ -411,7 +411,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Own Attempts
+         * @description Biblioteca de decisões / minha evolução: só as tentativas do dono da sessão,
+         *     mais recente primeiro. Metadado de localização e tempo, sem o conteúdo
+         *     pedagógico (ver GET /{attemptId}).
+         */
+        get: operations["list_own_attempts_api_v1_learning_attempts_get"];
         put?: never;
         /** Post Attempt */
         post: operations["post_attempt_api_v1_learning_attempts_post"];
@@ -1271,6 +1277,13 @@ export interface components {
             /** Nextcursor */
             nextCursor?: string | null;
         };
+        /** CursorPage[LearningAttemptSummary] */
+        CursorPage_LearningAttemptSummary_: {
+            /** Items */
+            items: components["schemas"]["LearningAttemptSummary"][];
+            /** Nextcursor */
+            nextCursor?: string | null;
+        };
         /** CursorPage[MatchSummary] */
         CursorPage_MatchSummary_: {
             /** Items */
@@ -1860,6 +1873,48 @@ export interface components {
          * @enum {string}
          */
         LearningAttemptState: "OPEN" | "ANSWERED" | "REVEALED";
+        /**
+         * LearningAttemptSummary
+         * @description Uma linha da listagem (biblioteca de decisões, minha evolução): só o que
+         *     identifica e data a tentativa, sem o conteúdo pedagógico (contexto, opções,
+         *     pistas) — quem quiser isso abre `GET /{attemptId}` ou `/decisao/{decisionId}`.
+         *     `reflection` fica de fora de propósito: é texto do usuário, não um resumo.
+         */
+        LearningAttemptSummary: {
+            /** Analysisid */
+            analysisId?: string | null;
+            /**
+             * Attemptid
+             * Format: uuid
+             */
+            attemptId: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Decisionid
+             * Format: uuid
+             */
+            decisionId: string;
+            /** Hasreflection */
+            hasReflection: boolean;
+            /** Matchid */
+            matchId: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "STUDY" | "TRANSFER";
+            /** Participantid */
+            participantId: number;
+            /** Revealedat */
+            revealedAt?: string | null;
+            /** Skipped */
+            skipped: boolean;
+            status: components["schemas"]["LearningAttemptState"];
+        };
         /**
          * LearningProgress
          * @description CC-505: progresso local descritivo (contagens). Não é nota, elo nem estimativa de
@@ -3796,6 +3851,38 @@ export interface operations {
                 };
             };
             /** @description job_id não é um UUID válido. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    list_own_attempts_api_v1_learning_attempts_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_LearningAttemptSummary_"];
+                };
+            };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;

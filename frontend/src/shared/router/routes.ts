@@ -19,6 +19,8 @@
  *     ?antes=Nome%23TAG                  Riot ID que o jogador tinha na partida
  *   /jogador/:nome-:tag/ao-vivo          partida ao vivo do jogador (CC-1211)
  *   /conta                              conta local e vínculo da conta Riot (Sprint 2, #12)
+ *   /estudo/biblioteca                   biblioteca de decisões (tentativas de qualquer partida)
+ *   /estudo/evolucao                     minha evolução (tentativas e reflexões por semana)
  *   /prototipo                           protótipo ilustrativo do CC-102 (dados fictícios)
  */
 export type Route =
@@ -32,6 +34,8 @@ export type Route =
   | { name: "champions" }
   | { name: "account" }
   | { name: "history" }
+  | { name: "decisionLibrary" }
+  | { name: "myEvolution" }
   | { name: "historyMatch"; matchId: string; participantId: number | null }
   | { name: "import"; jobId: string }
   | { name: "match"; matchId: string; participantId: number | null }
@@ -124,6 +128,8 @@ export function parseRoute(pathname: string, search = ""): Route {
   if (trimmed === LEGACY_POSITION_PATH) return { name: "panel" };
   if (trimmed === "/conta") return { name: "account" };
   if (trimmed === "/historico") return { name: "history" };
+  if (trimmed === "/estudo/biblioteca") return { name: "decisionLibrary" };
+  if (trimmed === "/estudo/evolucao") return { name: "myEvolution" };
   const parts = trimmed.split("/").slice(1).map(safeDecode);
   const [head, id, ...rest] = parts;
   if (id !== undefined && id !== null && rest.length === 0) {
@@ -199,6 +205,10 @@ export function routeToPath(route: Route): string {
       return "/conta";
     case "history":
       return "/historico";
+    case "decisionLibrary":
+      return "/estudo/biblioteca";
+    case "myEvolution":
+      return "/estudo/evolucao";
     case "historyMatch": {
       const base = `/historico/${route.matchId}`;
       return route.participantId === null ? base : `${base}?participant=${route.participantId}`;

@@ -64,6 +64,8 @@ export type ObjectiveInterpretation = Schemas["ObjectiveInterpretResult"];
 export type FeedbackRequest = Schemas["FeedbackRequest"];
 export type FeedbackResult = Schemas["FeedbackResult"];
 export type LearningProgress = Schemas["LearningProgress"];
+export type LearningAttemptSummary = Schemas["LearningAttemptSummary"];
+export type LearningAttemptPage = Schemas["CursorPage_LearningAttemptSummary_"];
 export type AttemptMode = NonNullable<Schemas["LearningAttemptCreateRequest"]["mode"]>;
 
 export interface PageParams {
@@ -141,6 +143,8 @@ export interface ApiClient {
   ): Promise<LearningAttempt>;
   reflectAttempt(attemptId: string, reflection: string, signal?: AbortSignal): Promise<LearningAttempt>;
   getProgress(signal?: AbortSignal): Promise<LearningProgress>;
+  /** Biblioteca de decisões / minha evolução: tentativas do dono da sessão, mais recente primeiro. */
+  listAttempts(params?: PageParams, signal?: AbortSignal): Promise<LearningAttemptPage>;
   submitFeedback(
     analysisId: string,
     feedback: FeedbackRequest,
@@ -314,6 +318,10 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
         signal,
       }),
     getProgress: (signal) => request("GET", "/api/v1/learning-attempts/progress", { signal }),
+    listAttempts: (params = {}, signal) =>
+      request("GET", `/api/v1/learning-attempts${queryString({ cursor: params.cursor, limit: params.limit })}`, {
+        signal,
+      }),
     submitFeedback: (analysisId, feedback, idempotencyKey, signal) =>
       request("POST", `/api/v1/analyses/${enc(analysisId)}/feedback`, {
         body: feedback,

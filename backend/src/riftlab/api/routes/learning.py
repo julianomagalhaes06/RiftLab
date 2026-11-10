@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Request, Response
+from fastapi import APIRouter, Header, Query, Request, Response
 
 from riftlab.api.routes.analyses import _configs
 from riftlab.errors import ProblemDetail
@@ -19,10 +19,12 @@ from riftlab.learning.application import (
     create_attempt,
     get_attempt,
     hint_attempt,
+    list_attempts,
     progress,
     reflect_attempt,
     reveal_attempt,
 )
+from riftlab.shared.api.common import PAGINATION_DEFAULT_LIMIT, PAGINATION_MAX_LIMIT, CursorPage
 from riftlab.shared.api.learning import (
     LearningAttemptAnswerRequest,
     LearningAttemptCreateRequest,
@@ -30,6 +32,7 @@ from riftlab.shared.api.learning import (
     LearningAttemptPublicState,
     LearningAttemptReflectionRequest,
     LearningAttemptRevealRequest,
+    LearningAttemptSummary,
     LearningProgress,
 )
 
@@ -67,6 +70,43 @@ async def post_attempt(
     if not created:
         response.status_code = 200
     return LearningAttemptPublicState.model_validate(state)
+
+
+@router.get(
+    "", response_model=CursorPage[LearningAttemptSummary], responses={422: {"model": ProblemDetail}}
+)
+async def list_own_attempts(
+    request: Request,
+    cursor: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=PAGINATION_MAX_LIMIT)] = PAGINATION_DEFAULT_LIMIT,
+) -> CursorPage[LearningAttemptSummary]:
+    """Biblioteca de decisões / minha evolução: só as tentativas do dono da sessão,
+    mais recente primeiro. Metadado de localização e tempo, sem o conteúdo
+    pedagógico (ver GET /{attemptId})."""
+    page = await list_attempts(
+        request.app.state.session_factory, owner=_owner(request), limit=limit, cursor=cursor
+    )
+    return CursorPage[LearningAttemptSummary](
+        items=[
+            LearningAttemptSummary.model_validate(
+                {
+                    "attemptId": row.attempt_id,
+                    "decisionId": row.decision_id,
+                    "matchId": row.match_id,
+                    "participantId": row.participant_id,
+                    "status": row.status,
+                    "mode": row.mode,
+                    "skipped": row.skipped,
+                    "hasReflection": row.has_reflection,
+                    "analysisId": row.analysis_id,
+                    "createdAt": row.created_at,
+                    "revealedAt": row.revealed_at,
+                }
+            )
+            for row in page.items
+        ],
+        next_cursor=page.next_cursor,
+    )
 
 
 @router.get("/progress", response_model=LearningProgress)
