@@ -159,7 +159,27 @@
   .account-actions { grid-template-columns: 1fr; }
 }
 
-/* Aviso de conta recém-criada ao voltar à página de origem. */
-.account-created { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin: 0 0 16px; }
-.account-created p { margin: 0; }
-.account-created .button { min-height: 36px; padding: 0 12px; }
+/* Cartão flutuante de conta recém-criada. A sombra fica no invólucro: o chanfro da superfície
+   é um clip-path, que cortaria um box-shadow. */
+.account-toast { position: fixed; right: 24px; bottom: 24px; z-index: 30; width: min(380px, calc(100vw - 32px)); filter: drop-shadow(0 12px 32px var(--toast-shadow)); animation: account-toast-in .28s ease-out; }
+.account-toast__card { --surface-line: var(--nline2); display: flex; align-items: flex-start; gap: 14px; padding: 20px; }
+.account-toast__badge { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--accent-strong); border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
+.account-toast__body { display: grid; gap: 4px; min-width: 0; }
+.account-toast__body strong { font: 600 1.0625rem var(--font-display); color: var(--ntext); }
+.account-toast__body p { margin: 0; color: var(--ntext-muted); font-size: .9375rem; line-height: 1.45; }
+.account-toast__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.account-toast__actions .button { min-height: 40px; padding: 0 14px; font-size: .9375rem; }
+@keyframes account-toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+/* No celular, acima da barra fixa de navegação. */
+@media (max-width: 960px) {
+  .account-toast { right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); }
+}
+/* Telas estreitas: sem o ícone, os botões cabem numa linha e o cartão não cobre a busca. */
+@media (max-width: 700px) {
+  .account-toast__badge { display: none; }
+  .account-toast__card { padding: 16px 18px; }
+  .account-toast__actions .button { flex: 1 1 0; white-space: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .account-toast { animation: none; }
+}

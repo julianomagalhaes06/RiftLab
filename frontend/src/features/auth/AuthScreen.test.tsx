@@ -358,11 +358,11 @@ describe("Login social e conta nova", () => {
 
   it("conta nova que veio de uma página volta a ela com um aviso, e a marca sai do endereço", async () => {
     setup("/campeoes?conta=nova", { authRequired: true, user: USER });
-    const notice = await screen.findByText(/Sua conta foi criada/);
-    expect(screen.getByRole("link", { name: "vincule sua conta Riot" })).toHaveAttribute("href", "/conta");
+    const notice = await screen.findByText("Conta criada");
+    expect(screen.getByRole("link", { name: "Vincular agora" })).toHaveAttribute("href", "/conta");
     await waitFor(() => expect(window.location.search).toBe(""));
     expect(window.location.pathname).toBe("/campeoes");
-    fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
     expect(notice).not.toBeInTheDocument();
   });
 });

@@ -85,6 +85,7 @@
   --win-tint-soft: rgba(61, 214, 140, .10);
   --loss-tint-soft: rgba(242, 102, 122, .10);
   --shadow-soft: rgb(0 0 0 / .16);
+  --toast-shadow: rgb(0 0 0 / .55);
   --sheen: rgb(255 255 255 / .38);
   --sheen-soft: rgb(255 255 255 / .14);
   --shade: rgb(0 0 0 / .35);
@@ -192,6 +193,7 @@
   --win-tint-soft: rgba(10, 122, 71, .08);
   --loss-tint-soft: rgba(196, 42, 66, .08);
   --shadow-soft: rgb(22 24 29 / .1);
+  --toast-shadow: rgb(22 24 29 / .2);
 
   --color-available-bg: #dff5ea;
   --color-degraded: #7f5a05;
