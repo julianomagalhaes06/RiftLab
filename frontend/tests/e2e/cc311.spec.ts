@@ -42,12 +42,10 @@ for (const width of [360, 390, 1280, 1440]) {
       },
     });
     await page.goto("/painel");
-    await expect(page.getByRole("heading", { name: "Partidas importadas recentes" })).toBeVisible();
-    await expect(page.locator(".recent-row")).toHaveCount(5);
-    await expect(page.getByText(/Mostrando 5 partidas importadas recentes/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Entenda a partida. Evolua a decisão." })).toBeVisible();
     await expect(page.getByText(/Ainda não há observação desta (conta|fila)/)).toBeVisible();
     await expect(page.getByText(/vitória|derrota|KDA|tropas/i)).toHaveCount(0);
-    expect(calls.count("GET /api/v1/matches")).toBe(1);
+    expect(calls.count("GET /api/v1/matches")).toBe(0); // o Painel só usa as partidas da conta
     await layoutIsClear(page, width);
     await page.screenshot({ path: `${evidence}/painel-dados-${width}.png`, fullPage: true });
 
@@ -59,17 +57,17 @@ for (const width of [360, 390, 1280, 1440]) {
     await expect(page.getByRole("button", { name: "Minha conta", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator(".match-card")).toHaveCount(4);
     await expect(page.getByRole("link", { name: "Contexto da partida DEMO-0008" })).toHaveCount(0);
-    expect(calls.count("GET /api/v1/matches")).toBe(2);
+    expect(calls.count("GET /api/v1/matches")).toBe(1);
     // Pelo teclado, como o resto da jornada: o foco visível do link abaixo depende disso.
     await page.getByRole("button", { name: "Minha conta e DEMO", exact: true }).focus();
     await page.keyboard.press("Enter");
     await expect(page.locator(".match-card")).toHaveCount(5);
-    expect(calls.count("GET /api/v1/matches")).toBe(3);
+    expect(calls.count("GET /api/v1/matches")).toBe(2);
     const open = page.getByRole("link", { name: "Contexto da partida DEMO-0008" });
     await open.focus();
     expect(await open.evaluate((node) => node.matches(":focus-visible"))).toBe(true);
     await expect(page.getByText(/Sua conta não foi identificada nesta partida/).first()).toBeVisible();
-    expect(calls.count("GET /api/v1/matches")).toBe(3);
+    expect(calls.count("GET /api/v1/matches")).toBe(2);
     await layoutIsClear(page, width);
     await page.screenshot({ path: `${evidence}/historico-dados-${width}.png`, fullPage: true });
     await page.getByLabel("Buscar campeão ou partida").fill("caitlyn");
@@ -91,7 +89,6 @@ for (const width of [360, 390, 1280, 1440]) {
       "GET /api/v1/matches": () => ok({ items: [], nextCursor: null }),
     });
     await page.goto("/painel");
-    await expect(page.getByText("Nenhuma partida importada")).toBeVisible();
     await expect(page.getByText(/Ainda não há observação desta (conta|fila)/)).toBeVisible();
     await layoutIsClear(page, width);
     await page.screenshot({ path: `${evidence}/painel-vazio-${width}.png`, fullPage: true });
@@ -108,10 +105,6 @@ test("CC-311 falha e retry no Painel e no Histórico", async ({ page }) => {
     "GET /api/v1/ranked/me": () => ok(rankedUnavailable),
     "GET /api/v1/matches": () => ++attempts % 2 ? problem(503, "SERVICE_UNAVAILABLE") : ok({ items: [], nextCursor: null }),
   });
-  await page.goto("/painel");
-  await expect(page.getByRole("button", { name: "Tentar novamente" })).toBeVisible();
-  await page.getByRole("button", { name: "Tentar novamente" }).click();
-  await expect(page.getByText("Nenhuma partida importada")).toBeVisible();
   await page.goto("/historico");
   await expect(page.getByRole("button", { name: "Tentar novamente" })).toBeVisible();
   await page.getByRole("button", { name: "Tentar novamente" }).click();

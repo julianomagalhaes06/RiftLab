@@ -367,6 +367,52 @@ describe("Login social e conta nova", () => {
   });
 });
 
+describe("Site sem demonstração", () => {
+  function setup(path: string, user: typeof USER | null = USER) {
+    window.history.replaceState(null, "", path);
+    const mock = createMockApi();
+    mock.on("GET", /^\/api\/v1\/auth\/session$/, () => json(200, { authRequired: true, user, demoEnabled: false }));
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    return mock;
+  }
+  const noRank = { status: "UNAVAILABLE", reason: "ACCOUNT_NOT_LINKED", position: null, change: null };
+
+  it("conta sem vínculo vê só o convite no Painel, sem partida nenhuma", async () => {
+    const mock = setup("/painel");
+    mock.on("GET", /^\/api\/v1\/ranked\/me$/, () => json(200, noRank));
+    mock.on("GET", /^\/api\/v1\/dashboard$/, () => json(200, { origin: "REAL", status: "IDENTITY_UNAVAILABLE", window: 20, queue: 420, queueSelection: "AUTO", queues: [], totalMatches: 0, sampledMatches: 0, wins: 0, losses: 0, winSamples: 0, winRate: null, kda: null, kdaSamples: 0, distinctChampions: 0, champions: [], recentMatches: [], progress: { attempts: 0, revealed: 0, reflections: 0, matches: 0 } }));
+    const heading = await screen.findByRole("heading", { name: "Vincule sua conta Riot" });
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Vincular conta Riot" })).toHaveAttribute("href", "/conta");
+    expect(screen.queryByLabelText("Origem")).not.toBeInTheDocument();
+    expect(screen.queryByText(/BR1_/)).not.toBeInTheDocument();
+    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)).toHaveLength(0);
+  });
+
+  it("Importar não oferece demonstração nem protótipo", async () => {
+    setup("/importar");
+    expect(await screen.findByRole("heading", { name: "Analisar uma partida" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Explorar demonstração" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/protótipo/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Partidas DEMO/)).not.toBeInTheDocument();
+  });
+
+  it("Histórico não tem filtro de origem e pede só as partidas da conta", async () => {
+    const mock = setup("/historico");
+    mock.on("GET", /^\/api\/v1\/matches$/, () => json(200, { items: [], nextCursor: null }));
+    expect(await screen.findByRole("heading", { name: "Partidas para estudar" })).toBeInTheDocument();
+    await waitFor(() => expect(mock.callsTo("GET", /^\/api\/v1\/matches$/).length).toBeGreaterThan(0));
+    expect(mock.callsTo("GET", /^\/api\/v1\/matches$/)[0].search.get("scope")).toBe("account");
+    expect(screen.queryByRole("group", { name: "Origem da partida" })).not.toBeInTheDocument();
+  });
+
+  it("o protótipo com dados ilustrativos não abre", async () => {
+    setup("/prototipo", null);
+    expect(await screen.findByRole("heading", { name: "Página não encontrada" })).toBeInTheDocument();
+  });
+});
+
 describe("Tela de entrada: abas e senha", () => {
   it("alterna as abas pelo teclado e mostra ou oculta a senha", async () => {
     window.history.replaceState(null, "", "/entrar");

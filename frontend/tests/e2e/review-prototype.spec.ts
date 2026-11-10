@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 
-// Teste hermético: a sessão é simulada (sem login exigido), sem depender de uma API local no ar.
+// Teste hermético: a sessão é simulada (sem login exigido, com o ambiente de demonstração ligado,
+// o único em que o protótipo existe), sem depender de uma API local no ar.
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/v1/auth/session", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: '{"authRequired":false,"user":null}' }),
+    route.fulfill({ status: 200, contentType: "application/json", body: '{"authRequired":false,"user":null,"demoEnabled":true}' }),
   );
 });
 

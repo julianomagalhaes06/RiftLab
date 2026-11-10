@@ -32,6 +32,7 @@ SESSION_COOKIE = "riftlab_session"
 CSRF_HEADER = "x-riftlab-request"
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 API_PREFIX = "/api/v1/"
+_DEMO_RESOURCE = re.compile(r"/DEMO-[0-9]+(?:/|$)")
 PUBLIC_PREFIX = "/api/v1/auth/"
 _UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 _MATCH = r"[A-Za-z0-9_-]{1,64}"
@@ -70,6 +71,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not path.startswith(API_PREFIX):
             return await call_next(request)
         settings = request.app.state.settings
+        if not settings.demo_data_enabled and _DEMO_RESOURCE.search(path):
+            return problem_response(
+                request,
+                status_code=404,
+                code="RESOURCE_NOT_FOUND",
+                title="Não encontrado",
+                detail="Este recurso não existe.",
+            )
         token = request.cookies.get(SESSION_COOKIE)
         if token:
             request.state.user = await user_for_token(request.app.state.session_factory, token)

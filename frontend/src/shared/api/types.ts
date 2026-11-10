@@ -2822,6 +2822,11 @@ export interface components {
         SessionState: {
             /** Authrequired */
             authRequired: boolean;
+            /**
+             * Demoenabled
+             * @default false
+             */
+            demoEnabled: boolean;
             /** Socialproviders */
             socialProviders: ("google" | "discord")[];
             user: components["schemas"]["SessionUser"] | null;

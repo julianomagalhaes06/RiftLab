@@ -15,6 +15,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [socialProviders, setSocialProviders] = useState<readonly SocialProvider[]>([]);
 
   const { navigate } = useRouter();
+  const [demoEnabled, setDemoEnabled] = useState(false);
   const hadUser = useRef(false);
   useEffect(() => {
     hadUser.current = user !== null;
@@ -27,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session.user ?? null);
       if (expired && !session.user && hadUser.current) navigate("/", { replace: true });
       setSocialProviders(session.socialProviders ?? []);
+      setDemoEnabled(session.demoEnabled ?? false);
     }).catch(() => {
       if (!signal?.aborted) setAuthRequired(false);
     }).finally(() => {
@@ -57,8 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh, navigate]);
 
   const value = useMemo<AuthState>(() => ({
-    checked, authRequired, user, socialProviders, signOut, hasAccount: !authRequired || user !== null,
+    checked, authRequired, user, socialProviders, signOut, hasAccount: !authRequired || user !== null, demoEnabled,
     signedIn: (next) => { setUser(next); setChecked(true); },
-  }), [checked, authRequired, user, socialProviders, signOut]);
+  }), [checked, authRequired, user, socialProviders, signOut, demoEnabled]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

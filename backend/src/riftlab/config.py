@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Contas locais (Sprint 2, cards #10/#11): com auth_required, as rotas /api/v1 exigem sessão
     # (cookie HttpOnly, SameSite=Strict) e o cabeçalho X-RiftLab-Request nas alterações.
     auth_required: bool = False
+    # Partidas sintéticas e telas ilustrativas só existem no ambiente de demonstração
+    # (compose.demo.yaml). No site normal, a API nega e a interface não mostra nada disso.
+    demo_data_enabled: bool = False
     auth_session_days: int = 7
     # Só com HTTPS: o compose local serve HTTP em loopback.
     auth_cookie_secure: bool = False

@@ -10,6 +10,8 @@ export interface AuthState {
   /** Pode usar o que é da conta (análise, estudo, Painel): com sessão, ou numa instalação sem
    * login exigido. Sem isso, a pessoa só navega pela leitura pública. */
   hasAccount: boolean;
+  /** Ambiente de demonstração: só nele existem partidas sintéticas e telas ilustrativas. */
+  demoEnabled: boolean;
   /** Grava o resultado de login/cadastro sem nova consulta. */
   signedIn: (user: SessionUser) => void;
   signOut: () => Promise<void>;
@@ -21,6 +23,7 @@ export const AuthContext = createContext<AuthState>({
   user: null,
   socialProviders: [],
   hasAccount: true,
+  demoEnabled: false,
   signedIn: () => undefined,
   signOut: async () => undefined,
 });

@@ -14,6 +14,7 @@ services:
       RIFTLAB_DEMO_RANKED: "true"
       # A demonstração da defesa abre direto, sem login (contas locais: Sprint 2).
       RIFTLAB_AUTH_REQUIRED: "false"
+      RIFTLAB_DEMO_DATA_ENABLED: "true"
       RIFTLAB_SMTP_HOST: ""
   worker:
     environment:

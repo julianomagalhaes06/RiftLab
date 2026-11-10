@@ -76,6 +76,8 @@ async def get_dashboard(
     from riftlab.auth.request_account import own_account
     from riftlab.dashboard.application import QUEUE_IDS, dashboard
 
+    if not request.app.state.settings.demo_data_enabled:
+        origin = "REAL"
     return await dashboard(
         request.app.state.session_factory,
         request.app.state.settings,

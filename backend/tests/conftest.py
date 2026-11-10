@@ -12,6 +12,9 @@ from httpx import ASGITransport, AsyncClient
 from riftlab.api.app import create_app
 from riftlab.config import Settings
 
+# A suíte usa as partidas sintéticas como dados de teste; o site normal as desliga.
+os.environ.setdefault("RIFTLAB_DEMO_DATA_ENABLED", "true")
+
 BLOCKED = "rede externa bloqueada nos testes"
 
 

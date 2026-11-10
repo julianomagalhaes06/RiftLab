@@ -3,13 +3,13 @@ import { api, type Dashboard as DashboardData, type DashboardQueueParam } from "
 import { isAbortError } from "../../shared/api/errors";
 import { Link } from "../../shared/router/Link";
 import { ChampionAvatar } from "../history/ChampionAvatar";
-import { RecentMatches } from "../history/RecentMatches";
 import { matchDuration, queueLabel, shortWhen } from "../history/presentation";
 import { championName } from "../matches/format";
 import { MyRank } from "../ranked/MyRank";
 import { count } from "../../shared/text/count";
 import "./dashboard.css";
 import { useDemoNotice } from "../../app/demoNotice";
+import { useAuth } from "../auth/authContext";
 
 const number = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const QUEUE_NAME: Record<number, string> = { 420: "Solo/Duo", 440: "Flex" };
@@ -79,6 +79,7 @@ function RecentRow({ match, queue }: { match: DashboardData["recentMatches"][num
 
 export function Dashboard() {
   const [origin, setOrigin] = useState<"REAL" | "DEMO">("REAL");
+  const { user, demoEnabled } = useAuth();
   useDemoNotice(origin === "DEMO");
   const [windowSize, setWindowSize] = useState(20);
   const [queue, setQueue] = useState<DashboardQueueParam | "AUTO">("AUTO");
@@ -100,6 +101,23 @@ export function Dashboard() {
   const ready = data?.status === "READY" ? data : null;
   const champions = ready?.champions.slice(0, 3) ?? [];
 
+  // Conta sem vínculo: não há o que mostrar ainda, então a tela é só o convite para vincular.
+  if (user && data?.status === "IDENTITY_UNAVAILABLE") {
+    return (
+      <section className="panel-link surface surface--rank brackets" aria-labelledby="panel-link-heading">
+        <span className="panel-link__badge" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+          </svg>
+        </span>
+        <p className="page-head__context">Painel</p>
+        <h2 id="panel-link-heading">Vincule sua conta Riot</h2>
+        <p className="muted">Com o vínculo, suas partidas, sua taxa de vitória e seu elo aparecem aqui.</p>
+        <Link to="/conta" className="button">Vincular conta Riot</Link>
+      </section>
+    );
+  }
+
   return (
     <>
       <header className="page-head panel-head">
@@ -112,9 +130,9 @@ export function Dashboard() {
           <label>Fila<select value={queue} onChange={(event) => setQueue(event.target.value as DashboardQueueParam | "AUTO")}>
             <option value="AUTO">Automática</option><option value="RANKED_SOLO_5x5">Solo/Duo</option><option value="RANKED_FLEX_SR">Flex</option>
           </select></label>
-          <label>Origem<select value={origin} onChange={(event) => setOrigin(event.target.value as "REAL" | "DEMO")}>
+          {demoEnabled ? <label>Origem<select value={origin} onChange={(event) => setOrigin(event.target.value as "REAL" | "DEMO")}>
             <option value="REAL">Conta própria · real</option><option value="DEMO">Demonstração sintética</option>
-          </select></label>
+          </select></label> : null}
           <label>Partidas<select value={windowSize} onChange={(event) => setWindowSize(Number(event.target.value))}>
             {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
           </select></label>
@@ -132,12 +150,12 @@ export function Dashboard() {
                 {data.origin === "DEMO" ? <p className="panel-metrics__source">DEMO · participante 1 das partidas sintéticas; não representa seu desempenho.</p> : null}
                 {data.status === "IDENTITY_UNAVAILABLE" ? <div className="panel-metrics__state">
                   <strong>Conta própria ainda sem vínculo observado</strong>
-                  <p>O vínculo da conta é registrado na primeira atualização de Minha posição com a chave da Riot configurada. Depois, importe suas partidas. As partidas de terceiros continuam disponíveis para estudo no Histórico.</p>
+                  <p>O vínculo da conta é registrado na primeira atualização de Minha posição com a chave da Riot configurada.</p>
                   <Link to="/minha-posicao" className="arrow-link">Consultar Minha posição</Link>
                 </div> : data.status === "EMPTY" ? <div className="panel-metrics__state">
                   <strong>Nenhuma partida neste recorte</strong>
-                  <p>Importe partidas concluídas {origin === "REAL" ? "da conta configurada" : "da demonstração"} para ver as métricas.</p>
-                  <Link to="/importar" className="arrow-link">Importar ou abrir demonstração</Link>
+                  <p>{origin === "REAL" ? "Assim que você jogar uma ranqueada, ela aparece aqui." : "Importe as partidas da demonstração para ver as métricas."}</p>
+                  <Link to="/importar" className="arrow-link">Importar partida</Link>
                 </div> : <div className="panel-metrics__row">
                   <div className="metric">
                     <p className="metric__label">Taxa de vitória</p>
@@ -174,7 +192,7 @@ export function Dashboard() {
                 </div>
               </div>
             </section>
-          ) : <RecentMatches />}
+          ) : null}
         </div>
 
         <aside className="panel-side" aria-label="Posição e campeões">

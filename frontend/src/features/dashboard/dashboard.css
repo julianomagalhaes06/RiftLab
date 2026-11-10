@@ -89,3 +89,11 @@
   .panel-recent__foot { padding: 4px 16px; }
   .panel-champion { padding: 0 16px; min-height: 60px; }
 }
+
+/* Conta sem vínculo: um quadro único e centralizado no lugar do Painel. */
+.panel-link { display: grid; justify-items: center; gap: 10px; width: min(100%, 520px); margin: clamp(24px, 8vh, 80px) auto; padding: 40px; text-align: center; }
+.panel-link .page-head__context { margin: 6px 0 0; }
+.panel-link h2 { margin: 0; font: 600 1.625rem/1.2 var(--font-display); color: var(--ntext); }
+.panel-link .muted { margin: 0 0 8px; line-height: 1.5; }
+.panel-link__badge { display: grid; place-items: center; width: 56px; height: 56px; border: 1px solid var(--accent-strong); border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
+@media (max-width: 700px) { .panel-link { padding: 30px 22px; } }

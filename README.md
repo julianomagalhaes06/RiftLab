@@ -54,7 +54,7 @@ Tecnologias: Python (FastAPI), PostgreSQL, React com TypeScript, Docker.
 
 ## Executar a demonstração
 
-A demonstração usa partidas sintéticas e roda sem chave da Riot e sem internet depois da
+A demonstração é um ambiente à parte, e o site normal não mostra nada dela. Ela usa partidas sintéticas e roda sem chave da Riot e sem internet depois da
 primeira instalação. Requer Docker com Compose v2.
 
 ```sh

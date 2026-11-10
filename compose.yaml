@@ -46,6 +46,8 @@ services:
       RIFTLAB_AUTH_REQUIRED: ${RIFTLAB_AUTH_REQUIRED:-true}
       # E-mails da conta: por padrão vão para o Mailpit local (http://127.0.0.1:8025) e não
       # saem da máquina. Para enviar de verdade pelo Gmail, ver .env.example.
+      # Partidas sintéticas e telas ilustrativas: só no ambiente de demonstração.
+      RIFTLAB_DEMO_DATA_ENABLED: ${RIFTLAB_DEMO_DATA_ENABLED:-false}
       RIFTLAB_SMTP_HOST: ${RIFTLAB_SMTP_HOST:-mailpit}
       RIFTLAB_SMTP_PORT: ${RIFTLAB_SMTP_PORT:-1025}
       RIFTLAB_SMTP_USERNAME: ${RIFTLAB_SMTP_USERNAME:-}

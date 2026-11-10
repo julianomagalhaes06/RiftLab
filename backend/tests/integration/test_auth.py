@@ -137,6 +137,7 @@ async def test_register_confirms_by_code_before_any_session(client, mail, emails
         "authRequired": True,
         "user": {"id": str(user_id), "email": email, "name": "Jogadora"},
         "socialProviders": [],
+        "demoEnabled": True,  # a suíte liga os dados de demonstração (tests/conftest.py)
     }
     cookie = confirmed.headers["set-cookie"].lower()
     assert "httponly" in cookie and "samesite=strict" in cookie and "path=/" in cookie
@@ -475,6 +476,7 @@ async def test_protection_requires_session_and_csrf_header_but_not_for_health(cl
         "authRequired": True,
         "user": None,
         "socialProviders": [],
+        "demoEnabled": True,  # a suíte liga os dados de demonstração (tests/conftest.py)
     }
     no_header = await client.post(
         "/api/v1/auth/login", json={"email": "qualquer@example.test", "password": PASSWORD}
@@ -517,6 +519,7 @@ async def test_without_auth_required_routes_stay_open(session_factory):
             "authRequired": False,
             "user": None,
             "socialProviders": [],
+            "demoEnabled": True,
         }
         assert (await c.get("/api/v1/matches")).status_code == 200
 
@@ -612,3 +615,39 @@ async def test_anonymous_visitor_has_no_own_account_when_login_is_required():
 
     assert await own_account(anonymous(True)) is None
     assert await own_account(anonymous(False)) is CONFIGURED
+
+
+@pytest.mark.asyncio
+async def test_without_demo_data_the_api_denies_everything_synthetic(session_factory, mail, emails):
+    settings = Settings(auth_required=True, demo_data_enabled=False)
+    async for c in _client(settings, mail):
+        assert (await c.get("/api/v1/auth/session")).json()["demoEnabled"] is False
+        for path in (
+            "/api/v1/matches/DEMO-0008",
+            "/api/v1/matches/DEMO-0008/review",
+            "/api/v1/matches/DEMO-0008/decisions?participantId=1",
+        ):
+            response = await c.get(path)
+            assert (response.status_code, response.json()["code"]) == (404, "RESOURCE_NOT_FOUND"), (
+                path
+            )
+        email = _email(emails)
+        await create_verified_user(session_factory, email, PASSWORD)
+        await _post(c, "login", {"email": email, "password": PASSWORD})
+        refused = await c.post(
+            "/api/v1/imports", json={"matchId": "DEMO-0008", "mode": "DEMO"}, headers=HEADERS
+        )
+        assert (refused.status_code, refused.json()["code"]) == (422, "DEMO_DISABLED")
+        # Sem vínculo, nenhuma lista devolve partida: nem sintética, nem de outros jogadores.
+        for scope in ("all", "demo", "account_and_demo"):
+            listing = await c.get("/api/v1/matches", params={"scope": scope})
+            assert listing.json()["items"] == [], scope
+        assert (await c.get("/api/v1/dashboard", params={"origin": "DEMO"})).json()[
+            "origin"
+        ] == "REAL"
+
+
+@pytest.mark.asyncio
+async def test_demo_environment_still_serves_the_synthetic_flow(session_factory, mail):
+    async for c in _client(Settings(auth_required=True, demo_data_enabled=True), mail):
+        assert (await c.get("/api/v1/auth/session")).json()["demoEnabled"] is True

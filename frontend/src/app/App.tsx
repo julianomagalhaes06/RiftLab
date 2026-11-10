@@ -13,7 +13,7 @@ import { Link } from "../shared/router/Link";
 import { RouterProvider } from "../shared/router/RouterProvider";
 import { DemoNoticeProvider } from "./DemoNotice";
 import { ContextStrip } from "./ContextStrip";
-import { loginPath, type Route } from "../shared/router/routes";
+import { isDemoMatchId, loginPath, type Route } from "../shared/router/routes";
 import { PanelPage, PositionPage } from "./AreaPages";
 import { ChampionsPage } from "../features/champions/ChampionsPage";
 import { MainNav } from "./MainNav";
@@ -135,8 +135,11 @@ function AppShell() {
 
 function AppContent() {
   const { route, navigate, href } = useRouter();
-  const { hasAccount } = useAuth();
+  const { hasAccount, demoEnabled } = useAuth();
   const needsLogin = !hasAccount && ACCOUNT_AREAS.has(route.name);
+  // Fora do ambiente de demonstração, o que é sintético simplesmente não existe.
+  const hidden = !demoEnabled && (route.name === "prototype"
+    || ((route.name === "match" || route.name === "historyMatch") && isDemoMatchId(route.matchId)));
   useEffect(() => {
     if (needsLogin) navigate(loginPath(href), { replace: true });
   }, [needsLogin, href, navigate]);
@@ -147,16 +150,16 @@ function AppContent() {
   const firstRender = useRef(true);
 
   useEffect(() => {
-    document.title = TITLES[route.name];
+    document.title = TITLES[hidden ? "notFound" : route.name];
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
     // Navegação por link: leva o foco ao conteúdo novo (teclado/leitor de tela).
     mainRef.current?.focus();
-  }, [pathKey, route.name]);
+  }, [pathKey, route.name, hidden]);
 
-  if (route.name === "prototype") {
+  if (route.name === "prototype" && demoEnabled) {
     return <ReviewPrototype onExit={() => navigate("/")} />;
   }
 
@@ -185,7 +188,7 @@ function AppContent() {
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className={route.name === "home" ? "app__main app__main--home" : "app__main"}>
           <AccountCreatedNotice />
-          {needsLogin ? null : renderPage(route)}
+          {needsLogin ? null : renderPage(hidden ? { name: "notFound", path: href.split("?")[0] } : route)}
         </main>
         <footer className="app__footer">
           <div className="app__footer-row">

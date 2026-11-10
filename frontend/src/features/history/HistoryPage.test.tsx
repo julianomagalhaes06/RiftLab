@@ -116,7 +116,7 @@ describe("Histórico com dados realmente disponíveis", () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByText("Nenhuma partida importada")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Importar ou abrir demonstração" })).toHaveAttribute("href", "/importar");
+    expect(screen.getByRole("link", { name: "Importar partida" })).toHaveAttribute("href", "/importar");
   });
 
   it("Contexto abre rota profunda da partida e mantém percurso de participante", async () => {

@@ -11,7 +11,8 @@ export const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // --- importação: recusa da própria API ---
   // 422 de POST /imports no modo RIOT sem chave no servidor (código dedicado da API).
   RIOT_KEY_MISSING:
-    "A importação de partidas reais está indisponível: este ambiente não tem chave da Riot configurada. Explore a demonstração ou configure a chave Development no ambiente local.",
+    "A importação de partidas reais está indisponível: este ambiente não tem chave da Riot configurada. Configure a chave Development no ambiente local.",
+  DEMO_DISABLED: "A demonstração não está disponível neste ambiente.",
   VALIDATION_ERROR:
     "Os dados enviados não são válidos. Confira o ID da partida (formato BR1_ seguido de números) e tente de novo.",
   IMPORT_ACTIVE:

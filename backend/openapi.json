@@ -5304,6 +5304,11 @@
             "title": "Authrequired",
             "type": "boolean"
           },
+          "demoEnabled": {
+            "default": false,
+            "title": "Demoenabled",
+            "type": "boolean"
+          },
           "socialProviders": {
             "items": {
               "enum": [

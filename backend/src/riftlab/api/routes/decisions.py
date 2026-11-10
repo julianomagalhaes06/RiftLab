@@ -21,6 +21,7 @@ from riftlab.decisions.queries import (
 )
 from riftlab.errors import ProblemDetail
 from riftlab.shared.api.common import (
+    MATCH_ID_DEMO_PATTERN,
     PAGINATION_DEFAULT_LIMIT,
     PAGINATION_MAX_LIMIT,
     CursorPage,
@@ -37,6 +38,7 @@ from riftlab.shared.api.matches import (
     InventoryItem,
     ObservedLevel,
 )
+from riftlab.shared.errors import NotFoundError
 
 router = APIRouter(tags=["decisions"])
 
@@ -107,6 +109,10 @@ async def list_match_decisions(
 )
 async def get_decision(decision_id: uuid.UUID, request: Request) -> DecisionState:
     detail = await get_decision_detail(request.app.state.session_factory, decision_id)
+    if not request.app.state.settings.demo_data_enabled and MATCH_ID_DEMO_PATTERN.fullmatch(
+        detail.point.match_id
+    ):
+        raise NotFoundError(f"decisão {decision_id} não encontrada")
     return _to_detail(detail)
 
 

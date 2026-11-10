@@ -183,6 +183,12 @@ principal mostra só Início e Campeões; o topo, Entrar e Criar conta. Sair, ou
 no meio do uso, leva ao início. Numa página pública, o detalhe da decisão troca a análise e o
 estudo pelo convite `AccountGate` ("Disponível com conta", com Criar conta e Entrar).
 
+## Painel sem vínculo
+
+Conta sem vínculo Riot vê no Painel só um quadro centralizado (`.panel-link`) com o convite para
+vincular: sem filtros, métricas ou lista de partidas. O Painel mostra apenas partidas da própria
+conta; identificadores técnicos como `BR1_…` não aparecem como título.
+
 ## Tela de entrada (contas locais)
 
 Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em `auth.css`), em

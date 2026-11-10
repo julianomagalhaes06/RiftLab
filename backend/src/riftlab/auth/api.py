@@ -97,6 +97,7 @@ class SessionState(CamelModel):
 
     auth_required: bool
     user: SessionUser | None
+    demo_enabled: bool = False
     social_providers: list[SocialName]
 
 
@@ -107,6 +108,7 @@ def _user(user: AuthUser | None) -> SessionUser | None:
 def _session_state(request: Request, user: AuthUser | None) -> SessionState:
     settings = request.app.state.settings
     return SessionState(
+        demo_enabled=settings.demo_data_enabled,
         auth_required=settings.auth_required,
         user=_user(user),
         social_providers=social.enabled_providers(settings),
