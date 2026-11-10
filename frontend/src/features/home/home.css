@@ -140,7 +140,10 @@
 }
 .player-search--hero .player-search__submit:hover { background: var(--accent-fill-hover); }
 .player-search--hero > .player-search__popup { left: 0; right: 0; width: auto; max-width: none; text-align: left; }
-.player-search--hero .player-search__hint { left: 0; right: 0; text-align: center; }
+/* `width: max-content; max-width: 18rem` da regra base venceria o left/right (CSS resolve o
+   sistema sobre-restrito ignorando o `right`): sem isto, o aviso ficava preso e estreito do
+   lado esquerdo da barra, em vez de ocupar a largura inteira com o texto centralizado. */
+.player-search--hero .player-search__hint { left: 0; right: 0; width: auto; max-width: none; text-align: center; }
 
 /* ---- Seções ---- */
 .home-section,
