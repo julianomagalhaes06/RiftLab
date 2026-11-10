@@ -30,7 +30,6 @@ export type Route =
   | { name: "importEntry" }
   | { name: "panel" }
   | { name: "champions" }
-  | { name: "position" }
   | { name: "account" }
   | { name: "history" }
   | { name: "historyMatch"; matchId: string; participantId: number | null }
@@ -107,6 +106,9 @@ export function loginPath(next?: string | null, mode: "login" | "register" | "fo
   return target && target !== "/" ? `${base}?next=${encodeURIComponent(target)}` : base;
 }
 
+/** Endereço da antiga aba Minha posição: abre o Painel, onde o card de elo ficou. */
+export const LEGACY_POSITION_PATH = "/minha-posicao";
+
 export function parseRoute(pathname: string, search = ""): Route {
   const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   // Início público, como em sites de estatísticas; o Painel da conta fica em /painel.
@@ -119,7 +121,7 @@ export function parseRoute(pathname: string, search = ""): Route {
   }
   if (trimmed === "/importar") return { name: "importEntry" };
   if (trimmed === "/campeoes") return { name: "champions" };
-  if (trimmed === "/minha-posicao") return { name: "position" };
+  if (trimmed === LEGACY_POSITION_PATH) return { name: "panel" };
   if (trimmed === "/conta") return { name: "account" };
   if (trimmed === "/historico") return { name: "history" };
   const parts = trimmed.split("/").slice(1).map(safeDecode);
@@ -193,8 +195,6 @@ export function routeToPath(route: Route): string {
       return "/painel";
     case "champions":
       return "/campeoes";
-    case "position":
-      return "/minha-posicao";
     case "account":
       return "/conta";
     case "history":

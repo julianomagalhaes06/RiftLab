@@ -13,8 +13,8 @@ import { Link } from "../shared/router/Link";
 import { RouterProvider } from "../shared/router/RouterProvider";
 import { DemoNoticeProvider } from "./DemoNotice";
 import { ContextStrip } from "./ContextStrip";
-import { isDemoMatchId, loginPath, type Route } from "../shared/router/routes";
-import { PanelPage, PositionPage } from "./AreaPages";
+import { LEGACY_POSITION_PATH, isDemoMatchId, loginPath, type Route } from "../shared/router/routes";
+import { PanelPage } from "./AreaPages";
 import { ChampionsPage } from "../features/champions/ChampionsPage";
 import { MainNav } from "./MainNav";
 import { PlayerPage } from "../features/players/PlayerPage";
@@ -41,7 +41,6 @@ const TITLES: Record<Route["name"], string> = {
   importEntry: "Importar partida — RiftLab",
   panel: "Painel — RiftLab",
   champions: "Campeões — RiftLab",
-  position: "Minha posição — RiftLab",
   account: "Minha conta — RiftLab",
   history: "Histórico — RiftLab",
   historyMatch: "Contexto da partida — RiftLab",
@@ -55,7 +54,7 @@ const TITLES: Record<Route["name"], string> = {
 };
 
 // Áreas da conta própria: sem sessão, vão direto para entrar ou criar conta (e voltam depois).
-const ACCOUNT_AREAS: ReadonlySet<Route["name"]> = new Set(["panel", "position", "history", "account", "importEntry", "import"]);
+const ACCOUNT_AREAS: ReadonlySet<Route["name"]> = new Set(["panel", "history", "account", "importEntry", "import"]);
 
 function renderPage(route: Route): ReactNode {
   switch (route.name) {
@@ -72,8 +71,6 @@ function renderPage(route: Route): ReactNode {
       return <PanelPage />;
     case "champions":
       return <ChampionsPage />;
-    case "position":
-      return <PositionPage />;
     case "account":
       return <AccountPage />;
     case "history":
@@ -140,9 +137,12 @@ function AppContent() {
   // Fora do ambiente de demonstração, o que é sintético simplesmente não existe.
   const hidden = !demoEnabled && (route.name === "prototype"
     || ((route.name === "match" || route.name === "historyMatch") && isDemoMatchId(route.matchId)));
+  const legacyPosition = href.split("?")[0] === LEGACY_POSITION_PATH;
   useEffect(() => {
-    if (needsLogin) navigate(loginPath(href), { replace: true });
-  }, [needsLogin, href, navigate]);
+    // A antiga aba Minha posição virou o card de elo do Painel; links guardados continuam valendo.
+    if (legacyPosition) navigate("/painel", { replace: true });
+    else if (needsLogin) navigate(loginPath(href), { replace: true });
+  }, [legacyPosition, needsLogin, href, navigate]);
   const mainRef = useRef<HTMLElement>(null);
   // Só o CAMINHO conta: trocar de participante (?participant=N) não devolve o foco ao
   // topo da página, senão quem navega por teclado perderia o lugar a cada seleção.

@@ -150,8 +150,8 @@ export function Dashboard() {
                 {data.origin === "DEMO" ? <p className="panel-metrics__source">DEMO · participante 1 das partidas sintéticas; não representa seu desempenho.</p> : null}
                 {data.status === "IDENTITY_UNAVAILABLE" ? <div className="panel-metrics__state">
                   <strong>Conta própria ainda sem vínculo observado</strong>
-                  <p>O vínculo da conta é registrado na primeira atualização de Minha posição com a chave da Riot configurada.</p>
-                  <Link to="/minha-posicao" className="arrow-link">Consultar Minha posição</Link>
+                  <p>Vincule sua conta Riot em Minha conta para que suas partidas e seu elo apareçam aqui.</p>
+                  <Link to="/conta" className="arrow-link">Abrir Minha conta</Link>
                 </div> : data.status === "EMPTY" ? <div className="panel-metrics__state">
                   <strong>Nenhuma partida neste recorte</strong>
                   <p>{origin === "REAL" ? "Assim que você jogar uma ranqueada, ela aparece aqui." : "Importe as partidas da demonstração para ver as métricas."}</p>
@@ -196,7 +196,7 @@ export function Dashboard() {
         </div>
 
         <aside className="panel-side" aria-label="Posição e campeões">
-          <MyRank compact />
+          <MyRank />
           {champions.length ? (
             <section className="panel-champions" aria-labelledby="panel-champions-heading">
               <div className="section-head">

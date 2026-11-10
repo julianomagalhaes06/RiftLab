@@ -12,7 +12,7 @@ describe("parseRoute", () => {
     expect(parseRoute("/criar-conta", "?next=%2Fpainel")).toEqual({ name: "register", next: "/painel" });
     expect(parseRoute("/importar")).toEqual({ name: "importEntry" });
     expect(parseRoute("/campeoes")).toEqual({ name: "champions" });
-    expect(parseRoute("/minha-posicao")).toEqual({ name: "position" });
+    expect(parseRoute("/minha-posicao")).toEqual({ name: "panel" });
     expect(parseRoute("/conta")).toEqual({ name: "account" });
     expect(parseRoute("/historico")).toEqual({ name: "history" });
     expect(parseRoute("/historico/DEMO-0008", "?participant=3")).toEqual({
@@ -75,7 +75,6 @@ describe("routeToPath", () => {
       "/criar-conta?next=%2Fdecisions%2Fabc",
       "/importar",
       "/campeoes",
-      "/minha-posicao",
       "/historico",
       "/historico/DEMO-0008?participant=3",
       `/imports/${UUID}`,

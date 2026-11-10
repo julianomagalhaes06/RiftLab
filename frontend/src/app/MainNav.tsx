@@ -7,7 +7,6 @@ const entries = [
   { name: "home", href: "/", label: "Início", icon: "home", account: false },
   { name: "panel", href: "/painel", label: "Painel", icon: "panel", account: true },
   { name: "champions", href: "/campeoes", label: "Campeões", icon: "champions", account: false },
-  { name: "position", href: "/minha-posicao", label: "Minha posição", icon: "position", account: true },
   { name: "history", href: "/historico", label: "Histórico", icon: "history", account: true },
 ] as const;
 
@@ -17,7 +16,6 @@ function NavIcon({ kind }: { kind: typeof entries[number]["icon"] }) {
     case "home": return <svg {...common}><path d="M3 11 12 4l9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></svg>;
     case "panel": return <svg {...common}><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>;
     case "champions": return <svg {...common}><path d="M12 2 20 6v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4Z" /><path d="m9 12 2 2 4-4" /></svg>;
-    case "position": return <svg {...common}><path d="M8 4h8v6a4 4 0 0 1-8 0V4Z" /><path d="M8 6H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4M12 14v4m-4 3h8" /></svg>;
     case "history": return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>;
   }
 }

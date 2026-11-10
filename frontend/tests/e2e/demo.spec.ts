@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
  * Roteiro da demonstração (CC-605) contra a stack de demonstração já semeada
  * (`scripts/demo.sh up`, projeto `riftlab-demo`). Só roda no projeto `demo` com E2E_BASE_URL.
  * Cenários: o contexto muda as alternativas (DEMO-0009 × DEMO-0010), evidência insuficiente
- * (DEMO-0011), elo fictício marcado em Minha posição e relatório verificável. O cenário do
+ * (DEMO-0011), elo fictício marcado no card do Painel e relatório verificável. O cenário do
  * interpretador indisponível exige reiniciar a API (`scripts/demo.sh parser-offline`) e roda
  * só com DEMO_PARSER_OFFLINE=1.
  */
@@ -55,12 +55,11 @@ test.describe("Roteiro da demonstração (stack de demonstração semeada)", () 
     await page.screenshot({ path: `${evidence}/evidencia-insuficiente.png`, fullPage: true });
   });
 
-  test("Minha posição mostra elo fictício marcado e nunca a Riot", async ({ page }) => {
-    await page.goto("/minha-posicao");
+  test("card de elo do Painel mostra elo fictício marcado e nunca a Riot", async ({ page }) => {
+    await page.goto("/painel");
     await expect(page.getByText(/Elo fictício de demonstração/)).toBeVisible();
-    await expect(page.getByText(/Demonstração \(fictício\)/)).toBeVisible();
     await expect(page.getByText(/Riot League-V4/)).toHaveCount(0);
-    await page.screenshot({ path: `${evidence}/minha-posicao-ficticia.png`, fullPage: true });
+    await page.screenshot({ path: `${evidence}/painel-elo-ficticio.png`, fullPage: true });
   });
 
   test("relatório exportado abre sem rede e não traz identificadores", async ({ page }) => {

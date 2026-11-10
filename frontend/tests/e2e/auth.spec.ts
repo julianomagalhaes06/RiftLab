@@ -116,9 +116,10 @@ test("sem conta em 360px: início com a busca e convite nas áreas da conta", as
   let scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
 
+  // O endereço antigo de Minha posição leva ao Painel, que pede login.
   await page.goto("/minha-posicao");
   await expect(page.getByRole("heading", { name: "Entrar no RiftLab" })).toBeVisible();
-  await expect(page).toHaveURL(/\/entrar\?next=%2Fminha-posicao$/);
+  await expect(page).toHaveURL(/\/entrar\?next=%2Fpainel$/);
   scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
 });

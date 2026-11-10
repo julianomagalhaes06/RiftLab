@@ -19,17 +19,17 @@ async function noHorizontalScroll(page: Page) {
   );
 }
 
-test("Minha posição: League-V4 sem resposta preserva a última observação e diz o motivo", async ({ page }) => {
+test("Card de elo do Painel: League-V4 sem resposta preserva a última observação e diz o motivo", async ({ page }) => {
   await mockApi(page, {
     "GET /api/v1/ranked/me": () => ok({ status: "STALE", reason: "UPSTREAM_UNAVAILABLE", position: observed, change: null }),
   });
-  await page.goto("/minha-posicao");
+  await page.goto("/painel");
   await expect(page.getByText("A Riot não respondeu. A posição anterior foi preservada.")).toBeVisible();
   await expect(page.getByText("Elo Prata II, 40 de 100 PDL")).toBeVisible();
   await page.screenshot({ path: `${evidence}/posicao-league-v4-indisponivel.png`, fullPage: true });
 });
 
-test("Minha posição: sem observação e API fora do ar não inventam elo", async ({ page }) => {
+test("Card de elo do Painel: sem observação e API fora do ar não inventam elo", async ({ page }) => {
   let calls = 0;
   await mockApi(page, {
     "GET /api/v1/ranked/me": () =>
@@ -37,8 +37,8 @@ test("Minha posição: sem observação e API fora do ar não inventam elo", asy
         ? problem(503, "SERVICE_UNAVAILABLE")
         : ok({ status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }),
   });
-  await page.goto("/minha-posicao");
-  await expect(page.getByRole("alert")).toBeVisible();
+  await page.goto("/painel");
+  await expect(page.locator(".my-rank").getByRole("alert")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/Elo (Ferro|Bronze|Prata|Ouro)/);
   await page.reload();
   await expect(page.getByText(/Ainda não há observação desta (conta|fila)/)).toBeVisible();

@@ -382,7 +382,7 @@ Comprova a posse do Riot ID sem RSO, com a chave de desenvolvimento. Todas as ro
 
 ## Conta própria por usuário (Sprint 2, card #13)
 
-Minha posição (`/ranked/me`), Painel (`/dashboard`), Histórico (`/matches`, participante da conta), sincronização (`/history/sync`) e o chip do topo (`/players/me`) resolvem a conta própria pela requisição:
+Card de elo do Painel (`/ranked/me`), Painel (`/dashboard`), Histórico (`/matches`, participante da conta), sincronização (`/history/sync`) e o chip do topo (`/players/me`) resolvem a conta própria pela requisição:
 
 - **Usuário na sessão:** a conta Riot vinculada a ele (card #12). Sem vínculo, essas rotas respondem sem dados da conta e com o motivo `ACCOUNT_NOT_LINKED` (`ranked/me` e `history/sync` com `UNAVAILABLE`, `players/me` com `reason`); nunca usam a conta configurada de outra pessoa.
 - **Sem usuário** (login não exigido): a conta do arquivo `RIFTLAB_RANKED_ACCOUNT_FILE`, como antes.

@@ -148,8 +148,8 @@ export function AccountPage() {
         <PanelHead
           email={user.email}
           lead={link?.state === "LINKED"
-            ? "Minha posição, Painel e Histórico usam as partidas desta conta Riot."
-            : "Vincule sua conta Riot para que Minha posição, Painel e Histórico usem as suas partidas."}
+            ? "O Painel e o Histórico usam as partidas desta conta Riot."
+            : "Vincule sua conta Riot para que o Painel e o Histórico usem as suas partidas."}
         />
       <div className="account-card" aria-live="polite">
         {failed ? <p role="alert">Não foi possível consultar o vínculo agora.</p>

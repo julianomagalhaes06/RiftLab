@@ -18,8 +18,9 @@ for (const width of [360, 1280]) {
       ? { ...rank, position: { ...rank.position, queue: "RANKED_FLEX_SR", tier: "DIAMOND", division: "IV", leaguePoints: 29, wins: 55, losses: 22 },
         change: { ...rank.change, leaguePointsDelta: -8 } }
       : rank) });
-    await page.goto("/minha-posicao");
-    await expect(page.getByText("Elo Diamante IV, 29 de 100 PDL")).toBeVisible();
+    await page.goto("/painel");
+    const card = page.locator(".my-rank");
+    await expect(card.getByText("Elo Diamante IV, 29 de 100 PDL")).toBeVisible();
     const selector = page.getByLabel("Fila ranqueada");
     await expect(selector).toHaveValue("RANKED_FLEX_SR");
     await expect(page.getByText("Seleção automática · melhor classificação disponível")).toBeVisible();
@@ -29,18 +30,14 @@ for (const width of [360, 1280]) {
     await page.keyboard.press("Enter");
     await expect(selector).toHaveValue("RANKED_FLEX_SR");
     await expect(selector).toBeFocused();
-    await expect(page.getByText("Elo Diamante IV, 29 de 100 PDL")).toBeVisible();
-    await expect(page.getByText("55 vitórias · 22 derrotas na fila")).toBeVisible();
-    await expect(page.getByText("-8 PDL desde a observação anterior, na mesma divisão.")).toBeVisible();
-    await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toHaveCount(0);
+    await expect(card.getByText("Elo Diamante IV, 29 de 100 PDL")).toBeVisible();
+    await expect(card.locator(".rank-card__change--loss")).toContainText("-8 PDL desde a observação anterior");
+    await expect(card.getByText("Elo Ouro III, 76 de 100 PDL")).toHaveCount(0);
     expect(await selector.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.screenshot({ path: `../.private/validation/ranked-flex/flex-${width}.png`, fullPage: true });
     await selector.selectOption("RANKED_SOLO_5x5");
-    await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
-    await page.goto("/painel");
-    await page.getByLabel("Fila ranqueada").selectOption("RANKED_FLEX_SR");
-    await expect(page.locator(".my-rank--compact").getByText("Elo Diamante IV, 29 de 100 PDL")).toBeVisible();
+    await expect(card.getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
   });
 }
 
@@ -50,7 +47,7 @@ test("Flex sem observação e não classificado não herda a posição Solo/Duo"
     : unranked ? { ...rank, status: "UNRANKED", change: null, position: { ...rank.position,
       queue: "RANKED_FLEX_SR", state: "UNRANKED", tier: null, division: null, leaguePoints: null, wins: null, losses: null } }
       : { status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }) });
-  await page.goto("/minha-posicao");
+  await page.goto("/painel");
   await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
   await page.getByLabel("Fila ranqueada").selectOption("RANKED_FLEX_SR");
   await expect(page.getByText(/Ainda não há observação/)).toBeVisible();
@@ -62,26 +59,18 @@ test("Flex sem observação e não classificado não herda a posição Solo/Duo"
 });
 
 for (const width of [360, 390, 1280, 1440]) {
-  test(`Minha posição e card no Painel em ${width}px`, async ({ page }) => {
+  test(`card de elo no Painel em ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: width < 700 ? 780 : 900 });
     await mockApi(page, { "GET /api/v1/ranked/me": () => ok(rank) });
-    await page.goto("/minha-posicao");
-    await expect(page.getByRole("heading", { name: "Classificação da conta própria" })).toBeVisible();
-    await expect(page.getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
+    await page.goto("/painel");
+    await expect(page.locator(".my-rank--compact").getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
     await expect(page.getByText("Faltam 24 PDL para Ouro II")).toBeVisible();
-    await expect(page.getByText("+12 PDL desde a observação anterior, na mesma divisão.")).toBeVisible();
-    await expect(page.getByText(/sem atribuição a uma partida/)).toBeVisible();
     await expect(page.locator(".rank-card__emblem img")).toHaveAttribute("src", "/ranked-emblems/gold.webp");
     // CC-1203: placas IV → I (IV concluída, III atual) e ganho na faixa verde.
     await expect(page.locator(".rank-card .rank-plate--done")).toHaveCount(1);
     await expect(page.locator(".rank-card .rank-plate--now")).toHaveText("III");
     await expect(page.locator(".rank-card__change--win")).toContainText("+12 PDL desde a observação anterior");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
-    await page.screenshot({ path: `${evidence}/posicao-${width}.png`, fullPage: true });
-    const panelLink = page.getByRole("navigation", { name: "Áreas principais" }).getByRole("link", { name: /Painel/ });
-    await panelLink.focus();
-    await page.keyboard.press("Enter");
-    await expect(page.locator(".my-rank--compact").getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
     await page.screenshot({ path: `${evidence}/painel-${width}.png`, fullPage: true });
   });
 }
@@ -89,7 +78,7 @@ for (const width of [360, 390, 1280, 1440]) {
 test("estados não classificado e atualização indisponível", async ({ page }) => {
   let response: Record<string, unknown> = { ...rank, status: "UNRANKED", position: { ...rank.position, state: "UNRANKED", tier: null, division: null, leaguePoints: null, wins: null, losses: null }, change: null };
   await mockApi(page, { "GET /api/v1/ranked/me": () => ok(response) });
-  await page.goto("/minha-posicao");
+  await page.goto("/painel");
   await expect(page.getByText("Não classificado na Solo/Duo nesta observação válida.")).toBeVisible();
   response = { ...rank, status: "STALE", reason: "RIOT_KEY_MISSING" };
   await page.reload();
@@ -114,7 +103,7 @@ test("todos os elos preservam rótulo e contraste AA", async ({ page }) => {
   } }) });
   for (const tier of ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"]) {
     currentTier = tier;
-    await page.goto("/minha-posicao");
+    await page.goto("/painel");
     const card = page.locator(".rank-card");
     await expect(card).toHaveAttribute("data-tier", tier);
     await expect(card.locator(".rank-card__emblem img")).toHaveJSProperty("complete", true);
@@ -137,8 +126,17 @@ test("demonstração: elo fictício aparece marcado e sem atribuição à Riot",
     "GET /api/v1/ranked/me": () =>
       ok({ ...rank, position: { ...rank.position, origin: "DEMO_FICTITIOUS", season: "DEMO" } }),
   });
-  await page.goto("/minha-posicao");
+  await page.goto("/painel");
   await expect(page.getByText(/Elo fictício de demonstração: não foi consultado na Riot/)).toBeVisible();
-  await expect(page.getByText(/Demonstração \(fictício\)/)).toBeVisible();
   await expect(page.getByText("Riot League-V4", { exact: false })).toHaveCount(0);
+});
+
+test("o endereço antigo de Minha posição abre o Painel e a aba saiu do menu", async ({ page }) => {
+  await mockApi(page, { "GET /api/v1/ranked/me": () => ok(rank) });
+  await page.goto("/minha-posicao");
+  await expect(page).toHaveURL(/\/painel$/);
+  await expect(page.locator(".my-rank--compact").getByText("Elo Ouro III, 76 de 100 PDL")).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Áreas principais" });
+  await expect(nav.getByRole("link", { name: /Painel/ })).toHaveAttribute("aria-current", "page");
+  await expect(nav).not.toContainText("Minha posição");
 });

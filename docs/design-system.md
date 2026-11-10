@@ -70,8 +70,9 @@ Espaço e forma: chanfro `--cut` 8 px (superfícies), `--cut-chip` 6 px (retrato
 
 ## Moldura
 
-- **Topo** (64 px, linha `nline` embaixo): marca (hexágono roxo + "RiftLab"); quatro abas com
-  ícone de 18 px (Painel, Campeões, Minha posição, Histórico), ativa em `ntext` 600 com ícone
+- **Topo** (64 px, linha `nline` embaixo): marca (hexágono roxo + "RiftLab"); abas com
+  ícone de 18 px (Início, Painel, Campeões, Histórico; a antiga aba Minha posição saiu em
+  09/11/2026 e o elo ficou no card do Painel), ativa em `ntext` 600 com ícone
   `accent` e barra de 2 px `accent-strong` embaixo; busca Nome#TAG compacta; chip do perfil da
   conta configurada: selo "BR1", ícone de invocador chanfrado (32 px), Riot ID e, abaixo, emblema
   mini + elo e PDL na cor `text` do elo.
@@ -121,8 +122,8 @@ sempre com contorno `accent` de 3 px.
   divisões · PDL sem teto" e mostram o PDL acumulado.
 
 No código: card de elo em `features/ranked/RankCard.tsx` (estilo em `rank-card.css`), elos e
-escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; Minha posição
-(card grande, observação, variação e escada de elos) em `features/ranked/MyRank.tsx`; página do
+escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; card de elo
+da conta no Painel (Solo/Duo e Flex) em `features/ranked/MyRank.tsx`; página do
 jogador (cabeçalho e um card de elo por fila) em `features/players/PlayerPage.tsx`; Histórico
 (card de métricas, filtros `.segmented` e uma superfície por partida com `.result-bar` no artigo)
 em `features/history/`; Campeões (lista como "Campeões em foco", escolhido com `.is-selected`) em
@@ -177,7 +178,7 @@ vínculo (formulário do Riot ID, desafio do ícone ou conta vinculada).
 
 ## Sem conta
 
-As áreas da conta (Painel, Minha posição, Histórico, Minha conta, Importar) levam quem não tem
+As áreas da conta (Painel, Histórico, Minha conta, Importar) levam quem não tem
 sessão direto à tela de entrar, que volta ao mesmo endereço depois do login (`?next=`). O menu
 principal mostra só Início e Campeões; o topo, Entrar e Criar conta. Sair, ou a sessão terminar
 no meio do uso, leva ao início. Numa página pública, o detalhe da decisão troca a análise e o
