@@ -167,7 +167,7 @@ jobs:
           EMAIL="ci_$GITHUB_RUN_ID@example.test"
           PASSWORD="Aa-$(openssl rand -hex 16)"
           curl -sf -X POST -H 'X-RiftLab-Request: 1' -H 'Content-Type: application/json' \
-            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
+            -d "{\"name\":\"CI\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
             http://127.0.0.1:5173/api/v1/auth/register > /dev/null
           CODE="$(python3 scripts/mailpit_code.py "$EMAIL")"
           curl -sf -c "$RUNNER_TEMP/riftlab.jar" -X POST -H 'X-RiftLab-Request: 1' -H 'Content-Type: application/json' \
