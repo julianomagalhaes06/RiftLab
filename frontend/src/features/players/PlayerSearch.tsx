@@ -1,4 +1,4 @@
-import { useId, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useState, type FocusEvent, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "../../shared/router/context";
 import { routeToPath } from "../../shared/router/routes";
 import { emblemSrc, profileIconUrl, rankTitle } from "../ranked/tiers";
@@ -25,6 +25,9 @@ function RecentPortrait({ player }: { player: RecentPlayer }) {
   );
 }
 
+// Duração da saída em players.css (`player-search-hint-out`).
+const HINT_EXIT_MS = 120;
+
 /** Busca de jogador pelo Riot ID (CC-1102), com seletor de servidor e sugestões (CC-1208):
  * perfis já abertos neste navegador cujo Nome#TAG contém o texto e, sem "#", o mesmo nome com a
  * TAG padrão do servidor (BR1). Padrão combobox: setas escolhem, Enter abre, Esc fecha; sem
@@ -34,6 +37,16 @@ export function PlayerSearch({ variant = "bar" }: { variant?: "bar" | "hero" }) 
   const { navigate } = useRouter();
   const [value, setValue] = useState("");
   const [invalid, setInvalid] = useState(false);
+  // Aviso de Riot ID inválido: sai com uma animação curta em vez de sumir na hora. `hintLeaving`
+  // é derivado (não é estado): já fica true no mesmo render em que `invalid` vira false, sem
+  // esperar o efeito rodar. Reaparecer (nova busca inválida) cancela a saída em andamento.
+  const [hintVisible, setHintVisible] = useState(false);
+  const hintLeaving = hintVisible && !invalid;
+  useEffect(() => {
+    if (invalid || !hintVisible) return;
+    const timer = window.setTimeout(() => setHintVisible(false), HINT_EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [invalid, hintVisible]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [recent, setRecent] = useState<RecentPlayer[]>([]);
@@ -77,6 +90,7 @@ export function PlayerSearch({ variant = "bar" }: { variant?: "bar" | "hero" }) 
     const riotId = resolveRiotId(value, region);
     if (!riotId) {
       setInvalid(true);
+      setHintVisible(true);
       setOpen(false);
       return;
     }
@@ -228,8 +242,12 @@ export function PlayerSearch({ variant = "bar" }: { variant?: "bar" | "hero" }) 
           </div>
         ) : null}
       </div>
-      {invalid ? (
-        <p id={hintId} className="player-search__hint" role="alert">
+      {hintVisible ? (
+        <p
+          id={hintId}
+          className={hintLeaving ? "player-search__hint player-search__hint--leaving" : "player-search__hint"}
+          role="alert"
+        >
           Digite o nome do jogador (até 16 caracteres) e, se quiser, a TAG: Nome#TAG, com 3 a 5
           letras ou números.
         </p>

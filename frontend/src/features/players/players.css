@@ -59,6 +59,16 @@
   border-radius: var(--radius-sm);
   background: var(--n1);
   font-size: .85rem;
+  /* Some ao digitar de novo ou ao sair do campo: aparece de baixo (mais perto do campo),
+     some mais rápido do que aparece (~70%), para não atrasar quem já foi em frente. */
+  animation: player-search-hint-in .16s ease-out;
+}
+.player-search__hint--leaving { animation: player-search-hint-out .12s ease-out forwards; }
+@keyframes player-search-hint-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes player-search-hint-out { to { opacity: 0; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) {
+  .player-search__hint { animation: none; }
+  .player-search__hint--leaving { animation: none; opacity: 0; }
 }
 /* Página do jogador (CC-1204): cabeçalho numa superfície com retrato chanfrado de 88 px e selo de
    nível; abaixo, os cards de elo de Solo/Duo e Flex lado a lado (uma coluna no celular). */
