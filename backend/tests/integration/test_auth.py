@@ -437,6 +437,18 @@ def test_notice_email_has_no_code():
     assert "Esqueci minha senha" in email.text and "Esqueci minha senha" in email.html
 
 
+def test_social_linked_email_names_the_service_and_needs_it():
+    email = render("SOCIAL_LINKED", None, "Discord")
+    for part in (email.subject, email.text, email.html):
+        assert "Discord" in part
+        assert "{service}" not in part and "None" not in part
+    assert "Se não foi você" in email.text and "troque a senha" in email.html
+    for forbidden in ("<img", "<link", "<script", "<style", "<a ", "http://", "https://"):
+        assert forbidden not in email.html, forbidden
+    with pytest.raises(ValueError):
+        render("SOCIAL_LINKED", None)
+
+
 @pytest.mark.parametrize("kind", ["VERIFY", "RESET"])
 def test_code_email_is_self_contained_html_without_leaking_the_code_in_previews(kind):
     email = render(kind, "123456")

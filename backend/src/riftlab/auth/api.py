@@ -318,9 +318,13 @@ async def post_login(
     return _session_state(request, user)
 
 
-def _with_created_mark(target: str) -> str:
+SERVICE_NAMES: dict[SocialName, str] = {"google": "Google", "discord": "Discord"}
+
+
+def _with_mark(target: str, **mark: str) -> str:
+    """Acrescenta a marca do aviso (`conta=nova`, `conta=ligada&via=google`) ao destino."""
     parts = urlsplit(target)
-    query = "&".join(item for item in (parts.query, "conta=nova") if item)
+    query = "&".join(item for item in (parts.query, urlencode(mark)) if item)
     return urlunsplit(("", "", parts.path, query, parts.fragment))
 
 
@@ -372,6 +376,7 @@ async def get_social_start(
 async def get_social_callback(
     provider: SocialName,
     request: Request,
+    background: BackgroundTasks,
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
@@ -400,7 +405,7 @@ async def get_social_callback(
     if not profile.email or not profile.email_verified:
         return _social_failure("email", target)
     try:
-        _, token, created = await application.social_login(
+        opened, token, outcome = await application.social_login(
             request.app.state.session_factory,
             provider,
             profile.subject,
@@ -411,8 +416,16 @@ async def get_social_callback(
     except AuthError:
         return _social_failure("falhou", target)
     # Conta nova: boas-vindas ou, se veio de uma página, de volta a ela com um aviso curto.
-    if created:
-        destination = _with_created_mark(target) if target else "/boas-vindas"
+    # Provedor ligado a uma conta que já existia: o dono recebe um e-mail (pode não ser quem
+    # está entrando) e a tela mostra um aviso. Sem SMTP configurado, a entrada segue sem e-mail.
+    if outcome == "CREATED":
+        destination = _with_mark(target, conta="nova") if target else "/boas-vindas"
+    elif outcome == "LINKED":
+        destination = _with_mark(target or "/painel", conta="ligada", via=provider)
+        mailer: Mailer | None = request.app.state.mailer
+        if mailer is not None:
+            notice = OutgoingEmail(opened.email, "SOCIAL_LINKED", service=SERVICE_NAMES[provider])
+            _queue_email(background, mailer, notice)
     else:
         destination = target or "/painel"
     response = RedirectResponse(destination, status_code=302)

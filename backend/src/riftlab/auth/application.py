@@ -12,7 +12,8 @@ quem cadastrasse primeiro um e-mail alheio poderia ver a própria senha ativada 
 
 O login social (`social_login`) só recebe e-mail confirmado pelo provedor. Pelo mesmo motivo do
 parágrafo acima, um cadastro local ainda não confirmado perde a senha quando o dono do e-mail
-chega pelo provedor.
+chega pelo provedor. O resultado diz se a conta nasceu agora, se o provedor acabou de ser ligado
+a uma conta que já existia (a rota avisa o dono por e-mail) ou se foi só mais uma entrada.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -253,6 +255,9 @@ async def login(
     return _auth_user(user), token
 
 
+SocialOutcome = Literal["CREATED", "LINKED", "SIGNED_IN"]
+
+
 async def social_login(
     factory: SessionFactory,
     provider: str,
@@ -261,25 +266,27 @@ async def social_login(
     name: str | None,
     *,
     lifetime: timedelta,
-) -> tuple[AuthUser, str, bool]:
+) -> tuple[AuthUser, str, SocialOutcome]:
     """Abre a sessão de quem voltou do provedor com o e-mail confirmado. Devolve o usuário, o
-    token e se a conta acabou de nascer. A identidade já ligada vale mesmo com outro e-mail;
-    sem ela, a conta é achada pelo e-mail e, sem conta, criada já confirmada e sem senha."""
+    token e o que aconteceu com a conta. A identidade já ligada vale mesmo com outro e-mail;
+    sem ela, a conta é achada pelo e-mail e ligada ao provedor (LINKED) ou, sem conta, criada
+    já confirmada e sem senha (CREATED)."""
     email = normalize_email(email)
     validate_email(email)
     now = datetime.now(UTC)
-    created = False
+    outcome: SocialOutcome = "SIGNED_IN"
     try:
         async with unit_of_work(factory) as session:
             identity = await session.get(AuthSocialIdentityModel, (provider, subject))
             user = await session.get(UserModel, identity.user_id) if identity else None
             if user is None:
                 user = await _user_by_email(session, email)
+                outcome = "LINKED"
                 if user is None:
                     user = UserModel(email=email, email_verified_at=now, created_at=now)
                     session.add(user)
                     await session.flush()
-                    created = True
+                    outcome = "CREATED"
                 elif user.email_verified_at is None:
                     # Quem digitou essa senha pode não ser o dono do e-mail, que chegou agora.
                     user.password_hash, user.email_verified_at = None, now
@@ -302,7 +309,7 @@ async def social_login(
     except IntegrityError as exc:
         # Dois retornos simultâneos na primeira entrada: quem perdeu tenta de novo e acha a conta.
         raise AuthError("SOCIAL_FAILED") from exc
-    return opened, token, created
+    return opened, token, outcome
 
 
 async def verify_email(

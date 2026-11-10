@@ -367,6 +367,24 @@ describe("Login social e conta nova", () => {
     expect(notice.closest(".account-toast")).toHaveClass("account-toast--leaving");
     await waitFor(() => expect(notice).not.toBeInTheDocument());
   });
+
+  it("serviço ligado a uma conta que já existia mostra um aviso com o nome dele, e a marca sai do endereço", async () => {
+    setup("/painel?conta=ligada&via=discord", { authRequired: true, user: USER });
+    const notice = await screen.findByText("Discord ligado à sua conta");
+    expect(screen.getByText(/Agora você também entra com o Discord/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Vincular agora" })).not.toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toBe(""));
+    expect(window.location.pathname).toBe("/painel");
+    fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
+    await waitFor(() => expect(notice).not.toBeInTheDocument());
+  });
+
+  it("marca de serviço desconhecido não mostra aviso", async () => {
+    setup("/campeoes?conta=ligada&via=outro", { authRequired: true, user: USER });
+    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: /ligado/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/ligado à sua conta/)).not.toBeInTheDocument();
+  });
 });
 
 describe("Site sem demonstração", () => {

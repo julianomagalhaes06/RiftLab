@@ -27,7 +27,7 @@ import { AuthScreen } from "../features/auth/AuthScreen";
 import { UserMenu } from "../features/auth/UserMenu";
 import { AccountPage } from "../features/auth/AccountPage";
 import { ThemeToggle } from "../shared/theme/ThemeToggle";
-import { AccountCreatedNotice } from "../features/auth/AccountCreatedNotice";
+import { AccountNotice } from "../features/auth/AccountNotice";
 import { HomePage } from "../features/home/HomePage";
 import "./App.css";
 import "../design/concept-c.css";
@@ -187,7 +187,7 @@ function AppContent() {
           <ContextStrip />
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1} className={route.name === "home" ? "app__main app__main--home" : "app__main"}>
-          <AccountCreatedNotice />
+          <AccountNotice />
           {needsLogin ? null : renderPage(hidden ? { name: "notFound", path: href.split("?")[0] } : route)}
         </main>
         <footer className="app__footer">

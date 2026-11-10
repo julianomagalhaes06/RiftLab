@@ -1,4 +1,4 @@
-"""Envio dos e-mails da conta (confirmação, recuperação e aviso de conta existente) por SMTP.
+"""Envio dos e-mails da conta (confirmação, recuperação e avisos da conta) por SMTP.
 
 Serve qualquer servidor: o Mailpit local do compose (sem TLS nem login) ou o Gmail com senha
 de app (STARTTLS na 587). O envio roda em segundo plano, depois da resposta: a resposta é a
@@ -28,6 +28,8 @@ class OutgoingEmail:
     to: str
     kind: EmailKind
     code: str | None = None
+    # Nome do serviço de login nos avisos de login social ligado ("Google", "Discord").
+    service: str | None = None
 
 
 class Mailer(Protocol):
@@ -53,7 +55,7 @@ class SmtpMailer:
             smtp.send_message(message)
 
     async def send(self, email: OutgoingEmail) -> None:
-        rendered = render(email.kind, email.code)
+        rendered = render(email.kind, email.code, email.service)
         message = EmailMessage()
         message["Subject"] = rendered.subject
         message["From"] = self._settings.smtp_from

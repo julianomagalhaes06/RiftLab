@@ -5,15 +5,19 @@ Clientes de e-mail não aceitam folha de estilo externa, fonte própria, `clip-p
 forma confiável: o HTML usa tabelas e estilo inline, sem imagem e sem link, e as cores são os
 tokens de `frontend/src/design/tokens.css` (n0, n1, nline, ntext, accent). O texto puro vai
 junto, para quem não abre HTML. O código nunca entra no assunto nem na prévia da caixa de entrada.
+
+Os avisos sem código (conta já existente, login social ligado) trazem uma orientação no lugar do
+código. O do login ligado cita o serviço (`{service}` nos textos), que vem da lista fixa de
+provedores, nunca do que a pessoa digitou.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from html import escape
 from typing import Literal
 
-EmailKind = Literal["VERIFY", "RESET", "ALREADY_REGISTERED"]
+EmailKind = Literal["VERIFY", "RESET", "ALREADY_REGISTERED", "SOCIAL_LINKED"]
 
 _BACKGROUND = "#0f1013"
 _SURFACE = "#16181d"
@@ -47,6 +51,7 @@ class _Copy:
     lead: str
     preview: str
     closing: str
+    hint: str | None = None
 
 
 _COPY: dict[EmailKind, _Copy] = {
@@ -76,17 +81,44 @@ _COPY: dict[EmailKind, _Copy] = {
         ),
         preview="Houve uma tentativa de cadastro com o seu e-mail.",
         closing="Se não foi você, ignore este e-mail. Nada mudou na sua conta.",
+        hint='Se foi você, entre normalmente ou use "Esqueci minha senha" na tela de entrada.',
+    ),
+    "SOCIAL_LINKED": _Copy(
+        subject="Login com {service} ligado à sua conta no RiftLab",
+        eyebrow="Aviso da conta",
+        title="Login com {service} ligado",
+        lead=(
+            "Alguém entrou no RiftLab com uma conta do {service} que usa este e-mail. Ela foi "
+            "ligada à sua conta e, a partir de agora, também abre a sua conta."
+        ),
+        preview="Sua conta no RiftLab ganhou um novo jeito de entrar.",
+        closing=(
+            "Se não foi você, alguém acessou sua conta do {service}: troque a senha dela e "
+            "encerre as sessões abertas por lá."
+        ),
+        hint="Se foi você, não precisa fazer nada.",
     ),
 }
 
 _EXPIRES = "O código vale por 15 minutos."
-_ALREADY_HINT = 'Se foi você, entre normalmente ou use "Esqueci minha senha" na tela de entrada.'
+
+
+def _filled(copy: _Copy, service: str | None) -> _Copy:
+    if service is None:
+        return copy
+    return replace(
+        copy,
+        subject=copy.subject.replace("{service}", service),
+        title=copy.title.replace("{service}", service),
+        lead=copy.lead.replace("{service}", service),
+        closing=copy.closing.replace("{service}", service),
+    )
 
 
 def _text(copy: _Copy, code: str | None) -> str:
     if code is not None:
         return f"{copy.lead}\n\n{code}\n\n{_EXPIRES}\n{copy.closing}\n\nRiftLab\n"
-    return f"{copy.lead}\n\n{_ALREADY_HINT}\n{copy.closing}\n\nRiftLab\n"
+    return f"{copy.lead}\n\n{copy.hint}\n{copy.closing}\n\nRiftLab\n"
 
 
 def _paragraph(text: str, color: str, *, margin: str = "0 0 12px") -> str:
@@ -111,7 +143,7 @@ def _html(copy: _Copy, code: str | None) -> str:
     if code is not None:
         middle = _code_block(code) + _paragraph(_EXPIRES, _TEXT)
     else:
-        middle = _paragraph(_ALREADY_HINT, _TEXT)
+        middle = _paragraph(copy.hint or "", _TEXT)
     return f"""<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -153,6 +185,8 @@ def _html(copy: _Copy, code: str | None) -> str:
 """
 
 
-def render(kind: EmailKind, code: str | None) -> RenderedEmail:
-    copy = _COPY[kind]
+def render(kind: EmailKind, code: str | None, service: str | None = None) -> RenderedEmail:
+    copy = _filled(_COPY[kind], service)
+    if "{service}" in copy.subject:
+        raise ValueError(f"o e-mail {kind} precisa do nome do serviço")
     return RenderedEmail(copy.subject, _text(copy, code), _html(copy, code))

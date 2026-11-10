@@ -1,4 +1,5 @@
-"""Nome no cadastro e login social: a volta do provedor, o `state` e a conta resultante."""
+"""Nome no cadastro e login social: a volta do provedor, o `state`, a conta resultante e o
+aviso ao dono quando o provedor é ligado a uma conta que já existia."""
 
 from __future__ import annotations
 
@@ -58,6 +59,11 @@ def provider() -> FakeProvider:
     return FakeProvider()
 
 
+@pytest.fixture
+def mailer() -> FakeMailer:
+    return FakeMailer()
+
+
 @pytest_asyncio.fixture
 async def emails(session_factory) -> AsyncIterator[list[str]]:
     created: list[str] = []
@@ -66,8 +72,14 @@ async def emails(session_factory) -> AsyncIterator[list[str]]:
         await session.execute(delete(UserModel).where(UserModel.email.in_(created)))
 
 
-async def _client(settings: Settings, provider: FakeProvider) -> AsyncIterator[AsyncClient]:
-    app = create_app(settings, mailer=FakeMailer(), social_transport=httpx.MockTransport(provider))
+async def _client(
+    settings: Settings, provider: FakeProvider, mailer: FakeMailer | None = None
+) -> AsyncIterator[AsyncClient]:
+    app = create_app(
+        settings,
+        mailer=mailer if mailer is not None else FakeMailer(),
+        social_transport=httpx.MockTransport(provider),
+    )
     async with app.router.lifespan_context(app):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://127.0.0.1"
@@ -76,8 +88,8 @@ async def _client(settings: Settings, provider: FakeProvider) -> AsyncIterator[A
 
 
 @pytest_asyncio.fixture
-async def client(session_factory, provider) -> AsyncIterator[AsyncClient]:
-    async for c in _client(Settings(auth_required=True, **BOTH), provider):
+async def client(session_factory, provider, mailer) -> AsyncIterator[AsyncClient]:
+    async for c in _client(Settings(auth_required=True, **BOTH), provider, mailer):
         yield c
 
 
@@ -156,7 +168,7 @@ async def test_sessao_lista_so_os_provedores_configurados(session_factory, provi
 
 @pytest.mark.asyncio
 async def test_primeira_entrada_cria_conta_confirmada_sem_senha(
-    client, provider, session_factory, emails
+    client, provider, mailer, session_factory, emails
 ) -> None:
     email = _email(emails)
     provider.profile = _google(email.upper(), subject="sub-1")
@@ -165,6 +177,7 @@ async def test_primeira_entrada_cria_conta_confirmada_sem_senha(
 
     assert response.status_code == 302
     assert response.headers["location"] == "/boas-vindas"
+    assert mailer.sent == []
     assert provider.token_requests[0]["code"] == ["codigo"]
     assert provider.token_requests[0]["client_secret"] == ["segredo-google"]
     user = await _session_user(client)
@@ -248,20 +261,61 @@ async def test_falha_na_troca_do_codigo_volta_sem_sessao(client, provider) -> No
 
 
 @pytest.mark.asyncio
-async def test_conta_confirmada_e_ligada_e_mantem_a_senha(
-    client, provider, session_factory, emails
+async def test_conta_confirmada_e_ligada_avisa_o_dono_e_mantem_a_senha(
+    client, provider, mailer, session_factory, emails
 ) -> None:
     email = _email(emails)
     user_id = await create_verified_user(session_factory, email)
-    provider.profile = _google(email)
+    provider.profile = _google(email.upper(), subject="sub-ligado")
     response = await _finish(client, await _begin(client, target="/historico"))
 
-    assert response.headers["location"] == "/historico"
+    assert response.headers["location"] == "/historico?conta=ligada&via=google"
+    assert mailer.sent == [OutgoingEmail(email, "SOCIAL_LINKED", service="Google")]
     user = await _session_user(client)
     assert user is not None
     assert user["id"] == str(user_id)
     await client.post("/api/v1/auth/logout", headers=HEADERS)
     assert await _password_login(client, email, PASSWORD) == 200
+
+    # A partir daí é só mais uma entrada: sem e-mail e sem aviso na tela.
+    response = await _finish(client, await _begin(client))
+    assert response.headers["location"] == "/painel"
+    assert len(mailer.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_discord_ligado_a_conta_criada_pelo_google_avisa_com_o_nome_do_discord(
+    client, provider, mailer, emails
+) -> None:
+    email = _email(emails)
+    provider.profile = _google(email)
+    assert (await _finish(client, await _begin(client))).headers["location"] == "/boas-vindas"
+    google_user = await _session_user(client)
+    await client.post("/api/v1/auth/logout", headers=HEADERS)
+
+    provider.profile = {"id": "77", "username": "usuaria", "email": email, "verified": True}
+    response = await _finish(client, await _begin(client, "discord"), "discord")
+
+    assert response.headers["location"] == "/painel?conta=ligada&via=discord"
+    assert mailer.sent == [OutgoingEmail(email, "SOCIAL_LINKED", service="Discord")]
+    assert await _session_user(client) == google_user
+
+
+@pytest.mark.asyncio
+async def test_sem_smtp_a_ligacao_entra_sem_e_mail(session_factory, provider, emails) -> None:
+    email = _email(emails)
+    await create_verified_user(session_factory, email)
+    provider.profile = _google(email)
+    settings = Settings(auth_required=True, smtp_host=None, **BOTH)
+    app = create_app(settings, social_transport=httpx.MockTransport(provider))
+    async with app.router.lifespan_context(app):
+        assert app.state.mailer is None
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://127.0.0.1"
+        ) as client:
+            response = await _finish(client, await _begin(client))
+            assert response.headers["location"] == "/painel?conta=ligada&via=google"
+            assert await _session_user(client) is not None
 
 
 @pytest.mark.asyncio
@@ -352,11 +406,14 @@ async def test_cadastro_guarda_o_nome_e_recusa_nome_invalido(
     assert stored.display_name == "Ana Lima"
 
 
-def test_new_account_mark_keeps_the_query_of_the_return_page():
-    from riftlab.auth.api import _with_created_mark
+def test_notice_mark_keeps_the_query_of_the_return_page():
+    from riftlab.auth.api import _with_mark
 
-    assert _with_created_mark("/matches/BR1_1") == "/matches/BR1_1?conta=nova"
+    assert _with_mark("/matches/BR1_1", conta="nova") == "/matches/BR1_1?conta=nova"
     assert (
-        _with_created_mark("/matches/BR1_1?participant=3")
+        _with_mark("/matches/BR1_1?participant=3", conta="nova")
         == "/matches/BR1_1?participant=3&conta=nova"
+    )
+    assert (
+        _with_mark("/painel", conta="ligada", via="discord") == "/painel?conta=ligada&via=discord"
     )

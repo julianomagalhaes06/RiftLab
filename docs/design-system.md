@@ -201,8 +201,9 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
 - **Login social:** "Continuar com Google" e "Continuar com Discord" ficam uma vez só, no alto do
   cartão e acima das abas, porque servem para entrar e para criar conta; as abas tratam só de
   e-mail e senha. Conta nova vai à tela "Conta criada" (`/boas-vindas`) ou, vinda de uma página,
-  volta a ela com um cartão flutuante no canto (`AccountCreatedNotice`), que não desloca a página
-  e só sai por ação da pessoa.
+  volta a ela com um cartão flutuante no canto (`AccountNotice`), que não desloca a página
+  e só sai por ação da pessoa. O mesmo cartão avisa "Google ligado à sua conta" (ou Discord) quando
+  o serviço foi ligado a uma conta que já existia com o mesmo e-mail, com um só botão, "Entendi".
 - **Topo** de 64 px com a marca (link para o início) e "Continuar sem conta"; **rodapé** com
   créditos e o aviso legal da Riot.
 - **Desktop:** duas colunas. À esquerda, contexto (13 px), título em Chakra Petch (40 px), frase e
