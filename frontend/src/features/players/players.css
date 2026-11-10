@@ -10,6 +10,13 @@
   color: var(--ntext);
 }
 .player-search input[aria-invalid="true"] { border-color: var(--loss); }
+/* O anel de foco padrão (3 px, 3 px de distância) fica grosso e solto num campo de 36 px;
+   aqui o anel fica mais fino e colado à borda, como no restante dos controles do formulário. */
+.player-search input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
 /* Seletor de servidor (como nos sites de estatísticas): a sigla visível e, por cima, o select
    nativo transparente, que mantém teclado, leitor de tela e a lista do sistema. */
 .player-search__region {
