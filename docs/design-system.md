@@ -143,6 +143,9 @@ padrão dos sites de estatísticas do jogo:
   sorteada a cada carregamento da página entre skins curadas (`features/home/splashes.ts`). Véus
   de `n0` com transparência (`--hero-scrim*`) garantem a leitura do texto sobre qualquer arte e
   fundem a base no fundo da página; um brilho roxo discreto (`--hero-glow`) fica atrás da busca.
+  Atrás do selo e do título, um véu mais forte (`--hero-scrim-heavy`, .78) e o texto do selo numa
+  pílula escura (`--hero-scrim-strong`): medido nas 51 artes da lista, todo texto passa de 4,5:1
+  (título, texto grande, de 3:1), e `ui-polish.spec.ts` confere o pior caso, arte toda branca.
   O crédito da skin aparece no canto só depois que a arte carrega; se ela falhar, a vitrine fica
   no fundo neutro.
 - **Centro:** selo BR1, título em Chakra Petch (até 60 px) com a segunda frase em roxo, uma frase

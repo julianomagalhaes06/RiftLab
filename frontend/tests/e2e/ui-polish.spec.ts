@@ -158,3 +158,53 @@ for (const theme of ["dark", "light"] as const) {
     });
   }
 }
+
+// Vitrine do início (revisão ui-ux-pro-max): o texto lê sobre qualquer splash. Pior caso possível:
+// a arte trocada por uma imagem toda branca. O texto fica transparente para fotografar só o fundo
+// atrás de cada linha; o contraste usa o pixel claro do percentil 95 (o brilho do texto não conta).
+const WHITE_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGP4DwABAQEAG7buVgAAAABJRU5ErkJggg==", "base64");
+const HERO_TEXTS: Array<[string, string, number]> = [
+  ["selo", ".home-hero__kicker > span:last-child", 4.5],
+  ["título", ".home-hero__title", 3],
+  ["título roxo", ".home-hero__title span", 3],
+  ["frase", ".home-hero__lead", 4.5],
+  ["crédito", ".home-hero__credit", 4.5],
+];
+for (const width of [360, 1280]) {
+  test(`vitrine do início: texto legível sobre arte branca em ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.route("https://ddragon.leagueoflegends.com/**", (route) => route.fulfill({ contentType: "image/png", body: WHITE_PNG }));
+    await mockApi(page);
+    await page.goto("/");
+    await page.locator('.home-hero[data-art="ready"]').waitFor();
+    const colors = await page.evaluate((texts) => texts.map(([, selector]) => getComputedStyle(document.querySelector(selector)!).color), HERO_TEXTS);
+    await page.addStyleTag({ content: ".home-hero__inner *, .home-hero__credit { color: transparent !important; text-shadow: none !important; } .player-search--hero { visibility: hidden; } .home-hero__art { transition: none !important; transform: none !important; opacity: 1 !important; }" });
+    const ratios: Record<string, number> = {};
+    for (const [index, [name, selector, minimum]] of HERO_TEXTS.entries()) {
+      const png = (await page.locator(selector).screenshot()).toString("base64");
+      const ratio = await page.evaluate(async ({ png, color }) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${png}`;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext("2d")!;
+        context.drawImage(image, 0, 0);
+        const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        const channel = (value: number) => { const v = value / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        const luminance = (r: number, g: number, b: number) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+        const values: number[] = [];
+        for (let offset = 0; offset < data.length; offset += 4) values.push(luminance(data[offset], data[offset + 1], data[offset + 2]));
+        values.sort((a, b) => a - b);
+        const background = values[Math.floor(values.length * 0.95)];
+        const [r, g, b] = color.match(/\d+/g)!.map(Number);
+        const text = luminance(r, g, b);
+        return (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05);
+      }, { png, color: colors[index] });
+      ratios[name] = Math.round(ratio * 100) / 100;
+      expect(ratio, `${name}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(minimum);
+    }
+    test.info().annotations.push({ type: "contraste", description: JSON.stringify(ratios) });
+  });
+}

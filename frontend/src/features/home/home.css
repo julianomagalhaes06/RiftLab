@@ -43,6 +43,7 @@
   z-index: -1;
   background:
     linear-gradient(180deg, var(--hero-scrim) 0%, var(--hero-scrim-clear) 22%, var(--hero-scrim-clear) 38%, var(--hero-scrim) 66%, var(--hero-end) 100%),
+    radial-gradient(ellipse 50% 40% at 50% 42%, var(--hero-scrim-heavy) 0%, var(--hero-scrim-heavy) 45%, var(--hero-scrim-clear) 100%),
     radial-gradient(ellipse 62% 54% at 50% 52%, var(--hero-scrim), var(--hero-scrim-clear) 100%),
     linear-gradient(90deg, var(--hero-scrim-strong) 0%, var(--hero-scrim-clear) 26%, var(--hero-scrim-clear) 74%, var(--hero-scrim-strong) 100%);
 }
@@ -67,6 +68,9 @@
   text-shadow: 0 1px 8px var(--hero-ink-shadow);
 }
 .home-hero__kicker .chip { background: var(--hero-scrim-strong); color: var(--hero-ink); }
+/* O texto do selo fica numa pílula escura: sobre arte clara, o cinza solto sumia (medido em
+   todas as splash arts da lista). */
+.home-hero__kicker > span:last-child { padding: 3px 10px; border-radius: var(--radius-sm); background: var(--hero-scrim-strong); }
 .home-hero__title {
   margin: 0;
   color: var(--hero-ink);

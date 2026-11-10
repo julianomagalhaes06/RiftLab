@@ -64,6 +64,8 @@
   --hero-scrim-clear: rgb(15 16 19 / 0);
   --hero-scrim: rgb(15 16 19 / .6);
   --hero-scrim-strong: rgb(15 16 19 / .94);
+  /* Atrás do título e do selo: com .78, mesmo sobre arte branca o roxo do título passa de 3:1. */
+  --hero-scrim-heavy: rgb(15 16 19 / .78);
   --hero-glow: rgb(139 108 255 / .2);
   --hero-ink-shadow: rgb(0 0 0 / .65);
   /* Texto sobre a arte: a vitrine continua escura nos dois temas. */
