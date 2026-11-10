@@ -103,10 +103,12 @@ export function PlayerSearch({ variant = "bar" }: { variant?: "bar" | "hero" }) 
   }
 
   function onBlur(event: FocusEvent<HTMLFormElement>) {
-    // Fecha só quando o foco sai da busca inteira (campo, botão e "Limpar").
+    // Fecha só quando o foco sai da busca inteira (campo, botão e "Limpar"); o aviso de Riot ID
+    // inválido também não deve sobreviver a isso (senão fica preso ao navegar para outra aba).
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
       setOpen(false);
       setActive(-1);
+      setInvalid(false);
     }
   }
 
