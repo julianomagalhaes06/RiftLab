@@ -244,6 +244,23 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
   usam contorno de foco interno.
 - `prefers-reduced-motion` desliga transições.
 
+## Polimento e movimento
+
+Revisão com as skills better-ui e ui-ux-pro-max (09/11/2026), conferida em
+`tests/e2e/ui-polish.spec.ts`:
+
+- Controle visualmente menor que 44 px (seletor de tema, mostrar senha, chip de decisão) ganha um
+  `::after` transparente até 44 px. O `::after` parte de dentro da borda: com borda de 1 px, o
+  recuo é 1 px maior.
+- Ao clicar, botões, abas segmentadas, seletor de tema, busca e chips encolhem para `scale: 0.96`
+  em 150 ms (`cubic-bezier(0.2, 0, 0, 1)`). Só `scale` tem transição; cores mudam na hora, para a
+  troca de tema não animar a página inteira. Movimento reduzido desliga a escala.
+- Ícones de 24 unidades usam traço 1.8.
+- Imagens de item recebem o mesmo contorno de 1 px do retrato (`--portrait-outline`).
+- Cartão flutuante entra em 0,28 s (12 px) e sai em 0,2 s (8 px), ambos `ease-out`.
+- O card de elo segue escuro no tema claro e redefine também os apelidos `--color-*`, que
+  são resolvidos na raiz.
+
 ## Ativos
 
 - Retratos e ícones de invocador: Data Dragon da Riot, na versão do catálogo.

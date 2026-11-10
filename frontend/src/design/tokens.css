@@ -244,4 +244,12 @@
   --tier-grandmaster-text: #f28a8a;
   --tier-challenger-text: #93cefa;
   --tier-none-text: #b4b8c1;
+  /* Os apelidos semânticos são resolvidos na raiz; aqui voltam a apontar para os tons escuros
+     (sem isso o seletor de fila do card herdava o texto escuro do tema claro e sumia). */
+  --color-bg: var(--n0);
+  --color-surface: var(--n0);
+  --color-surface-alt: var(--n1);
+  --color-text: var(--ntext);
+  --color-muted: var(--ntext-muted);
+  --color-border: var(--nline);
 }

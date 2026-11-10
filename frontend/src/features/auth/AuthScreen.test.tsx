@@ -363,7 +363,9 @@ describe("Login social e conta nova", () => {
     await waitFor(() => expect(window.location.search).toBe(""));
     expect(window.location.pathname).toBe("/campeoes");
     fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
-    expect(notice).not.toBeInTheDocument();
+    // Sai com uma animação curta (200 ms) e então deixa a página.
+    expect(notice.closest(".account-toast")).toHaveClass("account-toast--leaving");
+    await waitFor(() => expect(notice).not.toBeInTheDocument());
   });
 });
 

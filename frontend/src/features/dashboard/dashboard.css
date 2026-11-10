@@ -4,7 +4,7 @@
 .panel-head > div:first-child { max-width: 760px; }
 .panel-filters { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: flex-end; gap: 8px 10px; max-width: 520px; }
 .panel-filters label { display: grid; gap: 4px; color: var(--ntext-subtle); font-size: .75rem; font-weight: 500; }
-.panel-filters select { min-height: 36px; font-size: .8125rem; }
+.panel-filters select { min-height: 44px; font-size: .8125rem; }
 .panel-filters__hint { flex-basis: 100%; margin: 0; color: var(--ntext-subtle); font-size: .75rem; line-height: 1.4; text-align: right; }
 
 .panel-grid { display: grid; grid-template-columns: minmax(0, 880fr) minmax(320px, 456fr); gap: 24px; align-items: start; }
