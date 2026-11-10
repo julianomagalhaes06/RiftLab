@@ -13,6 +13,11 @@
   min-width: 0;
   background: var(--surface-line);
   clip-path: polygon(var(--surface-cut) 0, 100% 0, 100% calc(100% - var(--surface-cut)), calc(100% - var(--surface-cut)) 100%, 0 100%, 0 var(--surface-cut));
+  /* O chanfro é um clip-path, que cortaria um box-shadow comum: drop-shadow sobrevive a ele
+     (mesmo recurso de .account-toast). --surface-elevation só existe no tema claro (ver
+     tokens.css): o escuro já separa superfície e fundo só por luminosidade, sem precisar de
+     sombra. */
+  filter: var(--surface-elevation, none);
 }
 .surface::before {
   content: "";

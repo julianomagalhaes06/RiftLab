@@ -96,4 +96,9 @@
 .panel-link h2 { margin: 0; font: 600 1.625rem/1.2 var(--font-display); color: var(--ntext); }
 .panel-link .muted { margin: 0 0 8px; line-height: 1.5; }
 .panel-link__badge { display: grid; place-items: center; width: 56px; height: 56px; border: 1px solid var(--accent-strong); border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
+/* Prévia do que aparece depois do vínculo: cartas "bloqueadas" em vez de só descrever em texto. */
+.panel-link__preview { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 2px 0 6px; padding: 0; list-style: none; }
+.panel-link__preview li { display: grid; gap: 2px; justify-items: center; min-width: 108px; padding: 10px 16px; border: 1px dashed var(--nline2); border-radius: var(--radius-sm); background: var(--n2); }
+.panel-link__preview-label { color: var(--ntext-subtle); font-size: .75rem; }
+.panel-link__preview-value { color: var(--ntext-muted); font: 600 1.125rem var(--font-display); }
 @media (max-width: 700px) { .panel-link { padding: 30px 22px; } }

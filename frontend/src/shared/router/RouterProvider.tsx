@@ -25,6 +25,18 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  // O app decide o scroll a cada rota (AppContent); o navegador não deve tentar restaurar
+  // a posição antiga de voltar/avançar, que fica inconsistente com conteúdo carregado à parte.
+  useEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      const previous = window.history.scrollRestoration;
+      window.history.scrollRestoration = "manual";
+      return () => {
+        window.history.scrollRestoration = previous;
+      };
+    }
+  }, []);
+
   const navigate = useCallback((to: string | Route, options?: { replace?: boolean }) => {
     const target = typeof to === "string" ? to : routeToPath(to);
     const url = new URL(target, window.location.origin);

@@ -165,8 +165,8 @@
   --n0: #f4f5f8;
   --n1: #ffffff;
   --n2: #eceef3;
-  --nline: #dde0e7;
-  --nline2: #c9ced8;
+  --nline: #cdd2db;
+  --nline2: #b9c0cc;
   --nline-soft: #e8eaef;
   --nline-strong: #757b87;
   --ntext: #16181d;
@@ -221,6 +221,10 @@
   --tier-grandmaster-text: #b02e2e;
   --tier-challenger-text: #1a68a6;
   --tier-none-text: #5f6571;
+
+  /* `.surface` some no tema claro sem isto: n1 (branco) quase não separa de n0, e o chanfro
+     de 1 px do nline já reforçado ainda não basta como única pista de profundidade. */
+  --surface-elevation: drop-shadow(0 1px 2px var(--shadow-soft));
 }
 
 /* O card de elo é uma placa de metal: fica escuro nos dois temas, com os valores do tema escuro. */

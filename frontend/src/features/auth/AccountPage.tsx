@@ -192,6 +192,11 @@ export function AccountPage() {
           </> : <>
             <h3>Vincular conta Riot</h3>
             <p className="muted">Sem o login da Riot, a posse da conta é comprovada pela troca temporária do ícone de perfil. Depois de vincular, você pode voltar ao ícone que preferir.</p>
+            <ol className="account-steps account-steps--preview">
+              <li>Informe seu Riot ID abaixo.</li>
+              <li>Troque seu ícone de perfil, no cliente do League of Legends, para o ícone que a Riot sortear.</li>
+              <li>Deixe esta página aberta: o vínculo se completa sozinho assim que o ícone novo aparecer.</li>
+            </ol>
             <form className="form" onSubmit={start} noValidate>
               <label htmlFor={inputId} className="form__label">Riot ID (Nome#TAG)</label>
               <input id={inputId} className="form__input" value={riotId} placeholder="Nome#BR1" autoComplete="off" spellCheck={false}

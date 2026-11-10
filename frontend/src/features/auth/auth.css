@@ -128,6 +128,26 @@
 .account-card__riot { margin: 0; font: 600 1.5rem var(--font-display); color: var(--ntext); overflow-wrap: anywhere; }
 .account-card__riot span { color: var(--ntext-subtle); font-weight: 500; }
 .account-steps { margin: 0; padding-left: 20px; color: var(--ntext-muted); line-height: 1.6; }
+/* Prévia antes do desafio começar: numeração em círculo, no mesmo tom do emblema do cabeçalho,
+   em vez da numeração padrão do navegador. */
+.account-steps--preview { display: grid; gap: 10px; padding-left: 0; list-style: none; counter-reset: account-step; text-align: left; }
+.account-steps--preview li { position: relative; padding-left: 34px; }
+.account-steps--preview li::before {
+  counter-increment: account-step;
+  content: counter(account-step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--accent-strong);
+  border-radius: 50%;
+  background: var(--accent-surface);
+  color: var(--accent);
+  font: 600 .75rem var(--font-display);
+}
 .account-icon { margin: 0; display: grid; justify-items: center; gap: 8px; color: var(--ntext-subtle); font-size: .8125rem; }
 .account-icon img { border: 1px solid var(--portrait-outline); }
 .account-auto { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 12px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); color: var(--ntext-muted); font-size: .875rem; line-height: 1.4; }

@@ -113,6 +113,11 @@ export function Dashboard() {
         <p className="page-head__context">Painel</p>
         <h2 id="panel-link-heading">Vincule sua conta Riot</h2>
         <p className="muted">Com o vínculo, suas partidas, sua taxa de vitória e seu elo aparecem aqui.</p>
+        <ul className="panel-link__preview" aria-hidden="true">
+          <li><span className="panel-link__preview-label">Taxa de vitória</span><span className="panel-link__preview-value">—</span></li>
+          <li><span className="panel-link__preview-label">Elo</span><span className="panel-link__preview-value">—</span></li>
+          <li><span className="panel-link__preview-label">Partidas recentes</span><span className="panel-link__preview-value">—</span></li>
+        </ul>
         <Link to="/conta" className="button">Vincular conta Riot</Link>
       </section>
     );

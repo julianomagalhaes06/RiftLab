@@ -5,3 +5,7 @@ import { afterEach } from "vitest";
 afterEach(() => {
   window.localStorage.clear();
 });
+
+// jsdom não implementa scroll: troca de rota chama window.scrollTo, que sem isto logaria
+// "Not implemented" no console a cada teste.
+window.scrollTo = () => {};

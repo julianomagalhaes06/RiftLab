@@ -155,8 +155,11 @@ function AppContent() {
       firstRender.current = false;
       return;
     }
-    // Navegação por link: leva o foco ao conteúdo novo (teclado/leitor de tela).
-    mainRef.current?.focus();
+    // Navegação por link: volta ao topo da página nova e leva o foco ao conteúdo (teclado/leitor
+    // de tela). `preventScroll` evita que o focus() brigue com o scrollTo e deixe a página alguns
+    // pixels abaixo do topo.
+    window.scrollTo(0, 0);
+    mainRef.current?.focus({ preventScroll: true });
   }, [pathKey, route.name, hidden]);
 
   if (route.name === "prototype" && demoEnabled) {
