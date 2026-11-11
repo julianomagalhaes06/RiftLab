@@ -78,6 +78,7 @@ for (const width of [360, 390, 1280, 1440]) {
     await page.getByRole("link", { name: "Contexto da partida DEMO-0008" }).click();
     await expect(page).toHaveURL(/\/historico\/DEMO-0008$/);
     await page.getByRole("link", { name: /^Participante 1 —/ }).click();
+    await page.getByRole("tab", { name: "Compras" }).click();
     await page.getByRole("link", { name: "Decisão em 7:52" }).click();
     await expect(page).toHaveURL(/\/decisions\//);
   });

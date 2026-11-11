@@ -74,6 +74,19 @@ describe("tela da partida", () => {
     expect(document.querySelector("section.section")).toBeNull();
     expect(screen.getByRole("status")).toHaveTextContent(/Partida pronta/);
 
+    // Abas da análise: abre na Revisão; placar, compras e ouro ficam nas outras abas.
+    await screen.findByRole("tab", { name: "Ouro" }); // aparece quando a linha do tempo chega
+    const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
+    expect(tabs).toEqual(["Revisão", "Compras", "Placar", "Ouro"]);
+    expect(screen.getByRole("tab", { name: "Revisão" })).toHaveAttribute("aria-selected", "true");
+    // Teclado (padrão de abas): seta para a direita leva à próxima aba e move o foco.
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Revisão" }), { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "Compras" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Compras" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Compras" }), { key: "End" });
+    expect(screen.getByRole("tab", { name: "Ouro" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Placar" }));
+    expect(window.location.search).toContain("aba=placar");
     const self = screen.getByRole("link", { name: "Participante 2 — Campeão #9002" });
     expect(self).toHaveAttribute("aria-current", "true"); // a conta local vem selecionada
     expect(within(self).getByText("Você")).toBeInTheDocument();
@@ -94,12 +107,14 @@ describe("tela da partida", () => {
     expect(within(officialBuilds[1]).getAllByText("Item #100001, nome indisponível")).toHaveLength(2);
     expect(screen.getByRole("group", { name: "Amuleto final oficial" })).toBeInTheDocument();
     expect(await screen.findAllByRole("group", { name: "Estimado pela linha do tempo" })).not.toHaveLength(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Compras" }));
     const path = await screen.findByRole("list", { name: "Compras por volta à loja" });
     expect(within(path).getAllByRole("listitem").filter((li) => li.classList.contains("build-path__visit"))).toHaveLength(3);
     expect(within(path).getByRole("link", { name: /^Decisão em 7:52/ })).toHaveTextContent("Bloqueada");
     expect(within(path).getByText(/Vendeu/)).toBeInTheDocument();
     expect(screen.getByText("Maximizou")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("tab", { name: "Ouro" }));
     const chart = await screen.findByRole("img", { name: "Gráfico da diferença de ouro por minuto" });
     expect(chart).toBeInTheDocument();
     fireEvent.click(screen.getByText("Ver em tabela"));

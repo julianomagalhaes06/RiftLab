@@ -22,7 +22,7 @@ import { ItemNames } from "../../shared/ui/ItemNames";
 import { useItemName } from "../../shared/hooks/useItemName";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
 import { useDemoNotice } from "../../app/demoNotice";
-import { isDemoMatchId } from "../../shared/router/routes";
+import { isDemoMatchId, routeToPath } from "../../shared/router/routes";
 
 const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
   NO_PRIOR_FRAME: "não há quadro anterior à decisão",
@@ -324,8 +324,9 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
   const participant = match?.participants.find((p) => p.participantId === decision.participantId) ?? null;
   return (
     <section className="area-page decision-page" aria-labelledby="decision-heading">
+      {/* Volta direto à aba Compras da análise, onde ficam as decisões. */}
       <Link
-        to={{ name: "match", matchId: decision.matchId, participantId: decision.participantId }}
+        to={`${routeToPath({ name: "match", matchId: decision.matchId, participantId: decision.participantId })}&aba=compras`}
         className="match-back"
       >
         Voltar às decisões da partida

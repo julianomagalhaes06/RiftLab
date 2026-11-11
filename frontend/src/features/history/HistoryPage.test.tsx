@@ -153,7 +153,7 @@ describe("Histórico com dados realmente disponíveis", () => {
     fireEvent.click(await screen.findByRole("link", { name: "Contexto da partida DEMO-0008" }));
     expect(window.location.pathname).toBe("/historico/DEMO-0008");
     fireEvent.click(await screen.findByRole("link", { name: /Participante 1/ }));
-    await waitFor(() => expect(window.location.search).toBe("?participant=1"));
+    await waitFor(() => expect(window.location.search).toBe("?participant=1&aba=placar")); // fica no Placar
     expect(screen.getByText(/Nenhuma decisão/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voltar ao Histórico" })).toHaveAttribute("href", "/historico");
   });

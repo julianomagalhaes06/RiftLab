@@ -41,9 +41,15 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
   const participantLabel = await tabTo(page, /^Participante 1 — Campeão #9000/);
   await expectFocusVisible(page);
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\?participant=1$/);
-  await expect(page.getByRole("heading", { name: /^Decisões de Campeão #9000/ })).toBeVisible();
+  await expect(page).toHaveURL(/\?participant=1&aba=placar$/);
   expect(await focusedLabel(page)).toBe(participantLabel);
+
+  // Abas da análise: Shift+Tab volta à aba ativa (Placar); seta para a esquerda abre Compras.
+  for (let step = 0; step < 40 && (await focusedLabel(page)) !== "Placar"; step += 1) await page.keyboard.press("Shift+Tab");
+  expect(await focusedLabel(page)).toBe("Placar");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("tab", { name: "Compras" })).toBeFocused();
+  await expect(page.getByRole("heading", { name: /^Decisões de Campeão #9000/ })).toBeVisible();
 
   // Decisões: "Carregar mais" por Espaço.
   await tabTo(page, "Carregar mais decisões");
@@ -69,7 +75,7 @@ test("fluxo principal completo só com teclado", async ({ page }) => {
   await expectFocusVisible(page);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { name: /^Decisões de Campeão #9000/ })).toBeVisible();
-  await expect(page).toHaveURL(/\/matches\/DEMO-0008\?participant=1$/);
+  await expect(page).toHaveURL(/\/matches\/DEMO-0008\?participant=1&aba=compras$/);
 });
 
 test("formulário por teclado: erro de validação anunciado e ligado ao campo", async ({ page }) => {

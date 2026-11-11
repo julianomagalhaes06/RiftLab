@@ -77,14 +77,14 @@ test("alvos de 44 px e escala ao clicar nos controles compactos", async ({ page 
   await expectTarget44(segmented);
   await expectPressScale(page, segmented);
 
-  await page.goto("/historico/DEMO-0008?participant=1");
+  await page.goto("/historico/DEMO-0008?participant=1&aba=compras");
   const chip = page.locator(".decision-chip").first();
   await expectTarget44(chip);
   await expectPressScale(page, chip, { navigates: true });
   await expect(page).toHaveURL(/\/decisions\//);
   await page.goBack();
   // Contorno de 1 px por cima do ícone de item, como no retrato de campeão.
-  const item = page.locator(".item-icon").first();
+  const item = page.locator(".item-icon:visible").first();
   await expect(item).toBeVisible();
   expect(await item.evaluate((element) => getComputedStyle(element, "::after").boxShadow)).toMatch(/inset/);
 });

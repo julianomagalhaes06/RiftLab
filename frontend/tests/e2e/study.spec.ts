@@ -282,6 +282,7 @@ for (const width of [1280, 360]) {
     await page.getByRole("link", { name: "Contexto da partida DEMO-0008" }).click();
     await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible();
     await page.getByRole("link", { name: /^Participante 1 —/ }).click();
+    await page.getByRole("tab", { name: "Compras" }).click();
     await page.getByRole("link", { name: "Decisão em 7:52" }).click();
     await page.getByRole("button", { name: "Praticar decisão", exact: true }).click();
 

@@ -157,6 +157,14 @@ sempre com contorno `accent` de 3 px.
   `features/history/HistoryParts.tsx`.
 - **Linha de partida** (outras telas): barra de resultado, "Vitória"/"Derrota" na cor do
   resultado, retrato de 36 px, campeão e fila, data e duração, K / D / A e tropas, ação em roxo.
+- **Análise da partida em abas** (`features/matches/MatchPage.tsx`, 11/11/2026): no lugar de um
+  rolar longo, abas que grudam no topo ao rolar — Revisão (padrão; o que estudar), Compras
+  (trajeto e decisões + ordem de habilidades), Placar e Ouro. A aba fica no endereço
+  (`?aba=revisao|compras|placar|ouro`), as setas e Home/End trocam de aba (padrão WAI-ARIA) e,
+  antes de a partida estar preparada, só o placar aparece, sem abas. Escolher um jogador no
+  placar mantém o Placar aberto (o foco não some); "Voltar às decisões da partida" reabre
+  Compras. O placar começa compacto (campeão com feitiços e runas, K/D/A, dano, farm e itens) e
+  um botão mostra ouro, sentinelas e participação, com a escolha lembrada no navegador.
 - **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px
   (escolhido com moldura e brilho roxos; sem partida no filtro aparecem bloqueados, em cinza e não
   clicáveis), patch e etapa numa linha com "Como ler estes números", cabeçalho sobre a splash do

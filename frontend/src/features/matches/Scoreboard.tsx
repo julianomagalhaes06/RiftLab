@@ -88,6 +88,25 @@ function Loadout({ participant, assets }: { participant: DetailParticipant; asse
   );
 }
 
+const DETAILED_KEY = "riftlab:placar-detalhado";
+
+/** Preferência do placar detalhado, só neste navegador (conveniência; sem armazenamento, compacto). */
+function readDetailed(): boolean {
+  try {
+    return window.localStorage.getItem(DETAILED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveDetailed(value: boolean): void {
+  try {
+    window.localStorage.setItem(DETAILED_KEY, value ? "1" : "0");
+  } catch {
+    // Armazenamento bloqueado: vale até recarregar a página.
+  }
+}
+
 function thousands(value: number): string {
   return value.toLocaleString("pt-BR");
 }
@@ -102,6 +121,7 @@ function Row({
   fromHistory,
   assets,
   maxDamage,
+  stayOnScoreboard,
 }: {
   match: MatchDetail;
   participant: DetailParticipant;
@@ -112,6 +132,7 @@ function Row({
   fromHistory: boolean;
   assets: GameAssets;
   maxDamage: number;
+  stayOnScoreboard: boolean;
 }) {
   const { kills, deaths, assists } = participant;
   const scored = kills != null && deaths != null && assists != null;
@@ -126,8 +147,10 @@ function Row({
     <tr className={`scoreboard__row${selected ? " scoreboard__row--selected" : ""}${participant.participantId === localId ? " scoreboard__row--local" : ""}`}>
       <th scope="row" className="scoreboard__champion">
         <div className="scoreboard__who">
+        {/* Com as abas da análise, escolher um jogador mantém o Placar aberto (o foco não some);
+            Revisão e Compras passam a mostrar o escolhido. */}
         <Link
-          to={{ name: fromHistory ? "historyMatch" : "match", matchId: match.matchId, participantId: participant.participantId }}
+          to={`${routeToPath({ name: fromHistory ? "historyMatch" : "match", matchId: match.matchId, participantId: participant.participantId })}${stayOnScoreboard ? "&aba=placar" : ""}`}
           className="scoreboard__link"
           aria-label={`Participante ${participant.participantId} — ${championName(participant)}`}
           aria-current={selected ? "true" : undefined}
@@ -194,19 +217,27 @@ export function Scoreboard({
   selected,
   localId,
   fromHistory,
+  stayOnScoreboard = false,
 }: {
   match: MatchDetail;
   timeline: MatchTimeline | null;
   selected: number | null;
   localId: number | null;
   fromHistory: boolean;
+  stayOnScoreboard?: boolean;
 }) {
   const teams = [...new Set(match.participants.map((p) => p.team))].sort((a, b) => a - b);
   const assets = useGameAssets(match.participants.find((p) => p.champion?.dataDragonVersion)?.champion?.dataDragonVersion);
   const maxDamage = Math.max(0, ...match.participants.map((p) => p.damageToChampions ?? 0));
+  const [detailed, setDetailed] = useState(readDetailed);
   if (!teams.length) return <p className="muted">Esta partida não tem participantes registrados.</p>;
   return (
-    <div className="scoreboard">
+    <div className={detailed ? "scoreboard" : "scoreboard scoreboard--compact"}>
+      <div className="scoreboard__toolbar">
+        <button type="button" className="scoreboard__toggle" aria-pressed={detailed} onClick={() => { setDetailed(!detailed); saveDetailed(!detailed); }}>
+          {detailed ? "Ocultar ouro, sentinelas e participação" : "Mostrar ouro, sentinelas e participação"}
+        </button>
+      </div>
       {teams.map((team) => {
         const totals = teamTotals(match.participants, team);
         const tone = team === BLUE ? "blue" : "red";
@@ -247,6 +278,7 @@ export function Scoreboard({
                   fromHistory={fromHistory}
                   assets={assets}
                   maxDamage={maxDamage}
+                  stayOnScoreboard={stayOnScoreboard}
                 />
               ))}
             </tbody>
