@@ -21,19 +21,24 @@ No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitiv
    (`--glow-accent`) no item escolhido.
 2. **Cada cor tem um papel.** Roxo para ação, seleção e destaque da conta própria. Verde e
    vermelho para resultado. Ouro (`--gold*`, como a loja do jogo) para molduras de item, o
-   trajeto mais frequente e conquistas. A cor do elo só na classificação. Pílulas de HUD
-   (`.hud-tag`, `--hud-bg`) para dados sobre arte.
+   trajeto mais frequente e o número em destaque (`--gold-text`). A cor do elo só na
+   classificação. Números sobre arte em placas de HUD (`--hud-bg`).
 3. **Dado e ícone antes de texto.** Número grande (Chakra Petch), ícone de linha
    (`shared/ui/GameIcon.tsx`, traço 1,8) e rótulo curto; metodologia e explicações longas ficam
    num "Como ler" (`details`), dica ou na tela de destino, nunca em parágrafos soltos na tela.
-4. **Estado vazio leva a algum lugar.** Ícone, título curto e uma ação (ex.: "Ver no patch
+4. **Destaque no próprio dado, não em etiqueta.** Como no tracker.gg e no u.gg: o maior número
+   da série fica dourado com uma estrela (`.is-best`), a revisão é texto discreto com ponto de
+   estado, e informação sobre arte é texto com ícone. Nada de pilhas de pílulas com borda
+   colorida; se houver várias marcas, no máximo uma, ou uma fileira uniforme e neutra
+   (Mobalytics).
+5. **Estado vazio leva a algum lugar.** Ícone, título curto e uma ação (ex.: "Ver no patch
    16.20"); nunca só uma caixa com um parágrafo.
-5. **Gamificação só com dado real.** Conquistas, sequências e progresso saem das partidas e
+6. **Gamificação só com dado real.** Conquistas, sequências e progresso saem das partidas e
    tentativas carregadas ("Maior KDA", "3 vitórias seguidas", decisões estudadas); nada
    inventado, nada que avalie a decisão sem base.
-6. **Nada fictício na interface real.** O protótipo usa dados ilustrativos; o produto mostra só o
+7. **Nada fictício na interface real.** O protótipo usa dados ilustrativos; o produto mostra só o
    que veio da API. Sem dado, a área mostra o estado vazio, nunca um exemplo.
-7. **Tipografia.** Chakra Petch para títulos grandes, nomes de campeão e números; Inter para o
+8. **Tipografia.** Chakra Petch para títulos grandes, nomes de campeão e números; Inter para o
    resto. Rótulos curtos em caixa alta usam Inter com espaçamento (a Chakra Petch abre espaço
    demais depois do "T" em tamanho pequeno).
 
@@ -130,20 +135,22 @@ sempre com contorno `accent` de 3 px.
   retrato de 56 px com a rota; K / D / A em 19 px (mortes em `loss`) e KDA; itens em grade 3 × 2
   com o amuleto redondo ao lado (casas vazias marcadas); participação em abates e farm; os dois
   times em faixas de cinco retratos de 24 px com filete `team-blue`/`team-red` (a conta própria
-  com anel `accent`, nomes no texto acessível e na dica); selos, "Analisar →" e o botão de 44 px
-  que abre o placar das duas equipes dentro do cartão (tabela por time: campeão, KDA, farm e
+  com anel `accent`, nomes no texto acessível e na dica); "Analisar →" com a revisão embaixo em
+  texto discreto (ponto verde quando há compras revistas) e, na borda direita, a faixa de 44 px
+  na tinta do resultado (u.gg) que abre o placar das duas equipes dentro do cartão (tabela por time: campeão, KDA, farm e
   itens; no celular, sem a coluna de itens). Coluna de resumo à esquerda (anel da taxa de
   vitória, KDA, sequência de vitórias, últimos 20 resultados em quadrados V/D, campeões mais
   jogados com taxa e KDA, rotas e o progresso de estudo com atalho para Minha evolução); banner
   do perfil no topo (splash do campeão mais jogado, ícone, Riot ID, elo e "Importar partida");
-  conquistas em selo dourado no cartão (`.chip--gold`: maior KDA, mais farm por minuto, maior
-  participação em abates, com ao menos três partidas); grupos por dia com quantidade, placar e
+  destaques no próprio número (`.is-best`, dourado com estrela e o motivo na dica: maior KDA,
+  mais farm por minuto, maior participação em abates, com ao menos três partidas); grupos por dia com quantidade, placar e
   KDA médio; filtros em grupos encostados; aviso de atualização numa faixa fina.
 - **Banner com splash** (`.splash-banner` em `arena.css`, arte por `shared/ui/SplashArt.tsx`):
   Histórico e perfil do jogador pesquisado. Mostra a splash do campeão mais jogado nas partidas
   carregadas (no perfil, a lista marca o jogador pesquisado como participante local), escuro nos
   dois temas (no claro, os tokens de dentro voltam aos tons escuros, como o card de elo), véus em
-  pixels e a sequência de vitórias em `.hud-tag--hot` quando ≥ 2.
+  pixels e a sequência de vitórias (`.banner-streak`, chama e número dourados, sem etiqueta)
+  quando ≥ 2.
 - **Perfil do jogador pesquisado** (`features/players/PlayerPage.tsx`): mesma página do Histórico
   da conta abaixo do banner e dos cards de elo — coluna de resumo (`LoadedSummary` com
   `subject="player"`), busca e filtros de fila e resultado, dias com placar e KDA médio,
@@ -154,7 +161,7 @@ sempre com contorno `accent` de 3 px.
 - **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px
   (escolhido com moldura e brilho roxos; sem partida no filtro aparecem bloqueados, em cinza e não
   clicáveis), patch e etapa numa linha com "Como ler estes números", cabeçalho escuro nos dois
-  temas sobre a splash do campeão com nome grande em caixa alta, pílulas de HUD (função, patch) e
+  temas sobre a splash do campeão com nome grande em caixa alta, linha de função e patch com ícone e
   os três números em pílulas com ícone; trajetos em linhas com posição, molduras de slot douradas
   (`.item-slot`), setas e anel de frequência (o 1º em ouro); estado vazio com ícone e ação;
   situações como "Desafios de decisão" com o minuto num círculo e "Analisar decisão" em botão.

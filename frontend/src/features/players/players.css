@@ -97,7 +97,6 @@
 .player-header__who h2 { width: fit-content; margin: 0 0 6px; font: 600 clamp(1.5rem, 3vw, 2.25rem)/1.15 var(--font-display); letter-spacing: .02em; color: var(--hero-ink); overflow-wrap: anywhere; }
 .player-header__tag { color: var(--hero-ink-muted); font-weight: 500; }
 .player-header__meta { width: fit-content; margin: 0; color: var(--hero-ink-muted); font-size: .9375rem; }
-.player-header__streak { margin: 10px 0 0; }
 .player-header__icon .portrait { box-shadow: 0 0 28px var(--glow-accent); }
 .player-ranks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; margin-bottom: 32px; }
 

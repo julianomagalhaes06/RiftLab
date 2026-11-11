@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type { MatchParticipant, MatchSummary } from "../../shared/api/client";
 import { Link } from "../../shared/router/Link";
 import { isDemoMatchId } from "../../shared/router/routes";
@@ -10,6 +10,8 @@ import { ItemNames } from "../../shared/ui/ItemNames";
 import { count } from "../../shared/text/count";
 import { GameIcon } from "../../shared/ui/GameIcon";
 import {
+  HIGHLIGHT_TEXT,
+  type HighlightKind,
   decimal,
   localPerformance,
   matchDate,
@@ -118,7 +120,18 @@ function MatchDetails({ id, teams, localId, version }: { id: string; teams: Matc
   );
 }
 
-export function MatchCard({ match, now, highlights }: { match: MatchSummary; now?: Date; highlights?: string[] }) {
+/** Número em destaque (maior da série carregada): cor dourada, estrela e o motivo na dica e no
+ * texto acessível. */
+function Best({ kind, on, children }: { kind: HighlightKind; on: boolean; children: ReactNode }) {
+  if (!on) return <>{children}</>;
+  return (
+    <span className="is-best" title={HIGHLIGHT_TEXT[kind]}>
+      {children}<GameIcon name="star" size={12} className="is-best__star" /><span className="sr-only"> ({HIGHLIGHT_TEXT[kind]})</span>
+    </span>
+  );
+}
+
+export function MatchCard({ match, now, highlights = [] }: { match: MatchSummary; now?: Date; highlights?: HighlightKind[] }) {
   const performance = localPerformance(match);
   const local = performance?.participant ?? null;
   const tone = performance?.result === "WIN" ? "win" : performance?.result === "LOSS" ? "loss" : "neutral";
@@ -134,7 +147,7 @@ export function MatchCard({ match, now, highlights }: { match: MatchSummary; now
   return (
     // Fundo levemente tingido pelo resultado (padrão dos sites de estatísticas) sobre a superfície
     // chanfrada; a barra de 3 px fica no artigo (as duas primitivas usam ::before).
-    <li className={`match-card match-card--${tone} surface`}>
+    <li className={`match-card match-card--${tone}${canExpand ? " match-card--expandable" : ""} surface`}>
       <article className="result-bar" data-result={tone === "neutral" ? undefined : tone} aria-label={`${title}, ${matchDate(match.startAt)}`}>
         <div className="match-card__meta">
           <strong className="match-card__queue">{queueLabel(match.queue)}</strong>
@@ -157,7 +170,7 @@ export function MatchCard({ match, now, highlights }: { match: MatchSummary; now
               <span className="match-card__kda-line" aria-label={`${local.kills ?? "?"} abates, ${local.deaths ?? "?"} mortes, ${local.assists ?? "?"} assistências`}>
                 {local.kills ?? "–"} <span aria-hidden="true">/</span> <span className="match-card__deaths">{local.deaths ?? "–"}</span> <span aria-hidden="true">/</span> {local.assists ?? "–"}
               </span>
-              <span className="match-card__kda">{performance.kda === null ? "KDA indisponível" : `${decimal(performance.kda, 2)} KDA`}</span>
+              <span className="match-card__kda">{performance.kda === null ? "KDA indisponível" : <Best kind="kda" on={highlights.includes("kda")}>{decimal(performance.kda, 2)} KDA</Best>}</span>
             </div>
             {local.finalItems?.length ? (
               <ItemNames version={local.champion?.dataDragonVersion ?? null}>
@@ -165,8 +178,8 @@ export function MatchCard({ match, now, highlights }: { match: MatchSummary; now
               </ItemNames>
             ) : null}
             <dl className="match-card__stats">
-              <div><dt>Part. abates</dt><dd>{performance.killParticipation === null ? "–" : percent(performance.killParticipation)}</dd></div>
-              <div><dt>Farm</dt><dd>{performance.cs === null ? "–" : <>{performance.cs}{performance.csPerMinute !== null ? <small> ({decimal(performance.csPerMinute)}/min)</small> : null}</>}</dd></div>
+              <div><dt>Part. abates</dt><dd>{performance.killParticipation === null ? "–" : <Best kind="kp" on={highlights.includes("kp")}>{percent(performance.killParticipation)}</Best>}</dd></div>
+              <div><dt>Farm</dt><dd>{performance.cs === null ? "–" : <Best kind="cs" on={highlights.includes("cs")}>{performance.cs}{performance.csPerMinute !== null ? <small> ({decimal(performance.csPerMinute)}/min)</small> : null}</Best>}</dd></div>
             </dl>
           </div>
         ) : (
@@ -188,38 +201,34 @@ export function MatchCard({ match, now, highlights }: { match: MatchSummary; now
         ) : null}
 
         <div className="match-card__actions">
-          <div className="match-card__badges">
-            {highlights?.map((label) => <span key={label} className="chip chip--gold"><GameIcon name="star" size={12} /> {label}</span>)}
-            {demo ? <span className="chip origin-badge origin-badge--demo">DEMO</span> : null}
-            {match.reviewPurchases && match.reviewPurchases.total > 0 ? (
-              <span
-                className={match.reviewPurchases.ready > 0 ? "chip chip--win review-badge" : "chip review-badge review-badge--none"}
-                title="Compras do 1º ao 5º item comparadas com jogadores do mesmo campeão e rota"
-              >
-                {match.reviewPurchases.ready > 0
-                  ? `Revisão: ${match.reviewPurchases.ready} de ${count(match.reviewPurchases.total, "compra", "compras")}`
-                  : "Sem compras para revisar"}
-              </span>
-            ) : null}
-          </div>
-          <div className="match-card__buttons">
-            <Link
-              to={{ name: "historyMatch", matchId: match.matchId, participantId: local?.participantId ?? null }}
-              className="match-card__open"
-              aria-label={`Contexto da partida ${match.matchId}`}
-              title={match.matchId}
+          <Link
+            to={{ name: "historyMatch", matchId: match.matchId, participantId: local?.participantId ?? null }}
+            className="match-card__open"
+            aria-label={`Contexto da partida ${match.matchId}`}
+            title={match.matchId}
+          >
+            Analisar <span aria-hidden="true">→</span>
+          </Link>
+          {match.reviewPurchases && match.reviewPurchases.total > 0 ? (
+            <span
+              className={match.reviewPurchases.ready > 0 ? "review-badge review-badge--ready" : "review-badge review-badge--none"}
+              title="Compras do 1º ao 5º item comparadas com jogadores do mesmo campeão e rota"
             >
-              Analisar <span aria-hidden="true">→</span>
-            </Link>
-            {canExpand ? (
-              <button type="button" className="match-card__toggle" aria-expanded={open} aria-controls={detailsId}
-                aria-label={open ? "Ocultar placar da partida" : "Mostrar placar da partida"} onClick={() => setOpen(!open)}>
-                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-              </button>
-            ) : null}
-          </div>
+              {match.reviewPurchases.ready > 0
+                ? `Revisão: ${match.reviewPurchases.ready} de ${count(match.reviewPurchases.total, "compra", "compras")}`
+                : "Sem compras para revisar"}
+            </span>
+          ) : null}
+          {demo ? <span className="chip origin-badge origin-badge--demo">DEMO</span> : null}
         </div>
       </article>
+      {/* Faixa de expandir na borda direita, na tinta do resultado (como no u.gg). */}
+      {canExpand ? (
+        <button type="button" className="match-card__toggle" aria-expanded={open} aria-controls={detailsId}
+          aria-label={open ? "Ocultar placar da partida" : "Mostrar placar da partida"} onClick={() => setOpen(!open)}>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+        </button>
+      ) : null}
       {open ? <MatchDetails id={detailsId} teams={teams} localId={local?.participantId ?? null} version={version} /> : null}
     </li>
   );

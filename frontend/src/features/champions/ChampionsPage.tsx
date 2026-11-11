@@ -149,10 +149,9 @@ export function ChampionsPage() {
         <section className="champion-overview" data-art={splash ? "splash" : "none"}>
           {splash ? <ChampionSplash key={splash} src={splash} /> : null}
           <div className="champion-overview__inner">
-            <div className="champion-overview__tags">
-              <span className="hud-tag"><GameIcon name="crosshair" size={14} /> Atirador · rota inferior</span>
-              <span className="hud-tag"><GameIcon name="map" size={14} /> Patch {patchLabel(data.patch, data.currentPatch)}</span>
-            </div>
+            <p className="champion-overview__meta">
+              <GameIcon name="crosshair" size={16} /> Atirador · rota inferior <span aria-hidden="true">·</span> Patch {patchLabel(data.patch, data.currentPatch)}
+            </p>
             <h3>{chosen ? <ChampionBadge participant={chosen} size={88} /> : "Campeão fora do recorte"}</h3>
             <dl className="champion-stats">
               <div><dt className="metric__label"><GameIcon name="users" size={14} /> Participações examinadas</dt><dd>{data.sampledParticipations} de {data.totalParticipations}</dd></div>
@@ -163,7 +162,7 @@ export function ChampionsPage() {
         </section>
         <div className="champions-columns">
         <section className="surface surface--pad champion-patterns" aria-labelledby="patterns-heading">
-          <div className="section-head"><h3 id="patterns-heading"><GameIcon name="route" /> Trajeto de itens</h3><span className="chip">Padrão observado</span></div>
+          <div className="section-head"><h3 id="patterns-heading"><GameIcon name="route" /> Trajeto de itens</h3></div>
           {data.status === "AVAILABLE" ? <ol className="pattern-list" aria-label="Trajetos observados">
             {(data.patterns ?? []).map((pattern, index) => {
               const share = pattern.denominator ? pattern.count / pattern.denominator : 0;

@@ -6,7 +6,7 @@ import { useAuth } from "../auth/authContext";
 import { championName } from "../matches/format";
 import { ChampionAvatar } from "./ChampionAvatar";
 import { MatchCard } from "./MatchCard";
-import { dayKey, dayLabel, decimal, percent, record, roleShort, summarizeLoaded, winStreak } from "./presentation";
+import { dayKey, dayLabel, decimal, percent, record, roleShort, summarizeLoaded, winStreak, type HighlightKind } from "./presentation";
 import "./history.css";
 
 /** Peças do Histórico usadas também no perfil do jogador pesquisado: filtros segmentados,
@@ -87,7 +87,7 @@ export function LoadedSummary({ matches, subject = "account" }: { matches: Match
           ) : null}
         </div>
         {winStreak(summary.recent) >= 2 ? (
-          <p className="history-streak"><GameIcon name="flame" size={16} /> {winStreak(summary.recent)} vitórias seguidas</p>
+          <p className="history-streak"><GameIcon name="flame" size={16} /> <strong>{winStreak(summary.recent)}</strong> vitórias seguidas</p>
         ) : null}
         {summary.recent.length ? (
           <div className="history-form">
@@ -148,7 +148,7 @@ export function LoadedSummary({ matches, subject = "account" }: { matches: Match
   );
 }
 
-export function DayGroups({ matches, highlights = {} }: { matches: MatchSummary[]; highlights?: Record<string, string[]> }) {
+export function DayGroups({ matches, highlights = {} }: { matches: MatchSummary[]; highlights?: Record<string, HighlightKind[]> }) {
   const now = new Date();
   const groups: { key: string; label: string; items: MatchSummary[] }[] = [];
   for (const match of matches) {

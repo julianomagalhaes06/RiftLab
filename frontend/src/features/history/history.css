@@ -15,8 +15,10 @@
 .history-banner__tag { margin-left: 2px; color: var(--hero-ink-muted); font-weight: 500; }
 .history-banner__rank { display: inline-flex; align-items: center; gap: 6px; color: var(--hero-ink); font-size: .875rem; }
 .history-banner__side { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.hud-tag--hot { border-color: var(--gold); color: var(--gold-ink); }
-.hud-tag--hot .game-icon { color: var(--gold); }
+/* Sequência de vitórias no banner: texto com chama, sem etiqueta. */
+.banner-streak { display: flex; align-items: center; gap: 6px; width: fit-content; margin: 10px 0 0; color: var(--hero-ink-muted); font-size: .875rem; }
+.banner-streak strong { color: var(--gold-text); font: 600 1.0625rem var(--font-display); }
+.banner-streak .game-icon { color: var(--gold-text); }
 .app .history-banner__import { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--hud-line); border-radius: var(--radius-sm); background: var(--hud-bg); color: var(--hero-ink); font-weight: 600; }
 .app .history-banner__import:hover { color: var(--hero-accent); }
 
@@ -35,8 +37,9 @@
 .history-card__title { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--ntext-muted); font: 700 .75rem/1.2 var(--font-body); letter-spacing: .1em; text-transform: uppercase; }
 .history-card__title .game-icon { color: var(--accent); }
 .history-aside { display: grid; gap: 16px; }
-.history-streak { display: inline-flex; align-items: center; gap: 6px; width: fit-content; margin: 0; padding: 4px 10px; border: 1px solid var(--gold); border-radius: 999px; background: var(--gold-surface); color: var(--gold-ink); font-size: .8125rem; font-weight: 600; }
-.history-streak .game-icon { color: var(--gold); }
+.history-streak { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--ntext-muted); font-size: .8125rem; }
+.history-streak strong { color: var(--gold-text); font: 600 1rem var(--font-display); }
+.history-streak .game-icon { color: var(--gold-text); }
 .history-study__big { margin: 0; color: var(--ntext-muted); font-size: .875rem; }
 .history-study__big strong { margin-right: 4px; color: var(--ntext); font: 600 2rem/1 var(--font-display); }
 .history-study__stats { display: flex; gap: 24px; margin: 0; }
@@ -156,15 +159,31 @@
 .match-card__mate .champion-avatar { border-radius: 3px; }
 .match-card__mate--local .champion-avatar { box-shadow: 0 0 0 2px var(--accent); }
 
-.match-card__actions { grid-area: actions; display: grid; justify-items: end; gap: 6px; }
-.match-card__badges { display: grid; justify-items: end; gap: 6px; }
-.match-card__badges:empty { display: none; }
-.match-card__buttons { display: flex; align-items: center; gap: 4px; }
-.app .match-card__open { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px 0 12px; color: var(--accent); font-size: .875rem; font-weight: 600; white-space: nowrap; text-decoration: none; }
+/* Ações: "Analisar" e, embaixo, a revisão em texto discreto (sem etiqueta), como os números
+   secundários do u.gg ("21 vision"). */
+.match-card__actions { grid-area: actions; display: grid; justify-items: end; gap: 2px; }
+.app .match-card__open { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 4px 0 12px; color: var(--accent); font-size: .875rem; font-weight: 600; white-space: nowrap; text-decoration: none; }
 .app .match-card__open:hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 4px; }
 .app .match-card__open:focus-visible { outline-offset: -3px; }
-.match-card__toggle { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--nline2); border-radius: var(--radius-sm); background: transparent; color: var(--ntext-muted); cursor: pointer; }
-.match-card__toggle:hover { color: var(--ntext); border-color: var(--nline-strong); background: var(--n2); }
+.review-badge { display: inline-flex; align-items: center; gap: 6px; padding-right: 4px; color: var(--ntext-subtle); font-size: .75rem; white-space: nowrap; }
+.review-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--nline-strong); }
+.review-badge--ready { color: var(--ntext-muted); }
+.review-badge--ready::before { background: var(--win); }
+
+/* Destaque no próprio número (maior da série carregada), como o KDA dourado do tracker.gg. */
+.is-best { display: inline-flex; align-items: center; gap: 4px; color: var(--gold-text); font-weight: 700; }
+.is-best small { color: inherit; }
+.is-best__star { flex: none; }
+
+/* Faixa de expandir na borda direita, na tinta do resultado (u.gg). */
+.match-card--expandable { display: grid; grid-template-columns: minmax(0, 1fr) 44px; }
+.match-card--expandable > article { grid-column: 1; grid-row: 1; }
+.match-card--expandable > .match-details { grid-column: 1 / -1; }
+.match-card__toggle { grid-column: 2; grid-row: 1; display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0; border: 0; border-left: 1px solid var(--nline); background: var(--n2); color: var(--ntext-muted); cursor: pointer; }
+.match-card--win .match-card__toggle { background: var(--win-tint); }
+.match-card--loss .match-card__toggle { background: var(--loss-tint); }
+.match-card__toggle:hover { color: var(--ntext); }
+.match-card__toggle:focus-visible { outline-offset: -3px; }
 .match-card__toggle svg { transition: rotate 200ms cubic-bezier(0.2, 0, 0, 1); }
 .match-card__toggle[aria-expanded="true"] svg { rotate: 180deg; }
 
@@ -210,8 +229,8 @@
   .match-card__divider { display: none; }
   .match-card__hero { gap: 10px 14px; }
   .match-card__teams { grid-auto-flow: row; gap: 4px; }
-  .match-card__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-  .match-card__badges { justify-items: start; }
+  .match-card__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+  .match-card__actions .match-card__open { order: 2; }
   .match-details { margin: 0 12px 0 16px; }
   .match-build--sm .match-build__grid { grid-template-columns: repeat(3, 22px); }
 }

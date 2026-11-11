@@ -153,6 +153,8 @@
   --gold-deep: #6b5126;
   --gold-ink: #f0dfb4;
   --gold-surface: #2a2216;
+  /* Texto em destaque (o maior número da série): ≥ 4,5:1 sobre n1/n2 e sobre a tinta do resultado. */
+  --gold-text: #e3bd62;
   --slot-bg: #0a0b0f;
   --panel-sheen: linear-gradient(180deg, rgb(255 255 255 / .04), rgb(255 255 255 / 0) 120px);
   --hud-bg: rgb(15 16 19 / .8);
@@ -246,6 +248,7 @@
   --gold-deep: #d9c59a;
   --gold-ink: #6b4d12;
   --gold-surface: #f8efd9;
+  --gold-text: #7a5710;
   --slot-bg: #1b1d22;
   --panel-sheen: linear-gradient(180deg, rgb(255 255 255 / .7), rgb(255 255 255 / 0) 120px);
   --locked: rgb(244 245 248 / .6);
@@ -311,6 +314,7 @@
   --gold: #c8aa6e;
   --gold-ink: #f0dfb4;
   --gold-surface: #2a2216;
+  --gold-text: #e3bd62;
   --color-text: var(--ntext);
   --color-muted: var(--ntext-muted);
   --color-border: var(--nline);

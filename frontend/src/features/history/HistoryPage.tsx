@@ -65,10 +65,10 @@ function HistoryBanner({ profile, splash, streak }: { profile: PlayerProfile | n
                 {tier ? <span className="history-banner__rank" data-tier={tier}><img src={emblemSrc(tier)} alt="" width="20" height="20" />{rankTitle(tier, rank?.division)} · {rank?.leaguePoints ?? 0} PDL</span> : null}
               </p>
             ) : null}
+            {streak >= 2 ? <p className="banner-streak"><GameIcon name="flame" size={16} /> <strong>{streak}</strong> vitórias seguidas</p> : null}
           </div>
         </div>
         <div className="history-banner__side">
-          {streak >= 2 ? <span className="hud-tag hud-tag--hot"><GameIcon name="flame" size={14} /> {streak} vitórias seguidas</span> : null}
           {/* CC-1202: a importação manual saiu do topo e fica junto das partidas. */}
           <Link to="/importar" className="arrow-link history-banner__import">Importar partida</Link>
         </div>

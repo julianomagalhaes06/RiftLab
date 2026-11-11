@@ -99,7 +99,7 @@ describe("Histórico com dados realmente disponíveis", () => {
     expect(within(overview).getByText("1,70 KDA")).toBeInTheDocument(); // (7 + 2 + 6 + 2) ÷ (4 + 6)
     expect(within(overview).getByText("Atirador")).toBeInTheDocument();
     // Placar das duas equipes aberto dentro do cartão.
-    const toggle = within(winCard).getByRole("button", { name: "Mostrar placar da partida" });
+    const toggle = within(winCard.closest("li")!).getByRole("button", { name: "Mostrar placar da partida" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");

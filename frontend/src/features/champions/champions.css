@@ -56,9 +56,8 @@
   linear-gradient(0deg, var(--hero-scrim-strong) 0%, var(--hero-scrim-clear) 60%); }
 .champion-overview::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, var(--accent-strong), var(--hero-scrim-clear) 70%); }
 .champion-overview__inner { width: 100%; padding: 28px 32px 26px; }
-.champion-overview__tags { display: flex; flex-wrap: wrap; gap: 8px; }
-.hud-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--hud-line); border-radius: 999px; background: var(--hud-bg); color: var(--hero-ink); font-size: .75rem; font-weight: 600; }
-.hud-tag .game-icon { color: var(--hero-accent); }
+.champions-content .champion-overview__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; width: fit-content; margin: 0; color: var(--hero-ink-muted); font-size: .875rem; font-weight: 600; letter-spacing: .02em; }
+.champion-overview__meta .game-icon { color: var(--hero-accent); }
 .champion-overview h3 { margin: 16px 0 22px; font: 600 clamp(1.75rem, 3.6vw, 2.75rem)/1.05 var(--font-display); letter-spacing: .03em; text-transform: uppercase; color: var(--hero-ink); }
 .champion-overview h3 .champion { gap: 20px; }
 .champion-overview h3 .champion__portrait { box-shadow: 0 0 0 2px var(--hero-accent), 0 0 28px var(--glow-accent); }

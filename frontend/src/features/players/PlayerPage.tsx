@@ -82,7 +82,7 @@ function ProfileHeader({ profile, banner }: { profile: PlayerProfile; banner: Ba
             Atualizado às {clock(profile.refreshedAt) ?? "–"}
             {profile.staleReason === "RIOT_KEY_MISSING" ? " (sem chave da Riot para atualizar)" : ""}
           </p>
-          {banner.streak >= 2 ? <p className="player-header__streak"><span className="hud-tag hud-tag--hot"><GameIcon name="flame" size={14} /> {banner.streak} vitórias seguidas</span></p> : null}
+          {banner.streak >= 2 ? <p className="banner-streak"><GameIcon name="flame" size={16} /> <strong>{banner.streak}</strong> vitórias seguidas</p> : null}
         </div>
         {/* CC-1211/CC-1213: partida ao vivo, com o aviso "jogando agora" como no op.gg. */}
         <LiveButton gameName={profile.gameName} tagLine={profile.tagLine} />

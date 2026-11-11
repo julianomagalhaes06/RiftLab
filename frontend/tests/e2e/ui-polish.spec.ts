@@ -262,7 +262,7 @@ for (const width of [360, 1000, 1280]) {
     await page.goto("/campeoes?champion=51&patch=16.19");
     await page.locator('.champion-overview__art[data-state="ready"]').waitFor();
     await noHorizontalScroll(page);
-    const texts: Array<[string, number]> = [[".hud-tag", 4.5], [".champion-overview h3 .champion__name", 4.5], [".champion-stats dd", 4.5], [".champion-stats dt", 4.5]];
+    const texts: Array<[string, number]> = [[".champion-overview__meta", 4.5], [".champion-overview h3 .champion__name", 4.5], [".champion-stats dd", 4.5], [".champion-stats dt", 4.5]];
     const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
     await page.addStyleTag({ content: ".champion-overview__inner * { color: transparent !important; } .champion-overview__inner .champion__portrait, .champion-overview__inner .game-icon { visibility: hidden; } .champion-overview__art { transition: none !important; scale: 1 !important; }" });
     for (const [index, [selector, minimum]] of texts.entries()) {
@@ -279,9 +279,9 @@ for (const width of [360, 1280]) {
     await mockApi(page, { "GET /api/v1/matches": () => ok({ items: [0, 2, 3].map(richMatch), nextCursor: null }) });
     await page.goto("/historico");
     await page.locator('.history-banner .splash-banner__art[data-state="ready"]').waitFor();
-    await expect(page.locator(".hud-tag--hot")).toHaveText(/3 vitórias seguidas/);
+    await expect(page.locator(".history-banner .banner-streak")).toHaveText(/3 vitórias seguidas/);
     await noHorizontalScroll(page);
-    const texts: Array<[string, number]> = [[".history-banner__context", 4.5], [".history-banner h2", 3], [".history-banner__who", 4.5], [".hud-tag--hot", 4.5], [".history-banner__import", 4.5]];
+    const texts: Array<[string, number]> = [[".history-banner__context", 4.5], [".history-banner h2", 3], [".history-banner__who", 4.5], [".history-banner .banner-streak", 4.5], [".history-banner__import", 4.5]];
     const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
     await page.addStyleTag({ content: ".history-banner__inner * { color: transparent !important; } .history-banner__inner img, .history-banner__inner .game-icon, .history-banner__icon { visibility: hidden; } .splash-banner__art { transition: none !important; scale: 1 !important; }" });
     for (const [index, [selector, minimum]] of texts.entries()) {
@@ -308,9 +308,9 @@ for (const width of [360, 1280]) {
     await page.locator('.player-header .splash-banner__art[data-state="ready"]').waitFor();
     // O jogador pesquisado é o participante 1 (Caitlyn) nas três partidas.
     expect(splashes.at(-1)).toMatch(/\/splash\/Caitlyn_0\.jpg$/);
-    await expect(page.locator(".player-header .hud-tag--hot")).toHaveText(/3 vitórias seguidas/);
+    await expect(page.locator(".player-header .banner-streak")).toHaveText(/3 vitórias seguidas/);
     await noHorizontalScroll(page);
-    const texts: Array<[string, number]> = [[".player-header__who h2", 4.5], [".player-header__meta", 4.5], [".player-header .hud-tag--hot", 4.5]];
+    const texts: Array<[string, number]> = [[".player-header__who h2", 4.5], [".player-header__meta", 4.5], [".player-header .banner-streak", 4.5]];
     const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
     await page.addStyleTag({ content: ".player-header__who * { color: transparent !important; } .player-header .game-icon, .player-header__icon { visibility: hidden; } .splash-banner__art { transition: none !important; scale: 1 !important; }" });
     for (const [index, [selector, minimum]] of texts.entries()) {
@@ -331,7 +331,7 @@ test("perfil do jogador: resumo, busca, filtros e conquistas como no Histórico 
   const summary = page.getByRole("region", { name: "Resumo das partidas carregadas do jogador" });
   await expect(summary.getByText("Taxa de vitória")).toBeVisible();
   await expect(summary.getByRole("list", { name: /Resultados recentes/ }).getByRole("listitem")).toHaveCount(4);
-  await expect(page.locator(".player .chip--gold").first()).toBeVisible();
+  await expect(page.locator(".player .is-best").first()).toBeVisible();
   await expect(page.locator(".player .match-card")).toHaveCount(4);
   await page.getByRole("group", { name: "Resultado" }).getByRole("button", { name: "Derrotas" }).click();
   await expect(page.locator(".player .match-card")).toHaveCount(1);

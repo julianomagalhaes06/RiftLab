@@ -280,25 +280,34 @@ export function winStreak(recent: Array<"WIN" | "LOSS">): number {
   return firstLoss === -1 ? recent.length : firstLoss;
 }
 
-/** Conquistas das partidas carregadas (só dado real): maior KDA, mais farm por minuto e maior
- * participação em abates, marcadas no cartão quando há ao menos três partidas da conta. */
-export function loadedHighlights(matches: MatchSummary[]): Record<string, string[]> {
+/** Destaques das partidas carregadas (só dado real), como no tracker.gg e no u.gg: o próprio
+ * número vira o destaque (cor dourada e estrela), sem etiqueta extra. Só com ao menos três
+ * partidas da conta. */
+export type HighlightKind = "kda" | "cs" | "kp";
+
+export const HIGHLIGHT_TEXT: Record<HighlightKind, string> = {
+  kda: "Maior KDA das partidas carregadas",
+  cs: "Mais farm por minuto das partidas carregadas",
+  kp: "Maior participação em abates das partidas carregadas",
+};
+
+export function loadedHighlights(matches: MatchSummary[]): Record<string, HighlightKind[]> {
   const performances = matches.flatMap((match) => {
     const performance = localPerformance(match);
     return performance ? [{ matchId: match.matchId, performance }] : [];
   });
   if (performances.length < 3) return {};
-  const result: Record<string, string[]> = {};
-  const mark = (label: string, pick: (p: (typeof performances)[number]["performance"]) => number | null) => {
+  const result: Record<string, HighlightKind[]> = {};
+  const mark = (kind: HighlightKind, pick: (p: (typeof performances)[number]["performance"]) => number | null) => {
     let best: { matchId: string; value: number } | null = null;
     for (const { matchId, performance } of performances) {
       const value = pick(performance);
       if (value !== null && (best === null || value > best.value)) best = { matchId, value };
     }
-    if (best) (result[best.matchId] ??= []).push(label);
+    if (best) (result[best.matchId] ??= []).push(kind);
   };
-  mark("Maior KDA", (p) => p.kda);
-  mark("Mais farm por minuto", (p) => p.csPerMinute);
-  mark("Maior participação em abates", (p) => p.killParticipation);
+  mark("kda", (p) => p.kda);
+  mark("cs", (p) => p.csPerMinute);
+  mark("kp", (p) => p.killParticipation);
   return result;
 }
