@@ -45,7 +45,7 @@
 .champions-content { display: grid; min-width: 0; gap: 24px; }
 .champions-content p { color: var(--ntext-muted); line-height: 1.5; }
 
-/* Cabeçalho de página de campeão sobre a splash art: escuro nos dois temas (como a vitrine do
+/* Cabeçalho de página de campeão sobre a splash art (como a vitrine do
    Início). Os véus são medidos em pixels: o texto vai até ~800 px, então até 820 px o fundo fica
    no mínimo em --hero-scrim-heavy (≥ 4,5:1 até sobre arte branca, ver ui-polish). */
 .champion-overview { position: relative; isolation: isolate; overflow: hidden; min-height: 300px; display: flex; align-items: flex-end; background: var(--hero-end); color: var(--hero-ink); clip-path: polygon(var(--cut-rank) 0, 100% 0, 100% calc(100% - var(--cut-rank)), calc(100% - var(--cut-rank)) 100%, 0 100%, 0 var(--cut-rank)); }

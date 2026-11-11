@@ -44,12 +44,12 @@ No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitiv
 
 ## Temas
 
-Dois temas com os mesmos papéis de token: escuro (`:root`, padrão) e claro
-(`:root[data-theme="light"]`), trocados pelo seletor de sol e lua no topo (`shared/theme`). A
-escolha fica no navegador e é aplicada antes da primeira pintura, por um script em `index.html`.
-Toda combinação de texto e fundo do claro tem contraste conferido em `tokens.test.ts`. Duas
-áreas ficam escuras nos dois temas: o card de elo, uma placa de metal cujo bloco de tokens repete
-os valores escuros, e a vitrine do início, com texto sobre a arte (`--hero-*`).
+Só tema escuro (`:root`, `color-scheme: dark`). O tema claro e o seletor de sol e lua saíram em
+11/11/2026, a pedido do usuário: as telas com arte (banners, card de elo, cabeçalho de
+Campeões) já eram escuras nos dois temas e a mistura ficava feia; as referências (tracker.gg,
+u.gg, Mobalytics) também são só escuras. Uma preferência antiga guardada no navegador
+(`riftlab:theme`) é ignorada. Toda combinação de texto e fundo tem contraste conferido em
+`tokens.test.ts`.
 
 ## Tokens
 
@@ -147,8 +147,7 @@ sempre com contorno `accent` de 3 px.
   KDA médio; filtros em grupos encostados; aviso de atualização numa faixa fina.
 - **Banner com splash** (`.splash-banner` em `arena.css`, arte por `shared/ui/SplashArt.tsx`):
   Histórico e perfil do jogador pesquisado. Mostra a splash do campeão mais jogado nas partidas
-  carregadas (no perfil, a lista marca o jogador pesquisado como participante local), escuro nos
-  dois temas (no claro, os tokens de dentro voltam aos tons escuros, como o card de elo), véus em
+  carregadas (no perfil, a lista marca o jogador pesquisado como participante local), véus em
   pixels e a sequência de vitórias (`.banner-streak`, chama e número dourados, sem etiqueta)
   quando ≥ 2.
 - **Perfil do jogador pesquisado** (`features/players/PlayerPage.tsx`): mesma página do Histórico
@@ -160,8 +159,8 @@ sempre com contorno `accent` de 3 px.
   resultado, retrato de 36 px, campeão e fila, data e duração, K / D / A e tropas, ação em roxo.
 - **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px
   (escolhido com moldura e brilho roxos; sem partida no filtro aparecem bloqueados, em cinza e não
-  clicáveis), patch e etapa numa linha com "Como ler estes números", cabeçalho escuro nos dois
-  temas sobre a splash do campeão com nome grande em caixa alta, linha de função e patch com ícone e
+  clicáveis), patch e etapa numa linha com "Como ler estes números", cabeçalho sobre a splash do
+  campeão com nome grande em caixa alta, linha de função e patch com ícone e
   os três números em pílulas com ícone; trajetos em linhas com posição, molduras de slot douradas
   (`.item-slot`), setas e anel de frequência (o 1º em ouro); estado vazio com ícone e ação;
   situações como "Desafios de decisão" com o minuto num círculo e "Analisar decisão" em botão.
@@ -298,17 +297,15 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
 Revisão com as skills better-ui e ui-ux-pro-max (09/11/2026), conferida em
 `tests/e2e/ui-polish.spec.ts`:
 
-- Controle visualmente menor que 44 px (seletor de tema, mostrar senha, chip de decisão) ganha um
+- Controle visualmente menor que 44 px (mostrar senha, chip de decisão) ganha um
   `::after` transparente até 44 px. O `::after` parte de dentro da borda: com borda de 1 px, o
   recuo é 1 px maior.
-- Ao clicar, botões, abas segmentadas, seletor de tema, busca e chips encolhem para `scale: 0.96`
-  em 150 ms (`cubic-bezier(0.2, 0, 0, 1)`). Só `scale` tem transição; cores mudam na hora, para a
-  troca de tema não animar a página inteira. Movimento reduzido desliga a escala.
+- Ao clicar, botões, abas segmentadas, busca e chips encolhem para `scale: 0.96`
+  em 150 ms (`cubic-bezier(0.2, 0, 0, 1)`). Só `scale` tem transição; cores mudam na hora
+  (nenhum elemento transiciona cor, fundo, borda ou sombra). Movimento reduzido desliga a escala.
 - Ícones de 24 unidades usam traço 1.8.
 - Imagens de item recebem o mesmo contorno de 1 px do retrato (`--portrait-outline`).
 - Cartão flutuante entra em 0,28 s (12 px) e sai em 0,2 s (8 px), ambos `ease-out`.
-- O card de elo segue escuro no tema claro e redefine também os apelidos `--color-*`, que
-  são resolvidos na raiz.
 
 ## Ativos
 

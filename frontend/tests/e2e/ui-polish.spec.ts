@@ -5,8 +5,8 @@ import { mockApi, ok } from "./support/mock-api";
 /**
  * Polimento visual (revisão better-ui + ui-ux-pro-max, 09/11/2026): alvos de toque de 44 px
  * medidos pelo ponto que o navegador realmente acerta, escala 0,96 ao clicar, saída curta do
- * aviso de conta criada, contorno dos ícones de item e troca de tema sem transição de cor.
- * As capturas dos dois temas em 360, 1280 e 1440 px ficam para conferência visual.
+ * aviso de conta criada, contorno dos ícones de item e nenhuma transição de cor. Só tema escuro
+ * (o claro saiu em 11/11/2026); capturas em 360, 1280 e 1440 px para conferência visual.
  */
 const evidence = "../.private/validation/ui-polish";
 const USER = { id: "11111111-1111-4111-8111-111111111111", email: "jogadora@example.test" };
@@ -62,8 +62,6 @@ test("alvos de 44 px e escala ao clicar nos controles compactos", async ({ page 
   await mockApi(page);
 
   await page.goto("/painel");
-  const toggle = page.getByRole("switch", { name: "Tema claro" });
-  await expectTarget44(toggle);
   await expectTarget44(page.locator(".app__topbar .player-search input"));
   await expectTarget44(page.locator(".app__topbar .player-search__submit"));
   await expectTarget44(page.locator(".app__topbar .player-search__region select"));
@@ -73,7 +71,6 @@ test("alvos de 44 px e escala ao clicar nos controles compactos", async ({ page 
   expect(new Set(heights).size, heights.join(" / ")).toBe(1);
   await expectTarget44(page.locator(".panel-filters select").first());
   await expectPressScale(page, page.locator(".app__topbar .player-search__submit"));
-  await expectPressScale(page, toggle);
 
   await page.goto("/historico");
   const segmented = page.locator(".segmented > button").first();
@@ -114,13 +111,22 @@ test("aviso de conta criada sai com animação curta e some", async ({ page }) =
   await expect(toast).toHaveCount(0);
 });
 
-test("troca de tema sem transição de cor em nenhum elemento", async ({ page }) => {
+test("só tema escuro: preferência antiga de tema claro é ignorada e não há botão de tema", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.addInitScript(() => window.localStorage.setItem("riftlab:theme", "light"));
+  await offline(page);
+  await mockApi(page);
+  await page.goto("/painel");
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.+/);
+  await expect(page.getByRole("switch", { name: /Tema/ })).toHaveCount(0);
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(15, 16, 19)");
+});
+
+test("nenhum elemento transiciona cor, fundo, borda ou sombra (só scale, opacity e translate)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await offline(page);
   await mockApi(page);
   await page.goto("/historico/DEMO-0008?participant=1");
-  await page.getByRole("switch", { name: "Tema claro" }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   const colorTransitions = await page.evaluate(() => [...document.querySelectorAll("*")].flatMap((element) => {
     const style = getComputedStyle(element);
     const animated = style.transitionDuration.split(",").some((value) => parseFloat(value) > 0);
@@ -130,31 +136,17 @@ test("troca de tema sem transição de cor em nenhum elemento", async ({ page })
   expect(colorTransitions).toEqual([]);
 });
 
-test("no tema claro, o seletor de fila do card de elo (que segue escuro) tem texto legível", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await page.addInitScript(() => window.localStorage.setItem("riftlab:theme", "light"));
-  await offline(page);
-  await mockApi(page);
-  await page.goto("/painel");
-  const select = page.locator(".rank-card__controls select");
-  await expect(select).toBeVisible();
-  const [color, background] = await select.evaluate((element) => [getComputedStyle(element).color, getComputedStyle(element).backgroundColor]);
-  expect(color).toBe("rgb(236, 237, 239)");
-  expect(background).toBe("rgb(22, 24, 29)");
-});
-
-for (const theme of ["dark", "light"] as const) {
+{
   for (const width of [360, 1280, 1440]) {
-    test(`capturas em ${theme} ${width}px sem rolagem lateral`, async ({ page }) => {
+    test(`capturas em ${width}px sem rolagem lateral`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      await page.addInitScript((value) => window.localStorage.setItem("riftlab:theme", value), theme);
       await offline(page);
       await mockApi(page);
       for (const [name, path] of [["painel", "/painel"], ["historico", "/historico"], ["partida", "/historico/DEMO-0008?participant=1"]]) {
         await page.goto(path);
         await page.waitForLoadState("networkidle");
         await noHorizontalScroll(page);
-        await page.screenshot({ path: `${evidence}/${name}-${theme}-${width}.png`, fullPage: true });
+        await page.screenshot({ path: `${evidence}/${name}-${width}.png`, fullPage: true });
       }
     });
   }
