@@ -24,6 +24,7 @@ from riftlab.learning.application import (
     reflect_attempt,
     reveal_attempt,
 )
+from riftlab.learning.gamification import gamification
 from riftlab.shared.api.common import PAGINATION_DEFAULT_LIMIT, PAGINATION_MAX_LIMIT, CursorPage
 from riftlab.shared.api.learning import (
     LearningAttemptAnswerRequest,
@@ -33,6 +34,7 @@ from riftlab.shared.api.learning import (
     LearningAttemptReflectionRequest,
     LearningAttemptRevealRequest,
     LearningAttemptSummary,
+    LearningGamification,
     LearningProgress,
 )
 
@@ -106,6 +108,20 @@ async def list_own_attempts(
             for row in page.items
         ],
         next_cursor=page.next_cursor,
+    )
+
+
+@router.get("/gamification", response_model=LearningGamification)
+async def read_gamification(
+    request: Request,
+    match_id: Annotated[str | None, Query(alias="matchId", min_length=1, max_length=40)] = None,
+) -> LearningGamification:
+    """XP e nível, sequência, conquistas e missões da semana, das tentativas do usuário da
+    sessão; com `matchId`, também as decisões já estudadas daquela partida."""
+    return LearningGamification.model_validate(
+        await gamification(
+            request.app.state.session_factory, owner=_owner(request), match_id=match_id
+        )
     )
 
 

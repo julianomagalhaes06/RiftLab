@@ -566,6 +566,7 @@ ACCOUNT_REQUESTS = (
     ("POST", f"/api/v1/analyses/{uuid.UUID(int=1)}/feedback", {}),
     ("POST", "/api/v1/learning-attempts", {}),
     ("GET", "/api/v1/learning-attempts/progress", None),
+    ("GET", "/api/v1/learning-attempts/gamification", None),
     ("POST", "/api/v1/objectives/interpret", {"text": "sobreviver"}),
     ("GET", "/api/v1/dashboard", None),
     ("GET", "/api/v1/ranked/me", None),

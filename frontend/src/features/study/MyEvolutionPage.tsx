@@ -5,6 +5,9 @@ import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { count } from "../../shared/text/count";
 import { weekLabel, weeklyBuckets, type WeekBucket } from "./evolution";
 import "./study.css";
+import { AchievementGrid, MissionList, StreakBadge, XpBar } from "./Gamification";
+import { useGamification } from "./useGamification";
+import { GameIcon } from "../../shared/ui/GameIcon";
 
 const PAGE_SIZE = 50;
 // Teto de segurança: a evolução é sobre tendência recente, não um relatório histórico
@@ -71,6 +74,7 @@ export function MyEvolutionPage() {
     return () => controller.abort();
   }, [retry]);
 
+  const game = useGamification();
   const totals = progress ? progress.study.attempts + progress.transfer.attempts : null;
   const totalReflections = progress ? progress.study.reflections + progress.transfer.reflections : null;
   const buckets = attempts ? weeklyBuckets(attempts, 12) : null;
@@ -85,6 +89,23 @@ export function MyEvolutionPage() {
           nem estimativa de habilidade.
         </p>
       </header>
+
+      {game ? (
+        <section className="evolution-game" aria-label="Nível, sequência e missões">
+          <div className="surface surface--pad evolution-game__level">
+            <XpBar game={game} />
+            <StreakBadge game={game} />
+          </div>
+          <div className="surface surface--pad evolution-game__missions">
+            <h3 className="evolution-game__title"><GameIcon name="target" size={16} /> Missões da semana</h3>
+            <MissionList missions={game.missions} />
+          </div>
+          <div className="surface surface--pad evolution-game__achievements">
+            <h3 className="evolution-game__title"><GameIcon name="trophy" size={16} /> Conquistas <span className="muted">{game.achievements.filter((a) => a.unlocked).length}/{game.achievements.length}</span></h3>
+            <AchievementGrid achievements={game.achievements} />
+          </div>
+        </section>
+      ) : null}
 
       {totals !== null ? (
         <div className="panel-metrics__row">

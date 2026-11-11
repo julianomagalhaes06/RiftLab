@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { api, type DecisionSummary, type MatchDetail, type MatchParticipant, type MatchTimeline } from "../../shared/api/client";
 import { isAbortError, isApiError } from "../../shared/api/errors";
 import { useAbortScope } from "../../shared/hooks/useAbortScope";
@@ -20,6 +20,7 @@ import { summarizeDecisions } from "./matchView";
 import { PreparationPanel } from "./PreparationPanel";
 import { PurgePanel } from "./PurgePanel";
 import { Scoreboard } from "./Scoreboard";
+import { MatchStudyBar } from "../study/Gamification";
 import "./match.css";
 import { count } from "../../shared/text/count";
 import { useDemoNotice } from "../../app/demoNotice";
@@ -85,11 +86,14 @@ function ParticipantSection({
   participant,
   timeline,
   local,
+  onDecisions,
 }: {
   matchId: string;
   participant: MatchParticipant;
   timeline: MatchTimeline | null;
   local: boolean;
+  /** Repassa a lista já carregada (barra de estudo da partida, sem nova busca). */
+  onDecisions?: (items: DecisionSummary[]) => void;
 }) {
   const participantId = participant.participantId;
   const list = usePagedList<DecisionSummary>({
@@ -97,6 +101,9 @@ function ParticipantSection({
     fetchPage: (cursor, signal) => api.listDecisions(matchId, participantId, { cursor, limit: 20 }, signal),
   });
   const cursorExpired = isApiError(list.loadMoreError) && list.loadMoreError.code === "INVALID_CURSOR";
+  useEffect(() => {
+    if (list.status === "ready") onDecisions?.(list.items);
+  }, [list.status, list.items, onDecisions]);
   const ownTimeline = timeline?.participants.find((p) => p.participantId === participantId) ?? null;
   const owner = championWithRole(championName(participant), participant.role);
   return (
@@ -226,6 +233,9 @@ export function MatchPage({
       ? (match.participants.find((p) => p.participantId === selectedId) ?? null)
       : null;
   const timelineState = useMatchTimeline(matchId, match?.preparation.status ?? "loading");
+  const [studyDecisions, setStudyDecisions] = useState<{ key: string; items: DecisionSummary[] } | null>(null);
+  const studyKey = `${matchId}#${selectedId ?? ""}`;
+  const reportDecisions = useCallback((items: DecisionSummary[]) => setStudyDecisions({ key: studyKey, items }), [studyKey]);
   const ready = match?.preparation.status === "READY";
   // Abas só com a partida preparada; antes disso a página mostra o placar, como sempre.
   const tabs: TabKey[] = !ready ? [] : [
@@ -305,6 +315,7 @@ export function MatchPage({
             if (!ready) return scoreboard;
             return (
               <>
+                {selectedParticipant && hasAccount ? <MatchStudyBar matchId={match.matchId} decisions={studyDecisions?.key === studyKey ? studyDecisions.items : null} /> : null}
                 <AnalysisTabs tabs={tabs} active={activeTab} onChange={changeTab} />
                 {selectedId !== null && selectedParticipant === null ? (
                   <div className="notice notice--info" role="note">
@@ -328,6 +339,7 @@ export function MatchPage({
                         participant={selectedParticipant}
                         timeline={timelineState?.timeline ?? null}
                         local={selectedId === localId}
+                        onDecisions={reportDecisions}
                       />
                     </TabPanel>
                   </>

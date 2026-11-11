@@ -1,0 +1,88 @@
+/* Gamificação do estudo (11/11/2026): selo de nível no topo, barra de XP, sequência, missões,
+   conquistas e a barra de estudo da partida. Ouro para conquista e missão concluída, roxo para
+   o XP (progresso da conta), chama dourada na sequência. */
+.level-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px 0 4px; border: 1px solid var(--nline2); border-radius: 999px; background: var(--n1); color: var(--ntext); text-decoration: none; }
+.app a.level-chip { text-decoration: none; }
+.level-chip:hover { border-color: var(--accent-strong); }
+.level-chip__ring { position: relative; display: grid; place-items: center; width: 30px; height: 30px; }
+.level-chip__ring .xp-ring { position: absolute; inset: 0; }
+.level-chip__level { position: relative; font: 700 .75rem/1 var(--font-display); color: var(--ntext); }
+.level-chip__streak { display: inline-flex; align-items: center; gap: 2px; color: var(--ntext-subtle); font: 600 .8125rem var(--font-display); font-variant-numeric: tabular-nums; }
+.level-chip__streak--on { color: var(--gold-text); }
+.xp-ring circle { fill: none; stroke-width: 3; }
+.xp-ring__track { stroke: var(--nline); }
+.xp-ring__fill { stroke: var(--accent); stroke-linecap: round; }
+
+.xp-bar { display: grid; gap: 6px; }
+.xp-bar__labels { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.xp-bar__level { font: 600 1.25rem var(--font-display); color: var(--ntext); }
+.xp-bar__count { color: var(--ntext-muted); font-size: .8125rem; font-variant-numeric: tabular-nums; }
+.xp-bar__track { height: 8px; overflow: hidden; border-radius: 4px; background: var(--nline); }
+.xp-bar__track > span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); box-shadow: 0 0 10px var(--glow-accent); }
+.xp-bar__total { margin: 0; color: var(--ntext-subtle); font-size: .8125rem; }
+
+.streak-badge { display: flex; align-items: center; gap: 12px; color: var(--ntext-subtle); }
+.streak-badge--on > .game-icon { color: var(--gold-text); }
+.streak-badge p { margin: 0; }
+.streak-badge__value { color: var(--ntext-muted); font-size: .875rem; }
+.streak-badge__value strong { color: var(--ntext); font: 600 1.375rem var(--font-display); }
+.streak-badge--on .streak-badge__value strong { color: var(--gold-text); }
+.streak-badge__hint { color: var(--ntext-subtle); font-size: .8125rem; }
+
+.goal-progress { height: 5px; overflow: hidden; border-radius: 3px; background: var(--nline); }
+.goal-progress > span { display: block; height: 100%; border-radius: 3px; background: var(--accent-strong); }
+.goal-progress > span.is-done { background: var(--gold); }
+
+.mission-list { list-style: none; display: grid; gap: 8px; margin: 0; padding: 0; }
+.mission { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--nline); border-radius: var(--radius-sm); background: var(--n2); }
+.mission__icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--accent-surface); color: var(--accent); }
+.mission--done { border-color: var(--gold-deep); background: linear-gradient(90deg, var(--gold-surface), var(--n2) 70%); }
+.mission--done .mission__icon { background: var(--gold-surface); color: var(--gold-text); }
+.mission__body { display: grid; gap: 4px; min-width: 0; }
+.mission__body p { margin: 0; }
+.mission__title { color: var(--ntext); font-weight: 600; font-size: .9375rem; }
+.mission__desc { color: var(--ntext-subtle); font-size: .8125rem; }
+.mission__count { color: var(--ntext-muted); font: 600 .875rem var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mission--done .mission__count { color: var(--gold-text); }
+
+.achievement-grid { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 0; padding: 0; }
+.achievement { display: grid; justify-items: center; align-content: start; gap: 6px; padding: 16px 12px; border: 1px solid var(--nline); border-radius: var(--radius-sm); background: var(--n1); text-align: center; }
+.achievement p { margin: 0; }
+.achievement__medal { display: grid; place-items: center; width: 52px; height: 52px; border: 2px solid var(--nline2); border-radius: 50%; background: var(--n2); color: var(--ntext-subtle); }
+.achievement__title { color: var(--ntext-muted); font-weight: 600; font-size: .875rem; }
+.achievement__desc { color: var(--ntext-subtle); font-size: .75rem; line-height: 1.4; }
+.achievement__state { color: var(--ntext-subtle); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.achievement .goal-progress { width: 100%; }
+.achievement--unlocked { border-color: var(--gold-deep); background: linear-gradient(180deg, var(--gold-surface), var(--n1) 70%); }
+.achievement--unlocked .achievement__medal { border-color: var(--gold); background: var(--gold-surface); color: var(--gold-text); box-shadow: 0 0 18px var(--glow-accent-soft); }
+.achievement--unlocked .achievement__title { color: var(--ntext); }
+.achievement--unlocked .achievement__state { color: var(--gold-text); font-weight: 600; }
+
+.match-study { display: flex; align-items: center; gap: 14px; margin: 0 0 12px; padding: 12px 16px; border: 1px solid var(--nline); border-left: 3px solid var(--accent-strong); border-radius: var(--radius-sm); background: var(--panel-sheen), var(--n1); }
+.match-study > .game-icon { flex: none; color: var(--accent); }
+.match-study--complete { border-left-color: var(--gold); }
+.match-study--complete > .game-icon { color: var(--gold-text); }
+.match-study__body { display: grid; flex: 1; gap: 6px; min-width: 0; }
+.match-study__title { margin: 0; color: var(--ntext-muted); font-size: .875rem; }
+.match-study__title strong { color: var(--ntext); }
+.match-study__xp { color: var(--accent); font-weight: 600; }
+.match-study__track { height: 6px; overflow: hidden; border-radius: 3px; background: var(--nline); }
+.match-study__track > span { display: block; height: 100%; border-radius: 3px; background: var(--accent-strong); }
+.match-study--complete .match-study__track > span { background: var(--gold); }
+.app a.match-study__level { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border: 1px solid var(--nline2); border-radius: 999px; color: var(--ntext); font: 600 .8125rem var(--font-display); text-decoration: none; }
+.app a.match-study__level:hover { border-color: var(--accent-strong); }
+
+@media (max-width: 700px) {
+  .match-study { flex-wrap: wrap; }
+  .app a.match-study__level { margin-left: auto; }
+}
+
+/* Minha evolução: nível e sequência, missões da semana e conquistas. */
+.evolution-game { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; margin: 0 0 24px; }
+.evolution-game__level { display: grid; align-content: start; gap: 20px; }
+.evolution-game__achievements { grid-column: 1 / -1; }
+.evolution-game__title { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: var(--ntext-muted); font: 700 .75rem/1.2 var(--font-body); letter-spacing: .1em; text-transform: uppercase; }
+.evolution-game__title .game-icon { color: var(--accent); }
+@media (max-width: 900px) {
+  .evolution-game { grid-template-columns: minmax(0, 1fr); }
+}

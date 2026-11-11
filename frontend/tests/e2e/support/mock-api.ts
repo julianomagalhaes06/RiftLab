@@ -250,6 +250,7 @@ export type RouteKey =
   | "DELETE /api/v1/matches/:id"
   | "POST /api/v1/objectives/interpret"
   | "GET /api/v1/learning-attempts/progress"
+  | "GET /api/v1/learning-attempts/gamification"
   | "POST /api/v1/learning-attempts"
   | "POST /api/v1/learning-attempts/:id/hint"
   | "POST /api/v1/learning-attempts/:id/answer"
@@ -295,6 +296,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/players/:id/sync", "GET", /^\/api\/v1\/players\/[^/]+\/sync$/],
   ["POST /api/v1/objectives/interpret", "POST", /^\/api\/v1\/objectives\/interpret$/],
   ["GET /api/v1/learning-attempts/progress", "GET", /^\/api\/v1\/learning-attempts\/progress$/],
+  ["GET /api/v1/learning-attempts/gamification", "GET", /^\/api\/v1\/learning-attempts\/gamification$/],
   ["POST /api/v1/learning-attempts", "POST", /^\/api\/v1\/learning-attempts$/],
   ["POST /api/v1/learning-attempts/:id/hint", "POST", /^\/api\/v1\/learning-attempts\/[^/]+\/hint$/],
   ["POST /api/v1/learning-attempts/:id/answer", "POST", /^\/api\/v1\/learning-attempts\/[^/]+\/answer$/],
@@ -350,6 +352,7 @@ function studyHandlers(): Partial<Record<RouteKey, Handler>> {
     return ok(state, status);
   };
   return {
+    "GET /api/v1/learning-attempts/gamification": ({ url }) => ok(gamification(url.searchParams.get("matchId"))),
     "GET /api/v1/learning-attempts/progress": () =>
       ok({ study: { attempts: 0, reflections: 0, usedHints: 0 }, transfer: { attempts: 0, reflections: 0 } }),
     "POST /api/v1/learning-attempts": ({ body }) => {
@@ -558,4 +561,28 @@ export async function mockApi(
 export function sequence(...replies: Array<() => MockReply>): Handler {
   let index = 0;
   return () => replies[Math.min(index++, replies.length - 1)]();
+}
+
+/** Gamificação de exemplo: nível 3, sequência de 2 dias, uma missão concluída e duas conquistas. */
+export function gamification(matchId: string | null = null) {
+  const goal = (key: string, title: string, progress: number, target: number, done: "unlocked" | "completed") => ({
+    key, title, description: `${title}.`, progress, target, [done]: progress >= target,
+  });
+  return {
+    xp: 310, level: 3, levelXp: 60, levelTarget: 200, studiedDecisions: 7,
+    streak: { current: 2, best: 4, studiedToday: true },
+    achievements: [
+      goal("first_study", "Primeira decisão", 1, 1, "unlocked"),
+      goal("first_reflection", "Primeira reflexão", 1, 1, "unlocked"),
+      goal("study_10", "Estudioso", 7, 10, "unlocked"),
+      goal("streak_7", "Semana completa", 4, 7, "unlocked"),
+    ],
+    missions: [
+      goal("study_3", "Estude 3 decisões", 3, 3, "completed"),
+      goal("reflect_2", "Escreva 2 reflexões", 1, 2, "completed"),
+      goal("loss_1", "Estude uma derrota", 0, 1, "completed"),
+    ],
+    weekStart: "2026-11-09",
+    match: matchId ? { matchId, studiedDecisionIds: [DECISION_1], xp: 55 } : null,
+  };
 }

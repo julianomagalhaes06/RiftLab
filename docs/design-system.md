@@ -176,6 +176,13 @@ sempre com contorno `accent` de 3 px.
   propõe UMA das quatro prioridades e ela confirma; sem entender, pede para escolher uma opção.
   As quatro prioridades seguem como escolha direta (rádios com cara de botão). A LLM só traduz o
   objetivo; nunca recomenda item nem mexe em preço ou atributo.
+- **Gamificação do estudo** (`features/study/Gamification.tsx`, dados em `useGamification.ts`):
+  selo no topo (nível dentro de um anel de XP roxo e a chama da sequência em dourado, leva a
+  Minha evolução), barra de XP, sequência ("estude hoje para não perder"), missões da semana
+  (concluída em ouro) e conquistas (medalha dourada quando conquistada; cinza com barra de
+  progresso quando não), na página Minha evolução e resumidas no card "Estudo" do Histórico; na
+  análise da partida, a barra "Partida estudada: x de y decisões analisáveis · +XP" com selo
+  "Partida concluída". Tudo recarrega quando a pessoa responde, revela ou reflete.
 - **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px
   (escolhido com moldura e brilho roxos; sem partida no filtro aparecem bloqueados, em cinza e não
   clicáveis), patch e etapa numa linha com "Como ler estes números", cabeçalho sobre a splash do

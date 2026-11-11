@@ -427,6 +427,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/learning-attempts/gamification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Gamification
+         * @description XP e nível, sequência, conquistas e missões da semana, das tentativas do usuário da
+         *     sessão; com `matchId`, também as decisões já estudadas daquela partida.
+         */
+        get: operations["read_gamification_api_v1_learning_attempts_gamification_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/learning-attempts/progress": {
         parameters: {
             query?: never;
@@ -1916,6 +1937,71 @@ export interface components {
             status: components["schemas"]["LearningAttemptState"];
         };
         /**
+         * LearningGamification
+         * @description Gamificação do estudo: XP e nível, sequência diária (horário de Brasília), conquistas e
+         *     3 missões da semana. Calculado das tentativas reais; não é nota nem estimativa de
+         *     habilidade. XP por decisão (a melhor tentativa): estudar 20, revelar +10, revelar sem dica
+         *     +10, refletir +15.
+         */
+        LearningGamification: {
+            /** Achievements */
+            achievements: components["schemas"]["LearningGoal"][];
+            /** Level */
+            level: number;
+            /**
+             * Leveltarget
+             * @description XP que o nível atual pede para subir.
+             */
+            levelTarget: number;
+            /**
+             * Levelxp
+             * @description XP já feito dentro do nível atual.
+             */
+            levelXp: number;
+            match?: components["schemas"]["LearningMatchProgress"] | null;
+            /** Missions */
+            missions: components["schemas"]["LearningGoal"][];
+            streak: components["schemas"]["LearningStreak"];
+            /** Studieddecisions */
+            studiedDecisions: number;
+            /** Weekstart */
+            weekStart: string;
+            /** Xp */
+            xp: number;
+        };
+        /**
+         * LearningGoal
+         * @description Conquista ou missão: progresso até o alvo (sempre de tentativas reais).
+         */
+        LearningGoal: {
+            /** Completed */
+            completed?: boolean | null;
+            /** Description */
+            description: string;
+            /** Key */
+            key: string;
+            /** Progress */
+            progress: number;
+            /** Target */
+            target: number;
+            /** Title */
+            title: string;
+            /** Unlocked */
+            unlocked?: boolean | null;
+        };
+        /**
+         * LearningMatchProgress
+         * @description Decisões já estudadas de uma partida e o XP feito nelas.
+         */
+        LearningMatchProgress: {
+            /** Matchid */
+            matchId: string;
+            /** Studieddecisionids */
+            studiedDecisionIds: string[];
+            /** Xp */
+            xp: number;
+        };
+        /**
          * LearningProgress
          * @description CC-505: progresso local descritivo (contagens). Não é nota, elo nem estimativa de
          *     habilidade; tentativas não alimentam treino.
@@ -1938,6 +2024,15 @@ export interface components {
             skipped: number;
             /** Usedhints */
             usedHints: number;
+        };
+        /** LearningStreak */
+        LearningStreak: {
+            /** Best */
+            best: number;
+            /** Current */
+            current: number;
+            /** Studiedtoday */
+            studiedToday: boolean;
         };
         /** LiveBan */
         LiveBan: {
@@ -3975,6 +4070,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    read_gamification_api_v1_learning_attempts_gamification_get: {
+        parameters: {
+            query?: {
+                matchId?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningGamification"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
