@@ -137,7 +137,6 @@ function PlayerMatches({ profile, onRefresh, onBanner }: { profile: PlayerProfil
               <div className="history-search">
                 <label htmlFor="player-query">Buscar campeão ou partida</label>
                 <input id="player-query" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome do campeão ou ID da partida" aria-describedby="player-search-scope" />
-                <p id="player-search-scope">Nas páginas carregadas; vale o campeão de qualquer participante.</p>
               </div>
               <div className="history-filters">
                 <FilterGroup<QueueFilter> label="Fila" value={queue} onChange={setQueue} options={[["ALL", "Todas as filas"], [420, "Solo/Duo"], [440, "Flex"]] as const} />
@@ -145,6 +144,7 @@ function PlayerMatches({ profile, onRefresh, onBanner }: { profile: PlayerProfil
                   <FilterGroup<ResultFilter> label="Resultado" value={result} onChange={setResult} options={[["ALL", "Todos"], ["WIN", "Vitórias"], ["LOSS", "Derrotas"]] as const} />
                 ) : null}
               </div>
+              <p id="player-search-scope" className="history-controls__hint">Nas páginas carregadas; vale o campeão de qualquer participante.</p>
             </section>
           ) : null}
           <section aria-labelledby="player-matches-heading" className="history-results">

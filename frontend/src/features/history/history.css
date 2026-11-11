@@ -83,11 +83,13 @@
 .history-summary p { margin: 0; }
 
 /* Barra de busca e filtros: uma superfície, filtros em grupos encostados. */
+/* Campo e filtros alinhados pela base do campo (o texto de ajuda fica fora do bloco do campo, numa
+   linha própria embaixo); sem espaço, os filtros descem inteiros para a linha seguinte. */
 :is(.history-page, .player) .history-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin: 0 0 24px; padding: 16px 18px; }
-:is(.history-page, .player) .history-search { flex: 1 1 240px; gap: 6px; }
+:is(.history-page, .player) .history-search { flex: 1 1 320px; gap: 6px; }
 :is(.history-page, .player) .history-search label { color: var(--ntext-muted); font-size: .8125rem; }
 :is(.history-page, .player) .history-search input { min-height: 44px; padding: 8px 12px; }
-:is(.history-page, .player) .history-search p { font-size: .75rem; color: var(--ntext-subtle); }
+:is(.history-page, .player) .history-controls__hint { flex: 1 1 100%; order: 10; margin: -4px 0 0; color: var(--ntext-subtle); font-size: .75rem; line-height: 1.4; }
 .history-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; }
 .history-filters .segmented { flex-wrap: nowrap; gap: 0; }
 .history-filters .segmented > button { position: relative; border-radius: 0; white-space: nowrap; }
@@ -95,7 +97,7 @@
 .history-filters .segmented > button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
 .history-filters .segmented > button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 .history-filters .segmented > button[aria-pressed="true"], .history-filters .segmented > button:focus-visible { z-index: 1; }
-:is(.history-page, .player) .history-controls__limit { flex: 1 1 100%; }
+:is(.history-page, .player) .history-controls__limit { flex: 1 1 100%; order: 11; }
 
 /* Grupos por dia: data, quantidade, placar do dia e KDA médio, como no tracker.gg. */
 .history-day { margin: 0 0 24px; }

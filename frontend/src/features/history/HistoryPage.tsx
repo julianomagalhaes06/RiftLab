@@ -128,7 +128,6 @@ export function HistoryPage() {
         <div className="history-search">
           <label htmlFor="history-query">Buscar campeão ou partida</label>
           <input id="history-query" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome do campeão ou ID da partida" aria-describedby="history-search-scope" />
-          <p id="history-search-scope">Nas páginas carregadas; vale o campeão de qualquer participante.</p>
         </div>
         <div className="history-filters">
           <FilterGroup<QueueFilter> label="Fila" value={queue} onChange={setQueue} options={[["ALL", "Todas as filas"], [420, "Solo/Duo"], [440, "Flex"]] as const} />
@@ -137,6 +136,7 @@ export function HistoryPage() {
           ) : null}
           {demoEnabled ? <FilterGroup<OriginFilter> label="Origem da partida" value={origin} onChange={setOrigin} options={[["ALL", "Minha conta e DEMO"], ["RIOT", "Minha conta"], ["DEMO", "DEMO"]] as const} /> : null}
         </div>
+        <p id="history-search-scope" className="history-controls__hint">Nas páginas carregadas; vale o campeão de qualquer participante.</p>
         {!hasLocal && list.status === "ready" ? (
           <p className="history-controls__limit">Filtro de resultado indisponível: sua conta não foi identificada nas partidas carregadas.</p>
         ) : null}
