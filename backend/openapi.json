@@ -2535,6 +2535,178 @@
         "title": "LearningAttemptSummary",
         "type": "object"
       },
+      "LearningGamification": {
+        "additionalProperties": false,
+        "description": "Gamificação do estudo: XP e nível, sequência diária (horário de Brasília), conquistas e\n3 missões da semana. Calculado das tentativas reais; não é nota nem estimativa de\nhabilidade. XP por decisão (a melhor tentativa): estudar 20, revelar +10, revelar sem dica\n+10, refletir +15.",
+        "properties": {
+          "achievements": {
+            "items": {
+              "$ref": "#/components/schemas/LearningGoal"
+            },
+            "title": "Achievements",
+            "type": "array"
+          },
+          "level": {
+            "minimum": 1.0,
+            "title": "Level",
+            "type": "integer"
+          },
+          "levelTarget": {
+            "description": "XP que o nível atual pede para subir.",
+            "minimum": 1.0,
+            "title": "Leveltarget",
+            "type": "integer"
+          },
+          "levelXp": {
+            "description": "XP já feito dentro do nível atual.",
+            "minimum": 0.0,
+            "title": "Levelxp",
+            "type": "integer"
+          },
+          "match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LearningMatchProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missions": {
+            "items": {
+              "$ref": "#/components/schemas/LearningGoal"
+            },
+            "title": "Missions",
+            "type": "array"
+          },
+          "streak": {
+            "$ref": "#/components/schemas/LearningStreak"
+          },
+          "studiedDecisions": {
+            "minimum": 0.0,
+            "title": "Studieddecisions",
+            "type": "integer"
+          },
+          "weekStart": {
+            "title": "Weekstart",
+            "type": "string"
+          },
+          "xp": {
+            "minimum": 0.0,
+            "title": "Xp",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "xp",
+          "level",
+          "levelXp",
+          "levelTarget",
+          "studiedDecisions",
+          "streak",
+          "achievements",
+          "missions",
+          "weekStart"
+        ],
+        "title": "LearningGamification",
+        "type": "object"
+      },
+      "LearningGoal": {
+        "additionalProperties": false,
+        "description": "Conquista ou missão: progresso até o alvo (sempre de tentativas reais).",
+        "properties": {
+          "completed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed"
+          },
+          "description": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "progress": {
+            "minimum": 0.0,
+            "title": "Progress",
+            "type": "integer"
+          },
+          "target": {
+            "minimum": 1.0,
+            "title": "Target",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "unlocked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unlocked"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "description",
+          "progress",
+          "target"
+        ],
+        "title": "LearningGoal",
+        "type": "object"
+      },
+      "LearningMatchProgress": {
+        "additionalProperties": false,
+        "description": "Decisões já estudadas de uma partida e o XP feito nelas.",
+        "properties": {
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "studiedDecisionIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Studieddecisionids",
+            "type": "array"
+          },
+          "xp": {
+            "minimum": 0.0,
+            "title": "Xp",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "matchId",
+          "studiedDecisionIds",
+          "xp"
+        ],
+        "title": "LearningMatchProgress",
+        "type": "object"
+      },
       "LearningProgress": {
         "additionalProperties": false,
         "description": "CC-505: progresso local descritivo (contagens). Não é nota, elo nem estimativa de\nhabilidade; tentativas não alimentam treino.",
@@ -2596,6 +2768,32 @@
           "reflections"
         ],
         "title": "LearningProgressCounts",
+        "type": "object"
+      },
+      "LearningStreak": {
+        "additionalProperties": false,
+        "properties": {
+          "best": {
+            "minimum": 0.0,
+            "title": "Best",
+            "type": "integer"
+          },
+          "current": {
+            "minimum": 0.0,
+            "title": "Current",
+            "type": "integer"
+          },
+          "studiedToday": {
+            "title": "Studiedtoday",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "current",
+          "best",
+          "studiedToday"
+        ],
+        "title": "LearningStreak",
         "type": "object"
       },
       "LiveBan": {
@@ -7219,6 +7417,58 @@
           }
         },
         "summary": "Post Attempt",
+        "tags": [
+          "learning"
+        ]
+      }
+    },
+    "/api/v1/learning-attempts/gamification": {
+      "get": {
+        "description": "XP e nível, sequência, conquistas e missões da semana, das tentativas do usuário da\nsessão; com `matchId`, também as decisões já estudadas daquela partida.",
+        "operationId": "read_gamification_api_v1_learning_attempts_gamification_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "matchId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Matchid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningGamification"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Gamification",
         "tags": [
           "learning"
         ]

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type LearningProgress, type MatchSummary, type PlayerProfile } from "../../shared/api/client";
+import { api, type LearningGamification, type MatchSummary, type PlayerProfile } from "../../shared/api/client";
+import { MissionList, StreakBadge, XpBar } from "../study/Gamification";
+import { useGamification } from "../study/useGamification";
 import { usePagedList } from "../../shared/hooks/usePagedList";
 import { Link } from "../../shared/router/Link";
 import { isDemoMatchId } from "../../shared/router/routes";
@@ -19,25 +21,16 @@ import { useAuth } from "../auth/authContext";
 
 const PAGE_SIZE = 20;
 
-/** Progresso de estudo (tentativas, revelações e reflexões) com atalho para Minha evolução. */
-function StudyProgress({ progress }: { progress: LearningProgress }) {
-  const attempts = progress.study.attempts + progress.transfer.attempts;
-  const revealed = progress.study.revealed + progress.transfer.revealed;
-  const reflections = progress.study.reflections + progress.transfer.reflections;
+/** Estudo gamificado: nível e XP, sequência e a próxima missão da semana (Minha evolução tem tudo). */
+function StudyProgress({ game }: { game: LearningGamification }) {
+  const pending = game.missions.filter((mission) => !mission.completed);
   return (
     <div className="history-card history-card--study surface">
       <h3 className="history-card__title"><GameIcon name="book" size={16} /> Estudo</h3>
-      {attempts ? (
-        <>
-          <p className="history-study__big"><strong>{attempts}</strong> {attempts === 1 ? "decisão estudada" : "decisões estudadas"}</p>
-          <dl className="history-study__stats">
-            <div><dt>Reveladas</dt><dd>{revealed}</dd></div>
-            <div><dt>Reflexões</dt><dd>{reflections}</dd></div>
-          </dl>
-          <div className="history-study__bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (reflections / attempts) * 100)}%` }} /></div>
-        </>
-      ) : <p className="history-study__empty">Nenhuma decisão estudada ainda. Abra uma partida e analise uma compra.</p>}
-      <Link to={{ name: "myEvolution" }} className="arrow-link">Minha evolução</Link>
+      <XpBar game={game} />
+      <StreakBadge game={game} />
+      {pending.length ? <MissionList missions={pending.slice(0, 1)} /> : <p className="history-study__empty">Missões da semana concluídas.</p>}
+      <Link to={{ name: "myEvolution" }} className="arrow-link">Missões e conquistas</Link>
     </div>
   );
 }
@@ -98,11 +91,10 @@ export function HistoryPage() {
     }, signal),
   });
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
-  const [progress, setProgress] = useState<LearningProgress | null>(null);
+  const game = useGamification();
   useEffect(() => {
     const controller = new AbortController();
     api.getOwnPlayer(controller.signal).then((own) => setProfile(own.profile ?? null)).catch(() => undefined);
-    api.getProgress(controller.signal).then(setProgress).catch(() => undefined);
     return () => controller.abort();
   }, []);
   const visible = filterLoadedMatches(list.items, query, origin, result, queue);
@@ -121,7 +113,7 @@ export function HistoryPage() {
       <div className={list.status === "ready" && list.items.length > 0 ? "history-shell history-shell--aside" : "history-shell"}>
       {list.status === "ready" && list.items.length > 0 && <aside className="history-aside">
         <LoadedSummary matches={list.items} />
-        {progress ? <StudyProgress progress={progress} /> : null}
+        {game ? <StudyProgress game={game} /> : null}
       </aside>}
       <div className="history-main">
       <section aria-label="Busca e filtros do histórico" className="history-controls surface">

@@ -108,6 +108,9 @@ async def test_attempts_belong_to_their_user(app_client, session_factory, tmp_pa
                 progress_b = (await bia.get("/api/v1/learning-attempts/progress")).json()
                 assert progress_a["study"]["attempts"] == 1
                 assert progress_b["study"]["attempts"] == 0
+                # A gamificação também é só de quem estudou.
+                game_b = (await bia.get("/api/v1/learning-attempts/gamification")).json()
+                assert game_b["xp"] == 0 and game_b["studiedDecisions"] == 0
         # Sem sessão (instalação de uma pessoa), a tentativa com dono também é invisível.
         assert (await app_client.get(f"/api/v1/learning-attempts/{attempt}")).status_code == 404
         assert (await app_client.get(f"/api/v1/learning-attempts/{legacy}")).status_code == 200

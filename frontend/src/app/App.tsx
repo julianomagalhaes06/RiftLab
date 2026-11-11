@@ -23,6 +23,7 @@ import { PlayerPage } from "../features/players/PlayerPage";
 import { LivePage } from "../features/live/LivePage";
 import { PlayerSearch } from "../features/players/PlayerSearch";
 import { ProfileChip } from "../features/players/ProfileChip";
+import { LevelChip } from "../features/study/Gamification";
 import { AuthProvider } from "../features/auth/AuthProvider";
 import { useAuth } from "../features/auth/authContext";
 import { AuthScreen } from "../features/auth/AuthScreen";
@@ -197,6 +198,7 @@ function AppContent() {
             <MainNav route={route} />
             <div className="app__tools">
               {route.name === "home" ? null : <PlayerSearch />}
+              {hasAccount ? <LevelChip /> : null}
               {hasAccount ? <ProfileChip /> : null}
               <UserMenu />
             </div>

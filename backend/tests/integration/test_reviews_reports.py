@@ -188,6 +188,18 @@ async def test_reflection_once_after_reveal_and_transfer_has_no_hints(
         "reflections",
     }
 
+    # Gamificação: a mesma tentativa revelada e com reflexão dá XP e libera as conquistas.
+    game = (
+        await app_client.get(
+            "/api/v1/learning-attempts/gamification", params={"matchId": "DEMO-0008"}
+        )
+    ).json()
+    assert game["studiedDecisions"] >= 1 and game["xp"] >= 45 and game["level"] >= 1
+    unlocked = {a["key"] for a in game["achievements"] if a["unlocked"]}
+    assert {"first_study", "first_reflection"} <= unlocked
+    assert len(game["missions"]) == 3 and game["streak"]["current"] >= 1
+    assert game["match"]["matchId"] == "DEMO-0008" and game["match"]["studiedDecisionIds"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("_demo_match", ["DEMO-0008"], indirect=True)

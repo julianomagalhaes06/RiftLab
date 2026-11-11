@@ -64,6 +64,8 @@ export type ObjectiveInterpretation = Schemas["ObjectiveInterpretResult"];
 export type FeedbackRequest = Schemas["FeedbackRequest"];
 export type FeedbackResult = Schemas["FeedbackResult"];
 export type LearningProgress = Schemas["LearningProgress"];
+export type LearningGamification = Schemas["LearningGamification"];
+export type LearningGoal = Schemas["LearningGoal"];
 export type LearningAttemptSummary = Schemas["LearningAttemptSummary"];
 export type LearningAttemptPage = Schemas["CursorPage_LearningAttemptSummary_"];
 export type AttemptMode = NonNullable<Schemas["LearningAttemptCreateRequest"]["mode"]>;
@@ -143,6 +145,7 @@ export interface ApiClient {
   ): Promise<LearningAttempt>;
   reflectAttempt(attemptId: string, reflection: string, signal?: AbortSignal): Promise<LearningAttempt>;
   getProgress(signal?: AbortSignal): Promise<LearningProgress>;
+  getGamification(matchId?: string | null, signal?: AbortSignal): Promise<LearningGamification>;
   /** Biblioteca de decisões / minha evolução: tentativas do dono da sessão, mais recente primeiro. */
   listAttempts(params?: PageParams, signal?: AbortSignal): Promise<LearningAttemptPage>;
   submitFeedback(
@@ -175,6 +178,17 @@ export interface ApiClient {
   getPurgePreview(matchId: string, signal?: AbortSignal): Promise<PurgePreview>;
   /** CC-603: expurgo com confirmação explícita (o próprio id); devolve o job PURGE. */
   purgeMatch(matchId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
+}
+
+/** Evento de "estudou algo" (responder, revelar, refletir): a gamificação (selo do topo, barra da
+ * partida) recarrega na hora, sem esperar a página ser recarregada. */
+export const STUDY_EVENT = "riftlab:study-updated";
+
+function studied<T>(promise: Promise<T>): Promise<T> {
+  return promise.then((result) => {
+    window.dispatchEvent(new Event(STUDY_EVENT));
+    return result;
+  });
 }
 
 function queryString(params: Record<string, string | number | null | undefined>): string {
@@ -313,11 +327,12 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
         idempotencyKey,
       }),
     reflectAttempt: (attemptId, reflection, signal) =>
-      request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/reflection`, {
+      studied(request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/reflection`, {
         body: { reflection },
         signal,
-      }),
+      })),
     getProgress: (signal) => request("GET", "/api/v1/learning-attempts/progress", { signal }),
+    getGamification: (matchId, signal) => request("GET", `/api/v1/learning-attempts/gamification${queryString({ matchId: matchId ?? undefined })}`, { signal }),
     listAttempts: (params = {}, signal) =>
       request("GET", `/api/v1/learning-attempts${queryString({ cursor: params.cursor, limit: params.limit })}`, {
         signal,
@@ -329,10 +344,10 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
         idempotencyKey,
       }),
     answerAttempt: (attemptId, answer, signal) =>
-      request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/answer`, {
+      studied(request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/answer`, {
         body: answer,
         signal,
-      }),
+      })),
     hintAttempt: (attemptId, level, signal) =>
       request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/hint`, {
         body: { level },
@@ -350,10 +365,10 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     interpretObjective: (text, signal) =>
       request("POST", "/api/v1/objectives/interpret", { body: { text }, signal }),
     revealAttempt: (attemptId, signal) =>
-      request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/reveal`, {
+      studied(request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/reveal`, {
         body: { explicit: true },
         signal,
-      }),
+      })),
   };
 }
 

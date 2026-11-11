@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
@@ -153,3 +154,47 @@ class LearningAttemptSummary(CamelModel):
     analysis_id: UUID | None = None
     created_at: datetime
     revealed_at: datetime | None = None
+
+
+class LearningGoal(CamelModel):
+    """Conquista ou missão: progresso até o alvo (sempre de tentativas reais)."""
+
+    key: str = Field(min_length=1, max_length=40)
+    title: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=200)
+    progress: int = Field(ge=0)
+    target: int = Field(ge=1)
+    unlocked: bool | None = None
+    completed: bool | None = None
+
+
+class LearningStreak(CamelModel):
+    current: int = Field(ge=0)
+    best: int = Field(ge=0)
+    studied_today: bool
+
+
+class LearningMatchProgress(CamelModel):
+    """Decisões já estudadas de uma partida e o XP feito nelas."""
+
+    match_id: str
+    studied_decision_ids: list[uuid.UUID]
+    xp: int = Field(ge=0)
+
+
+class LearningGamification(CamelModel):
+    """Gamificação do estudo: XP e nível, sequência diária (horário de Brasília), conquistas e
+    3 missões da semana. Calculado das tentativas reais; não é nota nem estimativa de
+    habilidade. XP por decisão (a melhor tentativa): estudar 20, revelar +10, revelar sem dica
+    +10, refletir +15."""
+
+    xp: int = Field(ge=0)
+    level: int = Field(ge=1)
+    level_xp: int = Field(ge=0, description="XP já feito dentro do nível atual.")
+    level_target: int = Field(ge=1, description="XP que o nível atual pede para subir.")
+    studied_decisions: int = Field(ge=0)
+    streak: LearningStreak
+    achievements: list[LearningGoal]
+    missions: list[LearningGoal]
+    week_start: str
+    match: LearningMatchProgress | None = None

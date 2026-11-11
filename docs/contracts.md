@@ -403,3 +403,11 @@ A sincronização da conta vinculada leva o Riot ID dela na execução só enqua
 **Dados de demonstração:** partidas sintéticas e telas ilustrativas só existem com `RIFTLAB_DEMO_DATA_ENABLED=true`, ligado pelo `compose.demo.yaml`. Fora dele, recursos `DEMO-…` respondem 404, `POST /imports` em modo DEMO responde `DEMO_DISABLED` 422, a lista sem `player` devolve só as partidas da conta própria e o Painel ignora a origem DEMO.
 
 **Padrão do ambiente:** o `compose.yaml` exige login (`RIFTLAB_AUTH_REQUIRED=true`); `false` no `.env` volta à instalação de uma pessoa, sem login. A demonstração (`compose.demo.yaml`) continua sem login. A interface espera a consulta da sessão antes de abrir as telas; sem sessão, abre o início público, e as áreas da conta levam à tela de entrar sem chamar as rotas delas. Sair, ou a sessão terminar no meio do uso, leva ao início. A CI confere a leitura pública e a recusa da lista sem sessão pelo proxy, e cria contas descartáveis no smoke, no proxy e no roteiro contra a stack real.
+
+## Gamificação do estudo (11/11/2026)
+
+- `GET /api/v1/learning-attempts/gamification[?matchId=]` (`LearningGamification`), das tentativas do usuário da sessão (sem sessão, 401 como as demais rotas de conta). Calculado na hora de `learning_attempts` + `decision_points` + `participants`, sem tabela nova (`learning/gamification.py`). Não é nota nem estimativa de habilidade.
+- XP por decisão estudada, contando a melhor tentativa de cada decisão (repetir a mesma não soma): estudar (respondida sem pular, ou revelada) 20, revelar +10, revelar sem dica +10, refletir +15. Nível: do L para L+1 são 100 + 50 × (L − 1) de XP; a resposta traz `level`, `levelXp` e `levelTarget`.
+- Sequência (`streak`): dias seguidos, no horário de Brasília, com ao menos uma decisão estudada; vale até o fim do dia seguinte ao último estudo (`current`, `best`, `studiedToday`).
+- Conquistas (10, `achievements`) e missões da semana (3 de 6, escolhidas de forma fixa pela semana ISO; semana de segunda a domingo, `missions`, `weekStart`), cada uma com `progress` e `target`.
+- Com `matchId`, `match.studiedDecisionIds` e `match.xp`: a interface cruza com as decisões analisáveis já carregadas na aba Compras para a barra "Partida estudada".
