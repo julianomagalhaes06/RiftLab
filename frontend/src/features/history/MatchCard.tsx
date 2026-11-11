@@ -8,6 +8,7 @@ import { useItemName } from "../../shared/hooks/useItemName";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
 import { ItemNames } from "../../shared/ui/ItemNames";
 import { count } from "../../shared/text/count";
+import { GameIcon } from "../../shared/ui/GameIcon";
 import {
   decimal,
   localPerformance,
@@ -117,7 +118,7 @@ function MatchDetails({ id, teams, localId, version }: { id: string; teams: Matc
   );
 }
 
-export function MatchCard({ match, now }: { match: MatchSummary; now?: Date }) {
+export function MatchCard({ match, now, highlights }: { match: MatchSummary; now?: Date; highlights?: string[] }) {
   const performance = localPerformance(match);
   const local = performance?.participant ?? null;
   const tone = performance?.result === "WIN" ? "win" : performance?.result === "LOSS" ? "loss" : "neutral";
@@ -188,6 +189,7 @@ export function MatchCard({ match, now }: { match: MatchSummary; now?: Date }) {
 
         <div className="match-card__actions">
           <div className="match-card__badges">
+            {highlights?.map((label) => <span key={label} className="chip chip--gold"><GameIcon name="star" size={12} /> {label}</span>)}
             {demo ? <span className="chip origin-badge origin-badge--demo">DEMO</span> : null}
             {match.reviewPurchases && match.reviewPurchases.total > 0 ? (
               <span

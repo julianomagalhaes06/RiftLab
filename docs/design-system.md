@@ -1,10 +1,12 @@
-# Padrão visual do RiftLab — Arena sóbrio
+# Padrão visual do RiftLab — Arena vivo
 
-Toda tela do RiftLab, atual ou futura, segue este padrão. A referência é o Painel desktop do
-protótipo da direção C (`docs/aps/prototipo-competitivo/direcao-c-arena/entrega/`, gerado por
-`gerar.py`: `chrome`, `footer`, `panel_desktop`, `panel_mobile`, `rank_panel`, `match_rows`,
-`champion_rows`, `metric_block`). Quando o protótipo não cobre uma tela, ela é montada com os
-mesmos tokens e primitivas abaixo, sem inventar elementos novos de estilo.
+O RiftLab é um site de jogo: a interface deve parecer parte do League of Legends, não um
+relatório. Desde 11/11/2026 (pedido do usuário) o padrão "Arena sóbrio" virou **Arena vivo**:
+mesma base de tokens e primitivas, com arte dos campeões, ícones, brilho e ouro onde ajudam a
+ler e a agir. A origem continua o protótipo da direção C
+(`docs/aps/prototipo-competitivo/direcao-c-arena/entrega/`); as referências visuais novas são os
+perfis do tracker.gg, u.gg e Mobalytics e as páginas de build do op.gg. Não é preciso seguir o
+protótipo ao pé da letra: telas novas podem criar elementos próprios, desde que usem os tokens.
 
 No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitivas em
 `frontend/src/design/arena.css`. O teste `design/tokens.test.ts` recusa cor literal fora de
@@ -12,17 +14,28 @@ No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitiv
 
 ## Princípios
 
-1. **Base neutra.** Fundo `n0`, superfícies `n1`, linhas `nline`. Nada de gradiente de fundo,
-   grade ou brilho fora do card de elo, com três exceções: a splash art com véus da vitrine do
-   Início e do cabeçalho de Campeões, e a tinta do resultado (`win-tint`/`loss-tint`, da
-   esquerda para a direita) no cartão de partida do Histórico.
-2. **Cada cor tem um papel.** Roxo só para ação e seleção (link, aba ativa, foco, item
-   escolhido). Verde e vermelho só para resultado (vitória, derrota, ganho e perda de PDL). A cor
-   do elo só na classificação (card de elo, linha do elo no chip do perfil).
-3. **Dado antes de texto.** Métrica grande, legenda curta; explicações longas ficam em
-   `details`, dicas ou na tela de destino.
-4. **Nada fictício na interface real.** O protótipo usa dados ilustrativos; o produto mostra só o
+1. **Arte e cor com propósito.** Base escura neutra (`n0`, `n1`, `nline`), com vida onde ela
+   carrega informação: splash art do campeão nos cabeçalhos (Início, Campeões, banner do
+   Histórico), sempre com véus que garantem 4,5:1 até sobre arte branca; tinta do resultado no
+   cartão de partida; reflexo leve no topo das superfícies (`--panel-sheen`); brilho roxo
+   (`--glow-accent`) no item escolhido.
+2. **Cada cor tem um papel.** Roxo para ação, seleção e destaque da conta própria. Verde e
+   vermelho para resultado. Ouro (`--gold*`, como a loja do jogo) para molduras de item, o
+   trajeto mais frequente e conquistas. A cor do elo só na classificação. Pílulas de HUD
+   (`.hud-tag`, `--hud-bg`) para dados sobre arte.
+3. **Dado e ícone antes de texto.** Número grande (Chakra Petch), ícone de linha
+   (`shared/ui/GameIcon.tsx`, traço 1,8) e rótulo curto; metodologia e explicações longas ficam
+   num "Como ler" (`details`), dica ou na tela de destino, nunca em parágrafos soltos na tela.
+4. **Estado vazio leva a algum lugar.** Ícone, título curto e uma ação (ex.: "Ver no patch
+   16.20"); nunca só uma caixa com um parágrafo.
+5. **Gamificação só com dado real.** Conquistas, sequências e progresso saem das partidas e
+   tentativas carregadas ("Maior KDA", "3 vitórias seguidas", decisões estudadas); nada
+   inventado, nada que avalie a decisão sem base.
+6. **Nada fictício na interface real.** O protótipo usa dados ilustrativos; o produto mostra só o
    que veio da API. Sem dado, a área mostra o estado vazio, nunca um exemplo.
+7. **Tipografia.** Chakra Petch para títulos grandes, nomes de campeão e números; Inter para o
+   resto. Rótulos curtos em caixa alta usam Inter com espaçamento (a Chakra Petch abre espaço
+   demais depois do "T" em tamanho pequeno).
 
 ## Temas
 
@@ -120,24 +133,21 @@ sempre com contorno `accent` de 3 px.
   com anel `accent`, nomes no texto acessível e na dica); selos, "Analisar →" e o botão de 44 px
   que abre o placar das duas equipes dentro do cartão (tabela por time: campeão, KDA, farm e
   itens; no celular, sem a coluna de itens). Coluna de resumo à esquerda (anel da taxa de
-  vitória, KDA, últimos 20 resultados em quadrados V/D, campeões mais jogados com taxa e KDA,
-  rotas); grupos por dia com quantidade, placar e KDA médio; filtros em grupos encostados.
+  vitória, KDA, sequência de vitórias, últimos 20 resultados em quadrados V/D, campeões mais
+  jogados com taxa e KDA, rotas e o progresso de estudo com atalho para Minha evolução); banner
+  do perfil no topo (splash do campeão mais jogado, ícone, Riot ID, elo e "Importar partida");
+  conquistas em selo dourado no cartão (`.chip--gold`: maior KDA, mais farm por minuto, maior
+  participação em abates, com ao menos três partidas); grupos por dia com quantidade, placar e
+  KDA médio; filtros em grupos encostados; aviso de atualização numa faixa fina.
 - **Linha de partida** (outras telas): barra de resultado, "Vitória"/"Derrota" na cor do
   resultado, retrato de 36 px, campeão e fila, data e duração, K / D / A e tropas, ação em roxo.
-- **Campeões** (refeito em 11/11/2026 a partir das páginas de build do op.gg e do u.gg):
-  seletor em cartões de retrato de 48 px (escolhido com borda `accent-strong` e `.is-selected`),
-  filtros numa barra (patch, etapa e a função como selo), cabeçalho escuro nos dois temas sobre a
-  splash art do campeão com véus medidos em pixels (texto ≥ 4,5:1 até sobre arte branca, ver
-  `ui-polish.spec.ts`), números da amostra com filete roxo claro (`hero-accent`), trajetos com
-  posição, ícones de 48 px com o nome embaixo e barra de frequência neutra, e as situações para
-  estudar em cartões com o minuto, com as perguntas guia num `details`.
-- **Card de elo** (`.surface.surface--rank.brackets`): título em caixa alta 16 px, selo BR1 com
-  fundo `deep` e texto `text` do elo, emblema oficial com halo, elo e divisão em Chakra Petch na
-  cor `text`, legenda da observação, trilha de placas IV → I (concluída: metal escuro com filete;
-  atual: metal claro→base→escuro com ▼; próximas: neutras) com o emblema do próximo elo, barra de
-  PDL 0–100 com marcas a cada 25 e meta "Faltam X PDL para …" na cor do elo, e faixa de variação
-  (fundo `win-surface` para ganho). Mestre, Grão-Mestre e Desafiante trocam a trilha por "Sem
-  divisões · PDL sem teto" e mostram o PDL acumulado.
+- **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px
+  (escolhido com moldura e brilho roxos; sem partida no filtro aparecem bloqueados, em cinza e não
+  clicáveis), patch e etapa numa linha com "Como ler estes números", cabeçalho escuro nos dois
+  temas sobre a splash do campeão com nome grande em caixa alta, pílulas de HUD (função, patch) e
+  os três números em pílulas com ícone; trajetos em linhas com posição, molduras de slot douradas
+  (`.item-slot`), setas e anel de frequência (o 1º em ouro); estado vazio com ícone e ação;
+  situações como "Desafios de decisão" com o minuto num círculo e "Analisar decisão" em botão.
 
 No código: card de elo em `features/ranked/RankCard.tsx` (estilo em `rank-card.css`), elos e
 escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; card de elo

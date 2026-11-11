@@ -29,7 +29,7 @@
 :root {
   color-scheme: dark;
 
-  /* Padrão Arena sóbrio (docs/design-system.md): base neutra, roxo só para ação e seleção,
+  /* Padrão Arena vivo (docs/design-system.md): base neutra com arte e brilho onde informam, roxo para ação e seleção,
      verde/vermelho só para resultado e a cor do elo só na classificação. Valores do protótipo
      docs/aps/prototipo-competitivo/direcao-c-arena (gerar.py, paleta C, chaves n*, accent*). */
 
@@ -144,6 +144,21 @@
   /* Sem elo (não classificado ou indisponível): neutro. */
   --tier-none-base: #7c8190; --tier-none-light: #b4b8c1; --tier-none-dark: #2b2f38; --tier-none-deep: #1c1f25; --tier-none-text: #b4b8c1;
 
+  /* Arena vivo (11/11/2026): brilho roxo da seleção, ouro das molduras de item (como a loja do
+     jogo), fundo dos slots, reflexo no topo dos painéis e as pílulas de HUD sobre arte. */
+  --glow-accent: rgb(139 108 255 / .5);
+  --glow-accent-soft: rgb(139 108 255 / .16);
+  --glow-win: rgb(61 214 140 / .3);
+  --gold: #c8aa6e;
+  --gold-deep: #6b5126;
+  --gold-ink: #f0dfb4;
+  --gold-surface: #2a2216;
+  --slot-bg: #0a0b0f;
+  --panel-sheen: linear-gradient(180deg, rgb(255 255 255 / .04), rgb(255 255 255 / 0) 120px);
+  --hud-bg: rgb(15 16 19 / .8);
+  --hud-line: rgb(255 255 255 / .14);
+  --locked: rgb(15 16 19 / .55);
+
   /* Espaço, chanfro, raio e tipografia. */
   --space-1: 0.5rem;
   --space-2: 0.75rem;
@@ -222,6 +237,19 @@
   --tier-challenger-text: #1a68a6;
   --tier-none-text: #5f6571;
 
+  /* Arena vivo no tema claro: ouro mais escuro (contraste do texto do selo sobre gold-surface),
+     brilho roxo mais leve e reflexo branco no topo dos painéis. */
+  --glow-accent: rgb(108 76 230 / .38);
+  --glow-accent-soft: rgb(108 76 230 / .12);
+  --glow-win: rgb(10 122 71 / .22);
+  --gold: #a8864a;
+  --gold-deep: #d9c59a;
+  --gold-ink: #6b4d12;
+  --gold-surface: #f8efd9;
+  --slot-bg: #1b1d22;
+  --panel-sheen: linear-gradient(180deg, rgb(255 255 255 / .7), rgb(255 255 255 / 0) 120px);
+  --locked: rgb(244 245 248 / .6);
+
   /* `.surface` some no tema claro sem isto: n1 (branco) quase não separa de n0, e o chanfro
      de 1 px do nline já reforçado ainda não basta como única pista de profundidade. */
   --surface-elevation: drop-shadow(0 1px 2px var(--shadow-soft));
@@ -229,6 +257,7 @@
 
 /* O card de elo é uma placa de metal: fica escuro nos dois temas, com os valores do tema escuro. */
 :root[data-theme="light"] .rank-card {
+  --panel-sheen: linear-gradient(180deg, rgb(255 255 255 / .04), rgb(255 255 255 / 0) 120px);
   --n0: #0f1013;
   --n1: #16181d;
   --n2: #1c1f25;

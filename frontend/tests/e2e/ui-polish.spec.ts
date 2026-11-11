@@ -262,9 +262,28 @@ for (const width of [360, 1000, 1280]) {
     await page.goto("/campeoes?champion=51&patch=16.19");
     await page.locator('.champion-overview__art[data-state="ready"]').waitFor();
     await noHorizontalScroll(page);
-    const texts: Array<[string, number]> = [[".champion-overview__context", 4.5], [".champion-overview h3 .champion__name", 4.5], [".champion-stats dd", 4.5], [".champion-stats dt", 4.5], [".champion-overview .metric__foot", 4.5]];
+    const texts: Array<[string, number]> = [[".hud-tag", 4.5], [".champion-overview h3 .champion__name", 4.5], [".champion-stats dd", 4.5], [".champion-stats dt", 4.5]];
     const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
-    await page.addStyleTag({ content: ".champion-overview__inner * { color: transparent !important; } .champion-overview__inner .champion__portrait { visibility: hidden; } .champion-overview__art { transition: none !important; }" });
+    await page.addStyleTag({ content: ".champion-overview__inner * { color: transparent !important; } .champion-overview__inner .champion__portrait, .champion-overview__inner .game-icon { visibility: hidden; } .champion-overview__art { transition: none !important; scale: 1 !important; }" });
+    for (const [index, [selector, minimum]] of texts.entries()) {
+      const ratio = await contrastOverBackground(page, selector, colors[index]);
+      expect(ratio, `${selector}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(minimum);
+    }
+  });
+}
+
+for (const width of [360, 1280]) {
+  test(`histórico em ${width}px: banner do perfil legível sobre splash branca`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.route("https://ddragon.leagueoflegends.com/**", (route) => route.fulfill({ contentType: "image/png", body: WHITE_PNG }));
+    await mockApi(page, { "GET /api/v1/matches": () => ok({ items: [0, 2, 3].map(richMatch), nextCursor: null }) });
+    await page.goto("/historico");
+    await page.locator('.history-banner__art[data-state="ready"]').waitFor();
+    await expect(page.locator(".hud-tag--hot")).toHaveText(/3 vitórias seguidas/);
+    await noHorizontalScroll(page);
+    const texts: Array<[string, number]> = [[".history-banner__context", 4.5], [".history-banner h2", 3], [".history-banner__who", 4.5], [".hud-tag--hot", 4.5], [".history-banner__import", 4.5]];
+    const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
+    await page.addStyleTag({ content: ".history-banner__inner * { color: transparent !important; } .history-banner__inner img, .history-banner__inner .game-icon, .history-banner__icon { visibility: hidden; } .history-banner__art { transition: none !important; scale: 1 !important; }" });
     for (const [index, [selector, minimum]] of texts.entries()) {
       const ratio = await contrastOverBackground(page, selector, colors[index]);
       expect(ratio, `${selector}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(minimum);

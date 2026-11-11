@@ -1,4 +1,4 @@
-/* Primitivas do padrão Arena sóbrio (docs/design-system.md). Telas e componentes novos montam a
+/* Primitivas do padrão Arena vivo (docs/design-system.md). Telas e componentes novos montam a
    interface com estas classes antes de criar estilo próprio; cores só por var(--…). */
 
 /* Superfície: fundo n1, borda nline de 1 px e chanfro nos cantos superior esquerdo e inferior
@@ -24,7 +24,8 @@
   position: absolute;
   inset: 1px;
   z-index: -1;
-  background: var(--surface-fill);
+  /* Arena vivo: reflexo leve no topo de toda superfície (--panel-sheen). */
+  background: var(--panel-sheen), var(--surface-fill);
   clip-path: polygon(calc(var(--surface-cut) - .586px) 0, 100% 0, 100% calc(100% - var(--surface-cut) + .586px), calc(100% - var(--surface-cut) + .586px) 100%, 0 100%, 0 calc(var(--surface-cut) - .586px));
 }
 .surface--rank { --surface-cut: var(--cut-rank); }
@@ -89,6 +90,9 @@
 .chip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); color: var(--ntext-muted); font-size: .75rem; font-weight: 600; line-height: 1; white-space: nowrap; }
 .chip--accent { border-color: var(--accent-strong); color: var(--accent); background: var(--accent-surface); }
 .chip--win { border-color: var(--win); color: var(--win); background: var(--win-surface); }
+/* Arena vivo: conquista (ouro da loja do jogo) e pílula de HUD sobre arte. */
+.chip--gold { gap: 4px; border-color: var(--gold); color: var(--gold-ink); background: var(--gold-surface); }
+.chip--gold .game-icon { color: var(--gold); }
 
 /* Métrica principal e secundária. */
 .metric__label { margin: 0; color: var(--ntext-muted); font-size: .875rem; font-weight: 500; }

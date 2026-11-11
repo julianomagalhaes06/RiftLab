@@ -1,16 +1,18 @@
-import { useCallback, useState } from "react";
-import { api, type MatchSummary } from "../../shared/api/client";
+import { useCallback, useEffect, useState } from "react";
+import { api, type LearningProgress, type MatchSummary, type PlayerProfile } from "../../shared/api/client";
 import { usePagedList } from "../../shared/hooks/usePagedList";
 import { Link } from "../../shared/router/Link";
 import { isDemoMatchId } from "../../shared/router/routes";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
-import { championName } from "../matches/format";
+import { championName, championSplashUrl } from "../matches/format";
+import { GameIcon } from "../../shared/ui/GameIcon";
+import { betterRank, emblemSrc, isTier, profileIconUrl, rankTitle } from "../ranked/tiers";
 import { ChampionAvatar } from "./ChampionAvatar";
 import { filterLoadedMatches, type OriginFilter, type QueueFilter, type ResultFilter } from "./filter";
 import { HistorySync, type SyncPending } from "./HistorySync";
 import { SyncPendingBox } from "./SyncPendingBox";
 import { MatchCard } from "./MatchCard";
-import { dayKey, dayLabel, decimal, percent, record, roleShort, summarizeLoaded } from "./presentation";
+import { dayKey, dayLabel, decimal, localPerformance, percent, record, roleShort, summarizeLoaded } from "./presentation";
 import "./history.css";
 import { count } from "../../shared/text/count";
 import { useDemoNotice } from "../../app/demoNotice";
@@ -37,6 +39,97 @@ function FilterGroup<T extends string | number>({
         </button>
       ))}
     </div>
+  );
+}
+
+/** Vitórias seguidas a partir da partida mais nova. */
+function winStreak(recent: Array<"WIN" | "LOSS">): number {
+  const firstLoss = recent.indexOf("LOSS");
+  return firstLoss === -1 ? recent.length : firstLoss;
+}
+
+/** Conquistas das partidas carregadas (só dado real): maior KDA, mais farm por minuto e maior
+ * participação em abates, marcadas no cartão quando há ao menos três partidas da conta. */
+function loadedHighlights(matches: MatchSummary[]): Record<string, string[]> {
+  const performances = matches.flatMap((match) => {
+    const performance = localPerformance(match);
+    return performance ? [{ matchId: match.matchId, performance }] : [];
+  });
+  if (performances.length < 3) return {};
+  const result: Record<string, string[]> = {};
+  const mark = (label: string, pick: (p: (typeof performances)[number]["performance"]) => number | null) => {
+    let best: { matchId: string; value: number } | null = null;
+    for (const { matchId, performance } of performances) {
+      const value = pick(performance);
+      if (value !== null && (best === null || value > best.value)) best = { matchId, value };
+    }
+    if (best) (result[best.matchId] ??= []).push(label);
+  };
+  mark("Maior KDA", (p) => p.kda);
+  mark("Mais farm por minuto", (p) => p.csPerMinute);
+  mark("Maior participação em abates", (p) => p.killParticipation);
+  return result;
+}
+
+/** Progresso de estudo (tentativas, revelações e reflexões) com atalho para Minha evolução. */
+function StudyProgress({ progress }: { progress: LearningProgress }) {
+  const attempts = progress.study.attempts + progress.transfer.attempts;
+  const revealed = progress.study.revealed + progress.transfer.revealed;
+  const reflections = progress.study.reflections + progress.transfer.reflections;
+  return (
+    <div className="history-card history-card--study surface">
+      <h3 className="history-card__title"><GameIcon name="book" size={16} /> Estudo</h3>
+      {attempts ? (
+        <>
+          <p className="history-study__big"><strong>{attempts}</strong> {attempts === 1 ? "decisão estudada" : "decisões estudadas"}</p>
+          <dl className="history-study__stats">
+            <div><dt>Reveladas</dt><dd>{revealed}</dd></div>
+            <div><dt>Reflexões</dt><dd>{reflections}</dd></div>
+          </dl>
+          <div className="history-study__bar" aria-hidden="true"><span style={{ width: `${Math.min(100, (reflections / attempts) * 100)}%` }} /></div>
+        </>
+      ) : <p className="history-study__empty">Nenhuma decisão estudada ainda. Abra uma partida e analise uma compra.</p>}
+      <Link to={{ name: "myEvolution" }} className="arrow-link">Minha evolução</Link>
+    </div>
+  );
+}
+
+/** Banner do perfil, como no tracker.gg: splash do campeão mais jogado, ícone, Riot ID e elo. */
+function HistoryBanner({ profile, splash, streak }: { profile: PlayerProfile | null; splash: string | null; streak: number }) {
+  const [art, setArt] = useState<"loading" | "ready" | "failed">("loading");
+  const [iconBroken, setIconBroken] = useState(false);
+  const rank = profile ? betterRank(profile.solo, profile.flex) : null;
+  const tier = rank?.state === "READY" && isTier(rank.tier) ? rank.tier : null;
+  const icon = profile ? profileIconUrl(profile) : null;
+  return (
+    <header className="history-banner">
+      {splash && art !== "failed" ? (
+        <img key={splash} className="history-banner__art" data-state={art} src={splash} alt="" decoding="async" referrerPolicy="no-referrer"
+          onLoad={() => setArt("ready")} onError={() => setArt("failed")} />
+      ) : null}
+      <div className="history-banner__inner">
+        <div className="history-banner__identity">
+          <span className="portrait history-banner__icon">
+            {icon && !iconBroken ? <img src={icon} alt="" width="72" height="72" onError={() => setIconBroken(true)} /> : <GameIcon name="crosshair" size={30} />}
+          </span>
+          <div>
+            <p className="history-banner__context">Histórico de partidas importadas</p>
+            <h2>Partidas para estudar</h2>
+            {profile ? (
+              <p className="history-banner__who">
+                <span>{profile.gameName}<span className="history-banner__tag">#{profile.tagLine}</span></span>
+                {tier ? <span className="history-banner__rank" data-tier={tier}><img src={emblemSrc(tier)} alt="" width="20" height="20" />{rankTitle(tier, rank?.division)} · {rank?.leaguePoints ?? 0} PDL</span> : null}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <div className="history-banner__side">
+          {streak >= 2 ? <span className="hud-tag hud-tag--hot"><GameIcon name="flame" size={14} /> {streak} vitórias seguidas</span> : null}
+          {/* CC-1202: a importação manual saiu do topo e fica junto das partidas. */}
+          <Link to="/importar" className="arrow-link history-banner__import">Importar partida</Link>
+        </div>
+      </div>
+    </header>
   );
 }
 
@@ -70,7 +163,7 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
   return (
     <section className="history-overview" aria-label="Resumo das suas partidas carregadas">
       <div className="history-card surface">
-        <h3 className="history-card__title">Desempenho</h3>
+        <h3 className="history-card__title"><GameIcon name="trophy" size={16} /> Desempenho</h3>
         <div className="history-perf">
           {rate !== null ? <WinRing rate={rate} /> : null}
           <div className="metric">
@@ -88,6 +181,9 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
             <p className="metric__foot">{decimal(summary.averages.kills)} / {decimal(summary.averages.deaths)} / {decimal(summary.averages.assists)} em média</p>
           ) : null}
         </div>
+        {winStreak(summary.recent) >= 2 ? (
+          <p className="history-streak"><GameIcon name="flame" size={16} /> {winStreak(summary.recent)} vitórias seguidas</p>
+        ) : null}
         {summary.recent.length ? (
           <div className="history-form">
             <p className="metric__label">Últimas {count(summary.recent.length, "partida", "partidas")}</p>
@@ -104,7 +200,7 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
       </div>
 
       <div className="history-card surface">
-        <h3 className="history-card__title">Campeões mais jogados</h3>
+        <h3 className="history-card__title"><GameIcon name="sword" size={16} /> Campeões mais jogados</h3>
         <ul className="history-champions" aria-label="Campeões mais jogados nas partidas carregadas">
           {summary.champions.map((champion) => {
             const decided = champion.wins + champion.losses;
@@ -127,7 +223,7 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
 
       {summary.roles.length ? (
         <div className="history-card surface">
-          <h3 className="history-card__title">Rotas</h3>
+          <h3 className="history-card__title"><GameIcon name="map" size={16} /> Rotas</h3>
           <ul className="history-roles" aria-label="Rotas jogadas nas partidas carregadas">
             {summary.roles.map((role) => {
               const decided = role.wins + role.losses;
@@ -147,7 +243,7 @@ function LoadedSummary({ matches }: { matches: MatchSummary[] }) {
   );
 }
 
-export function DayGroups({ matches }: { matches: MatchSummary[] }) {
+export function DayGroups({ matches, highlights = {} }: { matches: MatchSummary[]; highlights?: Record<string, string[]> }) {
   const now = new Date();
   const groups: { key: string; label: string; items: MatchSummary[] }[] = [];
   for (const match of matches) {
@@ -174,7 +270,7 @@ export function DayGroups({ matches }: { matches: MatchSummary[] }) {
               {dayKda !== null ? <small className="history-day__kda">KDA médio {decimal(dayKda, 2)}</small> : null}
             </h4>
             <ul className="history-list" aria-label={`Partidas de ${group.label}`}>
-              {group.items.map((match) => <MatchCard key={match.matchId} match={match} now={now} />)}
+              {group.items.map((match) => <MatchCard key={match.matchId} match={match} now={now} highlights={highlights[match.matchId]} />)}
             </ul>
           </section>
         );
@@ -203,26 +299,32 @@ export function HistoryPage() {
       scope: origin === "RIOT" ? "account" : origin === "DEMO" ? "demo" : "account_and_demo",
     }, signal),
   });
+  const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [progress, setProgress] = useState<LearningProgress | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    api.getOwnPlayer(controller.signal).then((own) => setProfile(own.profile ?? null)).catch(() => undefined);
+    api.getProgress(controller.signal).then(setProgress).catch(() => undefined);
+    return () => controller.abort();
+  }, []);
   const visible = filterLoadedMatches(list.items, query, origin, result, queue);
+  const loadedSummary = summarizeLoaded(list.items);
+  const highlights = loadedHighlights(list.items);
   const hasLocal = list.items.some((match) => match.localParticipantId != null);
   useDemoNotice(list.items.some((match) => isDemoMatchId(match.matchId)));
 
   return (
     <div className="history-page">
-      <header className="page-head history-head">
-        <div>
-          <p className="page-head__context">Histórico de partidas importadas</p>
-          <h2>Partidas para estudar</h2>
-          <p className="page-head__lead">Partidas da sua conta. Veja como foi cada partida e abra a análise das suas compras.</p>
-        </div>
-        {/* CC-1202: a importação manual saiu do topo e fica junto das partidas. */}
-        <Link to="/importar" className="arrow-link">Importar partida</Link>
-      </header>
+      <HistoryBanner profile={profile} streak={winStreak(loadedSummary.recent)}
+        splash={championSplashUrl(loadedSummary.champions[0]?.participant.champion?.imageFile)} />
 
       <HistorySync onNewMatches={list.refresh} latestIds={latestIds} knownIds={() => list.items.map((m) => m.matchId)} onPendingChange={setPending} />
 
       <div className={list.status === "ready" && list.items.length > 0 ? "history-shell history-shell--aside" : "history-shell"}>
-      {list.status === "ready" && list.items.length > 0 && <aside className="history-aside"><LoadedSummary matches={list.items} /></aside>}
+      {list.status === "ready" && list.items.length > 0 && <aside className="history-aside">
+        <LoadedSummary matches={list.items} />
+        {progress ? <StudyProgress progress={progress} /> : null}
+      </aside>}
       <div className="history-main">
       <section aria-label="Busca e filtros do histórico" className="history-controls surface">
         <div className="history-search">
@@ -253,7 +355,7 @@ export function HistoryPage() {
           </div>
           {visible.length ? (
             <>
-              <DayGroups matches={visible} />
+              <DayGroups matches={visible} highlights={highlights} />
               {list.loadMoreError ? <ErrorNotice error={list.loadMoreError} onRetry={list.loadMore} retryLabel="Tentar carregar mais" /> : null}
               {list.nextCursor !== null && <button className="button button--secondary history-more" type="button" onClick={list.loadMore} disabled={list.loadingMore}>{list.loadingMore ? "Carregando…" : "Carregar mais partidas"}</button>}
             </>

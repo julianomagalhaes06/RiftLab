@@ -65,7 +65,10 @@ describe("Campeões com padrões observados", () => {
     expect(screen.getByText(/O patch 16.22 ainda não está na janela de análise \(16.19 e 16.18\)/)).toBeInTheDocument();
     // O pedido sem patch deixa o servidor escolher o atual.
     expect(mock.callsTo("GET", /^\/api\/v1\/champions\/patterns$/).map((call) => call.search.get("patch"))).toEqual([null]);
-    fireEvent.change(select, { target: { value: "16.21" } });
+    // Estado vazio com saída: o botão leva ao patch mais novo da janela de análise.
+    fireEvent.click(screen.getByRole("button", { name: "Ver no patch 16.19" }));
+    await waitFor(() => expect(window.location.search).toContain("patch=16.19"));
+    fireEvent.change(screen.getByLabelText("Patch"), { target: { value: "16.21" } });
     expect(await screen.findByText("Partidas coletadas no patch 16.21")).toBeInTheDocument();
     expect(window.location.search).toContain("patch=16.21");
   });
