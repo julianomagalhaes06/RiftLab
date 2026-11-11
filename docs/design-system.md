@@ -144,6 +144,11 @@ sempre com contorno `accent` de 3 px.
   carregadas (no perfil, a lista marca o jogador pesquisado como participante local), escuro nos
   dois temas (no claro, os tokens de dentro voltam aos tons escuros, como o card de elo), véus em
   pixels e a sequência de vitórias em `.hud-tag--hot` quando ≥ 2.
+- **Perfil do jogador pesquisado** (`features/players/PlayerPage.tsx`): mesma página do Histórico
+  da conta abaixo do banner e dos cards de elo — coluna de resumo (`LoadedSummary` com
+  `subject="player"`), busca e filtros de fila e resultado, dias com placar e KDA médio,
+  conquistas e o cartão de partida com placar. As peças compartilhadas ficam em
+  `features/history/HistoryParts.tsx`.
 - **Linha de partida** (outras telas): barra de resultado, "Vitória"/"Derrota" na cor do
   resultado, retrato de 36 px, campeão e fila, data e duração, K / D / A e tropas, ação em roxo.
 - **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px

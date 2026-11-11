@@ -319,3 +319,25 @@ for (const width of [360, 1280]) {
     }
   });
 }
+
+test("perfil do jogador: resumo, busca, filtros e conquistas como no Histórico da conta", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await offline(page);
+  await mockApi(page, { "GET /api/v1/matches": ({ url }) => ok({ items: url.searchParams.get("player") ? [0, 1, 2, 3].map(richMatch) : [], nextCursor: null }) });
+  await page.goto("/historico");
+  const search = page.getByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
+  await search.fill("Jogador Teste");
+  await search.press("Enter");
+  const summary = page.getByRole("region", { name: "Resumo das partidas carregadas do jogador" });
+  await expect(summary.getByText("Taxa de vitória")).toBeVisible();
+  await expect(summary.getByRole("list", { name: /Resultados recentes/ }).getByRole("listitem")).toHaveCount(4);
+  await expect(page.locator(".player .chip--gold").first()).toBeVisible();
+  await expect(page.locator(".player .match-card")).toHaveCount(4);
+  await page.getByRole("group", { name: "Resultado" }).getByRole("button", { name: "Derrotas" }).click();
+  await expect(page.locator(".player .match-card")).toHaveCount(1);
+  await expect(page.getByText("1 de 4 carregadas neste filtro")).toBeVisible();
+  await page.getByRole("group", { name: "Resultado" }).getByRole("button", { name: "Todos" }).click();
+  await page.getByRole("searchbox", { name: "Buscar campeão ou partida" }).fill("BR1_702");
+  await expect(page.locator(".player .match-card")).toHaveCount(1);
+  await noHorizontalScroll(page);
+});

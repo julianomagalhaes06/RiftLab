@@ -3,8 +3,9 @@ import { api, type MatchSummary, type PlayerProfile, type PlayerRank } from "../
 import { isAbortError, isApiError } from "../../shared/api/errors";
 import { usePagedList } from "../../shared/hooks/usePagedList";
 import { count } from "../../shared/text/count";
-import { DayGroups } from "../history/HistoryPage";
-import { summarizeLoaded, winStreak } from "../history/presentation";
+import { DayGroups, FilterGroup, LoadedSummary } from "../history/HistoryParts";
+import { filterLoadedMatches, type QueueFilter, type ResultFilter } from "../history/filter";
+import { loadedHighlights, summarizeLoaded, winStreak } from "../history/presentation";
 import { championSplashUrl } from "../matches/format";
 import { GameIcon } from "../../shared/ui/GameIcon";
 import { SplashArt } from "../../shared/ui/SplashArt";
@@ -117,29 +118,64 @@ function PlayerMatches({ profile, onRefresh, onBanner }: { profile: PlayerProfil
     }),
     [profile.id, profile.gameName, profile.tagLine, onRefresh],
   );
+  const [query, setQuery] = useState("");
+  const [result, setResult] = useState<ResultFilter>("ALL");
+  const [queue, setQueue] = useState<QueueFilter>("ALL");
+  const visible = filterLoadedMatches(list.items, query, "ALL", result, queue);
+  const highlights = loadedHighlights(list.items);
+  const hasLocal = list.items.some((match) => match.localParticipantId != null);
+  const ready = list.status === "ready" && list.items.length > 0;
+  // Mesma página do Histórico da conta: coluna de resumo, busca e filtros, dias e cartões.
   return (
     <>
       <HistorySync onNewMatches={list.refresh} calls={calls} latestIds={latestIds} knownIds={() => list.items.map((m) => m.matchId)} onPendingChange={setPending} />
-      <section aria-labelledby="player-matches-heading">
-        <h3 id="player-matches-heading">Partidas importadas</h3>
-        {pending ? <SyncPendingBox pending={pending} /> : null}
-        {list.status === "loading" && !pending ? <p className="muted" aria-busy="true">Carregando partidas…</p> : null}
-        {list.status === "error" ? <p className="muted">As partidas não puderam ser carregadas agora.</p> : null}
-        {list.status === "ready" && !list.items.length && !pending ? (
-          <p className="muted">Nenhuma partida deste jogador importada ainda. A atualização busca as ranqueadas recentes.</p>
-        ) : null}
-        {list.items.length ? (
-          <>
-            <p className="muted">{count(list.items.length, "partida carregada", "partidas carregadas")}</p>
-            <DayGroups matches={list.items} />
-          </>
-        ) : null}
-        {list.nextCursor !== null ? (
-          <button type="button" className="button button--secondary" onClick={list.loadMore} disabled={list.loadingMore}>
-            {list.loadingMore ? "Carregando…" : "Carregar mais partidas"}
-          </button>
-        ) : null}
-      </section>
+      <div className={ready ? "history-shell history-shell--aside" : "history-shell"}>
+        {ready ? <aside className="history-aside"><LoadedSummary matches={list.items} subject="player" /></aside> : null}
+        <div className="history-main">
+          {list.items.length ? (
+            <section aria-label="Busca e filtros das partidas do jogador" className="history-controls surface">
+              <div className="history-search">
+                <label htmlFor="player-query">Buscar campeão ou partida</label>
+                <input id="player-query" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nome do campeão ou ID da partida" aria-describedby="player-search-scope" />
+                <p id="player-search-scope">Nas páginas carregadas; vale o campeão de qualquer participante.</p>
+              </div>
+              <div className="history-filters">
+                <FilterGroup<QueueFilter> label="Fila" value={queue} onChange={setQueue} options={[["ALL", "Todas as filas"], [420, "Solo/Duo"], [440, "Flex"]] as const} />
+                {hasLocal ? (
+                  <FilterGroup<ResultFilter> label="Resultado" value={result} onChange={setResult} options={[["ALL", "Todos"], ["WIN", "Vitórias"], ["LOSS", "Derrotas"]] as const} />
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+          <section aria-labelledby="player-matches-heading" className="history-results">
+            <div className="history-list-heading">
+              <h3 id="player-matches-heading">Partidas importadas</h3>
+              {list.items.length ? <span>{visible.length} de {count(list.items.length, "carregada", "carregadas")} neste filtro</span> : null}
+            </div>
+            {pending ? <SyncPendingBox pending={pending} /> : null}
+            {list.status === "loading" && !pending ? <div className="history-state" role="status" aria-busy="true">Carregando partidas…</div> : null}
+            {list.status === "error" ? <div className="history-state">As partidas não puderam ser carregadas agora.</div> : null}
+            {list.status === "ready" && !list.items.length && !pending ? (
+              <div className="empty-state">
+                <h4>Nenhuma partida importada</h4>
+                <p>Nenhuma partida deste jogador importada ainda. A atualização busca as ranqueadas recentes.</p>
+              </div>
+            ) : null}
+            {list.items.length && !visible.length ? (
+              <div className="empty-state">
+                <h4>Nenhuma partida neste filtro</h4>
+                <p>Ajuste a busca ou carregue mais páginas.</p>
+              </div>
+            ) : null}
+            {visible.length ? <DayGroups matches={visible} highlights={highlights} /> : null}
+            {list.nextCursor !== null ? (
+              <button type="button" className="button button--secondary history-more" onClick={list.loadMore} disabled={list.loadingMore}>
+                {list.loadingMore ? "Carregando…" : "Carregar mais partidas"}
+              </button>
+            ) : null}
+          </section>
+        </div>
+      </div>
     </>
   );
 }
