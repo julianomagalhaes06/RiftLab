@@ -27,9 +27,25 @@ function LocalizedItemPortrait({ item }: { item: NonNullable<ChampionPatterns["p
   const [failed, setFailed] = useState(false);
   return <span className="pattern-item">
     {!failed && <img src={`https://ddragon.leagueoflegends.com/cdn/${item.dataDragonVersion}/img/item/${item.itemId}.png`}
-      alt="" width={40} height={40} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />}
+      alt="" width={48} height={48} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />}
     <span>{name(item)}</span>
   </span>;
+}
+
+const SPLASH_BASE = "https://ddragon.leagueoflegends.com/cdn/img/champion/splash";
+
+/** Splash art oficial do campeão (Data Dragon): a chave é o nome do arquivo do retrato. */
+function championSplashUrl(imageFile: string | null | undefined): string | null {
+  const key = imageFile?.replace(/\.png$/, "");
+  return key && /^[A-Za-z0-9]+$/.test(key) ? `${SPLASH_BASE}/${key}_0.jpg` : null;
+}
+
+/** Arte decorativa atrás do cabeçalho; some se falhar (fica o fundo neutro). */
+function ChampionSplash({ src }: { src: string }) {
+  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  if (state === "failed") return null;
+  return <img className="champion-overview__art" data-state={state} src={src} alt="" decoding="async"
+    referrerPolicy="no-referrer" onLoad={() => setState("ready")} onError={() => setState("failed")} />;
 }
 
 export function ChampionsPage() {
@@ -65,6 +81,7 @@ export function ChampionsPage() {
     next.set(name, value);
     navigate(`/campeoes?${next.toString()}`);
   }
+  const splash = championSplashUrl(chosen?.champion?.imageFile);
   return <div className="area-page champions-page">
     <header className="page-head">
       <p className="page-head__context">Campeões · estudo pós-partida</p>
@@ -76,88 +93,107 @@ export function ChampionsPage() {
       <p>Confira a conexão com o servidor e tente novamente.</p>
       <button type="button" onClick={() => { setErrorKey(null); setRetry(retry + 1); }}>Tentar novamente</button>
     </section> : !data ? <p role="status">Carregando campeões e amostra local…</p> : <>
-      <div className="champions-filters surface surface--pad" aria-label="Filtros dos padrões observados">
+      {/* Seletor em retratos (como a grade de campeões do u.gg); escolhido com véu e barra roxos. */}
+      <nav className="champions-roster" aria-labelledby="champions-roster-heading">
+        <div className="champions-roster__head">
+          <h3 id="champions-roster-heading">Campeões em foco</h3>
+          <p className="champions-roster__patch">Partidas coletadas no patch {patchLabel(data.patch, data.currentPatch)}</p>
+        </div>
+        <ul className="champions-roster__list">
+          {roster.map((champion) => {
+            const pressed = champion.championId === (championId ?? data.championId);
+            return <li key={champion.championId} className={pressed ? "result-bar is-selected" : undefined}>
+              <button type="button" aria-pressed={pressed} onClick={() => update("champion", String(champion.championId))}>
+                <ChampionBadge participant={champion} size={48} />
+                <small>{loading ? "Carregando…" : champion.matches ? count(champion.matches, "partida", "partidas") : "Sem partidas"}</small>
+              </button>
+            </li>;
+          })}
+        </ul>
+        {/* CC-904: campeões sem partida no filtro saem da lista e viram uma linha. */}
+        {absent.length ? <p className="champions-roster__absent">Sem partidas no patch {data.patch}: {absent.map((c) => championName(c)).join(", ")}.</p> : null}
+      </nav>
+
+      <div className="champions-filters surface" aria-label="Filtros dos padrões observados">
         <label>Patch<select value={patch ?? data.patch ?? ""} onChange={(event) => update("patch", event.target.value)}>
           {data.patches.map((value) => <option key={value} value={value}>{patchLabel(value, data.currentPatch)}</option>)}
           {data.patch && !data.patches.includes(data.patch) && <option value={data.patch}>{patchLabel(data.patch, data.currentPatch)}</option>}
         </select></label>
-        <label>Função<select value="BOTTOM" disabled><option value="BOTTOM">Atirador · rota inferior</option></select></label>
         <label>Etapa da build<select value={phase} onChange={(event) => update("phase", event.target.value)}>
           {Object.entries(PHASES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <p>Origem: partidas reais importadas. Até {data.sampleLimit} participações recentes por campeão. O guia cobre hoje os atiradores da rota inferior.</p>
+        <div className="champions-filters__role"><span>Função</span><span className="chip">Atirador · rota inferior</span></div>
+        <p>Partidas reais importadas, até {data.sampleLimit} participações recentes por campeão. O guia cobre hoje os atiradores da rota inferior.</p>
       </div>
-      <div className="champions-layout">
-        {/* CC-1206: lista como "Campeões em foco" do Painel; escolhido com véu e barra roxos. */}
-        <nav className="champions-roster" aria-labelledby="champions-roster-heading">
-          <div className="section-head"><h3 id="champions-roster-heading">Campeões em foco</h3></div>
-          <p className="champions-roster__patch">Partidas coletadas no patch {patchLabel(data.patch, data.currentPatch)}</p>
-          <ul className="row-list surface">
-            {roster.map((champion) => {
-              const pressed = champion.championId === (championId ?? data.championId);
-              return <li key={champion.championId} className={pressed ? "result-bar is-selected" : undefined}>
-                <button type="button" aria-pressed={pressed} onClick={() => update("champion", String(champion.championId))}>
-                  <ChampionBadge participant={champion} size={36} />
-                  <small>{loading ? "Carregando…" : champion.matches ? count(champion.matches, "partida", "partidas") : "Sem partidas"}</small>
-                </button>
-              </li>;
-            })}
-          </ul>
-          {/* CC-904: campeões sem partida no filtro saem da lista e viram uma linha. */}
-          {absent.length ? <p className="champions-roster__absent">Sem partidas no patch {data.patch}: {absent.map((c) => championName(c)).join(", ")}.</p> : null}
-        </nav>
-        <div className="champions-content" aria-live="polite" aria-busy={loading}>
-          {loading ? <p role="status">Carregando padrões deste filtro…</p> : <>
-          <section className="champion-overview surface surface--pad">
-            <p className="champion-overview__context">BOTTOM · patch {patchLabel(data.patch, data.currentPatch)}</p>
-            <h3>{chosen ? <ChampionBadge participant={chosen} size={56} /> : "Campeão fora do recorte"}</h3>
+
+      <div className="champions-content" aria-live="polite" aria-busy={loading}>
+        {loading ? <p role="status">Carregando padrões deste filtro…</p> : <>
+        <section className="champion-overview" data-art={splash ? "splash" : "none"}>
+          {splash ? <ChampionSplash key={splash} src={splash} /> : null}
+          <div className="champion-overview__inner">
+            <p className="champion-overview__context">Atirador · rota inferior · patch {patchLabel(data.patch, data.currentPatch)}</p>
+            <h3>{chosen ? <ChampionBadge participant={chosen} size={72} /> : "Campeão fora do recorte"}</h3>
             <dl className="champion-stats">
               <div><dt className="metric__label">Participações examinadas</dt><dd>{data.sampledParticipations} de {data.totalParticipations}</dd></div>
               <div><dt className="metric__label">Decisões elegíveis na etapa</dt><dd>{data.eligibleDecisions} de {data.observedDecisions}</dd></div>
               <div><dt className="metric__label">Trajetos completos na etapa</dt><dd>{data.patternDenominator}</dd></div>
             </dl>
             <p className="metric__foot">Cobertura sobre compras principais reconstruídas na etapa selecionada. Ausência de dados não significa ausência de compras.</p>
-          </section>
-          <section className="surface surface--pad champion-patterns" aria-labelledby="patterns-heading">
-            <div className="section-head"><h3 id="patterns-heading">Trajeto de itens</h3><span className="chip">Padrão observado</span></div>
-            <p>Frequência descreve o que aconteceu. Não é uma build ideal nem uma avaliação da qualidade da decisão.</p>
-            <p className="muted">Até seis trajetos mais frequentes; as demais sequências permanecem no denominador.</p>
-            {data.status === "AVAILABLE" ? <ol className="pattern-list" aria-label="Trajetos observados">
-              {(data.patterns ?? []).map((pattern, index) => <li key={index}>
+          </div>
+        </section>
+        <div className="champions-columns">
+        <section className="surface surface--pad champion-patterns" aria-labelledby="patterns-heading">
+          <div className="section-head"><h3 id="patterns-heading">Trajeto de itens</h3><span className="chip">Padrão observado</span></div>
+          <p>Frequência descreve o que aconteceu, não uma build ideal nem uma nota para a decisão. Até seis trajetos mais frequentes; as demais sequências seguem no denominador.</p>
+          {data.status === "AVAILABLE" ? <ol className="pattern-list" aria-label="Trajetos observados">
+            {(data.patterns ?? []).map((pattern, index) => {
+              const share = pattern.denominator ? pattern.count / pattern.denominator : 0;
+              return <li key={index}>
+                <span className="pattern-rank" aria-hidden="true">{index + 1}</span>
                 <div className="pattern-sequence">{pattern.items.map((item, itemIndex) => <span key={`${itemIndex}-${item.itemId}-${item.dataDragonVersion}`}>
                   {itemIndex > 0 && <span className="pattern-arrow" aria-hidden="true">→</span>}
                   <ItemPortrait item={item} />
                 </span>)}</div>
-                <strong>{pattern.count} de {pattern.denominator} <small>({Math.round(100 * pattern.count / pattern.denominator)}%)</small></strong>
-              </li>)}
-            </ol> : <div className="champion-empty" role="status">
-              <h4>{data.status === "SMALL_SAMPLE" ? "Amostra insuficiente para publicar padrões" : data.status === "OUT_OF_SCOPE" ? "Seleção fora do recorte validado" : "Ainda não há trajetos elegíveis neste filtro"}</h4>
-              {data.status === "OUT_OF_SCOPE" && data.patch && !(data.analysisPatches ?? []).includes(data.patch)
-                ? <p>O patch {data.patch} ainda não está na janela de análise{(data.analysisPatches ?? []).length ? ` (${(data.analysisPatches ?? []).join(" e ")})` : ""}. Os padrões só são publicados para patches da janela; a contagem de partidas continua visível.</p>
-                : <p>São necessárias pelo menos {data.minimumSample} participações com a etapa completa e elegível. Nenhum padrão é preenchido por estimativa.</p>}
-            </div>}
-            <p className="champion-limit">Sem ranking de itens validado para este guia. O baseline de popularidade usado no estudo é separado desta amostra local.</p>
-          </section>
-          <section className="surface surface--pad champion-study" aria-labelledby="champion-study-heading">
-            <div className="section-head"><h3 id="champion-study-heading">Do padrão à sua decisão</h3></div>
-            <p>Antes de revelar a comparação, observe o inventário, o ouro aproximado e os adversários naquela situação.</p>
-            <ul className="champion-questions">
+                <div className="pattern-share">
+                  <strong>{pattern.count} de {pattern.denominator} <small>({Math.round(100 * share)}%)</small></strong>
+                  <span className="pattern-bar" aria-hidden="true"><span style={{ width: `${share * 100}%` }} /></span>
+                </div>
+              </li>;
+            })}
+          </ol> : <div className="champion-empty" role="status">
+            <h4>{data.status === "SMALL_SAMPLE" ? "Amostra insuficiente para publicar padrões" : data.status === "OUT_OF_SCOPE" ? "Seleção fora do recorte validado" : "Ainda não há trajetos elegíveis neste filtro"}</h4>
+            {data.status === "OUT_OF_SCOPE" && data.patch && !(data.analysisPatches ?? []).includes(data.patch)
+              ? <p>O patch {data.patch} ainda não está na janela de análise{(data.analysisPatches ?? []).length ? ` (${(data.analysisPatches ?? []).join(" e ")})` : ""}. Os padrões só são publicados para patches da janela; a contagem de partidas continua visível.</p>
+              : <p>São necessárias pelo menos {data.minimumSample} participações com a etapa completa e elegível. Nenhum padrão é preenchido por estimativa.</p>}
+          </div>}
+          <p className="champion-limit">Sem ranking de itens validado para este guia. O baseline de popularidade usado no estudo é separado desta amostra local.</p>
+        </section>
+        <section className="surface surface--pad champion-study" aria-labelledby="champion-study-heading">
+          <div className="section-head"><h3 id="champion-study-heading">Do padrão à sua decisão</h3></div>
+          <p>Antes de revelar a comparação, observe o inventário, o ouro aproximado e os adversários naquela situação.</p>
+          {(data.situations ?? []).length > 0 ? <ul className="champion-situations" aria-label="Situações para estudar">
+            {(data.situations ?? []).map((situation) => <li key={situation.decisionId}>
+              <div className="champion-situation__head">
+                <span className="champion-situation__minute">{Math.floor(situation.timestampMs / 60000)}<small>min</small></span>
+                <div><strong>{situation.matchId}</strong><span>Participante {situation.participantId}</span></div>
+              </div>
+              <div className="champion-situation-actions">
+                <Link className="arrow-link" to={`/decisions/${situation.decisionId}`}>Analisar decisão</Link>
+                <Link className="arrow-link" to={`/historico/${situation.matchId}?participant=${situation.participantId}`}>Abrir contexto</Link>
+              </div>
+            </li>)}
+          </ul> : <Link className="arrow-link" to="/historico">Examinar partidas no Histórico</Link>}
+          <details className="champion-questions">
+            <summary>Perguntas para guiar o estudo</summary>
+            <ul>
               <li>Quais componentes já estavam no inventário e quais alternativas os aproveitam?</li>
               <li>Que ameaças a composição adversária apresentava naquele momento?</li>
               <li>O objetivo pede mais dano, sobrevivência ou utilidade? Que informação ainda falta?</li>
             </ul>
-            {(data.situations ?? []).length > 0 ? <ul className="champion-situations" aria-label="Situações para estudar">
-              {(data.situations ?? []).map((situation) => <li key={situation.decisionId}>
-                <div><strong>{situation.matchId}</strong><span>Participante {situation.participantId} · {Math.floor(situation.timestampMs / 60000)} min</span></div>
-                <div className="champion-situation-actions">
-                  <Link className="arrow-link" to={`/decisions/${situation.decisionId}`}>Analisar decisão</Link>
-                  <Link className="arrow-link" to={`/historico/${situation.matchId}?participant=${situation.participantId}`}>Abrir contexto</Link>
-                </div>
-              </li>)}
-            </ul> : <Link className="arrow-link" to="/historico">Examinar partidas no Histórico</Link>}
-          </section>
-          </>}
+          </details>
+        </section>
         </div>
+        </>}
       </div>
     </>}
   </div>;

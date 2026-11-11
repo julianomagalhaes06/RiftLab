@@ -13,7 +13,9 @@ No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitiv
 ## Princípios
 
 1. **Base neutra.** Fundo `n0`, superfícies `n1`, linhas `nline`. Nada de gradiente de fundo,
-   grade ou brilho fora do card de elo.
+   grade ou brilho fora do card de elo, com três exceções: a splash art com véus da vitrine do
+   Início e do cabeçalho de Campeões, e a tinta do resultado (`win-tint`/`loss-tint`, da
+   esquerda para a direita) no cartão de partida do Histórico.
 2. **Cada cor tem um papel.** Roxo só para ação e seleção (link, aba ativa, foco, item
    escolhido). Verde e vermelho só para resultado (vitória, derrota, ganho e perda de PDL). A cor
    do elo só na classificação (card de elo, linha do elo no chip do perfil).
@@ -109,10 +111,26 @@ sempre com contorno `accent` de 3 px.
 
 - **Card de métricas** (`.surface`): duas métricas lado a lado com divisória vertical; abaixo, uma
   faixa secundária (ex.: decisões revistas, campeões no recorte com retratos de 22 px).
-- **Linha de partida**: barra de resultado, "Vitória"/"Derrota" na cor do resultado, retrato de
-  36 px, campeão e fila, data e duração, K / D / A e tropas, ação "Contexto" em roxo. No celular,
-  retrato + campeão + resultado e data à esquerda; K/D/A e "Contexto →" à direita.
-- **Linha de campeão**: retrato de 36 px, nome + contagem, função e subtítulo, "Ver guia →".
+- **Cartão de partida do Histórico** (refeito em 11/11/2026 a partir dos perfis do tracker.gg,
+  u.gg e Mobalytics): superfície com tinta do resultado da esquerda para a direita e borda
+  `win-surface`/`loss-surface`, barra de 3 px; fila, tempo, resultado em 15 px e duração;
+  retrato de 56 px com a rota; K / D / A em 19 px (mortes em `loss`) e KDA; itens em grade 3 × 2
+  com o amuleto redondo ao lado (casas vazias marcadas); participação em abates e farm; os dois
+  times em faixas de cinco retratos de 24 px com filete `team-blue`/`team-red` (a conta própria
+  com anel `accent`, nomes no texto acessível e na dica); selos, "Analisar →" e o botão de 44 px
+  que abre o placar das duas equipes dentro do cartão (tabela por time: campeão, KDA, farm e
+  itens; no celular, sem a coluna de itens). Coluna de resumo à esquerda (anel da taxa de
+  vitória, KDA, últimos 20 resultados em quadrados V/D, campeões mais jogados com taxa e KDA,
+  rotas); grupos por dia com quantidade, placar e KDA médio; filtros em grupos encostados.
+- **Linha de partida** (outras telas): barra de resultado, "Vitória"/"Derrota" na cor do
+  resultado, retrato de 36 px, campeão e fila, data e duração, K / D / A e tropas, ação em roxo.
+- **Campeões** (refeito em 11/11/2026 a partir das páginas de build do op.gg e do u.gg):
+  seletor em cartões de retrato de 48 px (escolhido com borda `accent-strong` e `.is-selected`),
+  filtros numa barra (patch, etapa e a função como selo), cabeçalho escuro nos dois temas sobre a
+  splash art do campeão com véus medidos em pixels (texto ≥ 4,5:1 até sobre arte branca, ver
+  `ui-polish.spec.ts`), números da amostra com filete roxo claro (`hero-accent`), trajetos com
+  posição, ícones de 48 px com o nome embaixo e barra de frequência neutra, e as situações para
+  estudar em cartões com o minuto, com as perguntas guia num `details`.
 - **Card de elo** (`.surface.surface--rank.brackets`): título em caixa alta 16 px, selo BR1 com
   fundo `deep` e texto `text` do elo, emblema oficial com halo, elo e divisão em Chakra Petch na
   cor `text`, legenda da observação, trilha de placas IV → I (concluída: metal escuro com filete;
@@ -125,9 +143,9 @@ No código: card de elo em `features/ranked/RankCard.tsx` (estilo em `rank-card.
 escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; card de elo
 da conta no Painel (Solo/Duo e Flex) em `features/ranked/MyRank.tsx`; página do
 jogador (cabeçalho e um card de elo por fila) em `features/players/PlayerPage.tsx`; Histórico
-(card de métricas, filtros `.segmented` e uma superfície por partida com `.result-bar` no artigo)
-em `features/history/`; Campeões (lista como "Campeões em foco", escolhido com `.is-selected`) em
-`features/champions/`; partida, decisão e importação em `features/matches/` e
+(coluna de resumo, filtros `.segmented` encostados e o cartão de partida em `MatchCard.tsx`, que
+a página do jogador também usa) em `features/history/`; Campeões (seletor em retratos,
+cabeçalho com splash e trajetos) em `features/champions/`; partida, decisão e importação em `features/matches/` e
 `features/imports/`, com `.surface` nos painéis e barra de resultado no `::after` do cabeçalho
 da partida (o `::before` da superfície é o fundo). Os selos antigos `.badge`/`.tag` têm a forma
 do `.chip`; a classe antiga `.section` (borda no topo) só fica como divisória entre blocos dentro

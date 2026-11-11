@@ -188,6 +188,12 @@ export function record(matches: MatchSummary[]): RecordSummary {
 
 export interface ChampionRecord extends RecordSummary {
   participant: MatchParticipant;
+  /** KDA de somas nas partidas desse campeão com placar completo. */
+  kda: number | null;
+}
+
+export interface RoleRecord extends RecordSummary {
+  role: string;
 }
 
 export interface LoadedSummary extends RecordSummary {
@@ -195,6 +201,10 @@ export interface LoadedSummary extends RecordSummary {
   kda: number | null;
   averages: { kills: number; deaths: number; assists: number } | null;
   champions: ChampionRecord[];
+  /** Resultados da conta, da partida mais nova para a mais antiga (até 20). */
+  recent: Array<"WIN" | "LOSS">;
+  /** Rotas jogadas pela conta, da mais frequente para a menos. */
+  roles: RoleRecord[];
 }
 
 /** Resumo só das partidas carregadas em que a conta local foi identificada. */
@@ -209,14 +219,30 @@ export function summarizeLoaded(matches: MatchSummary[]): LoadedSummary {
     }),
     { kills: 0, deaths: 0, assists: 0 },
   );
-  const byChampion = new Map<number, ChampionRecord>();
+  const byChampion = new Map<number, ChampionRecord & { kills: number; deaths: number; assists: number; scored: number }>();
+  const byRole = new Map<string, RoleRecord>();
   for (const performance of performances) {
-    const id = performance.participant.championId;
-    const entry = byChampion.get(id) ?? { participant: performance.participant, games: 0, wins: 0, losses: 0 };
+    const { participant } = performance;
+    const entry = byChampion.get(participant.championId)
+      ?? { participant, games: 0, wins: 0, losses: 0, kda: null, kills: 0, deaths: 0, assists: 0, scored: 0 };
     entry.games += 1;
     if (performance.result === "WIN") entry.wins += 1;
     if (performance.result === "LOSS") entry.losses += 1;
-    byChampion.set(id, entry);
+    if (performance.kda !== null) {
+      entry.kills += participant.kills ?? 0;
+      entry.deaths += participant.deaths ?? 0;
+      entry.assists += participant.assists ?? 0;
+      entry.scored += 1;
+      entry.kda = (entry.kills + entry.assists) / Math.max(1, entry.deaths);
+    }
+    byChampion.set(participant.championId, entry);
+    if (participant.role) {
+      const role = byRole.get(participant.role) ?? { role: participant.role, games: 0, wins: 0, losses: 0 };
+      role.games += 1;
+      if (performance.result === "WIN") role.wins += 1;
+      if (performance.result === "LOSS") role.losses += 1;
+      byRole.set(participant.role, role);
+    }
   }
   const { wins, losses } = record(matches);
   return {
@@ -231,7 +257,12 @@ export function summarizeLoaded(matches: MatchSummary[]): LoadedSummary {
           assists: totals.assists / scored.length,
         }
       : null,
-    champions: [...byChampion.values()].sort((a, b) => b.games - a.games || b.wins - a.wins).slice(0, 3),
+    champions: [...byChampion.values()]
+      .sort((a, b) => b.games - a.games || b.wins - a.wins)
+      .slice(0, 5)
+      .map(({ participant, games, wins: w, losses: l, kda }) => ({ participant, games, wins: w, losses: l, kda })),
+    recent: performances.flatMap((p) => (p.result ? [p.result] : [])).slice(0, 20),
+    roles: [...byRole.values()].sort((a, b) => b.games - a.games),
   };
 }
 

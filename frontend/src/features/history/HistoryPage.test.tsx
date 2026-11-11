@@ -83,8 +83,8 @@ describe("Histórico com dados realmente disponíveis", () => {
     expect(within(overview).getByText("1D")).toBeInTheDocument();
     const winCard = screen.getByRole("article", { name: /^Smolder — Ranqueada Flex/ });
     expect(within(winCard).getByText("Vitória")).toBeInTheDocument();
-    // CC-1205: superfície chanfrada por partida e barra de resultado de 3 px, sem fundo tingido.
-    expect(winCard.closest("li")).toHaveClass("match-card", "surface");
+    // Superfície chanfrada por partida, fundo tingido pelo resultado e barra de 3 px.
+    expect(winCard.closest("li")).toHaveClass("match-card", "match-card--win", "surface");
     expect(winCard).toHaveAttribute("data-result", "win");
     expect(within(winCard).getByText("Vitória")).toHaveClass("result-text--win");
     expect(within(overview).getByText("Taxa de vitória")).toBeInTheDocument();
@@ -93,6 +93,24 @@ describe("Histórico com dados realmente disponíveis", () => {
     expect(within(winCard).getByText("68%")).toBeInTheDocument(); // (7 + 6) ÷ (7 + 4 × 3) abates do time
     expect(within(winCard).getByRole("list", { name: "Time vermelho" })).toBeInTheDocument();
     expect(within(winCard).getByRole("link", { name: "Contexto da partida BR1_1" })).toHaveAttribute("href", "/historico/BR1_1?participant=4");
+    // Forma recente (mais nova primeiro) e KDA por campeão na coluna de resumo.
+    const form = within(overview).getByRole("list", { name: /Resultados recentes/ });
+    expect(within(form).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["VVitória", "DDerrota"]);
+    expect(within(overview).getByText("1,70 KDA")).toBeInTheDocument(); // (7 + 2 + 6 + 2) ÷ (4 + 6)
+    expect(within(overview).getByText("Atirador")).toBeInTheDocument();
+    // Placar das duas equipes aberto dentro do cartão.
+    const toggle = within(winCard).getByRole("button", { name: "Mostrar placar da partida" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAccessibleName("Ocultar placar da partida");
+    const details = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+    const blue = within(details).getByRole("table", { name: "Time azul Vitória" });
+    expect(within(blue).getAllByRole("rowheader").map((row) => row.textContent)).toContain("Smolder você");
+    expect(within(blue).getByText("7 / 4 / 6")).toBeInTheDocument();
+    expect(within(details).getByRole("table", { name: "Time vermelho Derrota" })).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Derrotas" }));
     expect(screen.queryByRole("article", { name: /Ranqueada Flex/ })).not.toBeInTheDocument();

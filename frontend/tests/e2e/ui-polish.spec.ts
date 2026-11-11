@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { championPatterns } from "../../src/test/championPatterns";
 import { mockApi, ok } from "./support/mock-api";
 
 /**
@@ -163,6 +164,31 @@ for (const theme of ["dark", "light"] as const) {
 // a arte trocada por uma imagem toda branca. O texto fica transparente para fotografar só o fundo
 // atrás de cada linha; o contraste usa o pixel claro do percentil 95 (o brilho do texto não conta).
 const WHITE_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGP4DwABAQEAG7buVgAAAABJRU5ErkJggg==", "base64");
+/** Contraste do texto (cor já lida) contra o pixel claro do percentil 95 do fundo atrás dele;
+ * o texto precisa estar transparente antes da captura. */
+async function contrastOverBackground(page: Page, selector: string, color: string): Promise<number> {
+  const png = (await page.locator(selector).first().screenshot()).toString("base64");
+  return page.evaluate(async ({ png, color }) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${png}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext("2d")!;
+    context.drawImage(image, 0, 0);
+    const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const channel = (value: number) => { const v = value / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    const luminance = (r: number, g: number, b: number) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    const values: number[] = [];
+    for (let offset = 0; offset < data.length; offset += 4) values.push(luminance(data[offset], data[offset + 1], data[offset + 2]));
+    values.sort((a, b) => a - b);
+    const background = values[Math.floor(values.length * 0.95)];
+    const [r, g, b] = color.match(/\d+/g)!.map(Number);
+    const text = luminance(r, g, b);
+    return (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05);
+  }, { png, color });
+}
 const HERO_TEXTS: Array<[string, string, number]> = [
   ["selo", ".home-hero__kicker > span:last-child", 4.5],
   ["título", ".home-hero__title", 3],
@@ -181,30 +207,67 @@ for (const width of [360, 1280]) {
     await page.addStyleTag({ content: ".home-hero__inner *, .home-hero__credit { color: transparent !important; text-shadow: none !important; } .player-search--hero { visibility: hidden; } .home-hero__art { transition: none !important; transform: none !important; opacity: 1 !important; }" });
     const ratios: Record<string, number> = {};
     for (const [index, [name, selector, minimum]] of HERO_TEXTS.entries()) {
-      const png = (await page.locator(selector).screenshot()).toString("base64");
-      const ratio = await page.evaluate(async ({ png, color }) => {
-        const image = new Image();
-        image.src = `data:image/png;base64,${png}`;
-        await image.decode();
-        const canvas = document.createElement("canvas");
-        canvas.width = image.width;
-        canvas.height = image.height;
-        const context = canvas.getContext("2d")!;
-        context.drawImage(image, 0, 0);
-        const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
-        const channel = (value: number) => { const v = value / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-        const luminance = (r: number, g: number, b: number) => 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-        const values: number[] = [];
-        for (let offset = 0; offset < data.length; offset += 4) values.push(luminance(data[offset], data[offset + 1], data[offset + 2]));
-        values.sort((a, b) => a - b);
-        const background = values[Math.floor(values.length * 0.95)];
-        const [r, g, b] = color.match(/\d+/g)!.map(Number);
-        const text = luminance(r, g, b);
-        return (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05);
-      }, { png, color: colors[index] });
+      const ratio = await contrastOverBackground(page, selector, colors[index]);
       ratios[name] = Math.round(ratio * 100) / 100;
       expect(ratio, `${name}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(minimum);
     }
     test.info().annotations.push({ type: "contraste", description: JSON.stringify(ratios) });
+  });
+}
+
+// Histórico refeito (11/11/2026): cartão tingido pelo resultado, placar que abre no próprio cartão
+// e coluna de resumo. Campeões: cabeçalho sobre a splash art do campeão.
+const CHAMPS: Array<[number, string]> = [[51, "Caitlyn"], [222, "Jinx"], [412, "Thresh"], [64, "LeeSin"], [103, "Ahri"], [21, "MissFortune"], [117, "Lulu"], [86, "Garen"], [202, "Jhin"], [145, "Kaisa"]];
+function richMatch(index: number) {
+  const win = index % 3 !== 1;
+  const participants = CHAMPS.map(([championId, file], position) => ({
+    participantId: position + 1, championId, team: position < 5 ? 100 : 200, win: position < 5 ? win : !win,
+    champion: { name: file, dataDragonVersion: "16.20.1", imageFile: `${file}.png` },
+    role: ["BOTTOM", "UTILITY", "JUNGLE", "MIDDLE", "TOP"][position % 5],
+    kills: 2 + position, deaths: 1 + (position % 4), assists: 3 + index, totalMinionsKilled: 150 + position, neutralMinionsKilled: 4,
+    finalItems: [3031, 3036, 3006, 3094, 3072, 6672], finalTrinketItemId: 3363,
+  }));
+  return { matchId: `BR1_70${index}`, queue: 420, map: 11, patch: "16.20", startAt: new Date(Date.now() - index * 7_200_000).toISOString(),
+    durationSeconds: 1700, preparationStatus: "READY", supportLevel: "LIMITED", supportReason: "PATCH_NOT_VALIDATED",
+    championsPresent: participants.map((p) => ({ championId: p.championId, name: p.champion.name })),
+    participants, localParticipantId: 1, reviewPurchases: { ready: 2, total: 5 } };
+}
+
+for (const width of [360, 1280]) {
+  test(`histórico em ${width}px: placar abre no cartão, alvo de 44 px e sem rolagem lateral`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await offline(page);
+    await mockApi(page, { "GET /api/v1/matches": () => ok({ items: [0, 1, 2].map(richMatch), nextCursor: null }) });
+    await page.goto("/historico");
+    const card = page.locator(".match-card").first();
+    await expect(card).toHaveClass(/match-card--win/);
+    await expect(page.locator(".match-card--loss")).toHaveCount(1);
+    await expect(page.getByRole("list", { name: /Resultados recentes/ }).getByRole("listitem")).toHaveCount(3);
+    const toggle = card.getByRole("button", { name: "Mostrar placar da partida" });
+    await expectTarget44(toggle);
+    await toggle.click();
+    await expect(card.getByRole("table", { name: "Time azul Vitória" })).toBeVisible();
+    await expect(card.getByRole("table", { name: "Time vermelho Derrota" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Ocultar placar da partida" })).toHaveAttribute("aria-expanded", "true");
+    await noHorizontalScroll(page);
+    await page.screenshot({ path: `${evidence}/historico-placar-${width}.png`, fullPage: true });
+  });
+}
+
+for (const width of [360, 1000, 1280]) {
+  test(`campeões em ${width}px: cabeçalho legível sobre splash branca e sem rolagem lateral`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.route("https://ddragon.leagueoflegends.com/**", (route) => route.fulfill({ contentType: "image/png", body: WHITE_PNG }));
+    await mockApi(page, { "GET /api/v1/champions/patterns": () => ok(championPatterns()) });
+    await page.goto("/campeoes?champion=51&patch=16.19");
+    await page.locator('.champion-overview__art[data-state="ready"]').waitFor();
+    await noHorizontalScroll(page);
+    const texts: Array<[string, number]> = [[".champion-overview__context", 4.5], [".champion-overview h3 .champion__name", 4.5], [".champion-stats dd", 4.5], [".champion-stats dt", 4.5], [".champion-overview .metric__foot", 4.5]];
+    const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
+    await page.addStyleTag({ content: ".champion-overview__inner * { color: transparent !important; } .champion-overview__inner .champion__portrait { visibility: hidden; } .champion-overview__art { transition: none !important; }" });
+    for (const [index, [selector, minimum]] of texts.entries()) {
+      const ratio = await contrastOverBackground(page, selector, colors[index]);
+      expect(ratio, `${selector}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(minimum);
+    }
   });
 }

@@ -1,29 +1,73 @@
-/* Histórico (CC-1205, padrão Arena): cabeçalho, card de métricas, filtros segmentados e uma
-   superfície chanfrada por partida com barra de resultado de 3 px, sem fundo tingido. */
+/* Histórico (CC-1205; refeito em 11/11/2026 a partir dos perfis do tracker.gg, u.gg e
+   Mobalytics): coluna de resumo à esquerda, barra de filtros compacta e uma linha por partida
+   com fundo levemente tingido pelo resultado, itens em grade 3 × 2, times em faixas de retratos
+   e o placar das duas equipes aberto dentro do cartão. */
 
-.history-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 24px; max-width: none; }
+.history-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 24px; max-width: none; margin-bottom: 24px; }
 .history-head > div { max-width: 760px; }
 
-.history-overview { margin: 0 0 24px; }
-.history-overview__row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.history-overview__row .metric { padding: 26px 28px 20px; min-width: 0; }
-.history-overview__row .metric + .metric { position: relative; }
-.history-overview__row .metric + .metric::before { content: ""; position: absolute; left: 0; top: 22px; bottom: 22px; width: 1px; background: var(--nline); }
-.history-overview__secondary { position: relative; display: grid; gap: 12px; padding: 18px 28px 20px; }
-.history-overview__secondary::before { content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--nline); }
-.history-overview__champions { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 12px 28px; }
-.history-overview__champions li { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.history-overview__champions strong { display: block; font-size: .9375rem; font-weight: 600; }
-.history-overview__champions small { color: var(--ntext-subtle); font-size: .8125rem; }
-.history-overview__scope { margin: 0; color: var(--ntext-subtle); font-size: .8125rem; }
-.history-summary { display: grid; gap: 6px; margin: 0 0 24px; color: var(--ntext-muted); }
+.history-shell { display: grid; gap: 24px; align-items: start; }
+.history-shell--aside { grid-template-columns: 300px minmax(0, 1fr); }
+.history-main { min-width: 0; }
+
+/* Coluna de resumo. */
+.history-overview { display: grid; gap: 16px; margin: 0; }
+.history-card { display: grid; gap: 16px; padding: 18px 20px 20px; }
+.history-card__title { margin: 0; color: var(--ntext-subtle); font: 600 .75rem/1.2 var(--font-body); letter-spacing: .08em; text-transform: uppercase; }
+.history-perf { display: flex; align-items: center; gap: 18px; }
+.history-perf .metric__value { margin: 2px 0; font-size: 2.25rem; }
+.win-ring { flex: none; }
+.win-ring circle { fill: none; stroke-width: 8; }
+.win-ring__loss { stroke: var(--loss); }
+.win-ring__win { stroke: var(--win); }
+.history-perf__kda { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 12px; padding-top: 14px; border-top: 1px solid var(--nline); }
+.history-perf__value { margin: 2px 0 0; font: 600 1.5rem/1.1 var(--font-body); font-variant-numeric: tabular-nums; }
+.history-form .metric__label { font-size: .8125rem; }
+.history-form__list { list-style: none; display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; padding: 0; }
+.history-form__dot { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 3px; font: 700 .6875rem/1 var(--font-body); }
+.history-form__dot--win { background: var(--win-surface); color: var(--win); }
+.history-form__dot--loss { background: var(--loss-surface); color: var(--loss); }
+
+.history-champions { list-style: none; display: grid; margin: -6px 0 -8px; padding: 0; }
+.history-champions li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 0; }
+.history-champions li + li { border-top: 1px solid var(--nline); }
+.history-champions__name, .history-champions__nums { display: grid; gap: 2px; min-width: 0; }
+.history-champions__name strong { overflow: hidden; font-size: .9375rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.history-champions__nums { justify-items: end; font-variant-numeric: tabular-nums; }
+.history-champions__nums strong { font-size: .9375rem; }
+.history-champions small { color: var(--ntext-subtle); font-size: .8125rem; white-space: nowrap; }
+
+.history-roles { list-style: none; display: grid; gap: 10px; margin: 0; padding: 0; }
+.history-roles li { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: .8125rem; }
+.history-roles__name { color: var(--ntext); font-weight: 600; }
+.history-roles__bar { height: 6px; overflow: hidden; border-radius: 3px; background: var(--nline); }
+.history-roles__bar > span { display: block; height: 100%; border-radius: 3px; background: var(--ntext-subtle); }
+.history-roles__nums { color: var(--ntext-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.history-overview__scope { margin: 0 2px; color: var(--ntext-subtle); font-size: .8125rem; line-height: 1.4; }
+.history-summary { display: grid; gap: 6px; margin: 0; color: var(--ntext-muted); }
 .history-summary p { margin: 0; }
 
-.history-filters { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px 16px; }
+/* Barra de busca e filtros: uma superfície, filtros em grupos encostados. */
+.history-page .history-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin: 0 0 24px; padding: 16px 18px; }
+.history-page .history-search { flex: 1 1 240px; gap: 6px; }
+.history-page .history-search label { color: var(--ntext-muted); font-size: .8125rem; }
+.history-page .history-search input { min-height: 44px; padding: 8px 12px; }
+.history-page .history-search p { font-size: .75rem; color: var(--ntext-subtle); }
+.history-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.history-filters .segmented { flex-wrap: nowrap; gap: 0; }
+.history-filters .segmented > button { position: relative; border-radius: 0; white-space: nowrap; }
+.history-filters .segmented > button + button { margin-left: -1px; }
+.history-filters .segmented > button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.history-filters .segmented > button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.history-filters .segmented > button[aria-pressed="true"], .history-filters .segmented > button:focus-visible { z-index: 1; }
+.history-page .history-controls__limit { flex: 1 1 100%; }
 
+/* Grupos por dia: data, quantidade, placar do dia e KDA médio, como no tracker.gg. */
 .history-day { margin: 0 0 24px; }
-.history-day__heading { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; font: 600 .9375rem var(--font-body); color: var(--ntext); }
-.history-day__heading small { color: var(--ntext-subtle); font-size: .8125rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.history-day__heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 10px; padding: 0 4px; font: 600 .9375rem var(--font-body); color: var(--ntext); }
+.history-day__count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); color: var(--ntext-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.history-day__heading small { color: var(--ntext-subtle); font-size: .8125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.history-day__heading .history-day__kda { margin-left: auto; font-weight: 500; }
 .history-more { margin-top: 4px; }
 .history-list { display: grid; gap: 8px; margin: 0; padding: 0; }
 
@@ -32,65 +76,111 @@
 .champion-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .champion-avatar__initials { color: var(--ntext-muted); font: 600 .62rem var(--font-body); }
 
+/* Cartão da partida: tinta do resultado da esquerda para a direita sobre a superfície. */
 .match-card { list-style: none; }
-.match-card > article { display: grid; grid-template-columns: 132px minmax(0, 1fr) minmax(0, 300px) auto; grid-template-areas: "meta hero teams actions"; align-items: center; gap: 14px 20px; padding: 14px 20px 14px 22px; min-width: 0; }
+.match-card--win { --surface-fill: linear-gradient(90deg, var(--win-tint), var(--win-tint-soft) 22%, transparent 60%), var(--n1); --surface-line: var(--win-surface); }
+.match-card--loss { --surface-fill: linear-gradient(90deg, var(--loss-tint), var(--loss-tint-soft) 22%, transparent 60%), var(--n1); --surface-line: var(--loss-surface); }
+.match-card > article { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto auto; grid-template-areas: "meta hero teams actions"; align-items: center; gap: 12px 20px; padding: 12px 14px 12px 22px; min-width: 0; }
 
-.match-card__meta { grid-area: meta; display: grid; gap: 3px; font-size: .8125rem; color: var(--ntext-subtle); min-width: 0; }
-.match-card__queue { color: var(--ntext); font-size: .875rem; font-weight: 600; }
-.match-card__divider { height: 1px; width: 44px; background: var(--nline); margin: 4px 0; }
-.match-card__result { font-weight: 600; }
-.match-card__result:not(.result-text--win, .result-text--loss) { color: var(--ntext-muted); }
+.match-card__meta { grid-area: meta; display: grid; gap: 2px; font-size: .8125rem; color: var(--ntext-subtle); min-width: 0; }
+.match-card__queue { color: var(--ntext); font-size: .8125rem; font-weight: 600; }
+.match-card__divider { height: 1px; width: 40px; background: var(--nline2); margin: 5px 0; }
+.match-card__result { font-size: .9375rem; font-weight: 700; }
+.match-card__result:not(.result-text--win, .result-text--loss) { color: var(--ntext-muted); font-size: .8125rem; font-weight: 600; }
 
-.match-card__hero { grid-area: hero; display: flex; align-items: center; gap: 16px 22px; min-width: 0; flex-wrap: wrap; }
+.match-card__hero { grid-area: hero; display: flex; align-items: center; gap: 14px 20px; min-width: 0; flex-wrap: wrap; }
 .match-card__hero--unknown p { margin: 0; color: var(--ntext-muted); font-size: .875rem; }
 .match-card__hero--unknown small { display: block; margin-top: 2px; }
 .match-card__portrait { position: relative; flex: none; padding-bottom: 6px; }
 .match-card__role { position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); padding: 1px 6px; border-radius: var(--radius-sm); background: var(--n0); border: 1px solid var(--nline2); font: 600 .625rem var(--font-body); color: var(--ntext-muted); white-space: nowrap; }
-.match-card__score { display: grid; gap: 2px; min-width: 112px; }
-.match-card__build { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
-.match-card__build .item-icon { width: 26px; height: 26px; }
-.match-card__build .item-icon img { width: 26px; height: 26px; }
-.match-card__trinket { margin-left: 4px; padding-left: 5px; border-left: 1px solid var(--nline); display: inline-flex; }
-.match-card__champion { font-weight: 600; font-size: .9375rem; }
-.match-card__kda-line { font: 600 1.125rem/1.2 var(--font-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.match-card__kda-line [aria-hidden] { color: var(--ntext-subtle); }
-.match-card__kda { color: var(--ntext-subtle); font-size: .8125rem; }
-.match-card__stats { display: flex; gap: 6px 18px; margin: 0; flex-wrap: wrap; }
-.match-card__stats div { min-width: 0; }
+.match-card__score { display: grid; gap: 1px; min-width: 104px; }
+.match-card__champion { color: var(--ntext-muted); font-weight: 600; font-size: .8125rem; }
+.match-card__kda-line { font: 700 1.1875rem/1.2 var(--font-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.match-card__kda-line [aria-hidden] { color: var(--ntext-subtle); font-weight: 500; }
+.match-card__deaths { color: var(--loss); }
+.match-card__kda { color: var(--ntext-subtle); font-size: .8125rem; font-weight: 600; }
+.match-card__stats { display: grid; gap: 4px; margin: 0; min-width: 92px; }
+.match-card__stats div { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .match-card__stats dt { color: var(--ntext-subtle); font-size: .75rem; }
-.match-card__stats dd { margin: 2px 0 0; font-weight: 600; font-size: .9375rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.match-card__stats dd { margin: 0; font-weight: 600; font-size: .875rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .match-card__stats small { color: var(--ntext-subtle); font-weight: 500; }
 
-.match-card__teams { grid-area: teams; display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; min-width: 0; }
-.match-card__team { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; min-width: 0; }
-.match-card__mate { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: .75rem; color: var(--ntext-subtle); }
-.match-card__mate span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.match-card__mate--local { color: var(--ntext); font-weight: 600; }
-.match-card__mate .champion-avatar { border-radius: 4px; }
+/* Itens: grade 3 × 2 e amuleto ao lado; casas vazias mantêm a largura. */
+.match-build { display: inline-flex; align-items: flex-start; gap: 4px; }
+.match-build__grid { display: grid; grid-template-columns: repeat(3, 26px); gap: 3px; }
+.match-build > .match-build__grid > span, .match-build__trinket { display: inline-flex; }
+.match-build .item-icon, .match-build .item-icon img, .match-build__empty { width: 26px; height: 26px; }
+.match-build__empty { border-radius: 3px; background: var(--n2); box-shadow: inset 0 0 0 1px var(--nline); }
+.match-build__trinket .item-icon, .match-build__trinket .item-icon img { border-radius: 50%; }
+.match-build--sm .match-build__grid { grid-template-columns: repeat(6, 22px); gap: 2px; }
+.match-build--sm .item-icon, .match-build--sm .item-icon img, .match-build--sm .match-build__empty { width: 22px; height: 22px; }
+
+/* Times: duas faixas de cinco retratos com a cor do lado; a conta própria em destaque. */
+.match-card__teams { grid-area: teams; display: grid; gap: 4px; min-width: 0; }
+.match-card__team { list-style: none; display: flex; gap: 3px; margin: 0; padding: 0 0 0 6px; border-left: 2px solid var(--team-blue); }
+.match-card__team--red { border-left-color: var(--team-red); }
+.match-card__mate { display: inline-flex; }
+.match-card__mate .champion-avatar { border-radius: 3px; }
+.match-card__mate--local .champion-avatar { box-shadow: 0 0 0 2px var(--accent); }
 
 .match-card__actions { grid-area: actions; display: grid; justify-items: end; gap: 6px; }
-.app .match-card__open { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 4px 0 12px; color: var(--accent); font-size: .875rem; font-weight: 600; white-space: nowrap; text-decoration: none; }
+.match-card__badges { display: grid; justify-items: end; gap: 6px; }
+.match-card__badges:empty { display: none; }
+.match-card__buttons { display: flex; align-items: center; gap: 4px; }
+.app .match-card__open { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px 0 12px; color: var(--accent); font-size: .875rem; font-weight: 600; white-space: nowrap; text-decoration: none; }
 .app .match-card__open:hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 4px; }
 .app .match-card__open:focus-visible { outline-offset: -3px; }
+.match-card__toggle { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--nline2); border-radius: var(--radius-sm); background: transparent; color: var(--ntext-muted); cursor: pointer; }
+.match-card__toggle:hover { color: var(--ntext); border-color: var(--nline-strong); background: var(--n2); }
+.match-card__toggle svg { transition: rotate 200ms cubic-bezier(0.2, 0, 0, 1); }
+.match-card__toggle[aria-expanded="true"] svg { rotate: 180deg; }
 
-@media (max-width: 1100px) {
-  .history-page .history-controls { grid-template-columns: 1fr; }
-  .history-filters { justify-content: flex-start; }
-  .match-card > article { grid-template-columns: 120px minmax(0, 1fr) auto; grid-template-areas: "meta hero actions" "teams teams teams"; }
-  .match-card__teams { grid-template-columns: repeat(2, minmax(0, 260px)); }
+/* Placar aberto dentro do cartão. */
+.match-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; margin: 0 14px 0 22px; padding: 14px 0 16px; border-top: 1px solid var(--nline); overflow-x: auto; animation: match-details-in 200ms cubic-bezier(0.2, 0, 0, 1); }
+@keyframes match-details-in { from { opacity: 0; translate: 0 -4px; } }
+.match-details__team { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+.match-details__team caption { caption-side: top; padding: 2px 0 2px 8px; margin-bottom: 6px; border-left: 2px solid var(--team-blue); font-weight: 600; text-align: left; color: var(--ntext); }
+.match-details__team--red caption { border-left-color: var(--team-red); }
+.match-details__team caption > span + span { margin-left: 10px; }
+.match-details__team th, .match-details__team td { padding: 5px 8px; text-align: left; vertical-align: middle; }
+.match-details__team thead th { white-space: nowrap; color: var(--ntext-subtle); font-size: .75rem; font-weight: 500; border-bottom: 1px solid var(--nline); }
+.match-details__team tbody th { font-weight: 500; }
+.match-details__team tbody tr + tr { border-top: 1px solid var(--nline-soft); }
+.match-details__team tr.is-local { background: var(--accent-select); }
+.match-details__who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
+.match-details__who small { color: var(--accent); font-weight: 600; }
+.match-details__num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .match-details { animation: none; }
+  .match-card__toggle svg { transition: none; }
+}
+
+@media (max-width: 1180px) {
+  .history-shell--aside { grid-template-columns: minmax(0, 1fr); }
+  .history-overview { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+  .history-overview__scope { grid-column: 1 / -1; }
+}
+@media (max-width: 1000px) {
+  .match-card > article { grid-template-columns: 104px minmax(0, 1fr) auto; grid-template-areas: "meta hero actions" "meta teams actions"; }
+  .match-card__teams { grid-auto-flow: column; justify-content: start; gap: 12px; }
+  .match-details { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 700px) {
-  .history-overview__row { grid-template-columns: minmax(0, 1fr); }
-  .history-overview__row .metric { padding: 20px 18px 16px; }
-  .history-overview__row .metric + .metric::before { left: 16px; right: 16px; top: 0; bottom: auto; width: auto; height: 1px; }
-  .history-overview__secondary { padding: 16px 18px 18px; }
-  .history-filters { justify-content: flex-start; }
-  .match-card > article { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "meta meta" "hero actions" "teams teams"; padding: 12px 12px 12px 16px; gap: 12px; }
-  .match-card__meta { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .history-filters .segmented { flex-wrap: wrap; }
+  .match-card > article { grid-template-columns: minmax(0, 1fr); grid-template-areas: "meta" "hero" "teams" "actions"; padding: 12px 12px 12px 16px; gap: 12px; }
+  .match-card__meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
   .match-card__divider { display: none; }
   .match-card__hero { gap: 10px 14px; }
-  .match-card__actions { align-self: start; }
-  .match-card__teams { grid-template-columns: 1fr 1fr; }
+  .match-card__teams { grid-auto-flow: row; gap: 4px; }
+  .match-card__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+  .match-card__badges { justify-items: start; }
+  .match-details { margin: 0 12px 0 16px; }
+  .match-build--sm .match-build__grid { grid-template-columns: repeat(3, 22px); }
+}
+@media (max-width: 560px) {
+  /* No celular o placar mostra campeão, KDA e farm; os itens da conta ficam no próprio cartão. */
+  .match-details__items { display: none; }
 }
 
 /* CC-901: atualização do histórico com a Riot. */
