@@ -4,6 +4,10 @@ import { isAbortError, isApiError } from "../../shared/api/errors";
 import { usePagedList } from "../../shared/hooks/usePagedList";
 import { count } from "../../shared/text/count";
 import { DayGroups } from "../history/HistoryPage";
+import { summarizeLoaded, winStreak } from "../history/presentation";
+import { championSplashUrl } from "../matches/format";
+import { GameIcon } from "../../shared/ui/GameIcon";
+import { SplashArt } from "../../shared/ui/SplashArt";
 import { HistorySync, type SyncPending } from "../history/HistorySync";
 import { SyncPendingBox } from "../history/SyncPendingBox";
 import { clock } from "../history/syncMessage";
@@ -41,12 +45,23 @@ function QueueRank({ label, rank }: { label: string; rank: PlayerRank | null | u
   );
 }
 
-function ProfileHeader({ profile }: { profile: PlayerProfile }) {
+/** Arte e sequência do banner: campeão mais jogado e vitórias seguidas nas partidas carregadas. */
+interface BannerFacts { splash: string | null; streak: number }
+
+function bannerFacts(matches: MatchSummary[]): BannerFacts {
+  const summary = summarizeLoaded(matches);
+  return { splash: championSplashUrl(summary.champions[0]?.participant.champion?.imageFile), streak: winStreak(summary.recent) };
+}
+
+function ProfileHeader({ profile, banner }: { profile: PlayerProfile; banner: BannerFacts }) {
   const [broken, setBroken] = useState(false);
   const src = profileIconUrl(profile);
   return (
     <>
-      <div className="player-header surface surface--pad">
+      {/* Banner como no tracker.gg: splash do campeão que este jogador mais jogou nas partidas
+          carregadas (a lista marca o jogador pesquisado como participante local). */}
+      <div className="player-header splash-banner">
+        {banner.splash ? <SplashArt key={banner.splash} src={banner.splash} /> : null}
         <span className="player-header__icon">
           <span className="portrait">
             {src && !broken ? (
@@ -66,6 +81,7 @@ function ProfileHeader({ profile }: { profile: PlayerProfile }) {
             Atualizado às {clock(profile.refreshedAt) ?? "–"}
             {profile.staleReason === "RIOT_KEY_MISSING" ? " (sem chave da Riot para atualizar)" : ""}
           </p>
+          {banner.streak >= 2 ? <p className="player-header__streak"><span className="hud-tag hud-tag--hot"><GameIcon name="flame" size={14} /> {banner.streak} vitórias seguidas</span></p> : null}
         </div>
         {/* CC-1211/CC-1213: partida ao vivo, com o aviso "jogando agora" como no op.gg. */}
         <LiveButton gameName={profile.gameName} tagLine={profile.tagLine} />
@@ -78,7 +94,7 @@ function ProfileHeader({ profile }: { profile: PlayerProfile }) {
   );
 }
 
-function PlayerMatches({ profile, onRefresh }: { profile: PlayerProfile; onRefresh: (next: PlayerProfile) => void }) {
+function PlayerMatches({ profile, onRefresh, onBanner }: { profile: PlayerProfile; onRefresh: (next: PlayerProfile) => void; onBanner: (facts: BannerFacts) => void }) {
   const [pending, setPending] = useState<SyncPending | null>(null);
   const latestIds = useCallback(
     (signal?: AbortSignal) => api.listMatches({ limit: PAGE_SIZE, player: profile.id }, signal).then((page) => page.items.map((m) => m.matchId)),
@@ -88,6 +104,8 @@ function PlayerMatches({ profile, onRefresh }: { profile: PlayerProfile; onRefre
     resetKey: `player-${profile.id}`,
     fetchPage: (cursor, signal) => api.listMatches({ cursor, limit: PAGE_SIZE, player: profile.id }, signal),
   });
+  const { splash, streak } = bannerFacts(list.items);
+  useEffect(() => onBanner({ splash, streak }), [onBanner, splash, streak]);
   const calls = useMemo(
     () => ({
       // Atualizar: elo e ícone de novo, depois as partidas recentes (o worker importa as novas).
@@ -147,6 +165,7 @@ export function PlayerPage({
   const { navigate } = useRouter();
   const [state, setState] = useState<{ profile: PlayerProfile | null; error: string | null }>({ profile: null, error: null });
   const [confirmed, confirm] = useRiotIntent();
+  const [banner, setBanner] = useState<BannerFacts>({ splash: null, streak: 0 });
   useEffect(() => {
     if (!confirmed) return;
     // A página é remontada (key) a cada Riot ID: o estado inicial já é "buscando".
@@ -188,8 +207,8 @@ export function PlayerPage({
               Na partida, este jogador aparecia como <strong>{previousRiotId}</strong>. O Riot ID mudou desde então.
             </p>
           ) : null}
-          <ProfileHeader profile={state.profile} />
-          <PlayerMatches profile={state.profile} onRefresh={onRefresh} />
+          <ProfileHeader profile={state.profile} banner={banner} />
+          <PlayerMatches profile={state.profile} onRefresh={onRefresh} onBanner={setBanner} />
         </>
       ) : (
         <>

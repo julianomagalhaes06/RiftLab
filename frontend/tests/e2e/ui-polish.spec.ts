@@ -278,12 +278,41 @@ for (const width of [360, 1280]) {
     await page.route("https://ddragon.leagueoflegends.com/**", (route) => route.fulfill({ contentType: "image/png", body: WHITE_PNG }));
     await mockApi(page, { "GET /api/v1/matches": () => ok({ items: [0, 2, 3].map(richMatch), nextCursor: null }) });
     await page.goto("/historico");
-    await page.locator('.history-banner__art[data-state="ready"]').waitFor();
+    await page.locator('.history-banner .splash-banner__art[data-state="ready"]').waitFor();
     await expect(page.locator(".hud-tag--hot")).toHaveText(/3 vitórias seguidas/);
     await noHorizontalScroll(page);
     const texts: Array<[string, number]> = [[".history-banner__context", 4.5], [".history-banner h2", 3], [".history-banner__who", 4.5], [".hud-tag--hot", 4.5], [".history-banner__import", 4.5]];
     const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
-    await page.addStyleTag({ content: ".history-banner__inner * { color: transparent !important; } .history-banner__inner img, .history-banner__inner .game-icon, .history-banner__icon { visibility: hidden; } .history-banner__art { transition: none !important; scale: 1 !important; }" });
+    await page.addStyleTag({ content: ".history-banner__inner * { color: transparent !important; } .history-banner__inner img, .history-banner__inner .game-icon, .history-banner__icon { visibility: hidden; } .splash-banner__art { transition: none !important; scale: 1 !important; }" });
+    for (const [index, [selector, minimum]] of texts.entries()) {
+      const ratio = await contrastOverBackground(page, selector, colors[index]);
+      expect(ratio, `${selector}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(minimum);
+    }
+  });
+}
+
+for (const width of [360, 1280]) {
+  test(`perfil do jogador em ${width}px: banner com a splash do mais jogado, legível sobre arte branca`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const splashes: string[] = [];
+    await page.route("https://ddragon.leagueoflegends.com/**", (route) => {
+      if (route.request().url().includes("/splash/")) splashes.push(route.request().url());
+      return route.fulfill({ contentType: "image/png", body: WHITE_PNG });
+    });
+    await mockApi(page, { "GET /api/v1/matches": ({ url }) => ok({ items: url.searchParams.get("player") ? [0, 2, 3].map(richMatch) : [], nextCursor: null }) });
+    await page.goto("/historico");
+    const search = page.getByRole("combobox", { name: "Buscar jogador pelo Riot ID" });
+    await search.fill("Jogador Teste");
+    await search.press("Enter");
+    await expect(page.getByRole("heading", { name: /Jogador Teste #BR1/ })).toBeVisible();
+    await page.locator('.player-header .splash-banner__art[data-state="ready"]').waitFor();
+    // O jogador pesquisado é o participante 1 (Caitlyn) nas três partidas.
+    expect(splashes.at(-1)).toMatch(/\/splash\/Caitlyn_0\.jpg$/);
+    await expect(page.locator(".player-header .hud-tag--hot")).toHaveText(/3 vitórias seguidas/);
+    await noHorizontalScroll(page);
+    const texts: Array<[string, number]> = [[".player-header__who h2", 4.5], [".player-header__meta", 4.5], [".player-header .hud-tag--hot", 4.5]];
+    const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
+    await page.addStyleTag({ content: ".player-header__who * { color: transparent !important; } .player-header .game-icon, .player-header__icon { visibility: hidden; } .splash-banner__art { transition: none !important; scale: 1 !important; }" });
     for (const [index, [selector, minimum]] of texts.entries()) {
       const ratio = await contrastOverBackground(page, selector, colors[index]);
       expect(ratio, `${selector}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(minimum);

@@ -288,3 +288,31 @@
   --color-muted: var(--ntext-muted);
   --color-border: var(--nline);
 }
+
+/* Banner com splash art (Histórico, perfil do jogador): escuro nos dois temas, como a vitrine do
+   Início; no tema claro, os controles de dentro voltam aos tons do tema escuro. */
+:root[data-theme="light"] .splash-banner {
+  --panel-sheen: linear-gradient(180deg, rgb(255 255 255 / .04), rgb(255 255 255 / 0) 120px);
+  --n0: #0f1013;
+  --n1: #16181d;
+  --n2: #1c1f25;
+  --nline: #262a32;
+  --nline2: #343944;
+  --nline-strong: #656b76;
+  --ntext: #ecedef;
+  --ntext-muted: #b4b8c1;
+  --ntext-subtle: #8c919b;
+  --accent: #b8a6ff;
+  --accent-strong: #8b6cff;
+  --accent-hover: #cbbdff;
+  --accent-fill-hover: #9d84ff;
+  --accent-surface: #221c3d;
+  --on-accent: #0e0f13;
+  --gold: #c8aa6e;
+  --gold-ink: #f0dfb4;
+  --gold-surface: #2a2216;
+  --color-text: var(--ntext);
+  --color-muted: var(--ntext-muted);
+  --color-border: var(--nline);
+  --surface-elevation: none;
+}

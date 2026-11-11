@@ -12,7 +12,8 @@ import { filterLoadedMatches, type OriginFilter, type QueueFilter, type ResultFi
 import { HistorySync, type SyncPending } from "./HistorySync";
 import { SyncPendingBox } from "./SyncPendingBox";
 import { MatchCard } from "./MatchCard";
-import { dayKey, dayLabel, decimal, localPerformance, percent, record, roleShort, summarizeLoaded } from "./presentation";
+import { dayKey, dayLabel, decimal, localPerformance, percent, record, roleShort, summarizeLoaded, winStreak } from "./presentation";
+import { SplashArt } from "../../shared/ui/SplashArt";
 import "./history.css";
 import { count } from "../../shared/text/count";
 import { useDemoNotice } from "../../app/demoNotice";
@@ -40,12 +41,6 @@ function FilterGroup<T extends string | number>({
       ))}
     </div>
   );
-}
-
-/** Vitórias seguidas a partir da partida mais nova. */
-function winStreak(recent: Array<"WIN" | "LOSS">): number {
-  const firstLoss = recent.indexOf("LOSS");
-  return firstLoss === -1 ? recent.length : firstLoss;
 }
 
 /** Conquistas das partidas carregadas (só dado real): maior KDA, mais farm por minuto e maior
@@ -96,17 +91,13 @@ function StudyProgress({ progress }: { progress: LearningProgress }) {
 
 /** Banner do perfil, como no tracker.gg: splash do campeão mais jogado, ícone, Riot ID e elo. */
 function HistoryBanner({ profile, splash, streak }: { profile: PlayerProfile | null; splash: string | null; streak: number }) {
-  const [art, setArt] = useState<"loading" | "ready" | "failed">("loading");
   const [iconBroken, setIconBroken] = useState(false);
   const rank = profile ? betterRank(profile.solo, profile.flex) : null;
   const tier = rank?.state === "READY" && isTier(rank.tier) ? rank.tier : null;
   const icon = profile ? profileIconUrl(profile) : null;
   return (
-    <header className="history-banner">
-      {splash && art !== "failed" ? (
-        <img key={splash} className="history-banner__art" data-state={art} src={splash} alt="" decoding="async" referrerPolicy="no-referrer"
-          onLoad={() => setArt("ready")} onError={() => setArt("failed")} />
-      ) : null}
+    <header className="history-banner splash-banner">
+      {splash ? <SplashArt key={splash} src={splash} /> : null}
       <div className="history-banner__inner">
         <div className="history-banner__identity">
           <span className="portrait history-banner__icon">

@@ -273,3 +273,9 @@ export function decimal(value: number, digits = 1): string {
 export function percent(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
+
+/** Vitórias seguidas a partir da partida mais nova. */
+export function winStreak(recent: Array<"WIN" | "LOSS">): number {
+  const firstLoss = recent.indexOf("LOSS");
+  return firstLoss === -1 ? recent.length : firstLoss;
+}

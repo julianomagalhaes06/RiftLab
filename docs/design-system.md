@@ -139,6 +139,11 @@ sempre com contorno `accent` de 3 px.
   conquistas em selo dourado no cartão (`.chip--gold`: maior KDA, mais farm por minuto, maior
   participação em abates, com ao menos três partidas); grupos por dia com quantidade, placar e
   KDA médio; filtros em grupos encostados; aviso de atualização numa faixa fina.
+- **Banner com splash** (`.splash-banner` em `arena.css`, arte por `shared/ui/SplashArt.tsx`):
+  Histórico e perfil do jogador pesquisado. Mostra a splash do campeão mais jogado nas partidas
+  carregadas (no perfil, a lista marca o jogador pesquisado como participante local), escuro nos
+  dois temas (no claro, os tokens de dentro voltam aos tons escuros, como o card de elo), véus em
+  pixels e a sequência de vitórias em `.hud-tag--hot` quando ≥ 2.
 - **Linha de partida** (outras telas): barra de resultado, "Vitória"/"Derrota" na cor do
   resultado, retrato de 36 px, campeão e fila, data e duração, K / D / A e tropas, ação em roxo.
 - **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px
