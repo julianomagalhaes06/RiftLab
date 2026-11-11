@@ -85,10 +85,12 @@ for (const width of [1280, 1440, 360, 390]) {
     await expect(page).toHaveURL(/\/historico\/DEMO-0008$/);
     await expect(page.getByRole("heading", { name: /^Partida DEMO-0008/ })).toBeVisible();
     await page.getByRole("link", { name: /^Participante 1 —/ }).click();
+    // A análise fica no Placar com o jogador escolhido; as decisões estão na aba Compras.
+    await page.getByRole("tab", { name: "Compras" }).click();
     await expect(page.getByRole("heading", { name: /^Decisões de Campeão #9000/ })).toBeVisible();
     await page.getByRole("link", { name: "Decisão em 7:52" }).click();
     await expect(page).toHaveURL(/\/decisions\//);
     await page.goBack();
-    await expect(page).toHaveURL(/\/historico\/DEMO-0008\?participant=1$/);
+    await expect(page).toHaveURL(/\/historico\/DEMO-0008\?participant=1&aba=compras$/);
   });
 }

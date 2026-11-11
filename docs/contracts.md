@@ -243,6 +243,12 @@ Como em sites de estatísticas, qualquer Riot ID do servidor BR pode ser consult
 - O PUUID do bruto nunca sai da API. A lista (`GET /api/v1/matches`), o Painel e o Histórico continuam sem Riot ID.
 - Interface: no placar da partida, o Nome#TAG aparece embaixo do campeão como link para `/jogador/Nome-TAG`. Uma nota avisa que é o Riot ID da época da partida.
 
+## Placar completo da partida (11/11/2026)
+
+- `GET /api/v1/matches/{id}` também traz, em cada participante, os detalhes de placar lidos do mesmo bruto e da mesma forma (na hora, somente leitura, nada no banco): `summonerSpells` (dois ids do `summoner.json`), `runes` (`{primaryStyle, keystone, secondaryStyle}`, ids do `runesReforged.json`), `champLevel`, `damageToChampions`, `goldEarned`, `wardsPlaced`, `visionScore` e `largestMultiKill`. Leitor em `matches/raw_details.py`.
+- Valor ausente, de tipo errado ou fora da faixa vira `null`; DEMO, bruto ausente ou corrompido deixa todos nulos.
+- Interface: o frontend busca os catálogos em português do Data Dragon (`data/pt_BR/summoner.json` e `runesReforged.json`, `shared/ui/gameAssets.ts`) para os nomes e ícones. Placar no estilo do u.gg: retrato com nível, feitiços e runas ao lado do nome, dano com barra relativa ao maior da partida, ouro, farm, sentinelas com placar de visão, participação e itens em slots 3 × 2 com o amuleto.
+
 ## CC-1211 — Partida ao vivo
 
 - **Rota.** `POST /api/v1/players/live` com `{gameName, tagLine}`. É POST para o Riot ID ficar fora da URL e dos logs de acesso. Com chave da Riot, chama:

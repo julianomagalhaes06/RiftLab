@@ -5,7 +5,6 @@ import { isApiError } from "../../shared/api/errors";
 import { useRouter } from "../../shared/router/context";
 import { Link } from "../../shared/router/Link";
 import { loginPath } from "../../shared/router/routes";
-import { ThemeToggle } from "../../shared/theme/ThemeToggle";
 import { emblemSrc, type Tier } from "../ranked/tiers";
 import { useAuth } from "./authContext";
 import "./auth.css";
@@ -359,7 +358,6 @@ export function AuthScreen({ mode, next, welcome = null }: { mode: Mode; next: s
       <header className="auth-top">
         <Link to="/" className="auth-top__brand"><span className="app__mark" aria-hidden="true">R</span>RiftLab</Link>
         <div className="auth-top__tools">
-          <ThemeToggle />
           <Link to={next ?? "/"} className="auth-top__back">Continuar sem conta</Link>
         </div>
       </header>

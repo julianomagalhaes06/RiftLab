@@ -28,7 +28,6 @@ import { useAuth } from "../features/auth/authContext";
 import { AuthScreen } from "../features/auth/AuthScreen";
 import { UserMenu } from "../features/auth/UserMenu";
 import { AccountPage } from "../features/auth/AccountPage";
-import { ThemeToggle } from "../shared/theme/ThemeToggle";
 import { AccountNotice } from "../features/auth/AccountNotice";
 import { HomePage } from "../features/home/HomePage";
 import "./App.css";
@@ -199,7 +198,6 @@ function AppContent() {
             <div className="app__tools">
               {route.name === "home" ? null : <PlayerSearch />}
               {hasAccount ? <ProfileChip /> : null}
-              <ThemeToggle />
               <UserMenu />
             </div>
           </div>

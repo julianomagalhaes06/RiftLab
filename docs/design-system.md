@@ -1,10 +1,12 @@
-# Padrão visual do RiftLab — Arena sóbrio
+# Padrão visual do RiftLab — Arena vivo
 
-Toda tela do RiftLab, atual ou futura, segue este padrão. A referência é o Painel desktop do
-protótipo da direção C (`docs/aps/prototipo-competitivo/direcao-c-arena/entrega/`, gerado por
-`gerar.py`: `chrome`, `footer`, `panel_desktop`, `panel_mobile`, `rank_panel`, `match_rows`,
-`champion_rows`, `metric_block`). Quando o protótipo não cobre uma tela, ela é montada com os
-mesmos tokens e primitivas abaixo, sem inventar elementos novos de estilo.
+O RiftLab é um site de jogo: a interface deve parecer parte do League of Legends, não um
+relatório. Desde 11/11/2026 (pedido do usuário) o padrão "Arena sóbrio" virou **Arena vivo**:
+mesma base de tokens e primitivas, com arte dos campeões, ícones, brilho e ouro onde ajudam a
+ler e a agir. A origem continua o protótipo da direção C
+(`docs/aps/prototipo-competitivo/direcao-c-arena/entrega/`); as referências visuais novas são os
+perfis do tracker.gg, u.gg e Mobalytics e as páginas de build do op.gg. Não é preciso seguir o
+protótipo ao pé da letra: telas novas podem criar elementos próprios, desde que usem os tokens.
 
 No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitivas em
 `frontend/src/design/arena.css`. O teste `design/tokens.test.ts` recusa cor literal fora de
@@ -12,24 +14,42 @@ No código, as cores ficam só em `frontend/src/design/tokens.css` e as primitiv
 
 ## Princípios
 
-1. **Base neutra.** Fundo `n0`, superfícies `n1`, linhas `nline`. Nada de gradiente de fundo,
-   grade ou brilho fora do card de elo.
-2. **Cada cor tem um papel.** Roxo só para ação e seleção (link, aba ativa, foco, item
-   escolhido). Verde e vermelho só para resultado (vitória, derrota, ganho e perda de PDL). A cor
-   do elo só na classificação (card de elo, linha do elo no chip do perfil).
-3. **Dado antes de texto.** Métrica grande, legenda curta; explicações longas ficam em
-   `details`, dicas ou na tela de destino.
-4. **Nada fictício na interface real.** O protótipo usa dados ilustrativos; o produto mostra só o
+1. **Arte e cor com propósito.** Base escura neutra (`n0`, `n1`, `nline`), com vida onde ela
+   carrega informação: splash art do campeão nos cabeçalhos (Início, Campeões, banner do
+   Histórico), sempre com véus que garantem 4,5:1 até sobre arte branca; tinta do resultado no
+   cartão de partida; reflexo leve no topo das superfícies (`--panel-sheen`); brilho roxo
+   (`--glow-accent`) no item escolhido.
+2. **Cada cor tem um papel.** Roxo para ação, seleção e destaque da conta própria. Verde e
+   vermelho para resultado. Ouro (`--gold*`, como a loja do jogo) para molduras de item, o
+   trajeto mais frequente e o número em destaque (`--gold-text`). A cor do elo só na
+   classificação. Números sobre arte em placas de HUD (`--hud-bg`).
+3. **Dado e ícone antes de texto.** Número grande (Chakra Petch), ícone de linha
+   (`shared/ui/GameIcon.tsx`, traço 1,8) e rótulo curto; metodologia e explicações longas ficam
+   num "Como ler" (`details`), dica ou na tela de destino, nunca em parágrafos soltos na tela.
+4. **Destaque no próprio dado, não em etiqueta.** Como no tracker.gg e no u.gg: o maior número
+   da série fica dourado com uma estrela (`.is-best`), a revisão é texto discreto com ponto de
+   estado, e informação sobre arte é texto com ícone. Nada de pilhas de pílulas com borda
+   colorida; se houver várias marcas, no máximo uma, ou uma fileira uniforme e neutra
+   (Mobalytics).
+5. **Estado vazio leva a algum lugar.** Ícone, título curto e uma ação (ex.: "Ver no patch
+   16.20"); nunca só uma caixa com um parágrafo.
+6. **Gamificação só com dado real.** Conquistas, sequências e progresso saem das partidas e
+   tentativas carregadas ("Maior KDA", "3 vitórias seguidas", decisões estudadas); nada
+   inventado, nada que avalie a decisão sem base.
+7. **Nada fictício na interface real.** O protótipo usa dados ilustrativos; o produto mostra só o
    que veio da API. Sem dado, a área mostra o estado vazio, nunca um exemplo.
+8. **Tipografia.** Chakra Petch para títulos grandes, nomes de campeão e números; Inter para o
+   resto. Rótulos curtos em caixa alta usam Inter com espaçamento (a Chakra Petch abre espaço
+   demais depois do "T" em tamanho pequeno).
 
 ## Temas
 
-Dois temas com os mesmos papéis de token: escuro (`:root`, padrão) e claro
-(`:root[data-theme="light"]`), trocados pelo seletor de sol e lua no topo (`shared/theme`). A
-escolha fica no navegador e é aplicada antes da primeira pintura, por um script em `index.html`.
-Toda combinação de texto e fundo do claro tem contraste conferido em `tokens.test.ts`. Duas
-áreas ficam escuras nos dois temas: o card de elo, uma placa de metal cujo bloco de tokens repete
-os valores escuros, e a vitrine do início, com texto sobre a arte (`--hero-*`).
+Só tema escuro (`:root`, `color-scheme: dark`). O tema claro e o seletor de sol e lua saíram em
+11/11/2026, a pedido do usuário: as telas com arte (banners, card de elo, cabeçalho de
+Campeões) já eram escuras nos dois temas e a mistura ficava feia; as referências (tracker.gg,
+u.gg, Mobalytics) também são só escuras. Uma preferência antiga guardada no navegador
+(`riftlab:theme`) é ignorada. Toda combinação de texto e fundo tem contraste conferido em
+`tokens.test.ts`.
 
 ## Tokens
 
@@ -109,25 +129,57 @@ sempre com contorno `accent` de 3 px.
 
 - **Card de métricas** (`.surface`): duas métricas lado a lado com divisória vertical; abaixo, uma
   faixa secundária (ex.: decisões revistas, campeões no recorte com retratos de 22 px).
-- **Linha de partida**: barra de resultado, "Vitória"/"Derrota" na cor do resultado, retrato de
-  36 px, campeão e fila, data e duração, K / D / A e tropas, ação "Contexto" em roxo. No celular,
-  retrato + campeão + resultado e data à esquerda; K/D/A e "Contexto →" à direita.
-- **Linha de campeão**: retrato de 36 px, nome + contagem, função e subtítulo, "Ver guia →".
-- **Card de elo** (`.surface.surface--rank.brackets`): título em caixa alta 16 px, selo BR1 com
-  fundo `deep` e texto `text` do elo, emblema oficial com halo, elo e divisão em Chakra Petch na
-  cor `text`, legenda da observação, trilha de placas IV → I (concluída: metal escuro com filete;
-  atual: metal claro→base→escuro com ▼; próximas: neutras) com o emblema do próximo elo, barra de
-  PDL 0–100 com marcas a cada 25 e meta "Faltam X PDL para …" na cor do elo, e faixa de variação
-  (fundo `win-surface` para ganho). Mestre, Grão-Mestre e Desafiante trocam a trilha por "Sem
-  divisões · PDL sem teto" e mostram o PDL acumulado.
+- **Cartão de partida do Histórico** (refeito em 11/11/2026 a partir dos perfis do tracker.gg,
+  u.gg e Mobalytics): superfície com tinta do resultado da esquerda para a direita e borda
+  `win-surface`/`loss-surface`, barra de 3 px; fila, tempo, resultado em 15 px e duração;
+  retrato de 56 px com a rota; K / D / A em 19 px (mortes em `loss`) e KDA; itens em grade 3 × 2
+  com o amuleto redondo ao lado (casas vazias marcadas); participação em abates e farm; os dois
+  times em faixas de cinco retratos de 24 px com filete `team-blue`/`team-red` (a conta própria
+  com anel `accent`, nomes no texto acessível e na dica); "Analisar →" com a revisão embaixo em
+  texto discreto (ponto verde quando há compras revistas) e, na borda direita, a faixa de 44 px
+  na tinta do resultado (u.gg) que abre o placar das duas equipes dentro do cartão (tabela por time: campeão, KDA, farm e
+  itens; no celular, sem a coluna de itens). Coluna de resumo à esquerda (anel da taxa de
+  vitória, KDA, sequência de vitórias, últimos 20 resultados em quadrados V/D, campeões mais
+  jogados com taxa e KDA, rotas e o progresso de estudo com atalho para Minha evolução); banner
+  do perfil no topo (splash do campeão mais jogado, ícone, Riot ID, elo e "Importar partida");
+  destaques no próprio número (`.is-best`, dourado com estrela e o motivo na dica: maior KDA,
+  mais farm por minuto, maior participação em abates, com ao menos três partidas); grupos por dia com quantidade, placar e
+  KDA médio; filtros em grupos encostados; aviso de atualização numa faixa fina.
+- **Banner com splash** (`.splash-banner` em `arena.css`, arte por `shared/ui/SplashArt.tsx`):
+  Histórico e perfil do jogador pesquisado. Mostra a splash do campeão mais jogado nas partidas
+  carregadas (no perfil, a lista marca o jogador pesquisado como participante local), véus em
+  pixels e a sequência de vitórias (`.banner-streak`, chama e número dourados, sem etiqueta)
+  quando ≥ 2.
+- **Perfil do jogador pesquisado** (`features/players/PlayerPage.tsx`): mesma página do Histórico
+  da conta abaixo do banner e dos cards de elo — coluna de resumo (`LoadedSummary` com
+  `subject="player"`), busca e filtros de fila e resultado, dias com placar e KDA médio,
+  conquistas e o cartão de partida com placar. As peças compartilhadas ficam em
+  `features/history/HistoryParts.tsx`.
+- **Linha de partida** (outras telas): barra de resultado, "Vitória"/"Derrota" na cor do
+  resultado, retrato de 36 px, campeão e fila, data e duração, K / D / A e tropas, ação em roxo.
+- **Análise da partida em abas** (`features/matches/MatchPage.tsx`, 11/11/2026): no lugar de um
+  rolar longo, abas que grudam no topo ao rolar — Revisão (padrão; o que estudar), Compras
+  (trajeto e decisões + ordem de habilidades), Placar e Ouro. A aba fica no endereço
+  (`?aba=revisao|compras|placar|ouro`), as setas e Home/End trocam de aba (padrão WAI-ARIA) e,
+  antes de a partida estar preparada, só o placar aparece, sem abas. Escolher um jogador no
+  placar mantém o Placar aberto (o foco não some); "Voltar às decisões da partida" reabre
+  Compras. O placar começa compacto (campeão com feitiços e runas, K/D/A, dano, farm e itens) e
+  um botão mostra ouro, sentinelas e participação, com a escolha lembrada no navegador.
+- **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px
+  (escolhido com moldura e brilho roxos; sem partida no filtro aparecem bloqueados, em cinza e não
+  clicáveis), patch e etapa numa linha com "Como ler estes números", cabeçalho sobre a splash do
+  campeão com nome grande em caixa alta, linha de função e patch com ícone e
+  os três números em pílulas com ícone; trajetos em linhas com posição, molduras de slot douradas
+  (`.item-slot`), setas e anel de frequência (o 1º em ouro); estado vazio com ícone e ação;
+  situações como "Desafios de decisão" com o minuto num círculo e "Analisar decisão" em botão.
 
 No código: card de elo em `features/ranked/RankCard.tsx` (estilo em `rank-card.css`), elos e
 escada em `features/ranked/tiers.ts`; Painel em `features/dashboard/Dashboard.tsx`; card de elo
 da conta no Painel (Solo/Duo e Flex) em `features/ranked/MyRank.tsx`; página do
 jogador (cabeçalho e um card de elo por fila) em `features/players/PlayerPage.tsx`; Histórico
-(card de métricas, filtros `.segmented` e uma superfície por partida com `.result-bar` no artigo)
-em `features/history/`; Campeões (lista como "Campeões em foco", escolhido com `.is-selected`) em
-`features/champions/`; partida, decisão e importação em `features/matches/` e
+(coluna de resumo, filtros `.segmented` encostados e o cartão de partida em `MatchCard.tsx`, que
+a página do jogador também usa) em `features/history/`; Campeões (seletor em retratos,
+cabeçalho com splash e trajetos) em `features/champions/`; partida, decisão e importação em `features/matches/` e
 `features/imports/`, com `.surface` nos painéis e barra de resultado no `::after` do cabeçalho
 da partida (o `::before` da superfície é o fundo). Os selos antigos `.badge`/`.tag` têm a forma
 do `.chip`; a classe antiga `.section` (borda no topo) só fica como divisória entre blocos dentro
@@ -253,17 +305,15 @@ Tela própria, fora da moldura do app (`features/auth/AuthScreen.tsx`, estilo em
 Revisão com as skills better-ui e ui-ux-pro-max (09/11/2026), conferida em
 `tests/e2e/ui-polish.spec.ts`:
 
-- Controle visualmente menor que 44 px (seletor de tema, mostrar senha, chip de decisão) ganha um
+- Controle visualmente menor que 44 px (mostrar senha, chip de decisão) ganha um
   `::after` transparente até 44 px. O `::after` parte de dentro da borda: com borda de 1 px, o
   recuo é 1 px maior.
-- Ao clicar, botões, abas segmentadas, seletor de tema, busca e chips encolhem para `scale: 0.96`
-  em 150 ms (`cubic-bezier(0.2, 0, 0, 1)`). Só `scale` tem transição; cores mudam na hora, para a
-  troca de tema não animar a página inteira. Movimento reduzido desliga a escala.
+- Ao clicar, botões, abas segmentadas, busca e chips encolhem para `scale: 0.96`
+  em 150 ms (`cubic-bezier(0.2, 0, 0, 1)`). Só `scale` tem transição; cores mudam na hora
+  (nenhum elemento transiciona cor, fundo, borda ou sombra). Movimento reduzido desliga a escala.
 - Ícones de 24 unidades usam traço 1.8.
 - Imagens de item recebem o mesmo contorno de 1 px do retrato (`--portrait-outline`).
 - Cartão flutuante entra em 0,28 s (12 px) e sai em 0,2 s (8 px), ambos `ease-out`.
-- O card de elo segue escuro no tema claro e redefine também os apelidos `--color-*`, que
-  são resolvidos na raiz.
 
 ## Ativos
 

@@ -143,9 +143,9 @@ test("partida (preparando, falha, pronta) e decisões cabem em 360 px", async ({
         nextCursor: "MAIS",
       }),
   });
-  await page.goto(`/matches/${LONG_MATCH_ID}?participant=10`);
+  await page.goto(`/matches/${LONG_MATCH_ID}?participant=10&aba=compras`);
   await expect(page.getByRole("link", { name: "Decisão em 7:52" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Participante 10/ })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Compras" })).toHaveAttribute("aria-selected", "true");
   await expectNoHorizontalOverflow(page, "partida pronta com decisões");
   await expectInsideViewport(page, "Carregar mais decisões");
   await expectInsideViewport(page, /Decisão em 7:52/, "link");
@@ -230,7 +230,7 @@ test("ordem de habilidades em 360 px: níveis de dois dígitos não quebram e a 
     "GET /api/v1/matches/:id/timeline": () =>
       ok({ matchId: "DEMO-0008", dataDragonVersion: null, participants: [{ participantId: 1, items: [], skills }], kills: [], objectives: [], goldFrames: [] }),
   });
-  await page.goto("/historico/DEMO-0008?participant=1");
+  await page.goto("/historico/DEMO-0008?participant=1&aba=compras");
   const header = page.locator(".skill-order__grid thead th").filter({ hasText: /^18$/ });
   await expect(header).toBeVisible();
   const lineHeights = await page.locator(".skill-order__grid thead th").evaluateAll((cells) =>

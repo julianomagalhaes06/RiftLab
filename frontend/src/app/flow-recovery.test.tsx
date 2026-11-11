@@ -266,6 +266,8 @@ describe("decisões: erros e estados", () => {
       );
     });
 
+    // As decisões ficam na aba Compras da análise.
+    fireEvent.click(await screen.findByRole("tab", { name: "Compras" }));
     expect(await screen.findByText(/As decisões dessa partida ainda não foram preparadas/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Recarregar decisões" }));
 
@@ -284,6 +286,7 @@ describe("decisões: erros e estados", () => {
           : json(200, { items: [decisionSummary()], nextCursor: "VELHO" }),
       );
     });
+    fireEvent.click(await screen.findByRole("tab", { name: "Compras" }));
     fireEvent.click(await screen.findByRole("button", { name: "Carregar mais decisões" }));
 
     expect(await screen.findByText(/A página solicitada não é mais válida/)).toBeInTheDocument();
@@ -368,13 +371,15 @@ describe("decisões: erros e estados", () => {
 
 describe("URL: deep link, recarregar e voltar/avançar", () => {
   it("abre direto uma partida com participante escolhido (retomada por URL)", async () => {
-    setup("/matches/DEMO-0008?participant=1", (mock) => {
+    // A aba também vem do endereço (?aba=compras), como ao voltar da página da decisão.
+    setup("/matches/DEMO-0008?participant=1&aba=compras", (mock) => {
       mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008$/, () => json(200, matchDetail()));
       mock.on("GET", /decisions$/, () => json(200, { items: [decisionSummary()], nextCursor: null }));
     });
 
     expect(await screen.findByRole("link", { name: "Decisão em 7:52" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Participante 1/ })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("tab", { name: "Compras" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("link", { name: /Participante 1/, hidden: true })).toHaveAttribute("aria-current", "true");
     expect(api.callsTo("POST", /./)).toHaveLength(0); // retomar nunca dispara escrita
   });
 
@@ -397,11 +402,15 @@ describe("URL: deep link, recarregar e voltar/avançar", () => {
     fireEvent.click(await screen.findByRole("link", { name: "Contexto da partida DEMO-0008" }));
     await screen.findByRole("heading", { name: /^Partida DEMO-0008/ });
     fireEvent.click(await screen.findByRole("link", { name: /Participante 2/ }));
+    // Escolhido no placar, o jogador fica destacado e o Placar continua aberto (o foco não some);
+    // as decisões dele ficam na aba Compras.
+    expect(await screen.findByRole("tab", { name: "Placar" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Compras" }));
     await screen.findByRole("heading", { name: "Decisões de Campeão #9002" });
 
     window.history.back();
     await waitFor(() => expect(window.location.search).toBe(""));
-    await screen.findByText("Selecione um participante no placar para ver as compras e decisões dele.");
+    await screen.findByText("Selecione um participante no placar para ver a revisão, as compras e as decisões dele.");
 
     window.history.back();
     await screen.findByRole("heading", { name: "Partidas para estudar" });

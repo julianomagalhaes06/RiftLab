@@ -85,6 +85,20 @@ async def test_match_detail_carries_riot_id_without_puuid(app_client, session_fa
                     "puuid": "synthetic-p1",
                     "riotIdGameName": "Ana",
                     "riotIdTagline": "BR1",
+                    "summoner1Id": 4,
+                    "summoner2Id": 14,
+                    "perks": {
+                        "styles": [
+                            {
+                                "description": "primaryStyle",
+                                "style": 8100,
+                                "selections": [{"perk": 8112}],
+                            },
+                            {"description": "subStyle", "style": 8200, "selections": []},
+                        ]
+                    },
+                    "champLevel": 16,
+                    "goldEarned": 9000,
                 },
                 {"participantId": 2, "puuid": "synthetic-p2"},
             ]
@@ -121,6 +135,15 @@ async def test_match_detail_carries_riot_id_without_puuid(app_client, session_fa
         participants = {p["participantId"]: p for p in response.json()["participants"]}
         assert (participants[1]["gameName"], participants[1]["tagLine"]) == ("Ana", "BR1")
         assert participants[2]["gameName"] is None and participants[2]["tagLine"] is None
+        # Detalhes de placar do bruto: feitiços, runas, nível e ouro; nulos sem dado.
+        assert participants[1]["summonerSpells"] == [4, 14]
+        assert participants[1]["runes"] == {
+            "primaryStyle": 8100,
+            "keystone": 8112,
+            "secondaryStyle": 8200,
+        }
+        assert (participants[1]["champLevel"], participants[1]["goldEarned"]) == (16, 9000)
+        assert participants[2]["summonerSpells"] is None and participants[2]["runes"] is None
         assert "synthetic-p" not in response.text and "puuid" not in response.text.lower()
         # A lista do Histórico continua sem Riot ID.
         listing = await app_client.get("/api/v1/matches", params={"limit": 100})

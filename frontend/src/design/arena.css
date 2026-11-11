@@ -1,4 +1,4 @@
-/* Primitivas do padrão Arena sóbrio (docs/design-system.md). Telas e componentes novos montam a
+/* Primitivas do padrão Arena vivo (docs/design-system.md). Telas e componentes novos montam a
    interface com estas classes antes de criar estilo próprio; cores só por var(--…). */
 
 /* Superfície: fundo n1, borda nline de 1 px e chanfro nos cantos superior esquerdo e inferior
@@ -13,18 +13,14 @@
   min-width: 0;
   background: var(--surface-line);
   clip-path: polygon(var(--surface-cut) 0, 100% 0, 100% calc(100% - var(--surface-cut)), calc(100% - var(--surface-cut)) 100%, 0 100%, 0 var(--surface-cut));
-  /* O chanfro é um clip-path, que cortaria um box-shadow comum: drop-shadow sobrevive a ele
-     (mesmo recurso de .account-toast). --surface-elevation só existe no tema claro (ver
-     tokens.css): o escuro já separa superfície e fundo só por luminosidade, sem precisar de
-     sombra. */
-  filter: var(--surface-elevation, none);
 }
 .surface::before {
   content: "";
   position: absolute;
   inset: 1px;
   z-index: -1;
-  background: var(--surface-fill);
+  /* Arena vivo: reflexo leve no topo de toda superfície (--panel-sheen). */
+  background: var(--panel-sheen), var(--surface-fill);
   clip-path: polygon(calc(var(--surface-cut) - .586px) 0, 100% 0, 100% calc(100% - var(--surface-cut) + .586px), calc(100% - var(--surface-cut) + .586px) 100%, 0 100%, 0 calc(var(--surface-cut) - .586px));
 }
 .surface--rank { --surface-cut: var(--cut-rank); }
@@ -118,3 +114,17 @@
 [data-tier="MASTER"] { --tier-base: var(--tier-master-base); --tier-light: var(--tier-master-light); --tier-dark: var(--tier-master-dark); --tier-deep: var(--tier-master-deep); --tier-text: var(--tier-master-text); }
 [data-tier="GRANDMASTER"] { --tier-base: var(--tier-grandmaster-base); --tier-light: var(--tier-grandmaster-light); --tier-dark: var(--tier-grandmaster-dark); --tier-deep: var(--tier-grandmaster-deep); --tier-text: var(--tier-grandmaster-text); }
 [data-tier="CHALLENGER"] { --tier-base: var(--tier-challenger-base); --tier-light: var(--tier-challenger-light); --tier-dark: var(--tier-challenger-dark); --tier-deep: var(--tier-challenger-deep); --tier-text: var(--tier-challenger-text); }
+
+/* Banner com splash art (Arena vivo): Histórico e perfil do jogador. Véus
+   medidos em pixels atrás do texto (até 640 px no mínimo --hero-scrim-heavy, ≥ 4,5:1 até sobre
+   arte branca, ver ui-polish) e filete roxo na base. A arte entra com fade e leve zoom. */
+.splash-banner { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: flex-end; min-height: 200px; background: var(--hero-end); color: var(--hero-ink); clip-path: polygon(var(--cut-rank) 0, 100% 0, 100% calc(100% - var(--cut-rank)), calc(100% - var(--cut-rank)) 100%, 0 100%, 0 var(--cut-rank)); }
+.splash-banner__art { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; object-position: 70% 20%; opacity: 0; scale: 1.04; transition: opacity 500ms ease, scale 900ms cubic-bezier(0.2, 0, 0, 1); }
+.splash-banner__art[data-state="ready"] { opacity: 1; scale: 1; }
+.splash-banner::before { content: ""; position: absolute; inset: 0; z-index: -1; background:
+  linear-gradient(90deg, var(--hero-scrim-strong) 0, var(--hero-scrim-heavy) 420px, var(--hero-scrim-heavy) 640px, var(--hero-scrim-clear) 100%),
+  linear-gradient(0deg, var(--hero-scrim-strong) 0%, var(--hero-scrim-clear) 70%); }
+.splash-banner::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, var(--accent-strong), var(--hero-scrim-clear) 70%); }
+@media (prefers-reduced-motion: reduce) {
+  .splash-banner__art { transition: none; scale: 1; }
+}

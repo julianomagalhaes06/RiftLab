@@ -222,3 +222,11 @@ export const PREPARATION_LABEL: Readonly<Record<PreparationStatus, string>> = {
   READY: "Pronta",
   FAILED: "Preparação falhou",
 };
+
+const SPLASH_BASE = "https://ddragon.leagueoflegends.com/cdn/img/champion/splash";
+
+/** Splash art oficial do campeão (Data Dragon): a chave é o nome do arquivo do retrato. */
+export function championSplashUrl(imageFile: string | null | undefined): string | null {
+  const key = imageFile?.replace(/\.png$/, "");
+  return key && /^[A-Za-z0-9]+$/.test(key) ? `${SPLASH_BASE}/${key}_0.jpg` : null;
+}

@@ -48,15 +48,12 @@ describe("tokens visuais", () => {
  * controle ≥ 3:1). Lê os valores direto de tokens.css. */
 const tokenSheet = Object.entries(sheets).find(([path]) => path.endsWith("/design/tokens.css"))?.[1] ?? "";
 const hexIn = (block: string) => Object.fromEntries([...block.matchAll(/--([a-z0-9-]+):\s*(#[0-9a-f]{6})\b/gi)].map((m) => [m[1], m[2]]));
-const LIGHT = ':root[data-theme="light"] {';
-const PLATE = ':root[data-theme="light"] .rank-card {';
 const blockAt = (selector: string) => {
   const start = tokenSheet.indexOf(selector);
   return start < 0 ? "" : tokenSheet.slice(start, tokenSheet.indexOf("}", start));
 };
-const darkHex = hexIn(tokenSheet.slice(0, tokenSheet.indexOf(LIGHT)));
-const lightHex = { ...darkHex, ...hexIn(blockAt(LIGHT)) };
-const plateHex = hexIn(blockAt(PLATE));
+// Só tema escuro: os valores vêm do bloco :root.
+const darkHex = hexIn(blockAt(":root {"));
 const hex = darkHex;
 
 function luminance(value: string): number {
@@ -88,6 +85,14 @@ describe("contraste do padrão Arena", () => {
     ["tier-next-ink", "tier-next-top", 4.5],
     ["nline-strong", "n0", 3],
     ["nline-strong", "n1", 3],
+    ["accent", "n1", 4.5],
+    ["gold-text", "n1", 4.5],
+    ["gold-text", "n2", 4.5],
+    ["color-degraded", "color-degraded-bg", 4.5],
+    ["color-loading", "color-loading-bg", 4.5],
+    ["color-warning", "color-warning-bg", 4.5],
+    ["team-blue", "n1", 3],
+    ["team-red", "n1", 3],
     ...TIERS.flatMap((tier): Pair[] => [
       [`tier-${tier}-text`, "n1", 4.5],
       [`tier-${tier}-text`, `tier-${tier}-deep`, 4.5],
@@ -98,39 +103,5 @@ describe("contraste do padrão Arena", () => {
     expect(hex[fg], fg).toBeDefined();
     expect(hex[bg], bg).toBeDefined();
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(minimum);
-  });
-});
-
-describe("contraste do tema claro", () => {
-  it.each<Pair>([
-    ...["ntext", "ntext-muted", "ntext-subtle", "accent", "win", "loss"].flatMap((fg) =>
-      ["n0", "n1", "n2"].map((bg): Pair => [fg, bg, 4.5])),
-    ["on-accent", "accent-strong", 4.5],
-    ["on-accent", "accent-fill-hover", 4.5],
-    ["accent", "accent-surface", 4.5],
-    ["accent", "n1", 4.5],
-    ["win", "win-surface", 4.5],
-    ["loss", "loss-surface", 4.5],
-    ["color-degraded", "color-degraded-bg", 4.5],
-    ["color-loading", "color-loading-bg", 4.5],
-    ["color-warning", "color-warning-bg", 4.5],
-    ["nline-strong", "n0", 3],
-    ["nline-strong", "n1", 3],
-    ["team-blue", "n1", 3],
-    ["team-red", "n1", 3],
-    ...TIERS.map((tier): Pair => [`tier-${tier}-text`, "n1", 4.5]),
-  ])("%s sobre %s ≥ %s:1", (fg, bg, minimum) => {
-    expect(lightHex[fg], fg).toBeDefined();
-    expect(contrast(fg, bg, lightHex)).toBeGreaterThanOrEqual(minimum);
-  });
-
-  it("a placa de elo repete os valores do tema escuro, nos dois temas igual", () => {
-    expect(Object.keys(plateHex).length).toBeGreaterThan(15);
-    for (const [name, value] of Object.entries(plateHex)) expect(value, name).toBe(darkHex[name]);
-  });
-
-  it("todo token de cor do tema escuro que muda de papel tem par definido", () => {
-    expect(Object.keys(hexIn(blockAt(LIGHT))).length).toBeGreaterThan(40);
-    for (const name of Object.keys(hexIn(blockAt(LIGHT)))) expect(darkHex[name], name).toBeDefined();
   });
 });

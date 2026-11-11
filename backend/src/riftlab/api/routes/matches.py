@@ -15,7 +15,7 @@ import re
 import uuid
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -28,6 +28,7 @@ from riftlab.errors import ProblemDetail
 from riftlab.ingestion.domain import Match, MatchListScope
 from riftlab.ingestion.purge import purge_preview, request_purge
 from riftlab.matches.queries import MatchParticipantFactsView, get_match_detail, list_matches
+from riftlab.matches.raw_details import ParticipantDetailsRaw, participant_details
 from riftlab.matches.riot_ids import participant_riot_ids
 from riftlab.matches.timeline import get_match_timeline
 from riftlab.players.application import profile_subject
@@ -55,6 +56,7 @@ from riftlab.shared.api.matches import (
     MatchPreparation,
     MatchSummary,
     MatchTimeline,
+    ParticipantRunes,
     ParticipantTimeline,
     ReviewPurchaseCount,
     TimelineGoldFrame,
@@ -161,6 +163,27 @@ async def list_imported_matches(
     )
 
 
+def _detail_fields(raw: ParticipantDetailsRaw | None) -> dict[str, Any]:
+    if raw is None:
+        return {}
+    return {
+        "summoner_spells": list(raw.summoner_spells) if raw.summoner_spells else None,
+        "runes": ParticipantRunes(
+            primary_style=raw.runes.primary_style,
+            keystone=raw.runes.keystone,
+            secondary_style=raw.runes.secondary_style,
+        )
+        if raw.runes
+        else None,
+        "champ_level": raw.champ_level,
+        "damage_to_champions": raw.damage_to_champions,
+        "gold_earned": raw.gold_earned,
+        "wards_placed": raw.wards_placed,
+        "vision_score": raw.vision_score,
+        "largest_multi_kill": raw.largest_multi_kill,
+    }
+
+
 @router.get(
     "/api/v1/matches/{match_id}",
     response_model=MatchDetail,
@@ -190,8 +213,13 @@ async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail
             for p in detail.participants
         ),
     )
-    # CC-1210: Riot ID da partida lido do bruto (somente leitura, nada gravado).
-    riot_ids = await asyncio.to_thread(participant_riot_ids, settings.raw_storage_dir, match_id)
+    # CC-1210: Riot ID e detalhes de placar lidos do bruto (somente leitura, nada gravado).
+    riot_ids, extras = await asyncio.to_thread(
+        lambda: (
+            participant_riot_ids(settings.raw_storage_dir, match_id),
+            participant_details(settings.raw_storage_dir, match_id),
+        )
+    )
     return MatchDetail(
         **summary.model_dump(exclude={"participants", "local_participant_id"}),
         local_participant_id=detail.local_participant_id,
@@ -200,6 +228,7 @@ async def get_imported_match(match_id: MatchId, request: Request) -> MatchDetail
                 **_to_participant(p, detail.champions).model_dump(),
                 game_name=riot_ids.get(p.participant_id, (None, None))[0],
                 tag_line=riot_ids.get(p.participant_id, (None, None))[1],
+                **_detail_fields(extras.get(p.participant_id)),
             )
             for p in detail.participants
         ],

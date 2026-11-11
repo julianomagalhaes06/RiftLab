@@ -35,7 +35,7 @@ test.describe("saúde das regras herdadas", () => {
           }),
         ),
     });
-    await page.goto(`/matches/${MATCH_ID}?participant=1`);
+    await page.goto(`/matches/${MATCH_ID}?participant=1&aba=compras`);
     const blockedLink = page.getByRole("link", { name: /Decisão em 7:52/ });
     await expect(blockedLink).toBeVisible();
     await blockedLink.focus();

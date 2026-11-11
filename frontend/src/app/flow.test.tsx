@@ -142,8 +142,10 @@ describe("fluxo principal: demonstração → importação → partida → decis
     expect(screen.getByText("Atirador")).toBeInTheDocument();
     expect(screen.getByText("Função não informada")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: /Participante 1 — Campeão #9001/ }));
+    await waitFor(() => expect(window.location.search).toBe("?participant=1&aba=placar"));
+    // O Placar continua aberto com o jogador escolhido; as decisões ficam na aba Compras.
+    fireEvent.click(await screen.findByRole("tab", { name: "Compras" }));
     await screen.findByRole("heading", { name: "Decisões de Campeão #9001 (Atirador)" });
-    expect(window.location.search).toBe("?participant=1");
     expect(api.callsTo("GET", /decisions$/)[0].search.get("participantId")).toBe("1");
 
     expect(await screen.findByRole("link", { name: "Decisão em 7:52" })).toBeInTheDocument();
@@ -172,7 +174,7 @@ describe("fluxo principal: demonstração → importação → partida → decis
     // Volta às decisões do mesmo participante.
     fireEvent.click(screen.getByRole("link", { name: /^Voltar às decisões da partida$/ }));
     await screen.findByRole("heading", { name: "Decisões de Campeão #9001 (Atirador)" });
-    expect(window.location.search).toBe("?participant=1");
+    expect(window.location.search).toBe("?participant=1&aba=compras");
 
     // Nada consulta o progresso da importação depois do SUCCEEDED, nem a partida depois de READY.
     const importPolls = api.callsTo("GET", /\/api\/v1\/imports\//).length;

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { api, type DecisionSummary, type MatchDetail, type MatchParticipant, type MatchTimeline } from "../../shared/api/client";
 import { isAbortError, isApiError } from "../../shared/api/errors";
 import { useAbortScope } from "../../shared/hooks/useAbortScope";
 import { usePolling } from "../../shared/hooks/usePolling";
 import { Link } from "../../shared/router/Link";
+import { useRouter } from "../../shared/router/context";
 import { useAuth } from "../auth/authContext";
 import { ErrorNotice } from "../../shared/ui/ErrorNotice";
 import { usePagedList } from "../../shared/hooks/usePagedList";
@@ -63,7 +64,7 @@ function DecisionsSummary({ decisions }: { decisions: DecisionSummary[] }) {
       {summary.eligible === 0 ? (
         // CC-904: sem beco sem saída; o que a partida ainda oferece.
         <p className="decisions-summary__next">
-          O trajeto de compras, a ordem de habilidades e o gráfico de ouro continuam disponíveis abaixo.
+          O trajeto de compras e a ordem de habilidades continuam aqui; o gráfico de ouro fica na aba Ouro.
         </p>
       ) : null}
       {blocked > 0 && summary.reasons.length ? (
@@ -138,6 +139,43 @@ function ParticipantSection({
   );
 }
 
+type TabKey = "revisao" | "compras" | "placar" | "ouro";
+const TAB_LABEL: Record<TabKey, string> = { revisao: "Revisão", compras: "Compras", placar: "Placar", ouro: "Ouro" };
+
+/** Abas da análise (padrão WAI-ARIA: setas trocam de aba, a aba ativa recebe o foco). Trocam a
+ * área de baixo sem rolar a página; a escolhida fica no endereço (?aba=) para voltar e compartilhar. */
+function AnalysisTabs({ tabs, active, onChange }: { tabs: TabKey[]; active: TabKey; onChange(tab: TabKey): void }) {
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const index = tabs.indexOf(active);
+    const next = event.key === "ArrowRight" ? tabs[(index + 1) % tabs.length]
+      : event.key === "ArrowLeft" ? tabs[(index - 1 + tabs.length) % tabs.length]
+      : event.key === "Home" ? tabs[0] : event.key === "End" ? tabs[tabs.length - 1] : null;
+    if (!next) return;
+    event.preventDefault();
+    onChange(next);
+    document.getElementById(`analysis-tab-${next}`)?.focus();
+  }
+  return (
+    <div className="analysis-tabs" role="tablist" aria-label="Seções da análise">
+      {tabs.map((tab) => (
+        <button key={tab} id={`analysis-tab-${tab}`} type="button" role="tab" aria-selected={tab === active}
+          aria-controls={`analysis-panel-${tab}`} tabIndex={tab === active ? 0 : -1}
+          onClick={() => onChange(tab)} onKeyDown={onKeyDown}>
+          {TAB_LABEL[tab]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TabPanel({ tab, active, children }: { tab: TabKey; active: TabKey; children: ReactNode }) {
+  return (
+    <div id={`analysis-panel-${tab}`} role="tabpanel" aria-labelledby={`analysis-tab-${tab}`} hidden={tab !== active} className="analysis-panel">
+      {children}
+    </div>
+  );
+}
+
 /** Partida (/matches/:matchId?participant=N): preparação, participantes e decisões. */
 export function MatchPage({
   matchId,
@@ -149,6 +187,7 @@ export function MatchPage({
   fromHistory?: boolean;
 }) {
   const { hasAccount } = useAuth();
+  const { href, navigate } = useRouter();
   const newController = useAbortScope();
   const [preparing, setPreparing] = useState(false);
   useDemoNotice(isDemoMatchId(matchId));
@@ -187,6 +226,21 @@ export function MatchPage({
       ? (match.participants.find((p) => p.participantId === selectedId) ?? null)
       : null;
   const timelineState = useMatchTimeline(matchId, match?.preparation.status ?? "loading");
+  const ready = match?.preparation.status === "READY";
+  // Abas só com a partida preparada; antes disso a página mostra o placar, como sempre.
+  const tabs: TabKey[] = !ready ? [] : [
+    ...(selectedParticipant ? (["revisao", "compras"] as const) : []),
+    "placar",
+    ...(timelineState?.timeline ? (["ouro"] as const) : []),
+  ];
+  const requested = new URLSearchParams(href.split("?")[1]).get("aba") as TabKey | null;
+  const activeTab: TabKey = requested && tabs.includes(requested) ? requested : tabs[0] ?? "placar";
+  function changeTab(tab: TabKey) {
+    const [path, query = ""] = href.split("?");
+    const params = new URLSearchParams(query);
+    params.set("aba", tab);
+    navigate(`${path}?${params.toString()}`, { replace: true });
+  }
 
   return (
     <section className="area-page match-page" aria-labelledby="match-heading">
@@ -233,58 +287,73 @@ export function MatchPage({
             requestError={prepareError}
           />
 
-          {/* O placar vem da importação: aparece antes da revisão, que é sob demanda. */}
-          <section aria-labelledby="participants-heading" className="surface match-panel">
-            <h3 id="participants-heading">Placar</h3>
-            <Scoreboard
-              match={match}
-              timeline={timelineState?.timeline ?? null}
-              selected={selectedId}
-              localId={localId}
-              fromHistory={fromHistory}
-            />
-          </section>
-
-          {match.preparation.status === "READY" ? (
-            <>
-              {selectedId === null ? (
-                <p className="muted">Selecione um participante no placar para ver as compras e decisões dele.</p>
-              ) : selectedParticipant === null ? (
-                <div className="notice notice--info" role="note">
-                  <p>O participante {selectedId} não existe nesta partida.</p>
-                </div>
-              ) : (
-                <>
-                  <MatchReviewPanel
-                    key={`review-${selectedId}`}
-                    matchId={match.matchId}
-                    participant={selectedParticipant}
-                    participants={match.participants}
-                  />
-                  <ParticipantSection
-                    key={selectedId}
-                  matchId={match.matchId}
-                  participant={selectedParticipant}
-                    timeline={timelineState?.timeline ?? null}
-                    local={selectedId === localId}
-                  />
-                </>
-              )}
-              {timelineState?.timeline ? (
-                <section aria-labelledby="gold-heading" className="surface match-panel">
-                  <h3 id="gold-heading">Ouro ao longo da partida</h3>
-                  <GoldChart timeline={timelineState.timeline} participants={match.participants} />
-                  {timelineState.timeline.goldFrames == null ? (
-                    <button type="button" className="button button--secondary" onClick={() => void handlePrepare()} disabled={preparing}>
-                      {preparing ? "Enviando…" : "Preparar de novo para gerar o gráfico"}
-                    </button>
-                  ) : null}
-                </section>
-              ) : timelineState?.failed ? (
-                <p className="muted">A linha do tempo da partida não pôde ser carregada agora.</p>
-              ) : null}
-            </>
-          ) : null}
+          {(() => {
+            const scoreboard = (
+              <section aria-labelledby="participants-heading" className="surface match-panel">
+                <h3 id="participants-heading">Placar</h3>
+                <Scoreboard
+                  match={match}
+                  timeline={timelineState?.timeline ?? null}
+                  selected={selectedId}
+                  localId={localId}
+                  fromHistory={fromHistory}
+                  stayOnScoreboard={ready}
+                />
+              </section>
+            );
+            // Sem preparação pronta: só o placar, que vem da importação.
+            if (!ready) return scoreboard;
+            return (
+              <>
+                <AnalysisTabs tabs={tabs} active={activeTab} onChange={changeTab} />
+                {selectedId !== null && selectedParticipant === null ? (
+                  <div className="notice notice--info" role="note">
+                    <p>O participante {selectedId} não existe nesta partida.</p>
+                  </div>
+                ) : null}
+                {selectedParticipant ? (
+                  <>
+                    <TabPanel tab="revisao" active={activeTab}>
+                      <MatchReviewPanel
+                        key={`review-${selectedId}`}
+                        matchId={match.matchId}
+                        participant={selectedParticipant}
+                        participants={match.participants}
+                      />
+                    </TabPanel>
+                    <TabPanel tab="compras" active={activeTab}>
+                      <ParticipantSection
+                        key={selectedId}
+                        matchId={match.matchId}
+                        participant={selectedParticipant}
+                        timeline={timelineState?.timeline ?? null}
+                        local={selectedId === localId}
+                      />
+                    </TabPanel>
+                  </>
+                ) : null}
+                <TabPanel tab="placar" active={activeTab}>
+                  {selectedId === null ? <p className="muted">Selecione um participante no placar para ver a revisão, as compras e as decisões dele.</p> : null}
+                  {scoreboard}
+                </TabPanel>
+                {timelineState?.timeline ? (
+                  <TabPanel tab="ouro" active={activeTab}>
+                    <section aria-labelledby="gold-heading" className="surface match-panel">
+                      <h3 id="gold-heading">Ouro ao longo da partida</h3>
+                      <GoldChart timeline={timelineState.timeline} participants={match.participants} />
+                      {timelineState.timeline.goldFrames == null ? (
+                        <button type="button" className="button button--secondary" onClick={() => void handlePrepare()} disabled={preparing}>
+                          {preparing ? "Enviando…" : "Preparar de novo para gerar o gráfico"}
+                        </button>
+                      ) : null}
+                    </section>
+                  </TabPanel>
+                ) : timelineState?.failed ? (
+                  <p className="muted">A linha do tempo da partida não pôde ser carregada agora.</p>
+                ) : null}
+              </>
+            );
+          })()}
 
           {/* Remover apaga dado compartilhado: só com conta. */}
           {hasAccount ? (

@@ -59,13 +59,14 @@ test("partida mostra nome e retrato por key, recua sem salto de layout e só usa
   const boxes = await Promise.all([1, 2, 3].map((id) => portraitOf(page, id).boundingBox()));
   for (const box of boxes) {
     expect(box).not.toBeNull();
-    expect([Math.round(box!.width), Math.round(box!.height)]).toEqual([34, 34]); // retrato do placar
+    expect([Math.round(box!.width), Math.round(box!.height)]).toEqual([40, 40]); // retrato do placar (com o nível)
   }
   await expect(portraitOf(page, 3)).toHaveAttribute("data-state", "fallback");
 
   expect(imageRequests.length).toBeGreaterThan(0);
+  // Só o CDN oficial: retratos de campeão e os catálogos em português de feitiços e runas.
   for (const url of imageRequests) {
-    expect(url).toMatch(/^https:\/\/ddragon\.leagueoflegends\.com\/cdn\/16\.17\.1\/img\/champion\/[A-Za-z0-9]+\.png$/);
+    expect(url).toMatch(/^https:\/\/ddragon\.leagueoflegends\.com\/cdn\/16\.17\.1\/(img\/champion\/[A-Za-z0-9]+\.png|data\/pt_BR\/(summoner|runesReforged)\.json)$/);
   }
   await expect(page.getByText(/RiftLab isn't endorsed by Riot Games/)).toBeVisible();
   await expect(page.getByText(/Revisão de partidas concluídas/)).toBeVisible();
