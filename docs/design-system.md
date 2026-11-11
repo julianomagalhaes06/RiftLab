@@ -165,6 +165,17 @@ sempre com contorno `accent` de 3 px.
   placar mantém o Placar aberto (o foco não some); "Voltar às decisões da partida" reabre
   Compras. O placar começa compacto (campeão com feitiços e runas, K/D/A, dano, farm e itens) e
   um botão mostra ouro, sentinelas e participação, com a escolha lembrada no navegador.
+- **Tela de decisão** (`features/matches/DecisionDetailPage.tsx`, 11/11/2026): cabeçalho com HUD
+  (momento e nível, ouro em dourado), situação no momento da compra (inventário em slots dourados
+  com o amuleto redondo e os dois times), "Analisar decisão" e "Praticar decisão" como cartões
+  de escolha, comparação em cartões de item (1º em ouro, evidências sem o código da fonte na
+  tela — ele fica na dica e para leitores de tela), avisos num "Como ler esta comparação" e a
+  área "E se…" (outro objetivo e outro ouro) lado a lado.
+- **Assistente de objetivo** (`features/objectives/ObjectivePicker.tsx`): conversa no lugar do
+  formulário. A pessoa escreve ou clica numa sugestão; o interpretador (regras ou o modelo local)
+  propõe UMA das quatro prioridades e ela confirma; sem entender, pede para escolher uma opção.
+  As quatro prioridades seguem como escolha direta (rádios com cara de botão). A LLM só traduz o
+  objetivo; nunca recomenda item nem mexe em preço ou atributo.
 - **Campeões** (Arena vivo, 11/11/2026): seleção como a do jogo, em cartões com retrato de 72 px
   (escolhido com moldura e brilho roxos; sem partida no filtro aparecem bloqueados, em cinza e não
   clicáveis), patch e etapa numa linha com "Como ler estes números", cabeçalho sobre a splash do

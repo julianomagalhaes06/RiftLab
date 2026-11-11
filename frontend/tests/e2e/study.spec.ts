@@ -79,7 +79,7 @@ test("texto confirmado → estudo → comparação → reflexão → relatório,
   await page.getByRole("button", { name: "Revelar comparação" }).click();
   await expect(page.getByRole("heading", { name: "Comparação" })).toBeFocused();
   await expect(page.getByText(/Objetivo: Sobrevivência \(de texto confirmado \(interpretador rules_v1\)\)/)).toBeVisible();
-  await expect(page.getByText(/— sua escolha/)).toBeVisible();
+  await expect(page.locator(".comparison-list .tag-chosen")).toBeVisible();
   await expect(page.getByText(/compra feita na partida \(histórico\)/)).toBeVisible();
   await expect(page.getByText(/não é um gabarito/)).toBeVisible();
   await page.screenshot({ path: `${evidence}/comparacao-1280.png`, fullPage: true });
@@ -140,7 +140,7 @@ test("modelo local ativo e depois indisponível: o formulário segue e a compara
 
   await text.fill("fico sem mana, o que eu faço?");
   await page.getByRole("button", { name: "Interpretar texto" }).click();
-  await expect(page.getByText(/O interpretador não respondeu\. Escolha o objetivo no formulário/)).toBeVisible();
+  await expect(page.getByText(/O interpretador não respondeu\. Escolha uma das opções abaixo/)).toBeVisible();
   await expect(page.getByRole("group", { name: "Objetivo", exact: true }).locator("legend")).toBeFocused();
   await page.screenshot({ path: `${evidence}/modelo-indisponivel-1280.png`, fullPage: true });
 

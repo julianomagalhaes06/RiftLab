@@ -47,19 +47,20 @@ function Inventory({ decision }: { decision: DecisionState }) {
         <ul className="inventory-grid__slots" aria-label="Itens do inventário principal">
           {slots.map((item, index) => (
             <li key={`${item.itemId}-${index}`} className="inventory-grid__slot" title={itemName(item)}>
-              <ItemIcon itemId={item.itemId} />
+              <span className="inventory-grid__frame"><ItemIcon itemId={item.itemId} /></span>
               {item.quantity > 1 ? <span className="inventory-grid__count">×{item.quantity}</span> : null}
               <span className="inventory-grid__name">{itemName(item)}</span>
             </li>
           ))}
           {Array.from({ length: 6 - slots.length }, (_, index) => (
-            <li key={`empty-${index}`} className="inventory-grid__slot inventory-grid__slot--empty" aria-hidden="true" />
+            <li key={`empty-${index}`} className="inventory-grid__slot inventory-grid__slot--empty" aria-hidden="true"><span className="inventory-grid__frame" /></li>
           ))}
         </ul>
         {items.length === 0 ? <p className="muted">Nenhum item no inventário principal.</p> : null}
-        <p className="inventory-grid__trinket">Amuleto: {decision.inventory.trinketItemId != null
-          ? <span className="item-with-icon"><ItemIcon itemId={decision.inventory.trinketItemId} /><span>{itemName({ itemId: decision.inventory.trinketItemId })}</span></span>
-          : "Vazio"}</p>
+        <p className="inventory-grid__trinket">
+          <span className="inventory-grid__trinket-frame" aria-hidden="true">{decision.inventory.trinketItemId != null ? <ItemIcon itemId={decision.inventory.trinketItemId} /> : null}</span>
+          <span>Amuleto: {decision.inventory.trinketItemId != null ? itemName({ itemId: decision.inventory.trinketItemId }) : "Vazio"}</span>
+        </p>
       </div>
     </section>
   );
@@ -68,7 +69,7 @@ function Inventory({ decision }: { decision: DecisionState }) {
 function Budget({ decision }: { decision: DecisionState }) {
   const budget = describeBudget(decision.budget);
   return (
-    <div className="surface decision-stat decision-stat--gold" aria-labelledby="budget-heading">
+    <div className="decision-hud__stat decision-hud__stat--gold" aria-labelledby="budget-heading">
       <h3 id="budget-heading">Orçamento</h3>
       <p className={`decision-stat__value budget budget--${budget.tone}`}>{budget.headline}</p>
       {budget.notes.map((note) => (
@@ -331,9 +332,9 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
       >
         Voltar às decisões da partida
       </Link>
-      <header className="decision-hero">
-        {participant ? <ChampionAvatar participant={participant} size={56} className="portrait decision-hero__portrait" /> : null}
-        <div>
+      <header className="decision-hero surface">
+        {participant ? <ChampionAvatar participant={participant} size={64} className="portrait decision-hero__portrait" /> : null}
+        <div className="decision-hero__title">
           <h2 id="decision-heading">
             {participant && match?.localParticipantId === decision.participantId
               ? `Sua decisão em ${formatGameTime(decision.timestampMs)}`
@@ -349,6 +350,15 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
               {decision.versions.reconstructionRulesHealth === "SUSPENDED" ? "Análise bloqueada" : decision.eligible ? "Elegível para análise" : "Inelegível para análise"}
             </span>
           </p>
+        </div>
+        {/* O momento e o ouro em destaque, como um HUD do jogo. */}
+        <div className="decision-hud">
+          <div className="decision-hud__stat">
+            <h3>Momento</h3>
+            <p className="decision-stat__value">{formatGameTime(decision.timestampMs)}</p>
+            <Level decision={decision} />
+          </div>
+          <Budget decision={decision} />
         </div>
       </header>
       <DecisionStrip decision={decision} decisions={context?.decisions ?? []} durationSeconds={match?.durationSeconds ?? null} />
@@ -367,18 +377,9 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
       <ObservedRuleHealth decision={decision} />
 
       <ItemNames version={decision.versions.dataDragonVersion}>
+        {/* Situação no momento da compra: o que você tinha e contra quem. */}
         <div className="decision-grid">
-          <div className="decision-grid__main">
-            <div className="decision-stats">
-              <div className="surface decision-stat">
-                <h3>Momento</h3>
-                <p className="decision-stat__value">{formatGameTime(decision.timestampMs)}</p>
-                <Level decision={decision} />
-              </div>
-              <Budget decision={decision} />
-            </div>
-            <Inventory decision={decision} />
-          </div>
+          <Inventory decision={decision} />
           {match ? <TeamContext match={match} participantId={decision.participantId} /> : null}
         </div>
         {decision.eligible && decision.versions.reconstructionRulesHealth !== "SUSPENDED" ? (

@@ -1,0 +1,55 @@
+/* Assistente de objetivo em conversa (11/11/2026): balões do assistente à esquerda e da pessoa
+   à direita, indicador de digitação, sugestões de frase, campo com enviar e as quatro
+   prioridades como escolha direta (rádios nativos com cara de botão). */
+.objective-chat { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--nline); border-radius: var(--radius-sm); background: var(--panel-sheen), var(--n1); }
+.objective-chat__head { display: flex; align-items: center; gap: 12px; }
+.objective-chat__avatar { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--accent-strong); color: var(--on-accent); font: 700 .9375rem var(--font-display); box-shadow: 0 0 16px var(--glow-accent-soft); }
+.objective-chat__title { margin: 0; color: var(--ntext); font-weight: 700; font-size: .9375rem; }
+.objective-chat__sub { margin: 2px 0 0; color: var(--ntext-subtle); font-size: .8125rem; }
+
+.objective-chat__log { list-style: none; display: flex; flex-direction: column; gap: 8px; max-height: 320px; margin: 0; padding: 4px 2px; overflow-y: auto; scroll-behavior: smooth; }
+.objective-chat__msg { max-width: min(560px, 88%); padding: 10px 14px; border-radius: 14px; font-size: .9375rem; line-height: 1.45; animation: objective-chat-in 180ms cubic-bezier(0.2, 0, 0, 1); }
+.objective-chat__msg p { margin: 0; }
+.objective-chat__msg p + p { margin-top: 6px; }
+.objective-chat__msg--assistant { align-self: flex-start; border-bottom-left-radius: 4px; background: var(--n2); color: var(--ntext); }
+.objective-chat__msg--user { align-self: flex-end; border-bottom-right-radius: 4px; background: var(--accent-surface); color: var(--ntext); box-shadow: inset 0 0 0 1px var(--accent-strong); }
+.objective-chat__meta { color: var(--ntext-subtle); font-size: .75rem; }
+.objective-chat__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.objective-chat__typing { display: inline-flex; gap: 4px; padding: 14px 16px; }
+.objective-chat__typing > span[aria-hidden] { width: 7px; height: 7px; border-radius: 50%; background: var(--ntext-subtle); animation: objective-chat-dot 1s ease-in-out infinite; }
+.objective-chat__typing > span[aria-hidden]:nth-of-type(3) { animation-delay: .15s; }
+.objective-chat__typing > span[aria-hidden]:nth-of-type(4) { animation-delay: .3s; }
+@keyframes objective-chat-in { from { opacity: 0; translate: 0 4px; } }
+@keyframes objective-chat-dot { 0%, 100% { opacity: .35; translate: 0 0; } 50% { opacity: 1; translate: 0 -3px; } }
+
+.objective-chat__suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.objective-chat__suggestion { position: relative; min-height: 36px; padding: 0 14px; border: 1px solid var(--nline2); border-radius: 999px; background: transparent; color: var(--ntext-muted); font: 500 .8125rem var(--font-body); cursor: pointer; }
+.objective-chat__suggestion::after { content: ""; position: absolute; inset: -5px -1px; }
+.objective-chat__suggestion:hover:not(:disabled) { color: var(--ntext); border-color: var(--accent-strong); }
+.objective-chat__suggestion:disabled { opacity: .5; cursor: default; }
+
+.objective-chat__composer { display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 14px; border: 1px solid var(--nline-strong); border-radius: 22px; background: var(--n0); }
+.objective-chat__composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.objective-chat__composer textarea { flex: 1; min-height: 32px; max-height: 120px; padding: 6px 0; border: 0; outline: none; resize: none; background: transparent; color: var(--ntext); font: 400 .9375rem/1.4 var(--font-body); field-sizing: content; }
+.objective-chat__composer textarea::placeholder { color: var(--ntext-subtle); }
+.objective-chat__send { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--accent-strong); color: var(--on-accent); cursor: pointer; }
+.objective-chat__send:disabled { background: var(--n2); color: var(--ntext-subtle); cursor: default; }
+.objective-chat__send--cancel { width: auto; padding: 0 14px; border-radius: 22px; background: var(--n2); color: var(--ntext); font: 600 .8125rem var(--font-body); }
+.objective-chat__help { margin: -4px 0 0 14px; color: var(--ntext-subtle); font-size: .75rem; }
+
+.objective-chat__options { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 12px 0 0; border: 0; border-top: 1px solid var(--nline); }
+.objective-chat__options legend { float: left; width: 100%; margin: 0 0 8px; padding: 0; color: var(--ntext-muted); font-size: .8125rem; font-weight: 600; }
+.objective-option { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); background: var(--n1); color: var(--ntext-muted); font-size: .875rem; cursor: pointer; }
+.objective-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.objective-option:hover { color: var(--ntext); border-color: var(--nline-strong); }
+.objective-option:has(input:checked) { border-color: var(--accent-strong); background: var(--accent-surface); color: var(--ntext); box-shadow: inset 0 -2px 0 var(--accent-strong); }
+.objective-option:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.objective-option__label { font-weight: 600; }
+.objective-option__hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.objective-chat__selected { margin: 0; color: var(--ntext-subtle); font-size: .8125rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .objective-chat__msg { animation: none; }
+  .objective-chat__typing > span[aria-hidden] { animation: none; }
+  .objective-chat__log { scroll-behavior: auto; }
+}

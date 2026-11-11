@@ -5,6 +5,7 @@ import {
   type ObjectiveInterpretation,
 } from "../../shared/api/client";
 import { OBJECTIVES, TEXT_LIMIT, objectiveLabel, objectiveOrigin } from "./objectiveText";
+import "./objective-chat.css";
 
 /**
  * Objetivo por formulário ou por texto (CC-504, UC03). O texto vira uma das quatro
@@ -34,33 +35,66 @@ interface Props {
   onChange: (objective: ObjectiveForm) => void;
 }
 
-type Pending =
-  | { kind: "idle" }
-  | { kind: "busy" }
-  | { kind: "proposal"; result: ObjectiveInterpretation }
-  | { kind: "fallback"; message: string };
+type Message =
+  | { id: number; role: "user"; text: string }
+  | { id: number; role: "assistant"; kind: "hello" | "done"; text: string }
+  | { id: number; role: "assistant"; kind: "proposal"; result: ObjectiveInterpretation }
+  | { id: number; role: "assistant"; kind: "fallback"; text: string };
 
+type NewMessage = Message extends infer M ? (M extends Message ? Omit<M, "id"> : never) : never;
+
+const SUGGESTIONS = ["Quero sobreviver mais", "Preciso de mais dano", "Quero usar mais habilidades"] as const;
+
+const ICON = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true as const };
+
+/** Assistente de objetivo em formato de conversa (11/11/2026): a pessoa escreve com as próprias
+ * palavras, o interpretador (regras ou o modelo local) propõe UMA das quatro prioridades e ela
+ * confirma; sem entender, ele pergunta de volta com as opções. As opções também ficam como
+ * escolha direta. Nada aqui recomenda item: a prioridade só reordena candidatos legais. */
 export function ObjectivePicker({ idPrefix, value, onChange }: Props) {
   const [text, setText] = useState("");
-  const [pending, setPending] = useState<Pending>({ kind: "idle" });
+  const [busy, setBusy] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    { id: 0, role: "assistant", kind: "hello", text: "Qual é o seu objetivo nesta compra? Escreva com suas palavras ou escolha uma opção abaixo." },
+  ]);
+  const nextId = useRef(1);
+  // Só a proposta mais recente pode ser confirmada, e editar o texto a descarta.
+  const [activeProposal, setActiveProposal] = useState<number | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const sent = useRef(""); // a frase em interpretação, devolvida ao campo se a pessoa cancelar
   const legend = useRef<HTMLLegendElement>(null);
+  const log = useRef<HTMLOListElement>(null);
 
   useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    const element = log.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [messages, busy]);
 
-  async function interpret() {
+  function push(message: NewMessage): number {
+    const id = nextId.current++;
+    setMessages((current) => [...current, { ...message, id } as Message]);
+    return id;
+  }
+
+  async function interpret(raw: string) {
+    const phrase = raw.trim();
+    if (!phrase || busy) return;
     controller.current?.abort();
     const own = new AbortController();
     controller.current = own;
     const timer = window.setTimeout(() => own.abort(), CLIENT_TIMEOUT_MS);
-    setPending({ kind: "busy" });
+    push({ role: "user", text: phrase });
+    sent.current = raw;
+    setText("");
+    setBusy(true);
     try {
-      const result = await api.interpretObjective(text.trim(), own.signal);
+      const result = await api.interpretObjective(phrase, own.signal);
       if (result.status === "INTERPRETED" && result.objective) {
-        setPending({ kind: "proposal", result });
+        setActiveProposal(push({ role: "assistant", kind: "proposal", result }));
       } else {
         const reason = (result.reasonCodes ?? []).map((code) => NEEDS_INPUT_TEXT[code]).find(Boolean);
-        setPending({ kind: "fallback", message: reason ?? NEEDS_INPUT_TEXT.AMBIGUOUS_OR_OUT_OF_SCOPE });
+        push({ role: "assistant", kind: "fallback", text: reason ?? NEEDS_INPUT_TEXT.AMBIGUOUS_OR_OUT_OF_SCOPE });
         legend.current?.focus();
       }
     } catch {
@@ -68,124 +102,130 @@ export function ObjectivePicker({ idPrefix, value, onChange }: Props) {
         return; // substituída por outra interpretação ou cancelada
       }
       // abortada pelo relógio do cliente = demorou demais; qualquer outra falha = sem resposta
-      const message = own.signal.aborted ? NEEDS_INPUT_TEXT.TIMEOUT : NEEDS_INPUT_TEXT.PROVIDER_ERROR;
-      setPending({ kind: "fallback", message });
+      push({ role: "assistant", kind: "fallback", text: own.signal.aborted ? NEEDS_INPUT_TEXT.TIMEOUT : NEEDS_INPUT_TEXT.PROVIDER_ERROR });
       legend.current?.focus();
     } finally {
       window.clearTimeout(timer);
+      if (controller.current === own) setBusy(false);
     }
   }
 
   function cancel() {
     controller.current?.abort();
     controller.current = null;
-    setPending({ kind: "idle" });
+    setBusy(false);
+    setText(sent.current);
   }
 
-  const trimmed = text.trim();
+  function choose(objective: ObjectiveForm, announce: boolean) {
+    onChange(objective);
+    setActiveProposal(null);
+    if (announce) {
+      push({ role: "assistant", kind: "done", text: `Pronto: objetivo ${objectiveLabel(objective.priority)}.` });
+      legend.current?.focus();
+    }
+  }
+
   return (
-    <div className="objective-picker">
-      <fieldset className="field">
-        <legend ref={legend} tabIndex={-1}>
-          Objetivo
-        </legend>
+    <div className="objective-chat">
+      <div className="objective-chat__head">
+        <span className="objective-chat__avatar" aria-hidden="true">R</span>
+        <div>
+          <p className="objective-chat__title">Assistente de objetivo</p>
+          <p className="objective-chat__sub">Só traduz o seu objetivo em uma prioridade; não escolhe item.</p>
+        </div>
+      </div>
+      <ol ref={log} className="objective-chat__log" aria-live="polite" aria-label="Conversa sobre o objetivo">
+        {messages.map((message) => (
+          <li key={message.id} className={`objective-chat__msg objective-chat__msg--${message.role}`}>
+            {message.role === "user" ? <p>{message.text}</p> : message.kind === "proposal" && message.result.objective ? (
+              <>
+                <p>
+                  Entendi: <strong>{objectiveLabel(message.result.objective.priority)}</strong>
+                  {" "}({OBJECTIVES.find((o) => o.value === message.result.objective?.priority)?.hint}).
+                  Isso não diz qual item é melhor, só qual prioridade usar.
+                </p>
+                <p className="objective-chat__meta">{PROVIDER_TEXT[message.result.provider] ?? message.result.provider}, versão {message.result.parserVersion}</p>
+                {message.id === activeProposal ? (
+                  <div className="objective-chat__actions">
+                    <button type="button" className="button" onClick={() => { if (message.result.objective) choose(message.result.objective, true); }}>
+                      Usar este objetivo
+                    </button>
+                    <button type="button" className="button button--secondary" onClick={() => { setActiveProposal(null); push({ role: "assistant", kind: "done", text: "Tudo bem. Escolha uma das opções abaixo." }); legend.current?.focus(); }}>
+                      Prefiro escolher no formulário
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : message.kind === "fallback" ? (
+              <p>{message.text} Escolha uma das opções abaixo; o objetivo selecionado não mudou.</p>
+            ) : <p>{"text" in message ? message.text : null}</p>}
+          </li>
+        ))}
+        {busy ? (
+          <li className="objective-chat__msg objective-chat__msg--assistant objective-chat__typing">
+            <span className="sr-only">Interpretando…</span>
+            <span aria-hidden="true" /><span aria-hidden="true" /><span aria-hidden="true" />
+          </li>
+        ) : null}
+      </ol>
+
+      <div className="objective-chat__suggestions" role="group" aria-label="Sugestões de frase">
+        {SUGGESTIONS.map((suggestion) => (
+          <button key={suggestion} type="button" className="objective-chat__suggestion" disabled={busy} onClick={() => void interpret(suggestion)}>
+            {suggestion}
+          </button>
+        ))}
+      </div>
+
+      <form className="objective-chat__composer" onSubmit={(event) => { event.preventDefault(); void interpret(text); }}>
+        <label htmlFor={`${idPrefix}-text`} className="sr-only">Ou descreva em uma frase (opcional)</label>
+        <textarea
+          id={`${idPrefix}-text`}
+          rows={1}
+          maxLength={TEXT_LIMIT}
+          value={text}
+          placeholder="Ex.: quero aguentar mais o burst do Zed"
+          onChange={(event) => {
+            setText(event.target.value);
+            setActiveProposal(null); // uma sugestão vale só para o texto que a gerou
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void interpret(text);
+            }
+          }}
+          aria-describedby={`${idPrefix}-text-help`}
+        />
+        {/* Cancelar fica ao lado, nunca no lugar do enviar: trocar o botão sob o cursor fazia o
+            mesmo clique cancelar e reenviar. */}
+        {busy ? <button type="button" className="objective-chat__send objective-chat__send--cancel" onClick={cancel}>Cancelar</button> : null}
+        <button type="submit" className="objective-chat__send" aria-label="Interpretar texto" disabled={busy || text.trim().length === 0}>
+          <svg {...ICON}><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </button>
+      </form>
+      <p id={`${idPrefix}-text-help`} className="objective-chat__help">
+        {text.length}/{TEXT_LIMIT} caracteres · Enter envia, Shift+Enter quebra a linha. Você confirma antes de valer.
+      </p>
+
+      <fieldset className="objective-chat__options">
+        <legend ref={legend} tabIndex={-1}>Objetivo</legend>
         {OBJECTIVES.map((objective) => (
-          <label key={objective.value} className="radio-option">
+          <label key={objective.value} className="objective-option" title={objective.hint}>
             <input
               type="radio"
               name={`${idPrefix}-objective`}
               value={objective.value}
               checked={value.priority === objective.value}
-              onChange={() => onChange({ priority: objective.value })}
+              onChange={() => choose({ priority: objective.value }, false)}
             />
-            <span>
-              {objective.label} <span className="muted">— {objective.hint}</span>
-            </span>
+            <span className="objective-option__label">{objective.label}</span>
+            <span className="objective-option__hint">— {objective.hint}</span>
           </label>
         ))}
-        <p className="muted">Selecionado: {objectiveLabel(value.priority)}, {objectiveOrigin(value)}.</p>
       </fieldset>
-      <div className="field">
-        <label htmlFor={`${idPrefix}-text`}>Ou descreva em uma frase (opcional)</label>
-        <textarea
-          id={`${idPrefix}-text`}
-          maxLength={TEXT_LIMIT}
-          value={text}
-          onChange={(event) => {
-            setText(event.target.value);
-            // uma sugestão vale só para o texto que a gerou
-            if (pending.kind === "proposal" || pending.kind === "fallback") {
-              setPending({ kind: "idle" });
-            }
-          }}
-          aria-describedby={`${idPrefix}-text-help`}
-        />
-        <p id={`${idPrefix}-text-help`} className="muted">
-          {text.length}/{TEXT_LIMIT} caracteres. O texto só é usado para sugerir uma das quatro
-          prioridades acima; você confirma antes de valer.
-        </p>
-        <div className="actions">
-          <button
-            type="button"
-            className="button button--secondary"
-            disabled={trimmed.length === 0 || pending.kind === "busy"}
-            onClick={interpret}
-          >
-            Interpretar texto
-          </button>
-          {pending.kind === "busy" ? (
-            <button type="button" className="button button--secondary" onClick={cancel}>
-              Cancelar
-            </button>
-          ) : null}
-        </div>
-      </div>
-      <div aria-live="polite">
-        {pending.kind === "busy" ? <p className="muted">Interpretando…</p> : null}
-        {pending.kind === "proposal" && pending.result.objective ? (
-          <div className="notice notice--info" role="note">
-            <p>
-              Entendi: <strong>{objectiveLabel(pending.result.objective.priority)}</strong> (
-              {PROVIDER_TEXT[pending.result.provider] ?? pending.result.provider}, versão{" "}
-              {pending.result.parserVersion}). Isso não diz qual item é melhor, só qual prioridade
-              usar.
-            </p>
-            <div className="actions">
-              <button
-                type="button"
-                className="button"
-                onClick={() => {
-                  if (pending.result.objective) {
-                    onChange(pending.result.objective);
-                  }
-                  setPending({ kind: "idle" });
-                  legend.current?.focus();
-                }}
-              >
-                Usar este objetivo
-              </button>
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => {
-                  setPending({ kind: "idle" });
-                  legend.current?.focus();
-                }}
-              >
-                Prefiro escolher no formulário
-              </button>
-            </div>
-          </div>
-        ) : null}
-        {pending.kind === "fallback" ? (
-          <div className="notice notice--warning" role="note">
-            <p>
-              {pending.message} Escolha o objetivo no formulário acima; o objetivo selecionado não
-              mudou.
-            </p>
-          </div>
-        ) : null}
-      </div>
+      <p className="objective-chat__selected">Selecionado: {objectiveLabel(value.priority)}, {objectiveOrigin(value)}.</p>
     </div>
   );
 }
