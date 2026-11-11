@@ -84,9 +84,12 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(page).toHaveURL(/\/matches\/DEMO-0008$/);
     const matchUrl = "/matches/DEMO-0008";
 
-    // Participante → decisões
+    // Participante → decisões. A análise é em abas: o placar fica em "Placar" e as decisões
+    // em "Compras"; escolher um jogador no placar mantém o Placar aberto.
+    await page.getByRole("tab", { name: "Placar" }).click();
     await page.getByRole("link", { name: /^Participante 1 —/ }).click();
-    await expect(page).toHaveURL(/\/matches\/DEMO-0008\?participant=1$/);
+    await expect(page).toHaveURL(/\/matches\/DEMO-0008\?participant=1&aba=placar$/);
+    await page.getByRole("tab", { name: "Compras" }).click();
     await expect(page.getByRole("heading", { name: /^(Suas decisões — |Decisões de )/ })).toBeVisible();
     const decisionLink = page.getByRole("link", { name: /^Decisão em / }).first();
     await expect(decisionLink).toBeVisible();
@@ -168,7 +171,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await page.reload();
     await expect(page.getByText("Componente Sintético A")).toBeVisible();
     expect(page.url()).toBe(detailUrl);
-    await page.goto(`${matchUrl}?participant=1`);
+    await page.goto(`${matchUrl}?participant=1&aba=compras`);
     await expect(page.getByRole("heading", { name: /^(Suas decisões — |Decisões de )/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /^Decisão em / }).first()).toBeVisible();
 
@@ -180,8 +183,10 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
 
     // Outro participante da partida (o 6, do time 200): 200 com lista vazia, que é
     // diferente de "não preparado" (409)
+    await page.getByRole("tab", { name: "Placar" }).click();
     await page.getByRole("link", { name: /^Participante 6 —/ }).click();
-    await expect(page).toHaveURL(/\?participant=6$/);
+    await expect(page).toHaveURL(/\?participant=6&aba=placar$/);
+    await page.getByRole("tab", { name: "Compras" }).click();
     await expect(
       page.getByText("Nenhuma decisão de compra foi encontrada para este participante nesta partida."),
     ).toBeVisible();
