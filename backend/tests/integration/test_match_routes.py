@@ -318,8 +318,18 @@ async def test_detail_shows_match_participants_and_preparation_without_personal_
             # CC-1210: Riot ID da partida, lido do bruto; DEMO não tem bruto da Riot.
             "gameName",
             "tagLine",
+            # Detalhes de placar do bruto (feitiços, runas, nível, dano, ouro, visão).
+            "summonerSpells",
+            "runes",
+            "champLevel",
+            "damageToChampions",
+            "goldEarned",
+            "wardsPlaced",
+            "visionScore",
+            "largestMultiKill",
         }
         assert participant["gameName"] is None and participant["tagLine"] is None
+        assert participant["summonerSpells"] is None and participant["runes"] is None
         assert participant["champion"] is None  # DEMO nunca recebe campeão real (CC-208)
         assert participant["finalItems"] is None
         assert participant["finalTrinketItemId"] is None

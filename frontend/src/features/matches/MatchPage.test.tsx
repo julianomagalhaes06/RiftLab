@@ -88,7 +88,9 @@ describe("tela da partida", () => {
     expect(await screen.findByText("A decisão de compra desta partida não pode ser analisada.")).toBeInTheDocument();
     const officialBuilds = await screen.findAllByRole("group", { name: "Inventário final oficial" });
     expect(officialBuilds).toHaveLength(2);
-    expect(within(officialBuilds[0]).getByText("—")).toBeInTheDocument();
+    // Inventário oficial vazio com amuleto: seis slots vazios marcados e o amuleto ao lado.
+    expect(officialBuilds[0].querySelectorAll(".scoreboard__slot-empty")).toHaveLength(6);
+    expect(within(officialBuilds[0]).getByRole("group", { name: "Amuleto final oficial" })).toBeInTheDocument();
     expect(within(officialBuilds[1]).getAllByText("Item #100001, nome indisponível")).toHaveLength(2);
     expect(screen.getByRole("group", { name: "Amuleto final oficial" })).toBeInTheDocument();
     expect(await screen.findAllByRole("group", { name: "Estimado pela linha do tempo" })).not.toHaveLength(0);

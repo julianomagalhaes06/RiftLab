@@ -115,12 +115,36 @@ class MatchPreparation(CamelModel):
     attempts: int = Field(default=0, ge=0)
 
 
+class ParticipantRunes(CamelModel):
+    """Runas da partida: estilo principal, runa-chave (1ª escolha do principal) e estilo
+    secundário; ids do runesReforged do Data Dragon."""
+
+    primary_style: int = Field(ge=1)
+    keystone: int = Field(ge=1)
+    secondary_style: int | None = Field(default=None, ge=1)
+
+
 class MatchDetailParticipant(MatchParticipant):
     """Participante no detalhe da partida (CC-1210): o Riot ID como estava na partida, lido do
-    bruto guardado; nulo em DEMO, sem bruto ou sem Riot ID. Nunca PUUID nem subject_hash."""
+    bruto guardado; nulo em DEMO, sem bruto ou sem Riot ID. Nunca PUUID nem subject_hash.
+    Os detalhes de placar (feitiços, runas, nível, dano, ouro, sentinelas, visão e maior
+    multiabate) também vêm do bruto, só na resposta, e são nulos quando ele falta."""
 
     game_name: str | None = None
     tag_line: str | None = None
+    summoner_spells: list[int] | None = Field(
+        default=None,
+        min_length=2,
+        max_length=2,
+        description="Ids dos dois feitiços (summoner.json).",
+    )
+    runes: ParticipantRunes | None = None
+    champ_level: int | None = Field(default=None, ge=0, le=30)
+    damage_to_champions: int | None = Field(default=None, ge=0)
+    gold_earned: int | None = Field(default=None, ge=0)
+    wards_placed: int | None = Field(default=None, ge=0)
+    vision_score: int | None = Field(default=None, ge=0)
+    largest_multi_kill: int | None = Field(default=None, ge=0, le=5)
 
 
 class MatchDetail(MatchSummary):

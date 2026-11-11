@@ -3138,7 +3138,7 @@
       },
       "MatchDetailParticipant": {
         "additionalProperties": false,
-        "description": "Participante no detalhe da partida (CC-1210): o Riot ID como estava na partida, lido do\nbruto guardado; nulo em DEMO, sem bruto ou sem Riot ID. Nunca PUUID nem subject_hash.",
+        "description": "Participante no detalhe da partida (CC-1210): o Riot ID como estava na partida, lido do\nbruto guardado; nulo em DEMO, sem bruto ou sem Riot ID. Nunca PUUID nem subject_hash.\nOs detalhes de placar (feitiços, runas, nível, dano, ouro, sentinelas, visão e maior\nmultiabate) também vêm do bruto, só na resposta, e são nulos quando ele falta.",
         "properties": {
           "assists": {
             "anyOf": [
@@ -3152,6 +3152,19 @@
               }
             ],
             "title": "Assists"
+          },
+          "champLevel": {
+            "anyOf": [
+              {
+                "maximum": 30.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Champlevel"
           },
           "champion": {
             "anyOf": [
@@ -3168,6 +3181,18 @@
             "minimum": 1.0,
             "title": "Championid",
             "type": "integer"
+          },
+          "damageToChampions": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Damagetochampions"
           },
           "deaths": {
             "anyOf": [
@@ -3220,6 +3245,18 @@
             ],
             "title": "Gamename"
           },
+          "goldEarned": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goldearned"
+          },
           "kills": {
             "anyOf": [
               {
@@ -3232,6 +3269,19 @@
               }
             ],
             "title": "Kills"
+          },
+          "largestMultiKill": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largestmultikill"
           },
           "neutralMinionsKilled": {
             "anyOf": [
@@ -3265,6 +3315,33 @@
             ],
             "title": "Role"
           },
+          "runes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParticipantRunes"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summonerSpells": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Ids dos dois feitiços (summoner.json).",
+            "title": "Summonerspells"
+          },
           "tagLine": {
             "anyOf": [
               {
@@ -3293,6 +3370,30 @@
               }
             ],
             "title": "Totalminionskilled"
+          },
+          "visionScore": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visionscore"
+          },
+          "wardsPlaced": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wardsplaced"
           },
           "win": {
             "anyOf": [
@@ -4041,6 +4142,40 @@
           }
         },
         "title": "OwnPlayer",
+        "type": "object"
+      },
+      "ParticipantRunes": {
+        "additionalProperties": false,
+        "description": "Runas da partida: estilo principal, runa-chave (1ª escolha do principal) e estilo\nsecundário; ids do runesReforged do Data Dragon.",
+        "properties": {
+          "keystone": {
+            "minimum": 1.0,
+            "title": "Keystone",
+            "type": "integer"
+          },
+          "primaryStyle": {
+            "minimum": 1.0,
+            "title": "Primarystyle",
+            "type": "integer"
+          },
+          "secondaryStyle": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondarystyle"
+          }
+        },
+        "required": [
+          "primaryStyle",
+          "keystone"
+        ],
+        "title": "ParticipantRunes",
         "type": "object"
       },
       "ParticipantTimeline": {

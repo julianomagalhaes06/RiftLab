@@ -58,23 +58,55 @@
 .scoreboard__row--selected { background: var(--accent-select); }
 .scoreboard__team .scoreboard__row--selected th { box-shadow: inset 3px 0 0 var(--accent-strong); }
 .scoreboard__row td small { display: block; color: var(--ntext-muted); font-size: .72rem; }
-.scoreboard__champion { width: 34%; }
-.app .scoreboard__link { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ntext); text-decoration: none; }
+/* Placar completo (como o do u.gg): retrato com nível, nome e função, feitiços e runas ao lado,
+   Riot ID embaixo; K/D/A, dano com barra relativa ao maior da partida, ouro, farm, sentinelas,
+   participação e itens em slots 3 × 2 com o amuleto. Colunas fixas para os dois times espelharem. */
+.scoreboard__team { table-layout: fixed; }
+.scoreboard__team thead th:nth-child(1) { width: 270px; }
+.scoreboard__team thead th:nth-child(2) { width: 92px; }
+.scoreboard__team thead .scoreboard__damage { width: 112px; }
+.scoreboard__team thead .scoreboard__gold { width: 72px; }
+.scoreboard__team thead .scoreboard__cs { width: 72px; }
+.scoreboard__team thead .scoreboard__vision { width: 92px; }
+.scoreboard__team thead .scoreboard__kp { width: 88px; }
+.scoreboard__team thead th:last-child { width: auto; min-width: 116px; }
+.scoreboard__team thead th { white-space: nowrap; }
+.scoreboard__who { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 10px; min-width: 0; }
+.app .scoreboard__link { grid-column: 1; display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; color: var(--ntext); text-decoration: none; }
 .app .scoreboard__link:hover strong { color: var(--accent); }
+.scoreboard__portrait { position: relative; flex: none; }
 .scoreboard__link .champion-avatar { border-radius: 0; clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px); }
+.scoreboard__level { position: absolute; left: -4px; bottom: -4px; min-width: 18px; height: 18px; padding: 0 3px; display: grid; place-items: center; border: 1px solid var(--nline2); border-radius: 3px; background: var(--n0); color: var(--ntext); font: 700 .625rem/1 var(--font-body); font-variant-numeric: tabular-nums; }
 .scoreboard__name { display: grid; min-width: 0; }
 .scoreboard__name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scoreboard__name small { color: var(--ntext-muted); font-size: .72rem; display: flex; gap: 6px; align-items: center; }
 .scoreboard__you { padding: 0 6px; border-radius: var(--radius-sm); background: var(--accent-surface); border: 1px solid var(--accent-strong); color: var(--accent); font-weight: 700; font-size: .64rem; }
-/* CC-1210: Riot ID da partida embaixo do campeão, alinhado ao nome (retrato 34 + 10 de espaço). */
-.app a.scoreboard__riot-id { display: inline-flex; align-items: baseline; max-width: calc(100% - 44px); min-height: 24px; margin: -6px 0 0 44px; overflow: hidden; color: var(--accent); font-size: .75rem; font-weight: 500; text-decoration: none; white-space: nowrap; text-overflow: ellipsis; }
+.scoreboard__loadout { grid-column: 2; grid-row: 1; display: flex; gap: 3px; }
+.scoreboard__spells, .scoreboard__runes { display: grid; gap: 2px; }
+.scoreboard__spell, .scoreboard__keystone, .scoreboard__rune-style { display: grid; place-items: center; width: 20px; height: 20px; overflow: hidden; background: var(--slot-bg); }
+.scoreboard__spell { border-radius: 3px; box-shadow: inset 0 0 0 1px var(--portrait-outline); }
+.scoreboard__keystone { border-radius: 50%; }
+.scoreboard__rune-style { border-radius: 50%; }
+.scoreboard__rune-style img { width: 14px; height: 14px; }
+.scoreboard__spell img, .scoreboard__keystone img { width: 20px; height: 20px; }
+/* Riot ID embaixo do nome, alinhado com o texto (retrato de 40 px + 10 px). */
+.app a.scoreboard__riot-id { grid-column: 1 / -1; display: inline-flex; align-items: baseline; justify-self: start; max-width: calc(100% - 50px); min-height: 24px; margin: -4px 0 0 50px; overflow: hidden; color: var(--accent); font-size: .75rem; font-weight: 500; text-decoration: none; white-space: nowrap; text-overflow: ellipsis; }
 .app a.scoreboard__riot-id span { color: var(--ntext-subtle); }
 .app a.scoreboard__riot-id:hover { text-decoration: underline; text-underline-offset: 3px; }
 .scoreboard__note { margin: 8px 0 0; color: var(--ntext-subtle); font-size: .75rem; }
 .scoreboard__row--local th strong { color: var(--accent); }
 .scoreboard__kda { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.scoreboard__build { display: flex; gap: 3px; flex-wrap: wrap; }
-.scoreboard__build .item-icon, .scoreboard__build .item-icon img { width: 26px; height: 26px; }
+.scoreboard__row td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scoreboard__bar { display: block; height: 5px; margin-top: 5px; overflow: hidden; border-radius: 3px; background: var(--nline); }
+.scoreboard__team--blue .scoreboard__bar > span { display: block; height: 100%; border-radius: 3px; background: var(--team-blue); }
+.scoreboard__team--red .scoreboard__bar > span { display: block; height: 100%; border-radius: 3px; background: var(--team-red); }
+.scoreboard__build { display: inline-flex; align-items: flex-start; gap: 3px; }
+.scoreboard__slots { display: grid; grid-template-columns: repeat(3, 24px); gap: 2px; }
+.scoreboard__slots > span { display: inline-flex; }
+.scoreboard__build .item-icon { flex: none; }
+.scoreboard__build .item-icon, .scoreboard__build .item-icon img, .scoreboard__slot-empty { width: 24px; height: 24px; }
+.scoreboard__slot-empty { border-radius: 3px; background: var(--n2); box-shadow: inset 0 0 0 1px var(--nline); }
+.scoreboard__trinket .item-icon, .scoreboard__trinket .item-icon img { border-radius: 50%; }
 
 /* 3. Compras por volta à loja */
 .build-path { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px 0; }
@@ -226,11 +258,15 @@
   .match-hero__team { min-width: 0; }
   .match-panel { padding: 18px 16px; }
   .scoreboard__team thead { display: none; }
-  .scoreboard__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; border-top: 1px solid var(--nline); }
+  /* Celular: campeão (com feitiços e runas) e K/D/A na 1ª linha; dano, ouro e farm na 2ª; itens. */
+  .scoreboard__team { table-layout: auto; }
+  .scoreboard__row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; border-top: 1px solid var(--nline); }
   .scoreboard__row td, .scoreboard__row th { border-top: 0; padding: 4px 6px; }
-  .scoreboard__champion { width: auto; }
-  .scoreboard__row td:nth-of-type(3) { display: none; }
-  .scoreboard__items { grid-column: 1 / -1; padding-left: 50px !important; }
+  .scoreboard__champion { grid-column: 1 / 3; width: auto; }
+  .scoreboard__row .scoreboard__kda { grid-column: 3; text-align: right; }
+  .scoreboard__row [data-label]::before { content: attr(data-label); display: block; color: var(--ntext-subtle); font-size: .6875rem; font-weight: 500; }
+  .scoreboard__row .scoreboard__vision, .scoreboard__row .scoreboard__kp { display: none; }
+  .scoreboard__items { grid-column: 1 / -1; }
   .build-path__visit { padding: 6px 8px; }
   .decision-stats { grid-template-columns: 1fr; }
   .inventory-grid__slots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -238,7 +274,7 @@
 }
 
 /* CC-902: amuleto só com ícone, separado dos itens. */
-.scoreboard__trinket { display: inline-flex; align-items: center; margin-left: var(--space-1); padding-left: var(--space-1); border-left: 1px solid var(--color-border); }
+.scoreboard__trinket { display: inline-flex; align-items: center; margin-left: 2px; padding-left: 4px; border-left: 1px solid var(--color-border); }
 
 /* F1 (CC-1005): revisão da partida. */
 .match-panel.review h4 { margin: 28px 0 10px; font: 600 .9375rem/1.3 var(--font-body); }

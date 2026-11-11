@@ -2128,14 +2128,20 @@ export interface components {
          * MatchDetailParticipant
          * @description Participante no detalhe da partida (CC-1210): o Riot ID como estava na partida, lido do
          *     bruto guardado; nulo em DEMO, sem bruto ou sem Riot ID. Nunca PUUID nem subject_hash.
+         *     Os detalhes de placar (feitiços, runas, nível, dano, ouro, sentinelas, visão e maior
+         *     multiabate) também vêm do bruto, só na resposta, e são nulos quando ele falta.
          */
         MatchDetailParticipant: {
             /** Assists */
             assists?: number | null;
+            /** Champlevel */
+            champLevel?: number | null;
             /** @description null em partida DEMO, patch sem mapping, catálogo ainda não sincronizado ou campeão ausente do catálogo: a interface mostra o id numérico. */
             champion?: components["schemas"]["ChampionAsset"] | null;
             /** Championid */
             championId: number;
+            /** Damagetochampions */
+            damageToChampions?: number | null;
             /** Deaths */
             deaths?: number | null;
             /** Finalitems */
@@ -2144,20 +2150,34 @@ export interface components {
             finalTrinketItemId?: number | null;
             /** Gamename */
             gameName?: string | null;
+            /** Goldearned */
+            goldEarned?: number | null;
             /** Kills */
             kills?: number | null;
+            /** Largestmultikill */
+            largestMultiKill?: number | null;
             /** Neutralminionskilled */
             neutralMinionsKilled?: number | null;
             /** Participantid */
             participantId: number;
             /** Role */
             role?: string | null;
+            runes?: components["schemas"]["ParticipantRunes"] | null;
+            /**
+             * Summonerspells
+             * @description Ids dos dois feitiços (summoner.json).
+             */
+            summonerSpells?: number[] | null;
             /** Tagline */
             tagLine?: string | null;
             /** Team */
             team: number;
             /** Totalminionskilled */
             totalMinionsKilled?: number | null;
+            /** Visionscore */
+            visionScore?: number | null;
+            /** Wardsplaced */
+            wardsPlaced?: number | null;
             /**
              * Win
              * @description Vitória deste participante; null se não observada.
@@ -2403,6 +2423,19 @@ export interface components {
             profile?: components["schemas"]["PlayerProfile"] | null;
             /** Reason */
             reason?: string | null;
+        };
+        /**
+         * ParticipantRunes
+         * @description Runas da partida: estilo principal, runa-chave (1ª escolha do principal) e estilo
+         *     secundário; ids do runesReforged do Data Dragon.
+         */
+        ParticipantRunes: {
+            /** Keystone */
+            keystone: number;
+            /** Primarystyle */
+            primaryStyle: number;
+            /** Secondarystyle */
+            secondaryStyle?: number | null;
         };
         /** ParticipantTimeline */
         ParticipantTimeline: {
