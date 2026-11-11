@@ -134,17 +134,24 @@ export function Comparison({ comparison, selectedItemId, historicalItemId, headi
                     : "desceu pela prioridade do objetivo"
                   : null;
               return (
-                <li key={candidate.itemId} className={chosen ? "comparison-list__item--chosen" : undefined}>
-                  <strong>
-                    <span className="item-with-icon"><ItemIcon itemId={candidate.itemId} /><span>{candidate.rank}. {name(candidate)}</span></span>
-                  </strong>
-                  {chosen ? <span className="tag-chosen"> — sua escolha</span> : null}
-                  {historical ? <span className="tag"> compra feita na partida (histórico)</span> : null}
-                  {moved ? <span className="muted"> ({moved})</span> : null}
-                  <ul>
+                <li key={candidate.itemId} className={`comparison-card${chosen ? " comparison-list__item--chosen" : ""}${candidate.rank === 1 ? " comparison-card--top" : ""}`}>
+                  <div className="comparison-card__head">
+                    <span className="comparison-card__rank" aria-hidden="true">{candidate.rank}º</span>
+                    <span className="comparison-card__slot"><ItemIcon itemId={candidate.itemId} /></span>
+                    <strong className="comparison-card__name">{candidate.rank}. {name(candidate)}</strong>
+                  </div>
+                  {chosen || historical || moved ? (
+                    <p className="comparison-card__marks">
+                      {chosen ? <span className="tag-chosen">sua escolha</span> : null}
+                      {historical ? <span className="comparison-card__historical">compra feita na partida (histórico)</span> : null}
+                      {moved ? <span className="muted">{moved}</span> : null}
+                    </p>
+                  ) : null}
+                  {/* A fonte de cada evidência fica na dica (e para leitores de tela), sem código cru na tela. */}
+                  <ul className="comparison-card__evidence">
                     {(candidate.explanations ?? []).map((explanation) => (
-                      <li key={explanation.text}>
-                        {explanation.text} <span className="muted">fonte: {explanation.source}</span>
+                      <li key={explanation.text} title={`Fonte: ${explanation.source}`}>
+                        {explanation.text}<span className="sr-only"> Fonte: {explanation.source}</span>
                       </li>
                     ))}
                   </ul>

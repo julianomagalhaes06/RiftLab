@@ -161,3 +161,31 @@ describe("ObjectivePicker (CC-504): texto só vale depois de confirmado", () => 
     expect(onChange).toHaveBeenCalledWith({ priority: "UTILITY" });
   });
 });
+
+describe("assistente de objetivo em conversa", () => {
+  it("a sugestão envia a frase como mensagem; Enter também envia e Shift+Enter não", async () => {
+    mock.on("POST", URL, () =>
+      json(200, { status: "INTERPRETED", objective: { priority: "SURVIVAL", parserVersion: "rules_v1" }, parserVersion: "rules_v1", provider: "RULES", reasonCodes: [] }),
+    );
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    const log = screen.getByRole("list", { name: "Conversa sobre o objetivo" });
+    expect(log).toHaveTextContent("Qual é o seu objetivo nesta compra?");
+
+    fireEvent.click(screen.getByRole("button", { name: "Quero sobreviver mais" }));
+    expect(await screen.findByRole("button", { name: "Usar este objetivo" })).toBeInTheDocument();
+    expect(log).toHaveTextContent("Quero sobreviver mais");
+    expect(mock.callsTo("POST", URL)[0].body).toEqual({ text: "Quero sobreviver mais" });
+
+    const box = screen.getByLabelText(/descreva em uma frase/);
+    fireEvent.change(box, { target: { value: "quero vida" } });
+    fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
+    expect(mock.callsTo("POST", URL)).toHaveLength(1);
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(mock.callsTo("POST", URL)).toHaveLength(2));
+    expect(box).toHaveValue("");
+    fireEvent.click(await screen.findByRole("button", { name: "Usar este objetivo" }));
+    expect(onChange).toHaveBeenCalledWith({ priority: "SURVIVAL", parserVersion: "rules_v1" });
+    expect(log).toHaveTextContent("Pronto: objetivo Sobrevivência.");
+  });
+});

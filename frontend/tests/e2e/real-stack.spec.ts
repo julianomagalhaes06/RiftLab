@@ -124,7 +124,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await expect(page.getByRole("heading", { name: "Comparação" })).toBeVisible();
     await expect(page.getByText("Faltam 150 de ouro para completar o item.")).toBeVisible();
     await expect(page.getByText(/compra feita na partida \(histórico\)/)).toBeVisible();
-    await expect(page.getByText(/— sua escolha/)).toBeVisible();
+    await expect(page.locator(".comparison-list .tag-chosen")).toBeVisible();
     await expect(page.getByText(/Objetivo: Sobrevivência \(de texto confirmado/)).toBeVisible();
 
     // Reanalisar (CC-504): texto ambíguo cai no formulário sem mudar nada; o formulário reanalisa

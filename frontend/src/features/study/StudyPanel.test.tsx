@@ -84,10 +84,11 @@ describe("StudyPanel (CC-304/305): escolha antes da revelação", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Revelar/ }));
     await screen.findByRole("heading", { name: "Comparação" });
-    expect(screen.getByText(/— sua escolha/)).toBeInTheDocument();
+    expect(screen.getByText("sua escolha")).toBeInTheDocument();
     expect(screen.getByText(/compra feita na partida \(histórico\)/)).toBeInTheDocument();
     expect(screen.getByText(/subiu pela prioridade do objetivo/)).toBeInTheDocument();
-    expect(screen.getByText(/fonte: candidates.remainingCost/)).toBeInTheDocument();
+    // A fonte de cada evidência fica na dica e no texto para leitores de tela, sem código cru visível.
+    expect(screen.getByText(/Fonte: candidates.remainingCost/)).toHaveClass("sr-only");
     expect(screen.getByText(/não são probabilidades/)).toBeInTheDocument();
   });
 
