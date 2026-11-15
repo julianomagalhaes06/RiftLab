@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import CheckConstraint, DateTime, Float, Index, Integer, String, Uuid, func, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from riftlab.shared.db import Base
@@ -58,3 +60,6 @@ class HistorySyncRunModel(Base):
     skipped_purged: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
+    # Duração de cada consulta à Riot nesta execução, em ms (`accountMs`, `listMs`,
+    # `leagueMs`); só as etapas que chegaram a terminar. Nenhum identificador.
+    steps: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True), nullable=True)

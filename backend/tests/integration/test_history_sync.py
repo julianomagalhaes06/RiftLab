@@ -9,7 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 from pipeline_helpers import import_demo_match
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, update
 
 from riftlab.config import Settings
 from riftlab.history_sync import application
@@ -18,12 +18,13 @@ from riftlab.history_sync.models import HistorySyncRunModel as Run
 from riftlab.ingestion.application import request_import
 from riftlab.ingestion.domain import ImportMode
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
-from riftlab.ingestion.models import ImportJobModel, PurgeTombstoneModel
+from riftlab.ingestion.models import ImportJobModel, ParticipantModel, PurgeTombstoneModel
 from riftlab.ingestion.purge import match_ref
 from riftlab.ranked.application import ranked_me
 from riftlab.ranked.domain import account_key
 from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.db import unit_of_work
+from riftlab.timeline.models import TimelineEventModel
 
 PUUID = "synthetic-own-puuid"
 NOW = datetime(2026, 10, 19, 12, tzinfo=UTC)
@@ -220,6 +221,82 @@ async def test_sync_enqueues_only_new_matches_and_respects_cooldown(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_status_shows_each_riot_step_and_the_download_of_new_matches(
+    session_factory, tmp_path, clean, _demo_match
+):
+    """Etapas visíveis: duração de cada consulta à Riot, o download das partidas novas desta
+    execução e o que foi lido delas (contagens reais do banco, sem identificador)."""
+    settings = _settings(tmp_path)
+    await import_demo_match(session_factory, tmp_path, _demo_match)
+    await request_sync(session_factory, settings, now=NOW)
+    transport, client, _ = _transport([NEW, PENDING])
+    try:
+        await process_next_history_sync(session_factory, settings, transport=transport, now=NOW)
+    finally:
+        await client.aclose()
+
+    status = await sync_status(session_factory, settings)
+    assert set(status["steps"]) == {"accountMs", "listMs", "leagueMs"}
+    assert all(isinstance(ms, int) and ms >= 0 for ms in status["steps"].values())
+    assert status["imports"] == {"total": 2, "succeeded": 0, "failed": 0, "pending": 2}
+    assert status["evidence"] == {
+        "matches": 0,
+        "participants": 0,
+        "timelineEvents": 0,
+        "itemPurchases": 0,
+    }
+
+    # O worker baixa uma (aqui, a partida sintética já persistida) e a outra falha.
+    try:
+        await _finish_jobs_and_check(session_factory, settings, _demo_match)
+    finally:
+        # A limpeza da partida sintética apaga a partida; o job RIOT não pode apontar para ela.
+        async with unit_of_work(session_factory) as session:
+            await session.execute(
+                update(ImportJobModel)
+                .where(ImportJobModel.match_id == _demo_match, ImportJobModel.mode == "RIOT")
+                .values(match_id=None)
+            )
+
+
+async def _finish_jobs_and_check(session_factory, settings, _demo_match: str) -> None:
+    async with unit_of_work(session_factory) as session:
+        await session.execute(
+            update(ImportJobModel)
+            .where(ImportJobModel.requested_match_id == NEW, ImportJobModel.mode == "RIOT")
+            .values(state="SUCCEEDED", match_id=_demo_match)
+        )
+        await session.execute(
+            update(ImportJobModel)
+            .where(ImportJobModel.requested_match_id == PENDING, ImportJobModel.mode == "RIOT")
+            .values(state="FAILED", error_code="RIOT_NOT_FOUND")
+        )
+    async with session_factory() as session:
+        events, purchases = (
+            await session.execute(
+                select(
+                    func.count(),
+                    func.count().filter(TimelineEventModel.type == "ITEM_PURCHASED"),
+                ).where(TimelineEventModel.match_id == _demo_match)
+            )
+        ).one()
+        participants = await session.scalar(
+            select(func.count()).where(ParticipantModel.match_id == _demo_match)
+        )
+    assert events > 0 and purchases > 0 and participants > 0
+
+    status = await sync_status(session_factory, settings)
+    assert status["imports"] == {"total": 2, "succeeded": 1, "failed": 1, "pending": 0}
+    assert status["evidence"] == {
+        "matches": 1,
+        "participants": participants,
+        "timelineEvents": events,
+        "itemPurchases": purchases,
+    }
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("status_code", "headers", "code", "wait"),
     [(401, {}, "RIOT_AUTH_FAILED", 3600), (429, {"Retry-After": "900"}, "RIOT_RATE_LIMITED", 900)],
@@ -236,6 +313,9 @@ async def test_riot_failures_finish_failed_and_hold_new_requests(
         await client.aclose()
     status = await sync_status(session_factory, settings)
     assert (status["state"], status["reason"], status["newEnqueued"]) == ("FAILED", code, 0)
+    # A conta respondeu e a listagem falhou: só a etapa da conta fica com duração.
+    assert set(status["steps"]) == {"accountMs"} and status["steps"]["accountMs"] >= 0
+    assert "imports" not in status
     observations = await _observations(session_factory, _key("synthetic-owner"))
     assert [(o.queue, o.state, o.error_code) for o in observations] == [
         ("RANKED_FLEX_SR", "FAILED", code),

@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { historySync, matchSummary, mockApi, ok, sequence } from "./support/mock-api";
 
 const evidence = "../.private/validation/CC-901";
+const stages = "../.private/validation/demo-real/etapas";
 const later = () => new Date(Date.now() + 10 * 60_000).toISOString();
 
 async function noHorizontalScroll(page: Page) {
@@ -52,6 +53,35 @@ for (const width of [360, 1280]) {
       await expect(sync.getByRole("button", { name: "Atualizar" })).toBeDisabled();
       await noHorizontalScroll(page);
       await page.screenshot({ path: `${evidence}/novas-${width}.png`, fullPage: true });
+    });
+
+    test("as etapas mostram cada consulta à Riot e o download das partidas novas", async ({ page }) => {
+      const finished = new Date().toISOString();
+      const done = {
+        state: "SUCCEEDED",
+        listed: 20,
+        newEnqueued: 8,
+        alreadyKnown: 12,
+        finishedAt: finished,
+        nextAllowedAt: later(),
+        steps: { accountMs: 182, listMs: 240, leagueMs: 95 },
+      };
+      await mockApi(page, {
+        "POST /api/v1/history/sync": () => ok(historySync({ ...done, imports: { total: 8, succeeded: 3, failed: 0, pending: 5 }, evidence: { matches: 3, participants: 30, timelineEvents: 4210, itemPurchases: 236 } })),
+        "GET /api/v1/history/sync": () =>
+          ok(historySync({ ...done, imports: { total: 8, succeeded: 8, failed: 0, pending: 0 }, evidence: { matches: 8, participants: 80, timelineEvents: 11384, itemPurchases: 641 } })),
+        "GET /api/v1/matches": () => ok({ items: [matchSummary()], nextCursor: null }),
+      });
+      await page.goto("/historico");
+      const pipeline = page.locator(".sync-pipeline");
+      await expect(pipeline.getByText("Como esses dados chegaram")).toBeVisible();
+      await expect(pipeline.getByRole("listitem").nth(0)).toContainText("182 ms");
+      await expect(pipeline.getByRole("listitem").nth(3)).toContainText("3 de 8 partidas");
+      await page.screenshot({ path: `${stages}/baixando-${width}.png`, fullPage: true });
+      await expect(pipeline.getByRole("listitem").nth(3)).toContainText("8 de 8 partidas", { timeout: 8000 });
+      await expect(pipeline.getByRole("listitem").nth(4)).toContainText("11.384 eventos · 641 compras de itens");
+      await noHorizontalScroll(page);
+      await page.screenshot({ path: `${stages}/concluido-${width}.png`, fullPage: true });
     });
 
     test("histórico em dia, intervalo mínimo e falhas explicam o que aconteceu", async ({ page }) => {

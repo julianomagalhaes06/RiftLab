@@ -1629,6 +1629,8 @@ export interface components {
          * @description `reason`: RIOT_KEY_MISSING, ACCOUNT_NOT_CONFIGURED, o código do erro da última execução
          *     (ex.: RIOT_AUTH_FAILED, RIOT_RATE_LIMITED) ou COOLDOWN quando a última foi bem-sucedida e
          *     o intervalo mínimo ainda vale. `nextAllowedAt` diz quando um novo pedido cria execução.
+         *     `steps`, `imports` e `evidence` mostram as etapas da última execução: quanto levou cada
+         *     consulta à Riot, o download das partidas novas e o que foi lido delas.
          */
         HistorySyncStatus: {
             /**
@@ -1636,8 +1638,10 @@ export interface components {
              * @default 0
              */
             alreadyKnown: number;
+            evidence?: components["schemas"]["SyncEvidence"] | null;
             /** Finishedat */
             finishedAt?: string | null;
+            imports?: components["schemas"]["SyncImports"] | null;
             /**
              * Listed
              * @default 0
@@ -1664,6 +1668,7 @@ export interface components {
              * @enum {string}
              */
             state: "IDLE" | "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "UNAVAILABLE";
+            steps?: components["schemas"]["SyncSteps"] | null;
         };
         /**
          * ImportJobAccepted
@@ -3022,6 +3027,46 @@ export interface components {
             id: string;
             /** Name */
             name: string | null;
+        };
+        /**
+         * SyncEvidence
+         * @description O que foi lido das partidas novas já importadas: contagens do banco, sem identificador.
+         */
+        SyncEvidence: {
+            /** Itempurchases */
+            itemPurchases: number;
+            /** Matches */
+            matches: number;
+            /** Participants */
+            participants: number;
+            /** Timelineevents */
+            timelineEvents: number;
+        };
+        /**
+         * SyncImports
+         * @description Download das partidas novas pedidas por esta execução (uma importação por partida).
+         */
+        SyncImports: {
+            /** Failed */
+            failed: number;
+            /** Pending */
+            pending: number;
+            /** Succeeded */
+            succeeded: number;
+            /** Total */
+            total: number;
+        };
+        /**
+         * SyncSteps
+         * @description Duração de cada consulta à Riot na execução, em ms; ausente = a etapa não terminou.
+         */
+        SyncSteps: {
+            /** Accountms */
+            accountMs?: number | null;
+            /** Leaguems */
+            leagueMs?: number | null;
+            /** Listms */
+            listMs?: number | null;
         };
         /** TimelineGoldFrame */
         TimelineGoldFrame: {

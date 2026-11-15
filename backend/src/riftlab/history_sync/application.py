@@ -4,7 +4,9 @@ O pedido (API) só cria uma execução QUEUED, respeitando uma execução ativa 
 intervalo mínimo entre execuções. O worker faz a rede fora da transação: resolve a conta
 própria, lista os IDs ranqueados recentes e enfileira IMPORT (modo RIOT) só para as partidas
 novas; as importações seguem o caminho normal do worker, com limitador e cooldown. Nunca
-grava PUUID, Riot ID ou IDs de partida na execução: só contagens e códigos de erro.
+grava PUUID, Riot ID ou IDs de partida na execução: só contagens, durações e códigos de erro.
+As importações enfileiradas ficam ligadas à execução (`import_jobs.sync_run_id`), e o estado
+mostra o download delas e o que foi lido (eventos da linha do tempo, compras de itens).
 
 A mesma execução consulta o elo da conta (League-V4) e grava uma observação por fila, com a
 temporada do ano corrente, como a busca de jogadores. Falha só no elo fica registrada como
@@ -15,6 +17,7 @@ fica registrada no elo, preservando a última posição válida.
 from __future__ import annotations
 
 import contextlib
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -37,7 +40,7 @@ from riftlab.ingestion.infrastructure.riot_account import (
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.ingestion.infrastructure.riot_transport import RiotFetchBudget, RiotHttpTransport
 from riftlab.ingestion.infrastructure.subject_hash import compute_real_subject_hash
-from riftlab.ingestion.models import MatchModel
+from riftlab.ingestion.models import ImportJobModel, MatchModel, ParticipantModel
 from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
 from riftlab.ingestion.tombstone import MatchPurgedError
 from riftlab.ranked.application import failed_observations, league_observations
@@ -45,6 +48,7 @@ from riftlab.ranked.domain import account_key, parse_league_entries
 from riftlab.ranked.models import RankedObservationModel
 from riftlab.shared.db import unit_of_work
 from riftlab.shared.errors import SourceError, SourceRateLimitedError
+from riftlab.timeline.models import TimelineEventModel
 
 SessionFactory = async_sessionmaker[AsyncSession]
 ACTIVE = ("QUEUED", "RUNNING")
@@ -117,6 +121,7 @@ def _status(run: Run | None, settings: Settings, reason: str | None = None) -> d
         "newEnqueued": run.new_enqueued,
         "alreadyKnown": run.already_known,
         "skippedPurged": run.skipped_purged,
+        "steps": run.steps,
     }
 
 
@@ -145,7 +150,55 @@ async def sync_status(
     if key is None:
         return _unavailable("ACCOUNT_NOT_CONFIGURED")
     async with factory() as session:
-        return _status(await _latest(session, key), settings)
+        run = await _latest(session, key)
+        status = _status(run, settings)
+        if run is not None and run.state == "SUCCEEDED" and run.new_enqueued:
+            status.update(await _pipeline(session, run))
+        return status
+
+
+async def _pipeline(session: AsyncSession, run: Run) -> dict[str, Any]:
+    """Download das partidas novas desta execução e o que foi lido delas: só contagens.
+    Os jobs são os ligados à execução; a retomada manual de um job que falhou cria outro, sem
+    vínculo, e o original continua contado como falha."""
+    rows = await session.execute(
+        select(ImportJobModel.state, func.count())
+        .where(ImportJobModel.sync_run_id == run.id)
+        .group_by(ImportJobModel.state)
+    )
+    states: dict[str, int] = {state: int(count) for state, count in rows.all()}
+    succeeded, failed = states.get("SUCCEEDED", 0), states.get("FAILED", 0)
+    total = sum(states.values())
+    imported = (
+        select(ImportJobModel.match_id)
+        .where(ImportJobModel.sync_run_id == run.id, ImportJobModel.state == "SUCCEEDED")
+        .scalar_subquery()
+    )
+    events, purchases = (
+        await session.execute(
+            select(
+                func.count(),
+                func.count().filter(TimelineEventModel.type == "ITEM_PURCHASED"),
+            ).where(TimelineEventModel.match_id.in_(imported))
+        )
+    ).one()
+    participants = await session.scalar(
+        select(func.count()).where(ParticipantModel.match_id.in_(imported))
+    )
+    return {
+        "imports": {
+            "total": total,
+            "succeeded": succeeded,
+            "failed": failed,
+            "pending": total - succeeded - failed,
+        },
+        "evidence": {
+            "matches": succeeded,
+            "participants": int(participants or 0),
+            "timelineEvents": int(events or 0),
+            "itemPurchases": int(purchases or 0),
+        },
+    }
 
 
 async def request_sync(
@@ -279,6 +332,13 @@ async def process_next_history_sync(
     return True
 
 
+def _step(steps: dict[str, int], name: str, started: float) -> float:
+    """Grava a duração da etapa (ms) e devolve o relógio para a próxima."""
+    now = time.monotonic()
+    steps[name] = max(0, round((now - started) * 1000))
+    return now
+
+
 async def _record_ranked(
     factory: SessionFactory, observations: list[RankedObservationModel]
 ) -> None:
@@ -297,6 +357,7 @@ async def _run(
     now: datetime,
 ) -> None:
     season = str(now.year)
+    steps: dict[str, int] = {}
     try:
         account = _account_for(settings, key, riot_id)
         if account is None or not settings.riot_api_key:
@@ -305,7 +366,9 @@ async def _run(
         own = transport is None
         client = transport or _transport(settings)
         try:
+            clock = time.monotonic()
             puuid = await client.resolve_account_puuid(account.game_name, account.tag_line)
+            clock = _step(steps, "accountMs", clock)
             ids = await client.list_match_ids_by_puuid(
                 puuid,
                 queue=None,
@@ -314,10 +377,12 @@ async def _run(
                 start_time=int(since.timestamp()),
                 match_type="ranked",
             )
+            clock = _step(steps, "listMs", clock)
             try:
                 entries = parse_league_entries(
                     await client.fetch_league_entries_by_puuid(puuid), puuid
                 )
+                _step(steps, "leagueMs", clock)
                 ranked = league_observations(
                     key,
                     entries,
@@ -341,12 +406,18 @@ async def _run(
         )
         retry = exc.retry_after_seconds if isinstance(exc, SourceRateLimitedError) else None
         await _finish(
-            factory, run_id, state="FAILED", error_code=exc.code[:40], retry_after_seconds=retry
+            factory,
+            run_id,
+            state="FAILED",
+            error_code=exc.code[:40],
+            retry_after_seconds=retry,
+            steps=steps or None,
         )
         return
     await _record_ranked(factory, ranked)
     secret = settings.subject_hash_secret
-    known = purged = enqueued = 0
+    known = purged = 0
+    jobs: list[Any] = []
     for match_id in ids:
         async with factory() as session:
             exists = await session.get(MatchModel, match_id) is not None
@@ -358,13 +429,22 @@ async def _run(
             continue
         try:
             # Sem preparar: a lista chega rápido e a revisão vem sob demanda (ou no ocioso).
-            await request_import(
+            job = await request_import(
                 factory, match_id, ImportMode.RIOT, secret=secret, prepare_after=False
             )
         except MatchPurgedError:
             purged += 1  # expurgo pedido não volta por sincronização (CC-603)
             continue
-        enqueued += 1
+        jobs.append(job.id)
+    if jobs:
+        # Antes do SUCCEEDED: quando a tela vê a execução terminada, o vínculo já existe.
+        async with unit_of_work(factory) as session:
+            await session.execute(
+                update(ImportJobModel)
+                .where(ImportJobModel.id.in_(jobs))
+                .values(sync_run_id=run_id)
+                .execution_options(synchronize_session=False)
+            )
     await _finish(
         factory,
         run_id,
@@ -372,5 +452,6 @@ async def _run(
         listed=len(ids),
         already_known=known,
         skipped_purged=purged,
-        new_enqueued=enqueued,
+        new_enqueued=len(jobs),
+        steps=steps,
     )

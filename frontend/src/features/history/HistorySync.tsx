@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type HistorySyncStatus } from "../../shared/api/client";
+import { SyncPipeline } from "./SyncPipeline";
 import { active, syncMessage } from "./syncMessage";
 
 /**
@@ -19,6 +20,9 @@ const REFRESH_EVERY_MS = 2500;
 const REFRESH_TIMES = 24;
 const ARRIVAL_POLL_MS = 2000;
 const ARRIVAL_MAX_WAIT_MS = 60000;
+// Etapas visíveis: acompanha o download das partidas novas por até 2 minutos.
+const PROGRESS_POLL_MS = 2000;
+const PROGRESS_MAX_WAIT_MS = 120000;
 
 /** Espera visível na lista: sincronizando (expected nulo) ou trazendo N partidas novas. */
 export interface SyncPending {
@@ -61,6 +65,8 @@ export function HistorySync({
   const idsOf = useRef(latestIds);
   const known = useRef(knownIds);
   const [waitingImports, setWaitingImports] = useState(false);
+  // Estado mais recente só para as etapas visíveis; não mexe na lógica de recarregar a lista.
+  const [progress, setProgress] = useState<HistorySyncStatus | null>(null);
   useEffect(() => {
     onNew.current = onNewMatches;
     onPending.current = onPendingChange;
@@ -162,6 +168,34 @@ export function HistorySync({
     return () => window.clearInterval(timer);
   }, [arriving, status]);
 
+  // Download em andamento: consulta o estado para a barra de progresso das etapas.
+  const downloading = status?.state === "SUCCEEDED" && (status.imports?.pending ?? 0) > 0;
+  useEffect(() => {
+    if (!downloading) return;
+    const controller = new AbortController();
+    const started = Date.now();
+    let timer: number | undefined;
+    const poll = () => {
+      calls
+        .status(controller.signal)
+        .then((next) => {
+          if (controller.signal.aborted) return;
+          setProgress(next);
+          if ((next.imports?.pending ?? 0) > 0 && Date.now() - started < PROGRESS_MAX_WAIT_MS) {
+            timer = window.setTimeout(poll, PROGRESS_POLL_MS);
+          }
+        })
+        .catch(() => undefined);
+    };
+    timer = window.setTimeout(poll, PROGRESS_POLL_MS);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [downloading, status, calls]);
+  // O progresso só vale para a mesma execução que o estado mostra.
+  const shown = progress && status && progress.requestedAt === status.requestedAt ? progress : status;
+
   const next = status?.nextAllowedAt ? new Date(status.nextAllowedAt).getTime() : null;
   const waiting = next !== null && next > now;
   // Reabilita o botão quando o intervalo mínimo termina.
@@ -175,15 +209,18 @@ export function HistorySync({
   const tone = status?.state === "FAILED" || failedRequest ? "history-sync surface history-sync--warning" : "history-sync surface";
 
   return (
-    <section className={tone} aria-label="Atualização do histórico com a Riot">
-      <p role="status" aria-live="polite" aria-busy={active(status) || requesting}>
-        {syncMessage(status, failedRequest)}
-      </p>
-      {!unavailable ? (
-        <button type="button" className="button button--secondary" onClick={ask} disabled={disabled}>
-          {active(status) || requesting ? "Atualizando…" : "Atualizar"}
-        </button>
-      ) : null}
-    </section>
+    <>
+      <section className={tone} aria-label="Atualização do histórico com a Riot">
+        <p role="status" aria-live="polite" aria-busy={active(status) || requesting}>
+          {syncMessage(status, failedRequest)}
+        </p>
+        {!unavailable ? (
+          <button type="button" className="button button--secondary" onClick={ask} disabled={disabled}>
+            {active(status) || requesting ? "Atualizando…" : "Atualizar"}
+          </button>
+        ) : null}
+      </section>
+      <SyncPipeline status={shown} />
+    </>
   );
 }

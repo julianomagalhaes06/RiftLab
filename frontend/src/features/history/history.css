@@ -298,3 +298,38 @@
 @media (prefers-reduced-motion: reduce) {
   .sync-pending__spinner { animation-duration: 2.4s; }
 }
+
+/* Etapas visíveis da atualização com a Riot: cada consulta com o tempo que levou, o download
+   das partidas novas e o que foi lido delas. */
+:is(.history-page, .player) .history-sync:has(+ .sync-pipeline) { margin-bottom: 8px; }
+.sync-pipeline { margin: 0 0 24px; padding: 0; color: var(--ntext-muted); font-size: .875rem; }
+.sync-pipeline__summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 16px 12px 20px; cursor: pointer; list-style: none; }
+.sync-pipeline__summary::-webkit-details-marker { display: none; }
+.sync-pipeline__summary::after { content: ""; width: 7px; height: 7px; margin-left: auto; border-right: 1.5px solid var(--ntext-subtle); border-bottom: 1.5px solid var(--ntext-subtle); transform: rotate(45deg); align-self: center; }
+.sync-pipeline[open] > .sync-pipeline__summary::after { transform: rotate(-135deg); }
+.sync-pipeline__summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.sync-pipeline__kicker { color: var(--accent); font-size: .6875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.sync-pipeline__heading { color: var(--ntext); font-weight: 600; }
+.sync-pipeline__steps { display: grid; gap: 0; margin: 0; padding: 0 16px 12px 20px; list-style: none; }
+.sync-step { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--nline-soft); }
+.sync-step__mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border: 1.5px solid var(--nline2); border-radius: 50%; color: var(--ntext-subtle); font-size: .75rem; font-weight: 700; line-height: 1; }
+.sync-step__mark--done { border-color: var(--win); color: var(--win); background: var(--win-surface); }
+.sync-step__mark--failed { border-color: var(--loss); color: var(--loss); background: var(--loss-surface); }
+.sync-step__mark--warning { border-color: var(--color-warning); color: var(--color-warning); background: var(--color-warning-bg); }
+.sync-step__mark--running { border-color: var(--nline2); border-top-color: var(--accent); animation: sync-spin .8s linear infinite; }
+.sync-step__body { display: grid; gap: 4px; min-width: 0; }
+.sync-step__title { margin: 0; color: var(--ntext); font-weight: 600; }
+.sync-step--waiting .sync-step__title { color: var(--ntext-subtle); font-weight: 500; }
+.sync-step__detail { margin: 0; color: var(--ntext-muted); font-variant-numeric: tabular-nums; }
+.sync-step__source { padding: 2px 8px; border: 1px solid var(--nline2); border-radius: var(--radius-sm); color: var(--ntext-subtle); font-size: .6875rem; font-weight: 600; white-space: nowrap; }
+.sync-step__progress { width: 100%; max-width: 320px; height: 6px; border: 0; border-radius: 3px; background: var(--nline2); appearance: none; }
+.sync-step__progress::-webkit-progress-bar { border-radius: 3px; background: var(--nline2); }
+.sync-step__progress::-webkit-progress-value { border-radius: 3px; background: var(--accent-strong); }
+.sync-step__progress::-moz-progress-bar { border-radius: 3px; background: var(--accent-strong); }
+@media (max-width: 560px) {
+  .sync-step { grid-template-columns: 22px minmax(0, 1fr); }
+  .sync-step__source { grid-column: 2; justify-self: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sync-step__mark--running { animation-duration: 2.4s; }
+}

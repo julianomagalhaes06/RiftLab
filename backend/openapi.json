@@ -1847,12 +1847,22 @@
       },
       "HistorySyncStatus": {
         "additionalProperties": false,
-        "description": "`reason`: RIOT_KEY_MISSING, ACCOUNT_NOT_CONFIGURED, o código do erro da última execução\n(ex.: RIOT_AUTH_FAILED, RIOT_RATE_LIMITED) ou COOLDOWN quando a última foi bem-sucedida e\no intervalo mínimo ainda vale. `nextAllowedAt` diz quando um novo pedido cria execução.",
+        "description": "`reason`: RIOT_KEY_MISSING, ACCOUNT_NOT_CONFIGURED, o código do erro da última execução\n(ex.: RIOT_AUTH_FAILED, RIOT_RATE_LIMITED) ou COOLDOWN quando a última foi bem-sucedida e\no intervalo mínimo ainda vale. `nextAllowedAt` diz quando um novo pedido cria execução.\n`steps`, `imports` e `evidence` mostram as etapas da última execução: quanto levou cada\nconsulta à Riot, o download das partidas novas e o que foi lido delas.",
         "properties": {
           "alreadyKnown": {
             "default": 0,
             "title": "Alreadyknown",
             "type": "integer"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "finishedAt": {
             "anyOf": [
@@ -1865,6 +1875,16 @@
               }
             ],
             "title": "Finishedat"
+          },
+          "imports": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncImports"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "listed": {
             "default": 0,
@@ -1927,6 +1947,16 @@
             ],
             "title": "State",
             "type": "string"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncSteps"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -5814,6 +5844,107 @@
           "name"
         ],
         "title": "SessionUser",
+        "type": "object"
+      },
+      "SyncEvidence": {
+        "additionalProperties": false,
+        "description": "O que foi lido das partidas novas já importadas: contagens do banco, sem identificador.",
+        "properties": {
+          "itemPurchases": {
+            "title": "Itempurchases",
+            "type": "integer"
+          },
+          "matches": {
+            "title": "Matches",
+            "type": "integer"
+          },
+          "participants": {
+            "title": "Participants",
+            "type": "integer"
+          },
+          "timelineEvents": {
+            "title": "Timelineevents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "matches",
+          "participants",
+          "timelineEvents",
+          "itemPurchases"
+        ],
+        "title": "SyncEvidence",
+        "type": "object"
+      },
+      "SyncImports": {
+        "additionalProperties": false,
+        "description": "Download das partidas novas pedidas por esta execução (uma importação por partida).",
+        "properties": {
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "succeeded": {
+            "title": "Succeeded",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "succeeded",
+          "failed",
+          "pending"
+        ],
+        "title": "SyncImports",
+        "type": "object"
+      },
+      "SyncSteps": {
+        "additionalProperties": false,
+        "description": "Duração de cada consulta à Riot na execução, em ms; ausente = a etapa não terminou.",
+        "properties": {
+          "accountMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountms"
+          },
+          "leagueMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaguems"
+          },
+          "listMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listms"
+          }
+        },
+        "title": "SyncSteps",
         "type": "object"
       },
       "TimelineGoldFrame": {

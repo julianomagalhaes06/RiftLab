@@ -167,6 +167,10 @@ class ImportJobModel(UuidPkMixin, CreatedAtMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    # Sincronização do histórico que pediu esta importação, para a tela acompanhar o download
+    # das partidas novas. Sai junto com o job no expurgo. A FK (ON DELETE SET NULL) fica só na
+    # migração s20190000001, para a ingestão não depender do módulo da sincronização.
+    sync_run_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
 
 
 class RiotRateLimitModel(Base):

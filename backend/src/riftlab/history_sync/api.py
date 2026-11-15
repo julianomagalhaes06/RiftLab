@@ -17,10 +17,38 @@ from riftlab.shared.own_account import NOT_LINKED, OwnAccount
 router = APIRouter(prefix="/api/v1/history/sync", tags=["history"])
 
 
+class SyncSteps(CamelModel):
+    """Duração de cada consulta à Riot na execução, em ms; ausente = a etapa não terminou."""
+
+    account_ms: int | None = None
+    list_ms: int | None = None
+    league_ms: int | None = None
+
+
+class SyncImports(CamelModel):
+    """Download das partidas novas pedidas por esta execução (uma importação por partida)."""
+
+    total: int
+    succeeded: int
+    failed: int
+    pending: int
+
+
+class SyncEvidence(CamelModel):
+    """O que foi lido das partidas novas já importadas: contagens do banco, sem identificador."""
+
+    matches: int
+    participants: int
+    timeline_events: int
+    item_purchases: int
+
+
 class HistorySyncStatus(CamelModel):
     """`reason`: RIOT_KEY_MISSING, ACCOUNT_NOT_CONFIGURED, o código do erro da última execução
     (ex.: RIOT_AUTH_FAILED, RIOT_RATE_LIMITED) ou COOLDOWN quando a última foi bem-sucedida e
-    o intervalo mínimo ainda vale. `nextAllowedAt` diz quando um novo pedido cria execução."""
+    o intervalo mínimo ainda vale. `nextAllowedAt` diz quando um novo pedido cria execução.
+    `steps`, `imports` e `evidence` mostram as etapas da última execução: quanto levou cada
+    consulta à Riot, o download das partidas novas e o que foi lido delas."""
 
     state: Literal["IDLE", "QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "UNAVAILABLE"]
     reason: str | None = None
@@ -31,6 +59,9 @@ class HistorySyncStatus(CamelModel):
     new_enqueued: int = 0
     already_known: int = 0
     skipped_purged: int = 0
+    steps: SyncSteps | None = None
+    imports: SyncImports | None = None
+    evidence: SyncEvidence | None = None
 
 
 @router.post(
