@@ -310,8 +310,10 @@ somente leitura no banco, sem coleta ou inferência. `window` aceita 1–100. Se
 do recorte é a da partida própria mais recente (`queueSelection` AUTO; empate fica com
 Solo/Duo); com `queue`, é a pedida (EXPLICIT). `queue` na resposta traz 420 ou 440 e `queues`
 o total de partidas próprias por fila (CC-904); valor fora dos dois retorna 422.
-REAL requer a conta local e o vínculo HMAC da observação mais recente dessa conta
-em League-V4; sem esse vínculo, retorna `IDENTITY_UNAVAILABLE`, sem atribuir dados
+REAL requer a identidade HMAC da conta. Para o usuário logado, vem da conta Riot
+vinculada (comprovada pela troca de ícone), de modo que uma consulta ao elo que falhou
+não esconde o Painel. Sem login, vem da observação mais recente da conta configurada
+em League-V4. Sem identidade, retorna `IDENTITY_UNAVAILABLE`, sem atribuir dados
 de outros participantes. Partidas com vínculo ambíguo são excluídas. DEMO é uma
 seleção explícita do participante sintético 1 e nunca representa desempenho real.
 As origens não são misturadas. Ausência de chave Riot não troca REAL por DEMO.
