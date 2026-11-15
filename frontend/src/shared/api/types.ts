@@ -3402,6 +3402,8 @@ export interface components {
             hidden: string[];
             /** Itemid */
             itemId?: number | null;
+            /** Itemname */
+            itemName?: string | null;
             /** Level */
             level?: number | null;
             /** Raw */

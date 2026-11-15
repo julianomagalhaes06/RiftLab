@@ -557,6 +557,8 @@ async def test_trace_shows_the_riot_event_without_revealing_the_purchase(
         e["itemId"] for e in body["nearby"] if e["timestampMs"] < 472_000
     ]
     assert all(e["timestampMs"] < 472_000 for e in body["nearby"])
+    # Nomes do catálogo fixado pela decisão, como no inventário do detalhe.
+    assert all(e["itemName"] for e in body["nearby"] if e["itemId"] is not None)
     assert body["frame"] is None or body["frame"]["timestampMs"] <= 472_000
 
     missing = await app_client.get(f"/api/v1/decisions/{uuid.uuid4()}/trace")

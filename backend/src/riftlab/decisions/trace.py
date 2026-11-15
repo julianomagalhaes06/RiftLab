@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.decisions.models import DecisionPointModel
 from riftlab.ingestion.models import MatchModel
 from riftlab.shared.db import read_only_unit_of_work
@@ -36,7 +37,9 @@ HIDDEN_FIELDS = ("itemId", "beforeId", "afterId", "goldGain")
 RAW_FIELDS = ("participantId", "itemId", "beforeId", "afterId", "goldGain", "level")
 
 
-def _event(row: TimelineEventModel, *, hide_item: bool = False) -> dict[str, Any]:
+def _event(
+    row: TimelineEventModel, *, hide_item: bool = False, names: dict[int, str | None] | None = None
+) -> dict[str, Any]:
     payload = row.payload or {}
     hidden = HIDDEN_FIELDS if hide_item else ()
     raw: dict[str, Any] = {"type": row.type, "timestamp": row.timestamp_ms}
@@ -44,11 +47,13 @@ def _event(row: TimelineEventModel, *, hide_item: bool = False) -> dict[str, Any
     item = None if hide_item else payload.get("itemId")
     if row.type == "ITEM_UNDO" and not hide_item:
         item = payload.get("beforeId") or payload.get("afterId")
+    item_id = item if isinstance(item, int) and item > 0 else None
     return {
         "sourceIndex": row.source_index,
         "timestampMs": row.timestamp_ms,
         "type": row.type,
-        "itemId": item if isinstance(item, int) and item > 0 else None,
+        "itemId": item_id,
+        "itemName": (names or {}).get(item_id) if item_id is not None else None,
         "level": payload.get("level") if isinstance(payload.get("level"), int) else None,
         "hidden": list(field for field in hidden if field in payload),
         "raw": raw,
@@ -117,6 +122,17 @@ async def decision_trace(factory: SessionFactory, decision_id: uuid.UUID) -> dic
             )
         ).all()
         frames = await session.get(MatchFramesModel, point.match_id)
+        # Nomes do mesmo catálogo fixado pela decisão (como o inventário do detalhe).
+        names: dict[int, str | None] = {}
+        if point.catalog_id is not None:
+            catalog = SqlAlchemyCatalogRepository(session)
+            for row in nearby:
+                item = _event(row)["itemId"]
+                if item is None or item in names:
+                    continue
+                found = await catalog.get_item(point.catalog_id, item)
+                name = found.attributes.get("name") if found is not None else None
+                names[item] = name if isinstance(name, str) and name else None
     rows = list(reversed(nearby))  # os mais próximos da compra, em ordem de tempo
     return {
         "decisionId": point.id,
@@ -127,6 +143,6 @@ async def decision_trace(factory: SessionFactory, decision_id: uuid.UUID) -> dic
         "timelineEvents": int(total or 0),
         "participantItemEvents": int(item_events or 0),
         "event": _event(event, hide_item=True) if event is not None else None,
-        "nearby": [_event(row) for row in rows],
+        "nearby": [_event(row, names=names) for row in rows],
         **_frame(frames.frames if frames else None, point.participant_id, point.event_timestamp_ms),
     }

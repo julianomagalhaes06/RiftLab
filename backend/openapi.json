@@ -6680,6 +6680,17 @@
             ],
             "title": "Itemid"
           },
+          "itemName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Itemname"
+          },
           "level": {
             "anyOf": [
               {

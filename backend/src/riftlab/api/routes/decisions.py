@@ -54,6 +54,7 @@ class TraceEvent(CamelModel):
     timestamp_ms: int
     type: str
     item_id: int | None = None
+    item_name: str | None = None
     level: int | None = None
     hidden: list[str] = []
     raw: dict[str, Any]

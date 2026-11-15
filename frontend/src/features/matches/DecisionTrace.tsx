@@ -20,7 +20,9 @@ function clock(ms: number): string {
 
 function EventLine({ event }: { event: TraceEvent }) {
   const itemName = useItemName();
-  const item = event.itemId != null ? itemName({ itemId: event.itemId }) : null;
+  // Nome do Data Dragon ou do catálogo da decisão; sem nenhum dos dois, só o número do item.
+  const resolved = event.itemId != null ? itemName({ itemId: event.itemId, name: event.itemName }) : null;
+  const item = resolved && resolved.endsWith("nome indisponível") ? `o item ${event.itemId}` : resolved;
   const text =
     event.type === "ITEM_PURCHASED" ? `Comprou ${item ?? "um item"}`
       : event.type === "ITEM_SOLD" ? `Vendeu ${item ?? "um item"}`
@@ -102,7 +104,7 @@ export function DecisionTrace({ decisionId }: { decisionId: string }) {
               </p>
               <pre className="trace-raw" aria-label="Evento bruto da Riot"><code>{rawJson(event)}</code></pre>
               {event.hidden?.length ? (
-                <p className="trace-step__note">O item comprado fica oculto até você responder, para a escolha ser sua.</p>
+                <p className="trace-step__note">O item desta compra fica oculto até você responder, para a escolha ser sua.</p>
               ) : null}
             </div>
           </li>
