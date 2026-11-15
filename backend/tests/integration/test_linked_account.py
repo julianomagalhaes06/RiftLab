@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
@@ -22,6 +22,7 @@ from riftlab.ingestion.infrastructure.riot_account import (
     ALLOWED_REGIONAL_ROUTING,
     RiotAccountConfig,
 )
+from riftlab.ingestion.models import MatchModel, ParticipantModel
 from riftlab.ranked.domain import account_key
 from riftlab.ranked.models import RankedObservationModel as Observation
 from riftlab.shared.db import unit_of_work
@@ -57,6 +58,7 @@ async def env(session_factory, tmp_path) -> AsyncIterator[dict]:
         riot_api_key="synthetic-key",
         subject_hash_secret=SECRET,
         ranked_account_file=str(configured),
+        catalog_mappings_path=str(tmp_path / "no-mapping.yaml"),
     )
     linked_name = f"Vinc{uuid.uuid4().hex[:8]}"
     keys = [_key(linked_name), _key("Configurada")]
@@ -147,3 +149,78 @@ async def test_linked_account_drives_rank_and_history_sync(env, session_factory)
     # A execução leva o Riot ID da conta vinculada só enquanto estiver ativa.
     assert (run.game_name, run.tag_line) == (env["linked"], "BR1")
     assert (await c.get("/api/v1/history/sync")).json()["state"] == "QUEUED"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_keeps_linked_identity_after_failed_rank_refresh(env, session_factory):
+    """Chave da Riot expirada: a consulta ao elo falha e grava observação sem identidade. O
+    Painel do usuário vinculado segue com a identidade comprovada no vínculo, e não pede para
+    vincular de novo."""
+    user_id = await _login(env)
+    linked_key, _ = env["keys"]
+    own = "b" * 64
+    match_id = f"BR1_13{uuid.uuid4().int % 10**8:08d}"
+    now = datetime.now(UTC)
+    async with unit_of_work(session_factory) as session:
+        session.add(
+            RiotLinkModel(
+                user_id=user_id,
+                account_key=linked_key,
+                subject_hash=own,
+                game_name=env["linked"],
+                tag_line="BR1",
+                linked_at=now - timedelta(days=5),
+            )
+        )
+        for captured_at, state, subject in (
+            (now - timedelta(days=4), "READY", own),
+            (now, "FAILED", None),
+        ):
+            session.add(
+                Observation(
+                    account_key=linked_key,
+                    subject_hash=subject,
+                    queue="RANKED_SOLO_5x5",
+                    season="2026",
+                    captured_at=captured_at,
+                    state=state,
+                    error_code="RIOT_AUTH_FAILED" if state == "FAILED" else None,
+                    origin="RIOT_LEAGUE_V4",
+                )
+            )
+        session.add(
+            MatchModel(
+                match_id=match_id,
+                queue=420,
+                map_id=11,
+                patch="16.20",
+                start_at=now - timedelta(days=3),
+                duration_seconds=1800,
+                raw_hash="c" * 64,
+            )
+        )
+        await session.flush()
+        session.add(
+            ParticipantModel(
+                match_id=match_id,
+                participant_id=1,
+                champion_id=51,
+                team=100,
+                role="BOTTOM",
+                subject_hash=own,
+                win=True,
+                kills=1,
+                deaths=1,
+                assists=1,
+            )
+        )
+    try:
+        body = (await env["client"].get("/api/v1/dashboard")).json()
+        assert (body["status"], body["totalMatches"]) == ("READY", 1)
+        assert body["recentMatches"][0]["matchId"] == match_id
+    finally:
+        async with unit_of_work(session_factory) as session:
+            await session.execute(
+                delete(ParticipantModel).where(ParticipantModel.match_id == match_id)
+            )
+            await session.execute(delete(MatchModel).where(MatchModel.match_id == match_id))

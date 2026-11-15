@@ -9,6 +9,7 @@ from typing import Any, Literal
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from riftlab.auth.models import RiotLinkModel
 from riftlab.catalog.infrastructure.catalog_mapping import load_catalog_mapping
 from riftlab.catalog.patches import persisted_mapping
 from riftlab.champions.application import champion_assets
@@ -102,8 +103,15 @@ async def dashboard(
             matches=progress_row[3],
         )
         subject = None
-        if key:
-            # Sem fallback silencioso para vínculo de uma observação antiga.
+        if key and account is not CONFIGURED:
+            # Usuário com conta vinculada: a identidade é a comprovada no vínculo (troca de
+            # ícone). Uma consulta ao elo que falhou (chave da Riot expirada, Riot fora do ar)
+            # não diz nada sobre o dono da conta e não pode esconder o Painel.
+            subject = await session.scalar(
+                select(RiotLinkModel.subject_hash).where(RiotLinkModel.account_key == key)
+            )
+        elif key:
+            # Conta configurada: sem fallback silencioso para vínculo de uma observação antiga.
             observation = await session.scalar(
                 select(Observation)
                 .where(Observation.account_key == key, Observation.queue == SOLO_QUEUE)
