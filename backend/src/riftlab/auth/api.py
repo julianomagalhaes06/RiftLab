@@ -86,9 +86,12 @@ class CodeSent(CamelModel):
 
 
 class SessionUser(CamelModel):
+    """`isAdmin`: a conta é de administrador e vê os Bastidores."""
+
     id: str
     email: str
     name: str | None
+    is_admin: bool = False
 
 
 class SessionState(CamelModel):
@@ -102,7 +105,9 @@ class SessionState(CamelModel):
 
 
 def _user(user: AuthUser | None) -> SessionUser | None:
-    return SessionUser(id=str(user.id), email=user.email, name=user.name) if user else None
+    if user is None:
+        return None
+    return SessionUser(id=str(user.id), email=user.email, name=user.name, is_admin=user.is_admin)
 
 
 def _session_state(request: Request, user: AuthUser | None) -> SessionState:

@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/admin/backstage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bastidores: chamadas à Riot, fila do worker e acervo
+         * @description Somente banco; nenhuma chamada à Riot. Só para administradores: para qualquer outra conta (ou sem conta) responde 404, como se a rota não existisse.
+         */
+        get: operations["get_backstage_api_v1_admin_backstage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analyses": {
         parameters: {
             query?: never;
@@ -1116,6 +1136,24 @@ export interface components {
             /** Registryversion */
             registryVersion?: string | null;
         };
+        /** Backstage */
+        Backstage: {
+            /** Calls */
+            calls: components["schemas"]["RiotCallRow"][];
+            counters: components["schemas"]["Counters"];
+            /**
+             * Generatedat
+             * Format: date-time
+             */
+            generatedAt: string;
+            /** Jobs */
+            jobs: components["schemas"]["JobRow"][];
+            lastHour: components["schemas"]["LastHour"];
+            riotKey: components["schemas"]["RiotKeyState"];
+            /** Syncs */
+            syncs: components["schemas"]["SyncRow"][];
+            worker: components["schemas"]["WorkerState"];
+        };
         /**
          * BudgetSource
          * @description docs/domain-model.md: budget_source: UNKNOWN, FRAME_ESTIMATE,
@@ -1283,6 +1321,25 @@ export interface components {
              * @constant
              */
             status: "CODE_SENT";
+        };
+        /** Counters */
+        Counters: {
+            /** Decisions */
+            decisions: number;
+            /** Linkedaccounts */
+            linkedAccounts: number;
+            /** Matches */
+            matches: number;
+            /** Participants */
+            participants: number;
+            /** Playerssearched */
+            playersSearched: number;
+            /** Studyattempts */
+            studyAttempts: number;
+            /** Timelineevents */
+            timelineEvents: number;
+            /** Users */
+            users: number;
         };
         /** Credentials */
         Credentials: {
@@ -1747,6 +1804,57 @@ export interface components {
             name?: string | null;
             /** Quantity */
             quantity: number;
+        };
+        /** JobRow */
+        JobRow: {
+            /** Attempts */
+            attempts: number;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Errorcode */
+            errorCode?: string | null;
+            /** Fromsync */
+            fromSync: boolean;
+            /** Kind */
+            kind: string;
+            /** Matchid */
+            matchId: string;
+            /** Mode */
+            mode: string;
+            /** State */
+            state: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
+        /** KindStats */
+        KindStats: {
+            /** Averagems */
+            averageMs: number;
+            /** Calls */
+            calls: number;
+            /** Kind */
+            kind: string;
+        };
+        /** LastHour */
+        LastHour: {
+            /** Authfailures */
+            authFailures: number;
+            /** Averagems */
+            averageMs?: number | null;
+            /** Bykind */
+            byKind: components["schemas"]["KindStats"][];
+            /** Calls */
+            calls: number;
+            /** Ratelimited */
+            rateLimited: number;
+            /** Succeeded */
+            succeeded: number;
         };
         /**
          * LearningAttemptAnswerRequest
@@ -2784,6 +2892,15 @@ export interface components {
             /** Unverifiabledatasets */
             unverifiableDatasets: number;
         };
+        /** QueueKind */
+        QueueKind: {
+            /** Kind */
+            kind: string;
+            /** States */
+            states: {
+                [key: string]: number;
+            };
+        };
         /** RankedMe */
         RankedMe: {
             change: components["schemas"]["Change"] | null;
@@ -2974,12 +3091,58 @@ export interface components {
             /** Team */
             team: number;
         };
+        /**
+         * RiotCallRow
+         * @description Uma tentativa HTTP à Riot. `kind`: account, match-list, match, timeline, league,
+         *     summoner, spectator...; `outcome`: HTTP_200, HTTP_AUTH, HTTP_NOT_FOUND, HTTP_429, HTTP_5XX,
+         *     HTTP_UNEXPECTED ou NETWORK_ERROR.
+         */
+        RiotCallRow: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Attempt */
+            attempt: number;
+            /** Durationms */
+            durationMs: number;
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Outcome */
+            outcome: string;
+            /**
+             * Process
+             * @enum {string}
+             */
+            process: "api" | "worker" | "cli";
+            /** Region */
+            region: string;
+            /** Statuscode */
+            statusCode?: number | null;
+        };
         /** RiotIdBody */
         RiotIdBody: {
             /** Gamename */
             gameName: string;
             /** Tagline */
             tagLine: string;
+        };
+        /**
+         * RiotKeyState
+         * @description `status`: OK (última resposta conclusiva foi 200), REJECTED (401/403) ou UNKNOWN (sem
+         *     resposta conclusiva nas últimas 24 h).
+         */
+        RiotKeyState: {
+            /** Checkedat */
+            checkedAt?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "OK" | "REJECTED" | "UNKNOWN";
         };
         /**
          * RiotLinkState
@@ -3019,12 +3182,20 @@ export interface components {
             socialProviders: ("google" | "discord")[];
             user: components["schemas"]["SessionUser"] | null;
         };
-        /** SessionUser */
+        /**
+         * SessionUser
+         * @description `isAdmin`: a conta é de administrador e vê os Bastidores.
+         */
         SessionUser: {
             /** Email */
             email: string;
             /** Id */
             id: string;
+            /**
+             * Isadmin
+             * @default false
+             */
+            isAdmin: boolean;
             /** Name */
             name: string | null;
         };
@@ -3055,6 +3226,30 @@ export interface components {
             succeeded: number;
             /** Total */
             total: number;
+        };
+        /** SyncRow */
+        SyncRow: {
+            /** Alreadyknown */
+            alreadyKnown: number;
+            /** Errorcode */
+            errorCode?: string | null;
+            /** Finishedat */
+            finishedAt?: string | null;
+            /** Listed */
+            listed: number;
+            /** Newenqueued */
+            newEnqueued: number;
+            /**
+             * Requestedat
+             * Format: date-time
+             */
+            requestedAt: string;
+            /** State */
+            state: string;
+            /** Steps */
+            steps?: {
+                [key: string]: number;
+            } | null;
         };
         /**
          * SyncSteps
@@ -3178,6 +3373,17 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** WorkerState */
+        WorkerState: {
+            /** Failedtoday */
+            failedToday: number;
+            /** Lastriotcallat */
+            lastRiotCallAt?: string | null;
+            /** Queue */
+            queue: components["schemas"]["QueueKind"][];
+            /** Succeededtoday */
+            succeededToday: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -3187,6 +3393,35 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_backstage_api_v1_admin_backstage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backstage"];
+                };
+            };
+            /** @description Conta sem papel de administrador. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     post_analysis_api_v1_analyses_post: {
         parameters: {
             query?: never;

@@ -68,6 +68,8 @@ export type LearningGamification = Schemas["LearningGamification"];
 export type LearningGoal = Schemas["LearningGoal"];
 export type LearningAttemptSummary = Schemas["LearningAttemptSummary"];
 export type LearningAttemptPage = Schemas["CursorPage_LearningAttemptSummary_"];
+export type Backstage = Schemas["Backstage"];
+export type RiotCallRow = Schemas["RiotCallRow"];
 export type AttemptMode = NonNullable<Schemas["LearningAttemptCreateRequest"]["mode"]>;
 
 export interface PageParams {
@@ -92,6 +94,8 @@ export interface ApiClient {
   getChampionPatterns(params: { championId?: number; patch?: string; phase?: "first" | "second" | "sequence" }, signal?: AbortSignal): Promise<ChampionPatterns>;
   getRankedMe(signal?: AbortSignal, queue?: RankedQueue): Promise<RankedMe>;
   getHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
+  /** Bastidores (só administradores; 404 para as demais contas). */
+  getBackstage(signal?: AbortSignal): Promise<Backstage>;
   requestHistorySync(signal?: AbortSignal): Promise<HistorySyncStatus>;
   lookupPlayer(gameName: string, tagLine: string, refresh?: boolean, signal?: AbortSignal): Promise<PlayerProfile>;
   /** Participante de partida importada, pela conta (PUUID do bruto) e com o Riot ID atual. */
@@ -254,6 +258,7 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     getRankedMe: (signal, queue) => request("GET", `/api/v1/ranked/me${queryString({ queue })}`, { signal }),
     // CC-901: o POST só agenda; a rede com a Riot roda no worker.
     getHistorySync: (signal) => request("GET", "/api/v1/history/sync", { signal }),
+    getBackstage: (signal) => request("GET", "/api/v1/admin/backstage", { signal }),
     requestHistorySync: (signal) => request("POST", "/api/v1/history/sync", { signal }),
     lookupPlayer: (gameName, tagLine, refresh = false, signal) =>
       request("POST", "/api/v1/players/lookup", { body: { gameName, tagLine, refresh }, signal }),

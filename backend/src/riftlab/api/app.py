@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -22,6 +23,8 @@ from riftlab.auth.application import LoginThrottle
 from riftlab.auth.link_api import router as riot_link_router
 from riftlab.auth.mailer import Mailer, build_mailer
 from riftlab.auth.middleware import AuthMiddleware
+from riftlab.backstage import calls as riot_calls
+from riftlab.backstage.api import router as backstage_router
 from riftlab.catalog.api import router as catalog_router
 from riftlab.config import Settings, get_settings
 from riftlab.dashboard.api import router as dashboard_router
@@ -58,10 +61,18 @@ def create_app(
         )
         app.state.mailer = mailer if mailer is not None else build_mailer(settings)
         app.state.social_transport = social_transport
+        # Bastidores: as chamadas à Riot feitas pela API vão para o banco a cada segundo.
+        call_log = riot_calls.RiotCallLog(app.state.session_factory, "api")
+        riot_calls.install(call_log)
+        stop_calls = asyncio.Event()
+        calls_task = asyncio.create_task(call_log.run(stop_calls))
         logger.info("riftlab api iniciada modo=%s", "DEMO" if settings.demo_mode else "REAL")
         try:
             yield
         finally:
+            stop_calls.set()
+            await calls_task
+            riot_calls.install(None)
             await app.state.db_engine.dispose()
 
     # Swagger UI/ReDoc só em desenvolvimento (CC-1220): as páginas carregam JS de CDN sem SRI.
@@ -92,6 +103,7 @@ def create_app(
     app.include_router(ranked_router)
     app.include_router(history_sync_router)
     app.include_router(dashboard_router)
+    app.include_router(backstage_router)
     app.include_router(analyses_router)
     app.include_router(learning_router)
     app.include_router(objectives_router)

@@ -546,6 +546,61 @@
         "title": "AnalysisVersions",
         "type": "object"
       },
+      "Backstage": {
+        "additionalProperties": false,
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/RiotCallRow"
+            },
+            "title": "Calls",
+            "type": "array"
+          },
+          "counters": {
+            "$ref": "#/components/schemas/Counters"
+          },
+          "generatedAt": {
+            "format": "date-time",
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobRow"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "lastHour": {
+            "$ref": "#/components/schemas/LastHour"
+          },
+          "riotKey": {
+            "$ref": "#/components/schemas/RiotKeyState"
+          },
+          "syncs": {
+            "items": {
+              "$ref": "#/components/schemas/SyncRow"
+            },
+            "title": "Syncs",
+            "type": "array"
+          },
+          "worker": {
+            "$ref": "#/components/schemas/WorkerState"
+          }
+        },
+        "required": [
+          "generatedAt",
+          "riotKey",
+          "lastHour",
+          "calls",
+          "worker",
+          "jobs",
+          "syncs",
+          "counters"
+        ],
+        "title": "Backstage",
+        "type": "object"
+      },
       "BudgetSource": {
         "description": "docs/domain-model.md: budget_source: UNKNOWN, FRAME_ESTIMATE,\nUSER_PROVIDED.",
         "enum": [
@@ -890,6 +945,55 @@
           }
         },
         "title": "CodeSent",
+        "type": "object"
+      },
+      "Counters": {
+        "additionalProperties": false,
+        "properties": {
+          "decisions": {
+            "title": "Decisions",
+            "type": "integer"
+          },
+          "linkedAccounts": {
+            "title": "Linkedaccounts",
+            "type": "integer"
+          },
+          "matches": {
+            "title": "Matches",
+            "type": "integer"
+          },
+          "participants": {
+            "title": "Participants",
+            "type": "integer"
+          },
+          "playersSearched": {
+            "title": "Playerssearched",
+            "type": "integer"
+          },
+          "studyAttempts": {
+            "title": "Studyattempts",
+            "type": "integer"
+          },
+          "timelineEvents": {
+            "title": "Timelineevents",
+            "type": "integer"
+          },
+          "users": {
+            "title": "Users",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "matches",
+          "participants",
+          "timelineEvents",
+          "decisions",
+          "studyAttempts",
+          "playersSearched",
+          "users",
+          "linkedAccounts"
+        ],
+        "title": "Counters",
         "type": "object"
       },
       "Credentials": {
@@ -2135,6 +2239,140 @@
           "quantity"
         ],
         "title": "InventoryItem",
+        "type": "object"
+      },
+      "JobRow": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errorcode"
+          },
+          "fromSync": {
+            "title": "Fromsync",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "matchId",
+          "kind",
+          "mode",
+          "state",
+          "attempts",
+          "createdAt",
+          "updatedAt",
+          "fromSync"
+        ],
+        "title": "JobRow",
+        "type": "object"
+      },
+      "KindStats": {
+        "additionalProperties": false,
+        "properties": {
+          "averageMs": {
+            "title": "Averagems",
+            "type": "integer"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "calls",
+          "averageMs"
+        ],
+        "title": "KindStats",
+        "type": "object"
+      },
+      "LastHour": {
+        "additionalProperties": false,
+        "properties": {
+          "authFailures": {
+            "title": "Authfailures",
+            "type": "integer"
+          },
+          "averageMs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Averagems"
+          },
+          "byKind": {
+            "items": {
+              "$ref": "#/components/schemas/KindStats"
+            },
+            "title": "Bykind",
+            "type": "array"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "rateLimited": {
+            "title": "Ratelimited",
+            "type": "integer"
+          },
+          "succeeded": {
+            "title": "Succeeded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "calls",
+          "succeeded",
+          "authFailures",
+          "rateLimited",
+          "byKind"
+        ],
+        "title": "LastHour",
         "type": "object"
       },
       "LearningAttemptAnswerRequest": {
@@ -5085,6 +5323,28 @@
         "title": "PurgePreview",
         "type": "object"
       },
+      "QueueKind": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "states": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "States",
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind",
+          "states"
+        ],
+        "title": "QueueKind",
+        "type": "object"
+      },
       "RankedMe": {
         "properties": {
           "change": {
@@ -5672,6 +5932,73 @@
         "title": "ReviewWinProbability",
         "type": "object"
       },
+      "RiotCallRow": {
+        "additionalProperties": false,
+        "description": "Uma tentativa HTTP à Riot. `kind`: account, match-list, match, timeline, league,\nsummoner, spectator...; `outcome`: HTTP_200, HTTP_AUTH, HTTP_NOT_FOUND, HTTP_429, HTTP_5XX,\nHTTP_UNEXPECTED ou NETWORK_ERROR.",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "durationMs": {
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "process": {
+            "enum": [
+              "api",
+              "worker",
+              "cli"
+            ],
+            "title": "Process",
+            "type": "string"
+          },
+          "region": {
+            "title": "Region",
+            "type": "string"
+          },
+          "statusCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statuscode"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "process",
+          "kind",
+          "region",
+          "outcome",
+          "durationMs",
+          "attempt"
+        ],
+        "title": "RiotCallRow",
+        "type": "object"
+      },
       "RiotIdBody": {
         "additionalProperties": false,
         "properties": {
@@ -5693,6 +6020,38 @@
           "tagLine"
         ],
         "title": "RiotIdBody",
+        "type": "object"
+      },
+      "RiotKeyState": {
+        "additionalProperties": false,
+        "description": "`status`: OK (última resposta conclusiva foi 200), REJECTED (401/403) ou UNKNOWN (sem\nresposta conclusiva nas últimas 24 h).",
+        "properties": {
+          "checkedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkedat"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "REJECTED",
+              "UNKNOWN"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "RiotKeyState",
         "type": "object"
       },
       "RiotLinkState": {
@@ -5817,6 +6176,7 @@
       },
       "SessionUser": {
         "additionalProperties": false,
+        "description": "`isAdmin`: a conta é de administrador e vê os Bastidores.",
         "properties": {
           "email": {
             "title": "Email",
@@ -5825,6 +6185,11 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "isAdmin": {
+            "default": false,
+            "title": "Isadmin",
+            "type": "boolean"
           },
           "name": {
             "anyOf": [
@@ -5904,6 +6269,78 @@
           "pending"
         ],
         "title": "SyncImports",
+        "type": "object"
+      },
+      "SyncRow": {
+        "additionalProperties": false,
+        "properties": {
+          "alreadyKnown": {
+            "title": "Alreadyknown",
+            "type": "integer"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errorcode"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "listed": {
+            "title": "Listed",
+            "type": "integer"
+          },
+          "newEnqueued": {
+            "title": "Newenqueued",
+            "type": "integer"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "title": "Requestedat",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps"
+          }
+        },
+        "required": [
+          "state",
+          "requestedAt",
+          "listed",
+          "newEnqueued",
+          "alreadyKnown"
+        ],
+        "title": "SyncRow",
         "type": "object"
       },
       "SyncSteps": {
@@ -6233,6 +6670,45 @@
         ],
         "title": "VerifyEmail",
         "type": "object"
+      },
+      "WorkerState": {
+        "additionalProperties": false,
+        "properties": {
+          "failedToday": {
+            "title": "Failedtoday",
+            "type": "integer"
+          },
+          "lastRiotCallAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastriotcallat"
+          },
+          "queue": {
+            "items": {
+              "$ref": "#/components/schemas/QueueKind"
+            },
+            "title": "Queue",
+            "type": "array"
+          },
+          "succeededToday": {
+            "title": "Succeededtoday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queue",
+          "succeededToday",
+          "failedToday"
+        ],
+        "title": "WorkerState",
+        "type": "object"
       }
     }
   },
@@ -6242,6 +6718,38 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/backstage": {
+      "get": {
+        "description": "Somente banco; nenhuma chamada à Riot. Só para administradores: para qualquer outra conta (ou sem conta) responde 404, como se a rota não existisse.",
+        "operationId": "get_backstage_api_v1_admin_backstage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backstage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conta sem papel de administrador."
+          }
+        },
+        "summary": "Bastidores: chamadas à Riot, fila do worker e acervo",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/analyses": {
       "post": {
         "operationId": "post_analysis_api_v1_analyses_post",

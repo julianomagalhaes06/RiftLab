@@ -258,7 +258,8 @@ export type RouteKey =
   | "POST /api/v1/learning-attempts/:id/reflection"
   | "POST /api/v1/analyses"
   | "POST /api/v1/analyses/:id/feedback"
-  | "GET /api/v1/analyses/:id/report";
+  | "GET /api/v1/analyses/:id/report"
+  | "GET /api/v1/admin/backstage";
 
 const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/champions/patterns", "GET", /^\/api\/v1\/champions\/patterns$/],
@@ -277,6 +278,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["GET /api/v1/dashboard", "GET", /^\/api\/v1\/dashboard$/],
   ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
   ["GET /api/v1/auth/session", "GET", /^\/api\/v1\/auth\/session$/],
+  ["GET /api/v1/admin/backstage", "GET", /^\/api\/v1\/admin\/backstage$/],
   ["POST /api/v1/auth/login", "POST", /^\/api\/v1\/auth\/login$/],
   ["POST /api/v1/auth/register", "POST", /^\/api\/v1\/auth\/register$/],
   ["POST /api/v1/auth/verify-email", "POST", /^\/api\/v1\/auth\/verify-email$/],
@@ -473,6 +475,8 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
   "GET /api/v1/ranked/me": () => ok({ status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }),
   // Sprint 2 (#10): sem login exigido por padrão, como numa instalação de uma pessoa.
   "GET /api/v1/auth/session": () => ok({ authRequired: false, user: null, demoEnabled: true }),
+  // Bastidores: só administradores; sem conta administradora, a rota não existe.
+  "GET /api/v1/admin/backstage": () => problem(404, "RESOURCE_NOT_FOUND"),
   "POST /api/v1/auth/login": () => problem(401, "INVALID_CREDENTIALS"),
   "POST /api/v1/auth/register": () => ok({ status: "CODE_SENT" }, 202),
   "POST /api/v1/auth/verify-email": () => ok({ authRequired: false, user: { id: "00000000-0000-4000-8000-000000000000", email: "e2e@example.test" } }),

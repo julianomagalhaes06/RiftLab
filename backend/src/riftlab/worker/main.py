@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from riftlab import db
+from riftlab.backstage import calls as riot_calls
 from riftlab.catalog.patches import PublishedPatchRefresher
 from riftlab.config import Settings, get_settings
 from riftlab.history_sync.application import process_next_history_sync
@@ -94,6 +95,9 @@ async def run(settings: Settings | None = None, stop_event: asyncio.Event | None
     session_factory = build_session_factory(engine)
     raw_store = DurableRawMatchStore(Path(settings.raw_storage_dir))
     published = PublishedPatchRefresher(session_factory, settings)
+    # Bastidores: as chamadas à Riot feitas pelo worker vão para o banco a cada segundo.
+    call_log = riot_calls.RiotCallLog(session_factory, "worker")
+    riot_calls.install(call_log)
 
     async def lane(steps: tuple[tuple[str, Callable[[], Awaitable[bool]]], ...]) -> None:
         while not stop_event.is_set():
@@ -126,8 +130,10 @@ async def run(settings: Settings | None = None, stop_event: asyncio.Event | None
             *(lane(importing) for _ in range(settings.worker_import_concurrency)),
             lane(preparing),
             lane(maintenance),
+            call_log.run(stop_event),
         )
     finally:
+        riot_calls.install(None)
         await engine.dispose()
         heartbeat_path.unlink(missing_ok=True)
         logger.info("riftlab worker encerrado")

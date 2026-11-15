@@ -1642,3 +1642,59 @@ def popularity_readiness(
         output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         _atomic_write_once(output, canonical_json(report))
     typer.echo(json.dumps(report, ensure_ascii=False, sort_keys=True))
+
+
+admin_app = typer.Typer(
+    help="Administradores: quem vê os Bastidores. O papel só muda por aqui.",
+    no_args_is_help=True,
+)
+app.add_typer(admin_app, name="admin")
+
+
+def _admin_run(call: Any) -> Any:
+    import asyncio
+
+    from riftlab.db import build_engine
+    from riftlab.shared.db import build_session_factory
+
+    settings = get_settings()
+
+    async def _run() -> Any:
+        engine = build_engine(settings.database_url)
+        try:
+            return await call(build_session_factory(engine))
+        finally:
+            await engine.dispose()
+
+    return asyncio.run(_run())
+
+
+@admin_app.command("grant")
+def admin_grant(email: str = typer.Argument(..., help="E-mail de uma conta já criada.")) -> None:
+    """Dá o papel de administrador à conta com este e-mail."""
+    from riftlab.auth.application import ADMIN_ROLE, set_role
+
+    if not _admin_run(lambda factory: set_role(factory, email, ADMIN_ROLE)):
+        typer.echo("BLOCKED: nenhuma conta com esse e-mail.", err=True)
+        raise typer.Exit(code=1)
+    typer.echo("conta agora é administradora (vale no próximo carregamento da página)")
+
+
+@admin_app.command("revoke")
+def admin_revoke(email: str = typer.Argument(..., help="E-mail da conta.")) -> None:
+    """Tira o papel de administrador da conta com este e-mail."""
+    from riftlab.auth.application import USER_ROLE, set_role
+
+    if not _admin_run(lambda factory: set_role(factory, email, USER_ROLE)):
+        typer.echo("BLOCKED: nenhuma conta com esse e-mail.", err=True)
+        raise typer.Exit(code=1)
+    typer.echo("conta deixou de ser administradora")
+
+
+@admin_app.command("list")
+def admin_list() -> None:
+    """Lista os e-mails das contas administradoras."""
+    from riftlab.auth.application import admins
+
+    emails = _admin_run(admins)
+    typer.echo("\n".join(emails) if emails else "nenhuma conta administradora")

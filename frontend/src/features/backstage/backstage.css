@@ -1,0 +1,48 @@
+/* Bastidores: painel do administrador, no padrão Arena (superfícies, tokens e tipografia). */
+.backstage { display: grid; gap: 20px; }
+.backstage .page-head { margin-bottom: 8px; }
+.backstage-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.backstage-card { padding: 20px 22px; }
+.backstage-card__value { display: flex; align-items: center; gap: 10px; margin: 8px 0 6px; color: var(--ntext); font: 600 1.75rem/1.1 var(--font-body); font-variant-numeric: tabular-nums; }
+.backstage-card__unit { color: var(--ntext-muted); font-size: .875rem; font-weight: 500; }
+.backstage-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ntext-subtle); flex: none; }
+.backstage-card--ok .backstage-dot { background: var(--win); box-shadow: 0 0 0 4px var(--win-tint); }
+.backstage-card--rejected { --surface-line: var(--loss); }
+.backstage-card--rejected .backstage-dot { background: var(--loss); box-shadow: 0 0 0 4px var(--loss-tint); }
+.backstage-section { padding: 20px 22px; }
+.backstage-section .section-head h3 { display: inline-flex; align-items: center; gap: 10px; }
+.backstage-live { width: 8px; height: 8px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 0 var(--live-glow); animation: backstage-pulse 1.6s ease-out infinite; }
+@keyframes backstage-pulse { 0% { box-shadow: 0 0 0 0 var(--live-glow); } 100% { box-shadow: 0 0 0 10px transparent; } }
+.backstage-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 0; list-style: none; }
+.backstage-table-wrap { overflow-x: auto; }
+.backstage-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.backstage-table th { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--nline2); color: var(--ntext-subtle); font-size: .75rem; font-weight: 600; text-align: left; white-space: nowrap; }
+.backstage-table td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--nline-soft); color: var(--ntext-muted); vertical-align: top; }
+.backstage-table td strong { color: var(--ntext); font-weight: 600; }
+.backstage-table tr:last-child td { border-bottom: 0; }
+.backstage-num { text-align: right !important; padding-right: 0 !important; }
+.backstage-mono { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.backstage-status { font-weight: 600; white-space: nowrap; }
+.backstage-status--ok { color: var(--win); }
+.backstage-status--bad { color: var(--loss); }
+.backstage-status--warn { color: var(--color-warning); }
+.backstage-status--muted { color: var(--ntext-subtle); }
+.backstage-calls__row--fresh td { animation: backstage-fresh 1.6s ease-out; }
+@keyframes backstage-fresh { from { background: var(--accent-select); } to { background: transparent; } }
+.backstage-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; }
+.backstage-counters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 20px; margin: 0; }
+.backstage-counters div { display: grid; gap: 4px; }
+.backstage-counters dt { color: var(--ntext-subtle); font-size: .8125rem; }
+.backstage-counters dd { margin: 0; color: var(--ntext); font: 600 1.375rem/1.1 var(--font-body); font-variant-numeric: tabular-nums; }
+@media (max-width: 1100px) {
+  .backstage-cards, .backstage-counters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .backstage-columns { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .backstage-cards, .backstage-counters { grid-template-columns: minmax(0, 1fr); }
+  .backstage-section, .backstage-card { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .backstage-live { animation: none; }
+  .backstage-calls__row--fresh td { animation: none; }
+}

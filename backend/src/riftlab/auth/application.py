@@ -46,6 +46,7 @@ from riftlab.auth.models import (
 from riftlab.shared.db import unit_of_work
 
 SessionFactory = async_sessionmaker[AsyncSession]
+ADMIN_ROLE, USER_ROLE = "ADMIN", "USER"
 EMAIL_MAX = 254
 EMAIL_PATTERN = re.compile(r"^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$")
 CODE_PATTERN = re.compile(r"^[0-9]{6}$")
@@ -76,10 +77,12 @@ class AuthUser:
     id: uuid.UUID
     email: str
     name: str | None = None
+    # Administrador: vê os Bastidores (`users.role = 'ADMIN'`).
+    is_admin: bool = False
 
 
 def _auth_user(user: UserModel) -> AuthUser:
-    return AuthUser(user.id, user.email, user.display_name)
+    return AuthUser(user.id, user.email, user.display_name, user.role == ADMIN_ROLE)
 
 
 def token_hash(token: str) -> str:
@@ -389,7 +392,7 @@ async def user_for_token(factory: SessionFactory, token: str | None) -> AuthUser
     async with factory() as session:
         row = (
             await session.execute(
-                select(UserModel.id, UserModel.email, UserModel.display_name)
+                select(UserModel.id, UserModel.email, UserModel.display_name, UserModel.role)
                 .join(AuthSessionModel, AuthSessionModel.user_id == UserModel.id)
                 .where(
                     AuthSessionModel.token_hash == token_hash(token),
@@ -397,7 +400,34 @@ async def user_for_token(factory: SessionFactory, token: str | None) -> AuthUser
                 )
             )
         ).first()
-    return AuthUser(row.id, row.email, row.display_name) if row else None
+    return AuthUser(row.id, row.email, row.display_name, row.role == ADMIN_ROLE) if row else None
+
+
+async def set_role(factory: SessionFactory, email: str, role: str) -> bool:
+    """Muda o papel da conta com este e-mail (USER ou ADMIN); False se a conta não existe."""
+    if role not in (ADMIN_ROLE, USER_ROLE):
+        raise ValueError("papel inválido")
+    async with unit_of_work(factory) as session:
+        user = (
+            await session.scalars(select(UserModel).where(UserModel.email == email.strip().lower()))
+        ).first()
+        if user is None:
+            return False
+        user.role = role
+    return True
+
+
+async def admins(factory: SessionFactory) -> list[str]:
+    async with factory() as session:
+        return list(
+            (
+                await session.scalars(
+                    select(UserModel.email)
+                    .where(UserModel.role == ADMIN_ROLE)
+                    .order_by(UserModel.email)
+                )
+            ).all()
+        )
 
 
 async def logout(factory: SessionFactory, token: str | None) -> None:

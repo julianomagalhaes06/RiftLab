@@ -3,11 +3,13 @@ import { Link } from "../shared/router/Link";
 import type { Route } from "../shared/router/routes";
 
 // `account`: área da conta própria; sem conta, sai do menu (o início explica o que ela oferece).
+// `admin`: só para contas administradoras (Bastidores).
 const entries = [
-  { name: "home", href: "/", label: "Início", icon: "home", account: false },
-  { name: "panel", href: "/painel", label: "Painel", icon: "panel", account: true },
-  { name: "champions", href: "/campeoes", label: "Campeões", icon: "champions", account: false },
-  { name: "history", href: "/historico", label: "Histórico", icon: "history", account: true },
+  { name: "home", href: "/", label: "Início", icon: "home", account: false, admin: false },
+  { name: "panel", href: "/painel", label: "Painel", icon: "panel", account: true, admin: false },
+  { name: "champions", href: "/campeoes", label: "Campeões", icon: "champions", account: false, admin: false },
+  { name: "history", href: "/historico", label: "Histórico", icon: "history", account: true, admin: false },
+  { name: "backstage", href: "/bastidores", label: "Bastidores", icon: "backstage", account: true, admin: true },
 ] as const;
 
 function NavIcon({ kind }: { kind: typeof entries[number]["icon"] }) {
@@ -17,15 +19,17 @@ function NavIcon({ kind }: { kind: typeof entries[number]["icon"] }) {
     case "panel": return <svg {...common}><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>;
     case "champions": return <svg {...common}><path d="M12 2 20 6v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4Z" /><path d="m9 12 2 2 4-4" /></svg>;
     case "history": return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>;
+    case "backstage": return <svg {...common}><path d="M4 18V9" /><path d="M10 18V5" /><path d="M16 18v-6" /><path d="M22 18H2" /></svg>;
   }
 }
 
 export function MainNav({ route }: { route: Route }) {
-  const { hasAccount } = useAuth();
+  const { hasAccount, user } = useAuth();
+  const admin = Boolean(user?.isAdmin);
   const active = route.name === "historyMatch" ? "history" : route.name;
   return (
     <nav className="main-nav" aria-label="Áreas principais">
-      {entries.filter((entry) => hasAccount || !entry.account).map((entry) => {
+      {entries.filter((entry) => (hasAccount || !entry.account) && (admin || !entry.admin)).map((entry) => {
         const selected = active === entry.name;
         return (
           <Link key={entry.name} to={entry.href} className={selected ? "main-nav__link main-nav__link--active" : "main-nav__link"} aria-current={selected ? "page" : undefined}>

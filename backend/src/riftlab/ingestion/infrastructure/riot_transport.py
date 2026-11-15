@@ -18,6 +18,7 @@ from urllib.parse import quote
 import httpcore
 import httpx
 
+from riftlab.backstage import calls as riot_calls
 from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
 from riftlab.observability import quiet_http_client_logs
 from riftlab.shared.errors import (
@@ -42,6 +43,8 @@ API_KEY_HEADER = "X-Riot-Token"
 AMERICAS_HOST = "americas.api.riotgames.com"
 BR1_HOST = "br1.api.riotgames.com"
 ALLOWED_HOSTS = frozenset({AMERICAS_HOST, BR1_HOST})
+# Roteamento mostrado nos Bastidores (nunca a URL).
+_REGION = {AMERICAS_HOST: "AMERICAS", BR1_HOST: "BR1"}
 
 # Mesmo padrão de match ID de docs/contracts.md; a fonte real nunca aceita host,
 # URL ou caminho arbitrário de usuário.
@@ -513,6 +516,14 @@ class RiotHttpTransport:
                 )
             except httpx.HTTPError as exc:
                 duration_ms = max(0.0, (time.monotonic() - request_started_at) * 1000)
+                riot_calls.record(
+                    kind=kind,
+                    region=_REGION[host],
+                    outcome="NETWORK_ERROR",
+                    status_code=None,
+                    duration_ms=duration_ms,
+                    attempt=attempt,
+                )
                 if request_ordinal is not None and self._on_request_result is not None:
                     self._on_request_result(
                         request_ordinal,
@@ -532,6 +543,14 @@ class RiotHttpTransport:
 
             key = f"{kind}:{response.status_code}"
             self._status_counts[key] = self._status_counts.get(key, 0) + 1
+            riot_calls.record(
+                kind=kind,
+                region=_REGION[host],
+                outcome=_diagnostic_result_for_status(response.status_code),
+                status_code=response.status_code,
+                duration_ms=(time.monotonic() - request_started_at) * 1000,
+                attempt=attempt,
+            )
             if request_ordinal is not None and self._on_request_result is not None:
                 self._on_request_result(
                     request_ordinal,

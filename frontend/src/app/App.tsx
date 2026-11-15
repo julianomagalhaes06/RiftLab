@@ -5,6 +5,7 @@ import { DecisionDetailPage } from "../features/matches/DecisionDetailPage";
 import { HistoryPage } from "../features/history/HistoryPage";
 import { DecisionLibraryPage } from "../features/study/DecisionLibraryPage";
 import { MyEvolutionPage } from "../features/study/MyEvolutionPage";
+import { BackstagePage } from "../features/backstage/BackstagePage";
 import { EntryPage } from "../features/imports/EntryPage";
 import { ImportProgressPage } from "../features/imports/ImportProgressPage";
 import { MatchPage } from "../features/matches/MatchPage";
@@ -47,6 +48,7 @@ const TITLES: Record<Route["name"], string> = {
   history: "Histórico — RiftLab",
   decisionLibrary: "Biblioteca de decisões — RiftLab",
   myEvolution: "Minha evolução — RiftLab",
+  backstage: "Bastidores — RiftLab",
   historyMatch: "Contexto da partida — RiftLab",
   import: "Importação — RiftLab",
   match: "Partida — RiftLab",
@@ -66,6 +68,7 @@ const ACCOUNT_AREAS: ReadonlySet<Route["name"]> = new Set([
   "import",
   "decisionLibrary",
   "myEvolution",
+  "backstage",
 ]);
 
 function renderPage(route: Route): ReactNode {
@@ -91,6 +94,8 @@ function renderPage(route: Route): ReactNode {
       return <DecisionLibraryPage />;
     case "myEvolution":
       return <MyEvolutionPage />;
+    case "backstage":
+      return <BackstagePage />;
     case "historyMatch":
       return <MatchPage key={route.matchId} matchId={route.matchId} participantId={route.participantId} fromHistory />;
     case "import":

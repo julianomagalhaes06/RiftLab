@@ -83,6 +83,16 @@ Os botões aparecem quando o id e o segredo do serviço estão no `.env`
 `RIFTLAB_DISCORD_CLIENT_SECRET`). Sem eles, a tela mostra só o formulário. O `.env.example` traz
 onde criar as credenciais e o endereço de retorno que cada serviço pede.
 
+## Bastidores (administrador)
+
+Contas administradoras veem a área **Bastidores** no menu: cada chamada à API da Riot no momento
+em que acontece, com o tempo de resposta, o estado da chave, a fila do worker e o tamanho do
+acervo. O papel só muda pela linha de comando, para uma conta já criada:
+
+```sh
+docker compose run --rm api admin grant voce@exemplo.com   # revoke para tirar, list para listar
+```
+
 ## Documentação
 
 - [Requisitos](docs/requirements.md)

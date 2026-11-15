@@ -135,7 +135,7 @@ async def test_register_confirms_by_code_before_any_session(client, mail, emails
     assert confirmed.status_code == 200
     assert confirmed.json() == {
         "authRequired": True,
-        "user": {"id": str(user_id), "email": email, "name": "Jogadora"},
+        "user": {"id": str(user_id), "email": email, "name": "Jogadora", "isAdmin": False},
         "socialProviders": [],
         "demoEnabled": True,  # a suíte liga os dados de demonstração (tests/conftest.py)
     }

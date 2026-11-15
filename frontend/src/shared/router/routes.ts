@@ -36,6 +36,7 @@ export type Route =
   | { name: "history" }
   | { name: "decisionLibrary" }
   | { name: "myEvolution" }
+  | { name: "backstage" }
   | { name: "historyMatch"; matchId: string; participantId: number | null }
   | { name: "import"; jobId: string }
   | { name: "match"; matchId: string; participantId: number | null }
@@ -130,6 +131,7 @@ export function parseRoute(pathname: string, search = ""): Route {
   if (trimmed === "/historico") return { name: "history" };
   if (trimmed === "/estudo/biblioteca") return { name: "decisionLibrary" };
   if (trimmed === "/estudo/evolucao") return { name: "myEvolution" };
+  if (trimmed === "/bastidores") return { name: "backstage" };
   const parts = trimmed.split("/").slice(1).map(safeDecode);
   const [head, id, ...rest] = parts;
   if (id !== undefined && id !== null && rest.length === 0) {
@@ -209,6 +211,8 @@ export function routeToPath(route: Route): string {
       return "/estudo/biblioteca";
     case "myEvolution":
       return "/estudo/evolucao";
+    case "backstage":
+      return "/bastidores";
     case "historyMatch": {
       const base = `/historico/${route.matchId}`;
       return route.participantId === null ? base : `${base}?participant=${route.participantId}`;

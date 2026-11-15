@@ -14,6 +14,7 @@ class UserModel(Base):
     só usou o login social não tem senha local (`password_hash` nulo)."""
 
     __tablename__ = "users"
+    __table_args__ = (CheckConstraint("role IN ('USER','ADMIN')", name="role_valid"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True)
@@ -23,6 +24,10 @@ class UserModel(Base):
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # ADMIN vê os Bastidores. Só muda pela linha de comando (`riftlab admin grant/revoke`).
+    role: Mapped[str] = mapped_column(
+        String(12), nullable=False, default="USER", server_default="USER"
+    )
 
 
 class AuthSocialIdentityModel(Base):
