@@ -23,6 +23,7 @@ import { useItemName } from "../../shared/hooks/useItemName";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
 import { useDemoNotice } from "../../app/demoNotice";
 import { isDemoMatchId, routeToPath } from "../../shared/router/routes";
+import { DecisionTrace } from "./DecisionTrace";
 
 const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
   NO_PRIOR_FRAME: "não há quadro anterior à decisão",
@@ -382,6 +383,8 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
           <Inventory decision={decision} />
           {match ? <TeamContext match={match} participantId={decision.participantId} /> : null}
         </div>
+        {/* De onde vêm os dados: a linha do tempo oficial da Riot até esta decisão. */}
+        <DecisionTrace decisionId={decision.decisionId} />
         {decision.eligible && decision.versions.reconstructionRulesHealth !== "SUSPENDED" ? (
           hasAccount ? <DecisionExperience decisionId={decision.decisionId} /> : (
             <AccountGate

@@ -69,6 +69,8 @@ export type LearningGoal = Schemas["LearningGoal"];
 export type LearningAttemptSummary = Schemas["LearningAttemptSummary"];
 export type LearningAttemptPage = Schemas["CursorPage_LearningAttemptSummary_"];
 export type Backstage = Schemas["Backstage"];
+export type DecisionTrace = Schemas["DecisionTrace"];
+export type TraceEvent = Schemas["TraceEvent"];
 export type RiotCallRow = Schemas["RiotCallRow"];
 export type AttemptMode = NonNullable<Schemas["LearningAttemptCreateRequest"]["mode"]>;
 
@@ -140,6 +142,8 @@ export interface ApiClient {
     signal?: AbortSignal,
   ): Promise<DecisionPage>;
   getDecision(decisionId: string, signal?: AbortSignal): Promise<DecisionState>;
+  /** Da Riot até a análise: o evento oficial, os anteriores e o quadro (sem revelar a compra). */
+  getDecisionTrace(decisionId: string, signal?: AbortSignal): Promise<DecisionTrace>;
   createAttempt(
     decisionId: string,
     objective: ObjectiveForm,
@@ -325,6 +329,8 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
       ),
     getDecision: (decisionId, signal) =>
       request("GET", `/api/v1/decisions/${enc(decisionId)}`, { signal }),
+    getDecisionTrace: (decisionId, signal) =>
+      request("GET", `/api/v1/decisions/${enc(decisionId)}/trace`, { signal }),
     createAttempt: (decisionId, objective, idempotencyKey, signal, mode = "STUDY") =>
       request("POST", "/api/v1/learning-attempts", {
         body: { decisionId, objective, mode },

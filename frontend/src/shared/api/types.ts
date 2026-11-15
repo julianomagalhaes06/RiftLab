@@ -349,6 +349,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decisions/{decision_id}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Da Riot até a análise: os dados oficiais por trás da decisão
+         * @description Só leitura no banco; nenhuma chamada à Riot.
+         */
+        get: operations["get_decision_trace_api_v1_decisions__decision_id__trace_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/history/sync": {
         parameters: {
             query?: never;
@@ -1572,6 +1592,39 @@ export interface components {
             staleFrame: boolean;
             /** Timestampms */
             timestampMs: number;
+        };
+        /**
+         * DecisionTrace
+         * @description Caminho do dado oficial da Riot até a decisão. `timelineEvents`: eventos da partida;
+         *     `participantItemEvents`: eventos de item do jogador do início até a compra (refazem o
+         *     inventário); `event`: o evento que originou a decisão, sem o item comprado; `nearby`:
+         *     eventos de item e de nível do jogador nos 2 min antes do instante da compra (no máximo 24);
+         *     `frame`: o último quadro antes da compra. Nada revela a compra (modo Estudo).
+         */
+        DecisionTrace: {
+            /**
+             * Decisionid
+             * Format: uuid
+             */
+            decisionId: string;
+            event?: components["schemas"]["TraceEvent"] | null;
+            frame?: components["schemas"]["TraceFrame"] | null;
+            /** Framecount */
+            frameCount: number;
+            /** Matchid */
+            matchId: string;
+            /** Nearby */
+            nearby: components["schemas"]["TraceEvent"][];
+            /** Participantid */
+            participantId: number;
+            /** Participantitemevents */
+            participantItemEvents: number;
+            /** Patch */
+            patch: string;
+            /** Queue */
+            queue: number;
+            /** Timelineevents */
+            timelineEvents: number;
         };
         /**
          * DecisionVersionInfo
@@ -3335,6 +3388,50 @@ export interface components {
             timestampMs: number;
         };
         /**
+         * TraceEvent
+         * @description Evento da linha do tempo da Riot. `raw` traz os campos como vieram da API (tipo,
+         *     momento em ms e os do próprio jogador: participante, item, nível, ouro devolvido).
+         *     `hidden`: campos retirados para não revelar a compra no modo Estudo (só no evento da
+         *     própria decisão).
+         */
+        TraceEvent: {
+            /**
+             * Hidden
+             * @default []
+             */
+            hidden: string[];
+            /** Itemid */
+            itemId?: number | null;
+            /** Level */
+            level?: number | null;
+            /** Raw */
+            raw: {
+                [key: string]: unknown;
+            };
+            /** Sourceindex */
+            sourceIndex: number;
+            /** Timestampms */
+            timestampMs: number;
+            /** Type */
+            type: string;
+        };
+        /**
+         * TraceFrame
+         * @description Quadro da linha do tempo (um por minuto) anterior à compra, só deste jogador.
+         */
+        TraceFrame: {
+            /** Cs */
+            cs?: number | null;
+            /** Gold */
+            gold?: number | null;
+            /** Level */
+            level?: number | null;
+            /** Timestampms */
+            timestampMs: number;
+            /** Xp */
+            xp?: number | null;
+        };
+        /**
          * UserProvidedBudget
          * @description docs/contracts.md: Budget opcional {gold: inteiro 0..100000, source:
          *     USER_PROVIDED}. source e Literal fixo: o cliente nunca pode declarar
@@ -4085,6 +4182,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionState"];
+                };
+            };
+            /** @description Partida, participante ou decisão inexistente. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description decisionId não é um UUID válido. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    get_decision_trace_api_v1_decisions__decision_id__trace_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionTrace"];
                 };
             };
             /** @description Partida, participante ou decisão inexistente. */

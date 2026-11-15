@@ -523,3 +523,41 @@ async def test_read_transaction_is_read_only_at_the_database(session_factory) ->
             await session.execute(
                 text("DELETE FROM decision_points WHERE match_id = 'DEMO-NEVER-EXISTS'")
             )
+
+
+@pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
+async def test_trace_shows_the_riot_event_without_revealing_the_purchase(
+    app_client, session_factory, tmp_path, _demo_match
+) -> None:
+    """Da Riot até a análise: o evento oficial que originou a decisão, os eventos anteriores do
+    jogador e quantos eventos de item refazem o inventário, sem nunca revelar o item comprado."""
+    await _pipeline(session_factory, tmp_path, "DEMO-0002")
+    listing = await app_client.get(_listing("DEMO-0002"), params={"participantId": 1})
+    [item] = listing.json()["items"]
+
+    response = await app_client.get(f"/api/v1/decisions/{item['decisionId']}/trace")
+    assert response.status_code == 200
+    body = response.json()
+    _assert_pre_decision_only(body)
+    assert (body["matchId"], body["participantId"]) == ("DEMO-0002", 1)
+    assert body["timelineEvents"] > 0
+    event = body["event"]
+    assert (event["sourceIndex"], event["timestampMs"], event["type"]) == (
+        3,
+        472_000,
+        "ITEM_PURCHASED",
+    )
+    # O evento vem como a Riot mandou, menos o item: o modo Estudo pede a escolha antes.
+    assert event["itemId"] is None and event["hidden"] == ["itemId"]
+    assert event["raw"] == {"type": "ITEM_PURCHASED", "timestamp": 472_000, "participantId": 1}
+    assert "100010" not in response.text
+    # Antes da compra: as três compras que montam o inventário (2× A e 1× B).
+    assert body["participantItemEvents"] == 3
+    assert [e["itemId"] for e in body["nearby"]] == [
+        e["itemId"] for e in body["nearby"] if e["timestampMs"] < 472_000
+    ]
+    assert all(e["timestampMs"] < 472_000 for e in body["nearby"])
+    assert body["frame"] is None or body["frame"]["timestampMs"] <= 472_000
+
+    missing = await app_client.get(f"/api/v1/decisions/{uuid.uuid4()}/trace")
+    _assert_problem(missing, 404, "RESOURCE_NOT_FOUND")

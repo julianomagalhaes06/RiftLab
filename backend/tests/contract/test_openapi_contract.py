@@ -31,7 +31,7 @@ def test_openapi_only_announces_real_routes() -> None:
     (busca, perfil e sincronização) no CC-1101; perfil da conta e catálogo atual no CC-1202;
     partida ao vivo no CC-1211; aviso de jogando agora no CC-1213; contas locais e sessão
     (Sprint 2, #10), visitante (#14) e vínculo da conta Riot pelo ícone (#12); Bastidores do
-    administrador (15/11/2026)."""
+    administrador e caminho da Riot até a decisão (15/11/2026)."""
     schema = _current_schema()
     assert set(schema["paths"].keys()) == {
         "/health/live",
@@ -47,6 +47,7 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/matches/{match_id}/timeline",
         "/api/v1/matches/{match_id}/review",
         "/api/v1/decisions/{decision_id}",
+        "/api/v1/decisions/{decision_id}/trace",
         "/api/v1/ranked/me",
         "/api/v1/history/sync",
         "/api/v1/players/lookup",

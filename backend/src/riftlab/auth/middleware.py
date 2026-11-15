@@ -9,10 +9,11 @@ Para toda rota `/api/v1/*`, resolve o usuário do cookie de sessão e o deixa em
 
 Leitura pública, como em sites de estatísticas do jogo: sem conta, dá para buscar qualquer
 jogador, atualizar o histórico dele (com o intervalo mínimo da sincronização), abrir a lista de
-partidas dele, a partida (placar, linha do tempo, revisão e decisões), o detalhe de uma decisão,
-a partida ao vivo, os campeões e o catálogo. Exigem conta tudo o que cria ou guarda algo da
-pessoa (análise, estudo, objetivo, relatório, feedback), o Painel, a posição e o histórico da
-conta própria, a importação avulsa, o vínculo da conta Riot e as remoções.
+partidas dele, a partida (placar, linha do tempo, revisão e decisões), o detalhe de uma decisão
+e o caminho dos dados da Riot até ela, a partida ao vivo, os campeões e o catálogo. Exigem conta
+tudo o que cria ou guarda algo da pessoa (análise, estudo, objetivo, relatório, feedback), o
+Painel, a posição e o histórico da conta própria, a importação avulsa, o vínculo da conta Riot e
+as remoções.
 Health, OpenAPI e demais caminhos fora de `/api/v1` não passam por aqui.
 """
 
@@ -47,7 +48,7 @@ PUBLIC_ROUTES: tuple[tuple[frozenset[str], re.Pattern[str]], ...] = (
     (frozenset({"GET", "POST"}), re.compile(rf"/api/v1/players/{_UUID}/sync")),
     (frozenset({"GET"}), re.compile(rf"/api/v1/matches/{_MATCH}(?:/review|/timeline|/decisions)?")),
     (frozenset({"POST"}), re.compile(rf"/api/v1/matches/{_MATCH}/preparation")),
-    (frozenset({"GET"}), re.compile(rf"/api/v1/decisions/{_UUID}")),
+    (frozenset({"GET"}), re.compile(rf"/api/v1/decisions/{_UUID}(?:/trace)?")),
 )
 
 

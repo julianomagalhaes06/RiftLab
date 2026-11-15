@@ -160,6 +160,46 @@ export function decisionState(overrides: Record<string, unknown> = {}) {
 export const PLAYER_ID = "7a5c3f1e-0000-4000-8000-000000000001";
 
 /** Perfil buscado por Riot ID (CC-1101): ícone, nível e elo sintéticos. */
+/** Da Riot até a análise: evento da compra sem o item, eventos anteriores e o quadro. */
+export function decisionTrace(overrides: Record<string, unknown> = {}) {
+  const event = (sourceIndex: number, timestampMs: number, type: string, extra: Record<string, unknown> = {}) => ({
+    sourceIndex,
+    timestampMs,
+    type,
+    itemId: (extra.itemId as number | undefined) ?? null,
+    level: (extra.level as number | undefined) ?? null,
+    hidden: [],
+    raw: { type, timestamp: timestampMs, participantId: 1, ...extra },
+  });
+  return {
+    decisionId: "11111111-1111-4111-8111-111111111111",
+    matchId: "BR1_3091234567",
+    participantId: 1,
+    patch: "16.20",
+    queue: 420,
+    timelineEvents: 1384,
+    participantItemEvents: 17,
+    event: {
+      sourceIndex: 412,
+      timestampMs: 872_345,
+      type: "ITEM_PURCHASED",
+      itemId: null,
+      level: null,
+      hidden: ["itemId"],
+      raw: { type: "ITEM_PURCHASED", timestamp: 872_345, participantId: 1 },
+    },
+    nearby: [
+      event(370, 760_120, "LEVEL_UP", { level: 10 }),
+      event(388, 812_004, "ITEM_PURCHASED", { itemId: 1036 }),
+      event(389, 812_900, "ITEM_PURCHASED", { itemId: 2003 }),
+      event(401, 851_220, "ITEM_DESTROYED", { itemId: 2003 }),
+    ],
+    frame: { timestampMs: 840_210, gold: 6450, level: 10, cs: 142, xp: 7210 },
+    frameCount: 31,
+    ...overrides,
+  };
+}
+
 export function playerProfile(overrides: Record<string, unknown> = {}) {
   return {
     id: PLAYER_ID,
@@ -226,6 +266,7 @@ export type RouteKey =
   | "POST /api/v1/matches/:id/preparation"
   | "GET /api/v1/matches/:id/decisions"
   | "GET /api/v1/decisions/:id"
+  | "GET /api/v1/decisions/:id/trace"
   | "GET /api/v1/dashboard"
   | "GET /api/v1/ranked/me"
   | "GET /api/v1/auth/session"
@@ -275,6 +316,7 @@ const PATTERNS: Array<[RouteKey, string, RegExp]> = [
   ["DELETE /api/v1/matches/:id", "DELETE", /^\/api\/v1\/matches\/[^/]+$/],
   ["GET /api/v1/matches/:id", "GET", /^\/api\/v1\/matches\/[^/]+$/],
   ["GET /api/v1/decisions/:id", "GET", /^\/api\/v1\/decisions\/[^/]+$/],
+  ["GET /api/v1/decisions/:id/trace", "GET", /^\/api\/v1\/decisions\/[^/]+\/trace$/],
   ["GET /api/v1/dashboard", "GET", /^\/api\/v1\/dashboard$/],
   ["GET /api/v1/ranked/me", "GET", /^\/api\/v1\/ranked\/me$/],
   ["GET /api/v1/auth/session", "GET", /^\/api\/v1\/auth\/session$/],
@@ -471,6 +513,7 @@ export const happyPath: Partial<Record<RouteKey, Handler>> = {
           nextCursor: "PROXIMA_PAGINA",
         }),
   "GET /api/v1/decisions/:id": () => ok(decisionState()),
+  "GET /api/v1/decisions/:id/trace": () => ok(decisionTrace()),
   "GET /api/v1/dashboard": () => ok(dashboard({ status: "IDENTITY_UNAVAILABLE", totalMatches: 0, sampledMatches: 0, winSamples: 0, wins: 0, winRate: null, kdaSamples: 0, kda: null, distinctChampions: 0, champions: [], recentMatches: [], progress: { attempts: 0, revealed: 0, reflections: 0, matches: 0 } })),
   "GET /api/v1/ranked/me": () => ok({ status: "UNAVAILABLE", reason: "NO_OBSERVATION", position: null, change: null }),
   // Sprint 2 (#10): sem login exigido por padrão, como numa instalação de uma pessoa.

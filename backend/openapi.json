@@ -1645,6 +1645,85 @@
         "title": "DecisionStateSummary",
         "type": "object"
       },
+      "DecisionTrace": {
+        "additionalProperties": false,
+        "description": "Caminho do dado oficial da Riot até a decisão. `timelineEvents`: eventos da partida;\n`participantItemEvents`: eventos de item do jogador do início até a compra (refazem o\ninventário); `event`: o evento que originou a decisão, sem o item comprado; `nearby`:\neventos de item e de nível do jogador nos 2 min antes do instante da compra (no máximo 24);\n`frame`: o último quadro antes da compra. Nada revela a compra (modo Estudo).",
+        "properties": {
+          "decisionId": {
+            "format": "uuid",
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "frame": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceFrame"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "frameCount": {
+            "title": "Framecount",
+            "type": "integer"
+          },
+          "matchId": {
+            "title": "Matchid",
+            "type": "string"
+          },
+          "nearby": {
+            "items": {
+              "$ref": "#/components/schemas/TraceEvent"
+            },
+            "title": "Nearby",
+            "type": "array"
+          },
+          "participantId": {
+            "title": "Participantid",
+            "type": "integer"
+          },
+          "participantItemEvents": {
+            "title": "Participantitemevents",
+            "type": "integer"
+          },
+          "patch": {
+            "title": "Patch",
+            "type": "string"
+          },
+          "queue": {
+            "title": "Queue",
+            "type": "integer"
+          },
+          "timelineEvents": {
+            "title": "Timelineevents",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "decisionId",
+          "matchId",
+          "participantId",
+          "patch",
+          "queue",
+          "timelineEvents",
+          "participantItemEvents",
+          "nearby",
+          "frameCount"
+        ],
+        "title": "DecisionTrace",
+        "type": "object"
+      },
       "DecisionVersionInfo": {
         "additionalProperties": false,
         "description": "Todas as versões que produziram o ponto (linhas imutáveis: uma extração\nantiga continua consultável com as suas versões).",
@@ -6578,6 +6657,126 @@
         "title": "TimelineSkillUp",
         "type": "object"
       },
+      "TraceEvent": {
+        "additionalProperties": false,
+        "description": "Evento da linha do tempo da Riot. `raw` traz os campos como vieram da API (tipo,\nmomento em ms e os do próprio jogador: participante, item, nível, ouro devolvido).\n`hidden`: campos retirados para não revelar a compra no modo Estudo (só no evento da\nprópria decisão).",
+        "properties": {
+          "hidden": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Hidden",
+            "type": "array"
+          },
+          "itemId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Itemid"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "raw": {
+            "additionalProperties": true,
+            "title": "Raw",
+            "type": "object"
+          },
+          "sourceIndex": {
+            "title": "Sourceindex",
+            "type": "integer"
+          },
+          "timestampMs": {
+            "title": "Timestampms",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceIndex",
+          "timestampMs",
+          "type",
+          "raw"
+        ],
+        "title": "TraceEvent",
+        "type": "object"
+      },
+      "TraceFrame": {
+        "additionalProperties": false,
+        "description": "Quadro da linha do tempo (um por minuto) anterior à compra, só deste jogador.",
+        "properties": {
+          "cs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cs"
+          },
+          "gold": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gold"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "timestampMs": {
+            "title": "Timestampms",
+            "type": "integer"
+          },
+          "xp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xp"
+          }
+        },
+        "required": [
+          "timestampMs"
+        ],
+        "title": "TraceFrame",
+        "type": "object"
+      },
       "UserProvidedBudget": {
         "additionalProperties": false,
         "description": "docs/contracts.md: Budget opcional {gold: inteiro 0..100000, source:\nUSER_PROVIDED}. source e Literal fixo: o cliente nunca pode declarar\nFRAME_ESTIMATE/UNKNOWN, que so o servidor atribui — \"fonte de orcamento do\nservidor nao e sobrescrita, cria cenario separado\".",
@@ -7723,6 +7922,60 @@
           }
         },
         "summary": "Get Decision",
+        "tags": [
+          "decisions"
+        ]
+      }
+    },
+    "/api/v1/decisions/{decision_id}/trace": {
+      "get": {
+        "description": "Só leitura no banco; nenhuma chamada à Riot.",
+        "operationId": "get_decision_trace_api_v1_decisions__decision_id__trace_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionTrace"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Partida, participante ou decisão inexistente."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "decisionId não é um UUID válido."
+          }
+        },
+        "summary": "Da Riot até a análise: os dados oficiais por trás da decisão",
         "tags": [
           "decisions"
         ]

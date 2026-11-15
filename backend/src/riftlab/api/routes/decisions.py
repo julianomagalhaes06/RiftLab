@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, Request
 
@@ -24,6 +24,7 @@ from riftlab.shared.api.common import (
     MATCH_ID_DEMO_PATTERN,
     PAGINATION_DEFAULT_LIMIT,
     PAGINATION_MAX_LIMIT,
+    CamelModel,
     CursorPage,
     MatchId,
 )
@@ -41,6 +42,52 @@ from riftlab.shared.api.matches import (
 from riftlab.shared.errors import NotFoundError
 
 router = APIRouter(tags=["decisions"])
+
+
+class TraceEvent(CamelModel):
+    """Evento da linha do tempo da Riot. `raw` traz os campos como vieram da API (tipo,
+    momento em ms e os do próprio jogador: participante, item, nível, ouro devolvido).
+    `hidden`: campos retirados para não revelar a compra no modo Estudo (só no evento da
+    própria decisão)."""
+
+    source_index: int
+    timestamp_ms: int
+    type: str
+    item_id: int | None = None
+    level: int | None = None
+    hidden: list[str] = []
+    raw: dict[str, Any]
+
+
+class TraceFrame(CamelModel):
+    """Quadro da linha do tempo (um por minuto) anterior à compra, só deste jogador."""
+
+    timestamp_ms: int
+    gold: int | None = None
+    level: int | None = None
+    cs: int | None = None
+    xp: int | None = None
+
+
+class DecisionTrace(CamelModel):
+    """Caminho do dado oficial da Riot até a decisão. `timelineEvents`: eventos da partida;
+    `participantItemEvents`: eventos de item do jogador do início até a compra (refazem o
+    inventário); `event`: o evento que originou a decisão, sem o item comprado; `nearby`:
+    eventos de item e de nível do jogador nos 2 min antes do instante da compra (no máximo 24);
+    `frame`: o último quadro antes da compra. Nada revela a compra (modo Estudo)."""
+
+    decision_id: uuid.UUID
+    match_id: str
+    participant_id: int
+    patch: str
+    queue: int
+    timeline_events: int
+    participant_item_events: int
+    event: TraceEvent | None = None
+    nearby: list[TraceEvent]
+    frame: TraceFrame | None = None
+    frame_count: int
+
 
 _NOT_FOUND = {
     "model": ProblemDetail,
@@ -114,6 +161,27 @@ async def get_decision(decision_id: uuid.UUID, request: Request) -> DecisionStat
     ):
         raise NotFoundError(f"decisão {decision_id} não encontrada")
     return _to_detail(detail)
+
+
+@router.get(
+    "/api/v1/decisions/{decision_id}/trace",
+    response_model=DecisionTrace,
+    summary="Da Riot até a análise: os dados oficiais por trás da decisão",
+    description="Só leitura no banco; nenhuma chamada à Riot.",
+    responses={
+        404: _NOT_FOUND,
+        422: {"model": ProblemDetail, "description": "decisionId não é um UUID válido."},
+    },
+)
+async def get_decision_trace(decision_id: uuid.UUID, request: Request) -> DecisionTrace:
+    from riftlab.decisions.trace import decision_trace
+
+    trace = await decision_trace(request.app.state.session_factory, decision_id)
+    if not request.app.state.settings.demo_data_enabled and MATCH_ID_DEMO_PATTERN.fullmatch(
+        trace["matchId"]
+    ):
+        raise NotFoundError(f"decisão {decision_id} não encontrada")
+    return DecisionTrace.model_validate(trace)
 
 
 def _budget_parts(point: StoredDecisionPoint) -> tuple[BudgetSource, int | None, bool]:
