@@ -99,8 +99,10 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
     await decisionLink.click();
     await expect(page).toHaveURL(/\/decisions\/[0-9a-f-]{36}$/);
     await expect(page.getByRole("heading", { name: /^(Sua decisão|Decisão de .+) em / })).toBeVisible();
-    await expect(page.getByText("Componente Sintético A")).toBeVisible();
-    await expect(page.getByText("Componente Sintético B")).toBeVisible();
+    // No inventário (o caminho da Riot até a análise também cita os itens comprados antes).
+    const inventory = page.getByRole("region", { name: "Inventário antes da decisão" });
+    await expect(inventory.getByText("Componente Sintético A")).toBeVisible();
+    await expect(inventory.getByText("Componente Sintético B")).toBeVisible();
     await expect(
       page.getByText(/^(Aproximadamente .* de ouro|Snapshot antigo; orçamento não confirmável|Orçamento desconhecido)$/),
     ).toBeVisible();
