@@ -77,6 +77,39 @@ Os SHA256 dos GGUF obtidos nesta preparação foram:
 - Base Q4_K_M: `77d191163c1fd3e888a956fd790d0726c633fdb0271283eb297af02d7add3664`.
 - LoRA F16: `a85429164c4034136093929928108cf1270383563c9a04066d27d1b9dcb32e12`.
 
+## Linux nativo (CPU)
+
+Num Linux sem WSL nem GPU compatível, o mesmo par de pesos roda na CPU do host:
+`llama-server` com os parâmetros da medição de CPU (contexto 1024, um slot, quatro
+threads, batch 128/ubatch 64, só em `127.0.0.1`, token temporário) e o sidecar falando
+com ele direto no loopback, sem ponte PowerShell.
+
+Usar o pacote oficial `llama-b11960-bin-ubuntu-x64.tar.gz` da mesma versão (SHA256
+`31cc3a6bc638ac6c48dc4b1b74888f1eaadf3d14227c1e5f67daf9a49541d97a`, conferido com o
+publicado na release) e converter com os comandos acima, num ambiente isolado com as
+dependências de `requirements/requirements-convert_hf_to_gguf.txt` do código da tag.
+O LoRA F16 resultante confere com o hash acima. O base Q4_K_M sai com outro SHA256
+porque o conversor grava o nome da pasta de origem em `general.name`; partindo do cache
+do Hugging Face, esse nome é a revisão. A medição abaixo, com a mesma amostra, deu os
+mesmos acertos e o mesmo pico de RAM da preparação original.
+
+O manifesto ganha `"platform": "linux"` e `server` aponta para o `llama-server` do
+pacote (mantido na pasta com as bibliotecas). `scripts/local_llm.sh` e
+`scripts/local_llm_demo.sh` escolhem `runtime-manifest-linux.json` fora do WSL. O
+launcher confere os hashes, recusa porta ocupada ou menos de 2 GiB livres e encerra o
+modelo se o RSS passar de 2 GiB, se a memória disponível cair abaixo de 2 GiB ou ao fim
+da duração.
+
+Medição com Intel Core i5-11500 (6 núcleos, 12 threads), sem GPU, Linux nativo, a mesma
+amostra de 40 frases e os mesmos parâmetros de geração:
+
+| Execução | Pico de RAM física do processo do modelo | p50 por frase | p95 por frase | Acertos |
+| --- | ---: | ---: | ---: | ---: |
+| CPU/Linux nativo | 1643,7 MiB | 1,2684 s | 1,3606 s | 38/40 |
+
+JSON válido em 40/40 e macro-F1 0,9499 na amostra; carregamento em 1,48 s. Como as demais
+medições, é amostra de desenvolvimento, não avaliação independente.
+
 ## Inicialização e integração
 
 Para executar a aplicação em Docker, seguir o

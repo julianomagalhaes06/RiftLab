@@ -12,7 +12,9 @@ disponível. A validação `config` apenas lê e valida arquivos.
 
 Usar o terminal WSL na raiz do repositório. São necessários Docker/Compose,
 Python 3.12 ou posterior, interoperabilidade com PowerShell e os artefatos já
-convertidos descritos em [inferência local](inferencia-local.md).
+convertidos descritos em [inferência local](inferencia-local.md). Num Linux sem
+WSL, os mesmos comandos usam o modelo na CPU do host (seção "Linux nativo" do
+mesmo guia), sem PowerShell.
 
 O manifesto local padrão é
 `.private/experiments/objective-local-v3/runtime-manifest-windows.json`. Em outro
@@ -87,8 +89,10 @@ scripts/local_llm_demo.sh check
 ```
 
 Somente a API é recriada. Ela recebe um diretório de socket em modo somente
-leitura, sem pesos, binários ou tokens. A imagem usa UID 1000, que deve coincidir
-com o dono do socket no WSL. Não usar `chmod 777` para resolver uma divergência.
+leitura, sem pesos, binários ou tokens. O socket é `0600` de quem iniciou o modelo, e a
+API roda com esse mesmo UID (`RIFTLAB_LOCAL_MODEL_UID`, exportado pelos scripts; no WSL,
+normalmente 1000, o usuário da imagem). Com SELinux, a montagem usa o rótulo compartilhado
+`z`. Não usar `chmod 777` para resolver uma divergência.
 
 O comando `check` envia três frases de desenvolvimento e mostra as respostas.
 Conferir `provider: LOCAL_MODEL` e

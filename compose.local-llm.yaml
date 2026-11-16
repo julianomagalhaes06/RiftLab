@@ -1,7 +1,11 @@
-# Opt-in only: API -> Unix socket -> WSL sidecar -> Windows pipes -> RX 7600.
-# Never mounts weights, tokens, or Windows binaries in a container.
+# Opt-in only. WSL: API -> Unix socket -> WSL sidecar -> Windows pipes -> RX 7600.
+# Linux nativo: API -> Unix socket -> sidecar -> llama-server na CPU do host.
+# Never mounts weights, tokens, or model binaries in a container.
 services:
   api:
+    # O socket é 0600 do usuário que iniciou o modelo: a API usa o mesmo UID para alcançá-lo
+    # (os scripts exportam o UID; 1000 é o usuário da imagem, o caso do WSL).
+    user: "${RIFTLAB_LOCAL_MODEL_UID:-1000}:${RIFTLAB_LOCAL_MODEL_GID:-1000}"
     environment:
       RIFTLAB_OBJECTIVE_PARSER: local_model
       RIFTLAB_OBJECTIVE_MODEL_URL: http://localhost/interpret
@@ -9,8 +13,11 @@ services:
       RIFTLAB_OBJECTIVE_MODEL_VERSION: qwen2.5-1.5b-lora-v3-q4_k_m
     volumes:
       - type: bind
-        source: ${RIFTLAB_LOCAL_MODEL_SOCKET_DIR:?Defina o diretorio privado do socket no WSL}
+        source: ${RIFTLAB_LOCAL_MODEL_SOCKET_DIR:?Defina o diretorio privado do socket}
         target: /run/riftlab-objective
         read_only: true
         bind:
           create_host_path: false
+          # Com SELinux (Fedora), o rótulo compartilhado deixa o contêiner usar o socket.
+          # Sem SELinux (WSL), o Docker ignora a opção.
+          selinux: z

@@ -39,15 +39,18 @@ Se as imagens ainda não estiverem construídas ou o código tiver mudado, execu
 
 ## Iniciar
 
-Em um terminal WSL na raiz do repositório:
+Em um terminal WSL (modelo na RX 7600) ou Linux (modelo na CPU, ver
+[Linux nativo](inferencia-local.md#linux-nativo-cpu)) na raiz do repositório:
 
 ```bash
 scripts/local_llm.sh model
 ```
 
 Aguardar `Modelo local pronto` e manter o terminal aberto. O manifesto padrão é
-`.private/experiments/objective-local-v3/runtime-manifest-windows.json`; outro
-manifesto pode ser escolhido com `RIFTLAB_LOCAL_MODEL_MANIFEST`.
+`.private/experiments/objective-local-v3/runtime-manifest-windows.json` no WSL e
+`runtime-manifest-linux.json`, na mesma pasta, fora dele; outro manifesto pode ser
+escolhido com `RIFTLAB_LOCAL_MODEL_MANIFEST`. A API passa a rodar com o UID de quem
+iniciou o modelo, dono do socket.
 
 Em outro terminal, na mesma raiz:
 
@@ -58,7 +61,8 @@ scripts/local_llm.sh status
 ```
 
 `check` exige uma interpretação real com `provider: LOCAL_MODEL` e prioridade
-`SURVIVAL`. Abrir **http://127.0.0.1:5173/historico**, usar as partidas reais e
+`SURVIVAL`. Ele roda dentro do contêiner da API, com a mesma montagem da rota
+`POST /objectives/interpret`, porque a rota exige conta. Abrir **http://127.0.0.1:5173/historico**, usar as partidas reais e
 abrir uma decisão elegível. Em **Praticar decisão**, descrever o objetivo,
 selecionar **Interpretar texto** e confirmar em **Usar este objetivo**.
 

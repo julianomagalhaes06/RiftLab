@@ -64,9 +64,9 @@ jobs:
         working-directory: backend
         run: uv run python -m unittest discover -s ../ml/objectives/colab -p test_gate_v3_runner.py -v
 
-      - name: Contrato HTTP do interpretador quantizado (sem carregar modelos)
+      - name: Contrato HTTP do interpretador quantizado e launcher Linux (sem carregar modelos)
         working-directory: backend
-        run: uv run pytest ../ml/objectives/local/test_serve_llama.py ../ml/objectives/local/test_unix_sidecar.py -q
+        run: uv run pytest ../ml/objectives/local/test_serve_llama.py ../ml/objectives/local/test_unix_sidecar.py ../ml/objectives/local/test_run_linux.py -q
 
       - name: Validar configuração optativa da demonstração com LLM (sem subir serviços)
         working-directory: .

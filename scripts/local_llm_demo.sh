@@ -5,6 +5,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="riftlab-llm-demo"
 export RIFTLAB_LOCAL_MODEL_SOCKET_DIR="${RIFTLAB_LOCAL_MODEL_SOCKET_DIR:-$ROOT/.private/local-runtime/docker-socket}"
+# A API usa o UID de quem inicia o modelo: o socket é 0600 desse usuário.
+export RIFTLAB_LOCAL_MODEL_UID="${RIFTLAB_LOCAL_MODEL_UID:-$(id -u)}"
+export RIFTLAB_LOCAL_MODEL_GID="${RIFTLAB_LOCAL_MODEL_GID:-$(id -g)}"
+# WSL usa o modelo no Windows (RX 7600); Linux nativo, o llama-server na CPU do host.
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  DEFAULT_MANIFEST="$ROOT/.private/experiments/objective-local-v3/runtime-manifest-windows.json"
+else
+  DEFAULT_MANIFEST="$ROOT/.private/experiments/objective-local-v3/runtime-manifest-linux.json"
+fi
 # Afeta somente este processo. O override local habilita o modelo explicitamente.
 export RIFTLAB_OBJECTIVE_PARSER=rules
 export RIFTLAB_OBJECTIVE_MODEL_URL=""
@@ -18,8 +27,8 @@ require_socket() {
     echo "Inicie primeiro o modelo: scripts/local_llm_demo.sh model" >&2
     exit 1
   fi
-  if [ "$(stat -c %u "$socket")" != 1000 ]; then
-    echo "O socket precisa pertencer ao UID 1000, usado pela API na imagem Docker." >&2
+  if [ "$(stat -c %u "$socket")" != "$RIFTLAB_LOCAL_MODEL_UID" ]; then
+    echo "O socket precisa pertencer ao UID $RIFTLAB_LOCAL_MODEL_UID, o mesmo usado pela API." >&2
     exit 1
   fi
   python3 - "$socket" <<'PY'
@@ -68,7 +77,7 @@ case "${1:-}" in
     echo "Demonstração com regras pronta: http://127.0.0.1:5173"
     ;;
   model)
-    manifest="${RIFTLAB_LOCAL_MODEL_MANIFEST:-$ROOT/.private/experiments/objective-local-v3/runtime-manifest-windows.json}"
+    manifest="${RIFTLAB_LOCAL_MODEL_MANIFEST:-$DEFAULT_MANIFEST}"
     if [ ! -f "$manifest" ]; then
       echo "Defina RIFTLAB_LOCAL_MODEL_MANIFEST com o manifesto local dos pesos preparados." >&2
       exit 1
@@ -100,7 +109,9 @@ with opener.open("http://127.0.0.1:8000/health/ready", timeout=5) as response:
 for text in ("quero causar mais dano", "preciso de mana", "quero uma build equilibrada"):
     request = urllib.request.Request(
         "http://127.0.0.1:8000/api/v1/objectives/interpret",
-        json.dumps({"text": text}).encode(), {"Content-Type": "application/json"},
+        # Cabeçalho anti-CSRF exigido pela API; a demonstração não pede login.
+        json.dumps({"text": text}).encode(),
+        {"Content-Type": "application/json", "X-RiftLab-Request": "1"},
     )
     with opener.open(request, timeout=20) as response:
         body = json.load(response)
