@@ -333,7 +333,7 @@ async def test_riot_failures_finish_failed_and_hold_new_requests(
 
 
 @pytest.mark.asyncio
-async def test_auth_failure_before_process_start_only_waits_the_normal_cooldown(
+async def test_auth_failure_before_process_start_does_not_hold_new_requests(
     session_factory, tmp_path, clean, monkeypatch
 ):
     settings = _settings(tmp_path)
@@ -347,8 +347,13 @@ async def test_auth_failure_before_process_start_only_waits_the_normal_cooldown(
     # Processo reiniciado (ex.: chave renovada) depois da falha.
     monkeypatch.setattr(application, "PROCESS_STARTED_AT", finished + timedelta(seconds=1))
     status = await sync_status(session_factory, settings)
-    assert status["nextAllowedAt"] == finished + timedelta(seconds=300)
-    assert (await request_sync(session_factory, settings, now=finished + timedelta(seconds=300)))[1]
+    assert (status["state"], status["reason"]) == ("FAILED", "RIOT_AUTH_FAILED")
+    assert status["nextAllowedAt"] == finished
+    # Visita logo depois do reinício: a chave nova tenta já, sem os 300 s do intervalo mínimo.
+    retried, created = await request_sync(
+        session_factory, settings, now=finished + timedelta(seconds=2)
+    )
+    assert (retried["state"], created) == ("QUEUED", True)
 
 
 @pytest.mark.asyncio

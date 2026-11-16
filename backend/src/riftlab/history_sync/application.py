@@ -98,9 +98,12 @@ def next_allowed_at(run: Run, settings: Settings) -> datetime | None:
     """Quando um novo pedido pode criar outra execução; None enquanto há uma ativa."""
     if run.state in ACTIVE or run.finished_at is None:
         return None
+    if run.error_code == AUTH_FAILED and run.finished_at < PROCESS_STARTED_AT:
+        # A recusa veio da chave anterior ao reinício: a nova tenta já, sem o intervalo mínimo.
+        return run.finished_at
     wait = settings.history_sync_cooldown_seconds
-    if run.error_code == AUTH_FAILED and run.finished_at >= PROCESS_STARTED_AT:
-        # Chave rejeitada: esperar mais, em vez de repetir a mesma falha a cada visita.
+    if run.error_code == AUTH_FAILED:
+        # Chave rejeitada neste processo: esperar mais, em vez de repetir a falha a cada visita.
         wait = max(wait, settings.history_sync_auth_cooldown_seconds)
     elif run.retry_after_seconds:
         wait = max(wait, run.retry_after_seconds)
