@@ -461,11 +461,11 @@
   .decision-page > :not(.decision-strip):not(.match-back), .decision-trace, .decision-page .study-panel { transition: none; }
 }
 
-/* Marcador do momento atual: a trilha é container de tamanho e --at (0–100) vira cqw, a posição na
-   trilha; desliza do momento anterior para o novo em 220 ms. Largura zero: deslocado, não alarga a
+/* Marcador do momento atual: a trilha é container de tamanho e --at (0–100, vindo do style inline) vira cqw, a
+   posição na trilha; desliza do momento anterior para o novo em 220 ms. Largura zero: deslocado, não alarga a
    página (largura da trilha + translate gerava rolagem lateral). Por cima dos pontos, sem clique. */
 .decision-strip__track { container-type: inline-size; }
-.decision-strip__marker { position: absolute; left: 0; top: 15px; width: 0; height: 0; pointer-events: none; transform: translateX(calc(var(--at, 0) * 1cqw)); transition: transform 220ms cubic-bezier(0.2, 0, 0, 1); }
+.decision-strip__marker { --at: 0; position: absolute; left: 0; top: 15px; width: 0; height: 0; pointer-events: none; transform: translateX(calc(var(--at) * 1cqw)); transition: transform 220ms cubic-bezier(0.2, 0, 0, 1); }
 .decision-strip__marker > span { position: absolute; left: 0; top: 0; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--n1), 0 0 12px var(--glow-accent); }
 
 /* O que mudou desde o momento de onde se veio: brilho dourado curto nos itens que entraram (só

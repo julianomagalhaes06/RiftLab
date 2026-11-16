@@ -171,7 +171,8 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
 
     // Retomada por URL: recarregar o detalhe e abrir o deep link da partida
     await page.reload();
-    await expect(page.getByText("Componente Sintético A")).toBeVisible();
+    // No inventário: o caminho da Riot, carregado junto com a decisão, também cita o item.
+    await expect(inventory.getByText("Componente Sintético A")).toBeVisible();
     expect(page.url()).toBe(detailUrl);
     await page.goto(`${matchUrl}?participant=1&aba=compras`);
     await expect(page.getByRole("heading", { name: /^(Suas decisões — |Decisões de )/ })).toBeVisible();
@@ -179,7 +180,7 @@ test.describe("Demonstração ponta a ponta na stack real", () => {
 
     // Voltar / avançar do navegador
     await page.goBack(); // do deep link para o detalhe recarregado
-    await expect(page.getByText("Componente Sintético A")).toBeVisible();
+    await expect(inventory.getByText("Componente Sintético A")).toBeVisible();
     await page.goForward();
     await expect(page.getByRole("heading", { name: /^(Suas decisões — |Decisões de )/ })).toBeVisible();
 
