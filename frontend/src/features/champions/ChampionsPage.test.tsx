@@ -73,6 +73,32 @@ describe("Campeões com padrões observados", () => {
     expect(window.location.search).toContain("patch=16.21");
   });
 
+  it("troca de campeão sem esvaziar a tela enquanto o novo carrega", async () => {
+    window.history.replaceState(null, "", "/campeoes?champion=51&patch=16.19");
+    const mock = createMockApi();
+    let release: () => void = () => undefined;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    mock.on("GET", /^\/api\/v1\/champions\/patterns$/, async ({ search }) => {
+      if (search.get("championId") !== "222") return json(200, championPatterns());
+      await pending;
+      return json(200, championPatterns({ championId: 222, status: "NO_ELIGIBLE", patterns: [], situations: [] }));
+    });
+    vi.stubGlobal("fetch", mock.fetch);
+    render(<App />);
+    expect(await screen.findByText("Infinity Edge")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Jinx/ }));
+    // Durante a espera: o conteúdo anterior fica (marcado ocupado) e os retratos mantêm a contagem.
+    expect(await screen.findByText("Carregando padrões deste filtro…")).toBeInTheDocument();
+    expect(screen.getByText("Infinity Edge")).toBeInTheDocument();
+    expect(document.querySelector(".champions-content")).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("Carregando…")).not.toBeInTheDocument();
+    release();
+    expect(await screen.findByText("Ainda não há trajetos elegíveis neste filtro")).toBeInTheDocument();
+    expect(screen.queryByText("Infinity Edge")).not.toBeInTheDocument();
+    expect(document.querySelector(".champions-content")).toHaveAttribute("aria-busy", "false");
+    expect(screen.queryByText("Carregando padrões deste filtro…")).not.toBeInTheDocument();
+  });
+
   it("abstém com amostra pequena e mantém as situações para estudo", async () => {
     window.history.replaceState(null, "", "/campeoes");
     const mock = createMockApi();

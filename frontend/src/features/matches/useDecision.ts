@@ -32,5 +32,8 @@ export function useDecision(decisionId: string) {
 
   const current: DecisionLoad =
     state.decisionId === decisionId ? state : { decisionId, status: "loading" };
-  return { ...current, reload };
+  // Outro momento da partida já carregado: a tela o mantém enquanto o novo chega, em vez de esvaziar.
+  const previous = current.status === "loading" && state.status === "ready" && state.decisionId !== decisionId
+    ? state.decision : null;
+  return { ...current, previous, reload };
 }

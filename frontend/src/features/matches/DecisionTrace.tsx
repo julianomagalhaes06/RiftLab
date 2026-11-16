@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type DecisionTrace as Trace, type TraceEvent } from "../../shared/api/client";
 import { isAbortError } from "../../shared/api/errors";
 import { useItemName } from "../../shared/hooks/useItemName";
+import { useSlowWait } from "../../shared/hooks/useSlowWait";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
 import { formatGameTime } from "./format";
 
@@ -47,8 +48,8 @@ function rawJson(event: TraceEvent): string {
 }
 
 export function DecisionTrace({ decisionId }: { decisionId: string }) {
-  const [trace, setTrace] = useState<Trace | null>(null);
-  const [failed, setFailed] = useState(false);
+  // `trace: null` = falhou. Ao trocar de momento, o rastro anterior fica até o novo chegar.
+  const [loaded, setLoaded] = useState<{ decisionId: string; trace: Trace | null } | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     api
@@ -56,16 +57,19 @@ export function DecisionTrace({ decisionId }: { decisionId: string }) {
       .then((next) => {
         if (controller.signal.aborted) return;
         // Complemento da tela: resposta fora do formato esconde a seção, nunca derruba a decisão.
-        if (Array.isArray(next?.nearby) && typeof next.timelineEvents === "number") setTrace(next);
-        else setFailed(true);
+        const valid = Array.isArray(next?.nearby) && typeof next.timelineEvents === "number";
+        setLoaded({ decisionId, trace: valid ? next : null });
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted && !isAbortError(error)) setFailed(true);
+        if (!controller.signal.aborted && !isAbortError(error)) setLoaded({ decisionId, trace: null });
       });
     return () => controller.abort();
   }, [decisionId]);
+  const waiting = loaded?.decisionId !== decisionId;
+  const slow = useSlowWait(waiting && !!loaded?.trace, decisionId);
 
-  if (failed) return null; // complemento: a decisão continua utilizável sem ele
+  if (!waiting && !loaded?.trace) return null; // complemento: a decisão continua utilizável sem ele
+  const trace = loaded?.trace;
   if (!trace) {
     return (
       <section className="decision-trace surface" aria-busy="true" aria-label="Da Riot até esta análise">
@@ -77,7 +81,7 @@ export function DecisionTrace({ decisionId }: { decisionId: string }) {
   const frame = trace.frame;
   const age = frame && event ? event.timestampMs - frame.timestampMs : null;
   return (
-    <section className="decision-trace surface" aria-labelledby="trace-heading">
+    <section className="decision-trace surface" aria-labelledby="trace-heading" aria-busy={waiting} data-waiting={slow}>
       <p className="decision-trace__kicker">Como esta análise foi montada</p>
       <h3 id="trace-heading">Da Riot até esta análise</h3>
       <p className="decision-trace__lead">

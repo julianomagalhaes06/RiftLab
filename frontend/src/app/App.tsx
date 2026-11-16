@@ -103,7 +103,8 @@ function renderPage(route: Route): ReactNode {
     case "match":
       return <MatchPage key={route.matchId} matchId={route.matchId} participantId={route.participantId} />;
     case "decision":
-      return <DecisionDetailPage key={route.decisionId} decisionId={route.decisionId} />;
+      // Sem key: trocar de momento mantém a tela montada e a decisão anterior até a nova chegar.
+      return <DecisionDetailPage decisionId={route.decisionId} />;
     case "player":
       return (
         <PlayerPage
@@ -169,13 +170,19 @@ function AppContent() {
   // topo da página, senão quem navega por teclado perderia o lugar a cada seleção.
   const pathKey = href.split("?")[0];
   const firstRender = useRef(true);
+  const previousRoute = useRef(route.name);
 
   useEffect(() => {
     document.title = TITLES[hidden ? "notFound" : route.name];
+    const fromRoute = previousRoute.current;
+    previousRoute.current = route.name;
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
+    // Troca de momento na faixa da decisão (decisão → decisão) é a mesma tela com outro momento:
+    // mantém a rolagem e o foco no ponto clicado, como a troca de participante.
+    if (fromRoute === "decision" && route.name === "decision" && !hidden) return;
     // Navegação por link: volta ao topo da página nova e leva o foco ao conteúdo (teclado/leitor
     // de tela). `preventScroll` evita que o focus() brigue com o scrollTo e deixe a página alguns
     // pixels abaixo do topo.

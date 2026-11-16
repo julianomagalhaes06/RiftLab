@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { api, type DecisionState, type DecisionSummary, type MatchDetail, type MatchParticipant } from "../../shared/api/client";
 import { Link } from "../../shared/router/Link";
 import { AccountGate } from "../auth/AccountGate";
@@ -24,6 +24,7 @@ import { ItemIcon } from "../../shared/ui/ItemIcon";
 import { useDemoNotice } from "../../app/demoNotice";
 import { isDemoMatchId, routeToPath } from "../../shared/router/routes";
 import { DecisionTrace } from "./DecisionTrace";
+import { useSlowWait } from "../../shared/hooks/useSlowWait";
 
 const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
   NO_PRIOR_FRAME: "não há quadro anterior à decisão",
@@ -31,11 +32,51 @@ const LEVEL_ABSENT_TEXT: Readonly<Record<string, string>> = {
   LEVEL_INVALID: "o nível informado no quadro é inválido",
 };
 
-function Inventory({ decision }: { decision: DecisionState }) {
+type InventoryItem = NonNullable<DecisionState["inventory"]["items"]>[number];
+
+/** Posições de `items` sem par em `against`, contando repetições (duas Espadas Longas contra uma
+ * deixam uma sem par). Quantidade de consumível não conta como item novo. */
+function unmatched(items: InventoryItem[], against: InventoryItem[]): number[] {
+  const pool = new Map<number, number>();
+  for (const item of against) pool.set(item.itemId, (pool.get(item.itemId) ?? 0) + 1);
+  return items.flatMap((item, index) => {
+    const left = pool.get(item.itemId) ?? 0;
+    pool.set(item.itemId, left - 1);
+    return left > 0 ? [] : [index];
+  });
+}
+
+function joinNames(names: string[]): string {
+  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} e ${names.at(-1)}`;
+}
+
+/** O que mudou no inventário em relação ao momento de onde se veio: os itens que entraram ganham um
+ * brilho dourado curto (só ao chegar) e a frase diz a diferença em texto, para não depender da cor.
+ * Neutra quanto ao sentido: vale para avançar ou voltar na partida. */
+function InventoryChanges({ decision, before }: { decision: DecisionState; before: DecisionState }) {
+  const itemName = useItemName();
+  const items = decision.inventory.items ?? [];
+  const previous = before.inventory.items ?? [];
+  const added = unmatched(items, previous).map((index) => itemName(items[index]));
+  const removed = unmatched(previous, items).map((index) => itemName(previous[index]));
+  const when = formatGameTime(before.timestampMs);
+  if (!added.length && !removed.length) return <p className="inventory-grid__changes">Mesmo inventário de {when}.</p>;
+  return (
+    <p className="inventory-grid__changes">
+      Em relação a {when}:{" "}
+      {added.length ? <>a mais <strong>{joinNames(added)}</strong></> : null}
+      {added.length && removed.length ? "; " : null}
+      {removed.length ? <>a menos <strong>{joinNames(removed)}</strong></> : null}.
+    </p>
+  );
+}
+
+function Inventory({ decision, before }: { decision: DecisionState; before: DecisionState | null }) {
   const itemName = useItemName();
   const items = decision.inventory.items ?? [];
   const uncertain = (decision.reasons ?? []).some((reason) => reason.code === "INVENTORY_UNCERTAIN");
   const slots = items.slice(0, 6);
+  const fresh = new Set(before ? unmatched(items, before.inventory.items ?? []) : []);
   return (
     <section aria-labelledby="inventory-heading" className="surface decision-card">
       <h3 id="inventory-heading">Inventário antes da decisão</h3>
@@ -47,8 +88,10 @@ function Inventory({ decision }: { decision: DecisionState }) {
       <div className="inventory-grid">
         <ul className="inventory-grid__slots" aria-label="Itens do inventário principal">
           {slots.map((item, index) => (
-            <li key={`${item.itemId}-${index}`} className="inventory-grid__slot" title={itemName(item)}>
+            <li key={`${item.itemId}-${index}`} className={fresh.has(index) ? "inventory-grid__slot inventory-grid__slot--new" : "inventory-grid__slot"} title={itemName(item)}>
               <span className="inventory-grid__frame"><ItemIcon itemId={item.itemId} /></span>
+              {/* Elemento novo a cada momento (key): o brilho roda ao chegar, sem recriar o ícone. */}
+              {fresh.has(index) ? <span key={decision.decisionId} className="inventory-grid__glow" aria-hidden="true" /> : null}
               {item.quantity > 1 ? <span className="inventory-grid__count">×{item.quantity}</span> : null}
               <span className="inventory-grid__name">{itemName(item)}</span>
             </li>
@@ -58,6 +101,7 @@ function Inventory({ decision }: { decision: DecisionState }) {
           ))}
         </ul>
         {items.length === 0 ? <p className="muted">Nenhum item no inventário principal.</p> : null}
+        {before ? <InventoryChanges decision={decision} before={before} /> : null}
         <p className="inventory-grid__trinket">
           <span className="inventory-grid__trinket-frame" aria-hidden="true">{decision.inventory.trinketItemId != null ? <ItemIcon itemId={decision.inventory.trinketItemId} /> : null}</span>
           <span>Amuleto: {decision.inventory.trinketItemId != null ? itemName({ itemId: decision.inventory.trinketItemId }) : "Vazio"}</span>
@@ -222,10 +266,11 @@ function useDecisionContext(matchId: string | null, participantId: number | null
   return loaded !== null && loaded.key === key ? loaded : null;
 }
 
-function DecisionStrip({ decision, decisions, durationSeconds }: { decision: DecisionState; decisions: DecisionSummary[]; durationSeconds: number | null }) {
+/** `currentId`: o momento pedido na URL, marcado já no clique, antes de a decisão chegar. */
+function DecisionStrip({ currentId, decisions, durationSeconds }: { currentId: string; decisions: DecisionSummary[]; durationSeconds: number | null }) {
   if (decisions.length < 2) return null;
   const sorted = [...decisions].sort((a, b) => a.timestampMs - b.timestampMs);
-  const index = sorted.findIndex((d) => d.decisionId === decision.decisionId);
+  const index = sorted.findIndex((d) => d.decisionId === currentId);
   const end = Math.max(durationSeconds ? durationSeconds * 1000 : 0, sorted.at(-1)!.timestampMs);
   const previous = index > 0 ? sorted[index - 1] : null;
   const next = index >= 0 && index < sorted.length - 1 ? sorted[index + 1] : null;
@@ -239,14 +284,22 @@ function DecisionStrip({ decision, decisions, durationSeconds }: { decision: Dec
           <Link
             key={d.decisionId}
             to={{ name: "decision", decisionId: d.decisionId }}
-            className={`decision-strip__dot${d.decisionId === decision.decisionId ? " decision-strip__dot--current" : ""}${d.eligible ? " decision-strip__dot--eligible" : ""}`}
+            className={`decision-strip__dot${d.decisionId === currentId ? " decision-strip__dot--current" : ""}${d.eligible ? " decision-strip__dot--eligible" : ""}`}
             style={{ left: `${(d.timestampMs / end) * 100}%` }}
-            aria-label={`Ir para a decisão em ${formatGameTime(d.timestampMs)}${d.decisionId === decision.decisionId ? " (atual)" : ""}`}
-            aria-current={d.decisionId === decision.decisionId ? "true" : undefined}
+            aria-label={`Ir para a decisão em ${formatGameTime(d.timestampMs)}${d.decisionId === currentId ? " (atual)" : ""}`}
+            aria-current={d.decisionId === currentId ? "true" : undefined}
           >
             <span className="decision-strip__label" aria-hidden="true">{formatGameTime(d.timestampMs)}</span>
           </Link>
         ))}
+        {/* Marcador do momento atual: um só, que desliza do anterior para o novo (mostra para onde
+            e quanto se andou na partida). `--at` é a posição em % da trilha (cqw no CSS); só
+            transform anima e o marcador tem largura zero, então não alarga a página. */}
+        {index >= 0 ? (
+          <span className="decision-strip__marker" aria-hidden="true" style={{ "--at": String((sorted[index].timestampMs / end) * 100) } as CSSProperties}>
+            <span />
+          </span>
+        ) : null}
       </div>
       {next ? (
         <Link to={{ name: "decision", decisionId: next.decisionId }} className="decision-strip__step">{formatGameTime(next.timestampMs)} →</Link>
@@ -293,11 +346,22 @@ function teamsOrdered(members: MatchParticipant[]): MatchParticipant[] {
 export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
   const { hasAccount } = useAuth();
   const load = useDecision(decisionId);
-  const ready = load.status === "ready" ? load.decision : null;
-  const context = useDecisionContext(ready?.matchId ?? null, ready?.participantId ?? null);
-  useDemoNotice(ready !== null && isDemoMatchId(ready.matchId));
+  // Troca de momento: a decisão anterior fica na tela até a nova chegar (sem esvaziar a página);
+  // só uma espera longa a esmaece. O contexto é da partida e do participante, então não pisca.
+  const shown = load.status === "ready" ? load.decision : load.status === "loading" ? load.previous : null;
+  const waiting = load.status === "loading" && shown !== null;
+  const slow = useSlowWait(waiting, decisionId);
+  const context = useDecisionContext(shown?.matchId ?? null, shown?.participantId ?? null);
+  useDemoNotice(shown !== null && isDemoMatchId(shown.matchId));
+  // De que momento se veio: o inventário mostra o que mudou em relação a ele (mesmo participante).
+  const [viewed, setViewed] = useState<{ current: DecisionState | null; before: DecisionState | null }>({ current: shown, before: null });
+  if (shown !== viewed.current) setViewed({ current: shown, before: viewed.current });
+  const before = viewed.before !== null && shown !== null && viewed.current === shown
+    && viewed.before.decisionId !== shown.decisionId
+    && viewed.before.matchId === shown.matchId && viewed.before.participantId === shown.participantId
+    ? viewed.before : null;
 
-  if (load.status === "loading") {
+  if (load.status === "loading" && shown === null) {
     return (
       <section className="area-page decision-page" aria-labelledby="decision-heading">
         <h2 id="decision-heading">Decisão</h2>
@@ -319,13 +383,14 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
     );
   }
 
-  const decision = load.decision;
+  const decision = shown!;
   const reasons = decision.reasons ?? [];
   const ordinal = ordinalLabel(decision.mainItemOrdinal);
   const match = context?.match ?? null;
   const participant = match?.participants.find((p) => p.participantId === decision.participantId) ?? null;
   return (
-    <section className="area-page decision-page" aria-labelledby="decision-heading">
+    <section className="area-page decision-page" aria-labelledby="decision-heading" aria-busy={waiting} data-waiting={slow}>
+      {waiting ? <p role="status" className="sr-only">Carregando a decisão deste momento…</p> : null}
       {/* Volta direto à aba Compras da análise, onde ficam as decisões. */}
       <Link
         to={`${routeToPath({ name: "match", matchId: decision.matchId, participantId: decision.participantId })}&aba=compras`}
@@ -362,7 +427,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
           <Budget decision={decision} />
         </div>
       </header>
-      <DecisionStrip decision={decision} decisions={context?.decisions ?? []} durationSeconds={match?.durationSeconds ?? null} />
+      <DecisionStrip currentId={decisionId} decisions={context?.decisions ?? []} durationSeconds={match?.durationSeconds ?? null} />
       {reasons.length > 0 ? (
         <div className="decision-reasons" role="note">
           <p>Por que esta compra não pode ser analisada:</p>
@@ -380,11 +445,12 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
       <ItemNames version={decision.versions.dataDragonVersion}>
         {/* Situação no momento da compra: o que você tinha e contra quem. */}
         <div className="decision-grid">
-          <Inventory decision={decision} />
+          <Inventory decision={decision} before={before} />
           {match ? <TeamContext match={match} participantId={decision.participantId} /> : null}
         </div>
         {/* De onde vêm os dados: a linha do tempo oficial da Riot até esta decisão. */}
-        <DecisionTrace decisionId={decision.decisionId} />
+        {/* Id da URL: o rastro (só leitura, vale para qualquer decisão) carrega junto com a decisão. */}
+        <DecisionTrace decisionId={decisionId} />
         {decision.eligible && decision.versions.reconstructionRulesHealth !== "SUSPENDED" ? (
           hasAccount ? <DecisionExperience decisionId={decision.decisionId} /> : (
             <AccountGate

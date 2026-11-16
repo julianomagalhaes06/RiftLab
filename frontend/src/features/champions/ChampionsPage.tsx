@@ -6,6 +6,7 @@ import { Link } from "../../shared/router/Link";
 import { ChampionBadge } from "../matches/ChampionBadge";
 import { ItemNames } from "../../shared/ui/ItemNames";
 import { useItemName } from "../../shared/hooks/useItemName";
+import { useSlowWait } from "../../shared/hooks/useSlowWait";
 import "./champions.css";
 import { count } from "../../shared/text/count";
 import { championName, championSplashUrl } from "../matches/format";
@@ -33,12 +34,34 @@ function LocalizedItemPortrait({ item }: { item: NonNullable<ChampionPatterns["p
   </span>;
 }
 
-/** Arte decorativa atrás do cabeçalho; some se falhar (fica o fundo neutro). */
-function ChampionSplash({ src }: { src: string }) {
-  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
-  if (state === "failed") return null;
-  return <img className="champion-overview__art" data-state={state} src={src} alt="" decoding="async"
-    referrerPolicy="no-referrer" onLoad={() => setState("ready")} onError={() => setState("failed")} />;
+// `id` único por camada: voltar a um campeão cria outra imagem, que dispara onLoad e entra em fade
+// (reaproveitar a antiga a deixaria presa em "loading", invisível sob a arte do outro campeão).
+type SplashLayer = { id: number; src: string; state: "loading" | "ready" | "failed" };
+
+/** Começa a baixar a arte no clique, antes de a resposta da API trocar o cabeçalho. */
+function preloadSplash(src: string | null) {
+  if (src) new Image().src = src;
+}
+
+/** Arte decorativa atrás do cabeçalho. Na troca de campeão, a anterior fica até a nova carregar e
+ * a nova entra por cima, em fade (no máximo duas camadas). Se a nova falhar, fica o fundo neutro,
+ * nunca a arte de outro campeão. */
+function ChampionSplash({ src }: { src: string | null }) {
+  const [layers, setLayers] = useState<SplashLayer[]>(() => (src ? [{ id: 1, src, state: "loading" }] : []));
+  if ((layers.at(-1)?.src ?? null) !== src) {
+    const shown = layers.filter((layer) => layer.state === "ready").at(-1);
+    const id = Math.max(0, ...layers.map((layer) => layer.id)) + 1;
+    // Voltar ao campeão cuja arte ainda está visível só descarta a que estava carregando.
+    setLayers(!src ? [] : shown?.src === src ? [shown] : [...(shown ? [shown] : []), { id, src, state: "loading" }]);
+  }
+  const settle = (id: number, state: SplashLayer["state"]) => setLayers((current) => {
+    const layer = current.find((candidate) => candidate.id === id);
+    if (!layer) return current;
+    return state === "failed" ? [{ ...layer, state }] : current.map((candidate) => (candidate.id === id ? { ...layer, state } : candidate));
+  });
+  return <>{layers.map((layer) => layer.state === "failed" ? null :
+    <img key={layer.id} className="champion-overview__art" data-state={layer.state} src={layer.src} alt="" decoding="async"
+      referrerPolicy="no-referrer" onLoad={() => settle(layer.id, "ready")} onError={() => settle(layer.id, "failed")} />)}</>;
 }
 
 /** Anel de frequência do trajeto (decorativo: o número fica no texto ao lado). */
@@ -73,9 +96,12 @@ export function ChampionsPage() {
     });
     return () => controller.abort();
   }, [championId, patch, phase, queryKey, retry]);
+  // Enquanto o filtro novo carrega, o anterior continua na tela: troca direto se a resposta vier
+  // logo; esmaece só se demorar (sem animar o texto, que piscava a cada troca).
   const data = result?.data ?? null;
   const loading = result?.key !== queryKey;
   const failed = loading && errorKey === queryKey;
+  const slow = useSlowWait(loading, queryKey);
   const chosen = data?.champions.find((champion) => champion.championId === data.championId);
   const selected = championId ?? data?.championId;
   const roster = (data?.champions ?? []).filter((c) => c.matches > 0 || c.championId === selected);
@@ -109,9 +135,12 @@ export function ChampionsPage() {
           {roster.map((champion) => {
             const pressed = champion.championId === (championId ?? data.championId);
             return <li key={champion.championId} className={pressed ? "champion-tile result-bar is-selected" : "champion-tile"}>
-              <button type="button" aria-pressed={pressed} onClick={() => update("champion", String(champion.championId))}>
+              <button type="button" aria-pressed={pressed} onClick={() => {
+                preloadSplash(championSplashUrl(champion.champion?.imageFile));
+                update("champion", String(champion.championId));
+              }}>
                 <ChampionBadge participant={champion} size={72} />
-                <small>{loading ? "Carregando…" : champion.matches ? count(champion.matches, "partida", "partidas") : "Sem partidas"}</small>
+                <small>{champion.matches ? count(champion.matches, "partida", "partidas") : "Sem partidas"}</small>
               </button>
             </li>;
           })}
@@ -144,10 +173,10 @@ export function ChampionsPage() {
         </details>
       </div>
 
-      <div className="champions-content" aria-live="polite" aria-busy={loading}>
-        {loading ? <p role="status">Carregando padrões deste filtro…</p> : <>
+      {loading ? <p role="status" className="sr-only">Carregando padrões deste filtro…</p> : null}
+      <div className="champions-content" data-waiting={slow} aria-live="polite" aria-busy={loading}>
         <section className="champion-overview" data-art={splash ? "splash" : "none"}>
-          {splash ? <ChampionSplash key={splash} src={splash} /> : null}
+          <ChampionSplash src={splash} />
           <div className="champion-overview__inner">
             <p className="champion-overview__meta">
               <GameIcon name="crosshair" size={16} /> Atirador · rota inferior <span aria-hidden="true">·</span> Patch {patchLabel(data.patch, data.currentPatch)}
@@ -220,7 +249,6 @@ export function ChampionsPage() {
           </details>
         </section>
         </div>
-        </>}
       </div>
     </>}
   </div>;

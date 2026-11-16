@@ -332,6 +332,19 @@ Revisão com as skills better-ui e ui-ux-pro-max (09/11/2026), conferida em
 - Ícones de 24 unidades usam traço 1.8.
 - Imagens de item recebem o mesmo contorno de 1 px do retrato (`--portrait-outline`).
 - Cartão flutuante entra em 0,28 s (12 px) e sai em 0,2 s (8 px), ambos `ease-out`.
+- Troca de conteúdo na mesma tela (campeão, patch, etapa, momento da decisão): o conteúdo anterior
+  fica na tela e o novo entra direto, sem animar o texto. Só uma espera acima de 250 ms
+  (`useSlowWait`, atributo `data-waiting`) esmaece o anterior para 0,6 (o novo volta a 1 em 200 ms).
+  A seleção (retrato, ponto da faixa de momentos) marca o escolhido já no clique. Trocar de momento
+  na decisão não remonta a tela nem volta ao topo.
+- Na decisão, o conteúdo troca seco de propósito: uma interrupção entre dois momentos esconde o que
+  mudou. O movimento fica onde tem significado: o marcador da faixa desliza do momento anterior para
+  o novo (220 ms, só `transform`, largura zero em `cqw` para não alargar a página) e os itens que
+  entraram no inventário brilham em dourado (`--glow-gold`, 1,4 s, só opacidade, terminando num
+  contorno discreto). A diferença também vai em texto ("Em relação a 10:31: a mais …; a menos …"),
+  para não depender da cor. A splash anterior fica até a nova carregar, que entra por cima em fade.
+  Entrada de imagem que depende de `onLoad` usa `@keyframes`, não transição: com a imagem em cache,
+  o load chega antes do primeiro desenho em `loading` e a transição não roda.
 
 ## Ativos
 

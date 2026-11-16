@@ -256,7 +256,7 @@ for (const width of [360, 1000, 1280]) {
     await noHorizontalScroll(page);
     const texts: Array<[string, number]> = [[".champion-overview__meta", 4.5], [".champion-overview h3 .champion__name", 4.5], [".champion-stats dd", 4.5], [".champion-stats dt", 4.5]];
     const colors = await page.evaluate((list) => list.map(([selector]) => getComputedStyle(document.querySelector(selector)!).color), texts);
-    await page.addStyleTag({ content: ".champion-overview__inner * { color: transparent !important; } .champion-overview__inner .champion__portrait, .champion-overview__inner .game-icon { visibility: hidden; } .champion-overview__art { transition: none !important; scale: 1 !important; }" });
+    await page.addStyleTag({ content: ".champion-overview__inner * { color: transparent !important; } .champion-overview__inner .champion__portrait, .champion-overview__inner .game-icon { visibility: hidden; } .champion-overview__art { transition: none !important; animation: none !important; scale: 1 !important; }" });
     for (const [index, [selector, minimum]] of texts.entries()) {
       const ratio = await contrastOverBackground(page, selector, colors[index]);
       expect(ratio, `${selector}: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(minimum);

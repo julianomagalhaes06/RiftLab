@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMockApi,
@@ -338,5 +338,54 @@ describe("decisão reconstruída com regras herdadas", () => {
     });
     await screen.findByRole("heading", { name: /^Decisão em 7:52/ });
     expect(screen.queryByText(/aplicadas por herança/)).not.toBeInTheDocument();
+  });
+});
+
+describe("troca de momento na decisão", () => {
+  it("mantém a decisão anterior na tela, marca o momento novo e não volta ao topo", async () => {
+    let release: () => void = () => undefined;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const later = {
+      decisionId: DECISION_2,
+      timestampMs: 905_000,
+      inventory: {
+        items: [
+          { itemId: 100001, quantity: 1, name: "Componente Sintético A" },
+          { itemId: 100003, quantity: 1, name: "Lâmina Sintética" },
+        ],
+        trinketItemId: null,
+      },
+    };
+    setup(`/decisions/${DECISION_1}`, (mock) => {
+      mock.on("GET", /^\/api\/v1\/decisions\/[^/]+$/, async ({ path }) => {
+        if (!path.endsWith(DECISION_2)) return json(200, decisionState());
+        await pending;
+        return json(200, decisionState(later));
+      });
+      mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008$/, () => json(200, matchDetail()));
+      mock.on("GET", /^\/api\/v1\/matches\/DEMO-0008\/decisions$/, () =>
+        json(200, { items: [decisionSummary(), decisionSummary(later)], nextCursor: null }));
+    });
+    await screen.findByRole("heading", { level: 2, name: /em 7:52/ });
+    // Entrada direta: não há de onde comparar.
+    expect(screen.queryByText(/Em relação a/)).not.toBeInTheDocument();
+    const scrollTo = vi.spyOn(window, "scrollTo");
+    fireEvent.click(await screen.findByRole("link", { name: "Ir para a decisão em 15:05" }));
+    // Durante a espera: a faixa já marca 15:05 e a decisão de 7:52 continua (sem esvaziar a página).
+    expect(await screen.findByRole("link", { name: "Ir para a decisão em 15:05 (atual)" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("heading", { level: 2, name: /em 7:52/ })).toBeInTheDocument();
+    expect(document.querySelector(".decision-page")).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByText("Carregando a decisão…")).not.toBeInTheDocument();
+    release();
+    expect(await screen.findByRole("heading", { level: 2, name: /em 15:05/ })).toBeInTheDocument();
+    expect(document.querySelector(".decision-page")).toHaveAttribute("aria-busy", "false");
+    expect(scrollTo).not.toHaveBeenCalled();
+    // O que mudou desde 7:52: em texto e, no inventário, só o item que entrou fica marcado.
+    const inventory = screen.getByRole("region", { name: "Inventário antes da decisão" });
+    expect(within(inventory).getByText(/^Em relação a 7:52:/)).toHaveTextContent(/^Em relação a 7:52: a mais Lâmina Sintética; a menos .+\.$/);
+    const fresh = inventory.querySelectorAll(".inventory-grid__slot--new");
+    expect([...fresh].map((slot) => slot.getAttribute("title"))).toEqual(["Lâmina Sintética"]);
+    // Marcador único da faixa na posição de 15:05 (905 s de 1800 s).
+    expect(document.querySelector<HTMLElement>(".decision-strip__marker")?.style.getPropertyValue("--at")).toMatch(/^50\.27\d*$/);
   });
 });

@@ -149,6 +149,8 @@
   --glow-accent: rgb(139 108 255 / .5);
   --glow-accent-soft: rgb(139 108 255 / .16);
   --glow-win: rgb(61 214 140 / .3);
+  /* Brilho decorativo (sem texto por cima) do item que entrou no inventário; tom do --gold. */
+  --glow-gold: rgb(200 170 110 / .55);
   --gold: #c8aa6e;
   --gold-deep: #6b5126;
   --gold-ink: #f0dfb4;
