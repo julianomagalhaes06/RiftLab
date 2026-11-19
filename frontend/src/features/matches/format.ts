@@ -230,3 +230,9 @@ export function championSplashUrl(imageFile: string | null | undefined): string 
   const key = imageFile?.replace(/\.png$/, "");
   return key && /^[A-Za-z0-9]+$/.test(key) ? `${SPLASH_BASE}/${key}_0.jpg` : null;
 }
+
+/** CC-1504: a herança suspensa pelo inventário completo só bloqueia a análise quando a
+ * conferência restrita aos itens principais e componentes também não aprova. */
+export function rulesBlockAnalysis(health?: string | null, mainVerdict?: string | null): boolean {
+  return health === "SUSPENDED" && mainVerdict !== "ACCEPT";
+}

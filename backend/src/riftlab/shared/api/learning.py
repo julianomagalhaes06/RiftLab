@@ -66,6 +66,9 @@ class LearningAttemptPublicState(CamelModel):
     hints: list[LearningAttemptHint] = Field(default_factory=list)
     comparison: AnalysisResult | None = None  # só depois de REVEALED
     historical_item_id: int | None = None  # compra histórica, só depois de REVEALED
+    # CC-1501: compromisso da compra (classificação FORCED/SHARED/OPEN, parte já paga, início
+    # do caminho), só depois de REVEALED.
+    commitment: dict[str, Any] | None = None
     mode: Literal["STUDY", "TRANSFER"] = "STUDY"
     reflection: str | None = None  # CC-505: registrada uma vez, depois da revelação
 
@@ -74,7 +77,10 @@ class LearningAttemptPublicState(CamelModel):
         has_analysis = self.analysis_id is not None
         revealed = self.status == LearningAttemptState.REVEALED
         if (
-            has_analysis or self.comparison is not None or self.historical_item_id
+            has_analysis
+            or self.comparison is not None
+            or self.historical_item_id
+            or self.commitment is not None
         ) and not revealed:
             raise ValueError(
                 "analysisId so pode aparecer apos REVEALED (docs/domain-model.md: "

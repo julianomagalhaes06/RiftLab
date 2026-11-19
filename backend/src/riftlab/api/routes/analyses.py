@@ -19,7 +19,12 @@ from riftlab.analyses.application import create_analysis, get_analysis
 from riftlab.errors import ProblemDetail
 from riftlab.reviews.application import submit_feedback
 from riftlab.reviews.report import build_report, render_html
-from riftlab.shared.api.analyses import AnalysisRequest, AnalysisResult
+from riftlab.shared.api.analyses import (
+    AnalysisRequest,
+    AnalysisResult,
+    ExplanationRequest,
+    ExplanationResult,
+)
 from riftlab.shared.api.enums import ReportFormat
 from riftlab.shared.api.feedback import FeedbackRequest, FeedbackResult
 
@@ -53,7 +58,11 @@ async def post_analysis(
 ) -> AnalysisResult:
     payload = body.model_dump(mode="json", by_alias=True, exclude_none=True)
     result, created = await create_analysis(
-        request.app.state.session_factory, payload, idempotency_key, _configs(request)
+        request.app.state.session_factory,
+        payload,
+        idempotency_key,
+        _configs(request),
+        artifacts_dir=Path(request.app.state.settings.late_artifacts_dir),
     )
     if not created:
         response.status_code = 200
@@ -65,6 +74,31 @@ async def read_analysis(analysis_id: uuid.UUID, request: Request) -> AnalysisRes
     return AnalysisResult.model_validate(
         await get_analysis(request.app.state.session_factory, analysis_id)
     )
+
+
+@router.post(
+    "/{analysis_id}/explanation",
+    response_model=ExplanationResult,
+    responses=_ERRORS,
+    summary="Por que esta recomendação: resposta fundamentada nos fatos da decisão",
+)
+async def post_explanation(
+    analysis_id: uuid.UUID, body: ExplanationRequest, request: Request
+) -> ExplanationResult:
+    """CC-1505 (late game): fatos recuperados (análise, gatilhos, cartões, situações parecidas,
+    itens e habilidades) e até 4 frases, cada uma com as fontes. Sem gravação; a pergunta não é
+    registrada."""
+    from riftlab.knowledge.service import explain_analysis, explainer_from_settings
+
+    settings = request.app.state.settings
+    result = await explain_analysis(
+        request.app.state.session_factory,
+        analysis_id,
+        body.question,
+        _configs(request),
+        explainer=explainer_from_settings(settings),
+    )
+    return ExplanationResult.model_validate(result)
 
 
 @router.post(

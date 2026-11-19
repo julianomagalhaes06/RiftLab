@@ -279,3 +279,44 @@ fieldset legend {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 }
+
+/* Late game (CC-1504/1505): papéis do item na decisão, explicação com fontes e compromisso. */
+.late-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.late-tag {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 1px 10px;
+  font-size: .85rem;
+  color: var(--color-muted);
+}
+
+.late-tag--deviation {
+  border-color: var(--accent-strong);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.late-explanation__answer {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: 1.1rem;
+}
+
+.late-explanation__sources {
+  color: var(--color-muted);
+  font-size: .85rem;
+}
+
+.late-explanation__form {
+  margin-top: var(--space-3);
+}
+
+.late-explanation__form .button {
+  justify-self: start;
+}

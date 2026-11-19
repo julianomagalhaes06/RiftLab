@@ -69,6 +69,7 @@ def test_openapi_only_announces_real_routes() -> None:
         "/api/v1/learning-attempts/{attempt_id}/reveal",
         "/api/v1/objectives/interpret",
         "/api/v1/analyses/{analysis_id}/feedback",
+        "/api/v1/analyses/{analysis_id}/explanation",
         "/api/v1/analyses/{analysis_id}/report",
         "/api/v1/learning-attempts/progress",
         "/api/v1/learning-attempts/gamification",

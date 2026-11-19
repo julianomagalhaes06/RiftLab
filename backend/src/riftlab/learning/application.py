@@ -71,12 +71,15 @@ def _public(row: LearningAttemptModel, extra: dict[str, Any] | None = None) -> d
         "analysisId": str(row.analysis_id) if revealed and row.analysis_id else None,
         "comparison": (extra or {}).get("comparison") if revealed else None,
         "historicalItemId": (extra or {}).get("historicalItemId") if revealed else None,
+        "commitment": (extra or {}).get("commitment") if revealed else None,
         "mode": row.mode,
         "reflection": row.reflection,
     }
 
 
-async def _extra(session: AsyncSession, row: LearningAttemptModel) -> dict[str, Any]:
+async def _extra(
+    session: AsyncSession, row: LearningAttemptModel, configs: Path | None = None
+) -> dict[str, Any]:
     point = await session.get(DecisionPointModel, row.decision_id)
     assert point is not None
     values = (point.features or {}).get("values", {})
@@ -109,6 +112,12 @@ async def _extra(session: AsyncSession, row: LearningAttemptModel) -> dict[str, 
     extra: dict[str, Any] = {"context": context, "threatHints": threat}
     if row.status == "REVEALED":
         extra["historicalItemId"] = point.target_item_id
+        # CC-1501: quando a escolha foi feita e quanto do item já estava pago ao terminar.
+        from riftlab.decisions.commitment_view import commitment_summary
+
+        extra["commitment"] = (
+            await commitment_summary(session, point, configs) if configs is not None else None
+        )
     return extra
 
 
@@ -131,7 +140,7 @@ async def create_attempt(
         if existing is not None:
             if existing.request_sha256 != digest or existing.user_id != owner:
                 raise ConflictError("IDEMPOTENCY_CONFLICT")
-            return _public(existing, await _extra(session, existing)), False
+            return _public(existing, await _extra(session, existing, configs)), False
         decision_id = uuid.UUID(str(body["decisionId"]))
         analysis = await _compute(session, decision_id, body, configs)
     attempt_id = uuid.uuid4()
@@ -168,7 +177,7 @@ async def create_attempt(
     async with session_factory() as session:
         stored = await session.get(LearningAttemptModel, attempt_id)
         assert stored is not None
-        return _public(stored, await _extra(session, stored)), True
+        return _public(stored, await _extra(session, stored, configs)), True
 
 
 async def _load(
@@ -198,7 +207,7 @@ async def get_attempt(
 ) -> dict[str, Any]:
     async with session_factory() as session:
         row = await _load(session, attempt_id, owner)
-        extra = await _extra(session, row)
+        extra = await _extra(session, row, configs)
         if row.status == "REVEALED" and row.analysis_id is not None:
             from riftlab.analyses.application import get_analysis
 

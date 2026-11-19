@@ -29,8 +29,13 @@ vitória.
   elo, e histórico das partidas ranqueadas atualizado automaticamente.
 - **Revisão da partida:** placar com os nicks dos jogadores, trajeto de compras por ida à loja,
   ordem de habilidades, gráfico de ouro, momentos-chave e chance de vitória ao longo do jogo.
-- **Análise de decisão de compra:** estado do inventário e da partida no momento da compra e
-  até três alternativas comparadas, com custo, justificativa e confiança.
+- **Análise de decisão de compra:** estado do inventário e da partida no momento em que a
+  escolha foi feita (a primeira compra depois do item anterior, não o instante em que o item
+  ficou pronto) e até três alternativas comparadas, com custo, justificativa e confiança.
+- **Late game para qualquer campeão:** do 3º ao 6º item principal, o padrão do campeão naquela
+  etapa e o que a partida pede além dele (itens dos inimigos, cura, controle de grupo, quem
+  matou você, placar), com os gatilhos de cada desvio e uma explicação com fontes que pode ser
+  perguntada em texto livre.
 - **Modo estudo:** o jogador escolhe antes de ver a análise, pode pedir pistas e registra uma
   reflexão sobre a decisão.
 - **Objetivo estratégico:** o jogador descreve o que queria fazer na partida, por formulário ou
@@ -47,8 +52,10 @@ vitória.
 
 A aplicação importa as partidas pela API oficial da Riot Games, reconstrói o estado de cada
 jogador minuto a minuto e gera as alternativas a partir do catálogo de itens do patch da
-partida. Um modelo treinado com partidas reais ordena as alternativas, e uma interface web
-apresenta a revisão.
+partida. Do 3º item principal em diante, um modelo treinado com partidas reais de todos os
+campeões compara o padrão do campeão com o contexto da partida; a explicação usa só fatos
+recuperados (descrições oficiais, cartões revisados e situações parecidas) e é conferida antes
+de aparecer. Uma interface web apresenta a revisão.
 
 Tecnologias: Python (FastAPI), PostgreSQL, React com TypeScript, Docker.
 
@@ -98,6 +105,7 @@ docker compose run --rm api admin grant voce@exemplo.com   # revoke para tirar, 
 - [Requisitos](docs/requirements.md)
 - [Arquitetura](docs/architecture.md)
 - [Contratos da API](docs/contracts.md)
+- [Late game e explicação com fontes](docs/late-game.md)
 - [Padrão visual](docs/design-system.md)
 - [Detalhes de implementação e entrega](docs/detalhes-entrega.md)
 

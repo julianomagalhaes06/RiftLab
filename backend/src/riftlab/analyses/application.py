@@ -9,6 +9,7 @@ same body returns the stored result; a different body is a 409.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import uuid
@@ -30,8 +31,9 @@ from riftlab.candidates.rules import resolve_catalog_item_rules
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
 from riftlab.dataset.rows import RowsError, _catalog
 from riftlab.decisions.domain import IncompatibleStateError
-from riftlab.decisions.features import build_pre_decision_view
+from riftlab.decisions.features import PreDecisionView, build_pre_decision_view
 from riftlab.decisions.models import DecisionPointModel
+from riftlab.decisions.tolerance import tolerate
 from riftlab.ingestion.models import MatchModel
 from riftlab.ml.registry import resolve_active
 from riftlab.ranking.engine import (
@@ -52,7 +54,8 @@ from riftlab.shared.errors import ConflictError, NotFoundError
 from riftlab.timeline.health import health_for_state
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
 
-ALGORITHM_VERSION = "analysis_v1"
+LATE_FROM_ORDINAL = 3
+ALGORITHM_VERSION = "analysis_v2"  # v2 (CC-1501/1504): âncora de compromisso e late game
 FLEX_QUEUE = 440
 REGISTRY_TASK = "purchase_decision"  # escopo do registro = patch do catálogo
 
@@ -177,7 +180,13 @@ def _empty(
 
 
 async def _compute(
-    session: AsyncSession, decision_id: uuid.UUID, body: dict[str, Any], configs: Path
+    session: AsyncSession,
+    decision_id: uuid.UUID,
+    body: dict[str, Any],
+    configs: Path,
+    *,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+    artifacts_dir: Path | None = None,
 ) -> dict[str, Any]:
     objective = body["objective"]
     point = await session.get(DecisionPointModel, decision_id)
@@ -201,18 +210,50 @@ async def _compute(
         return _empty(
             decision_id, objective, "INSUFFICIENT_EVIDENCE", ["INVALID_STATE"], catalog_label
         )
+    # CC-1501: o contexto vem da âncora de compromisso (primeira compra depois do item
+    # principal anterior). Extrações anteriores à seleção v3 não têm âncora: instante da compra.
+    anchor = point.anchor if isinstance(point.anchor, dict) else None
+    view_state = state
+    if anchor is not None:
+        anchor_state = await SqlAlchemyTimelineRepository(session).get_decision_state(
+            uuid.UUID(str(anchor["stateId"]))
+        )
+        if anchor_state is None:
+            return _empty(
+                decision_id,
+                objective,
+                "INSUFFICIENT_EVIDENCE",
+                ["ANCHOR_STATE_MISSING"],
+                catalog_label,
+            )
+        view_state = anchor_state
     try:
-        view = build_pre_decision_view(state)
+        view: PreDecisionView = build_pre_decision_view(view_state)
     except IncompatibleStateError as exc:
         # Estado de outra versão da reconstrução (partida preparada antes de a versão mudar) ou
         # malformado: análise sem alternativas e com o motivo, nunca erro 500 (CC-1207).
         return _empty(decision_id, objective, "INSUFFICIENT_EVIDENCE", [exc.code], catalog_label)
+    tolerated_inventory = False
+    if anchor is not None:
+        tolerated = tolerate(view, bundle.classification)
+        if tolerated is None:
+            return _empty(
+                decision_id,
+                objective,
+                "INSUFFICIENT_EVIDENCE",
+                ["INVENTORY_UNCERTAIN"],
+                catalog_label,
+            )
+        view, tolerated_inventory = tolerated.view, tolerated.tolerated
     provenance = state.quality.get("empiricalRules") or []
     match = await session.get(MatchModel, point.match_id)
     queue = match.queue if match is not None else None
     health = await health_for_state(session, patch, point.reconstruction_version, provenance, queue)
     inherited = any(r.get("application") == "INHERITED" for r in provenance)
-    if inherited and health["status"] == "SUSPENDED":
+    # CC-1504: a análise só depende de itens principais e componentes. Se a conferência
+    # restrita a eles aprova a herança, a suspensão pelo inventário completo não bloqueia.
+    main_items_confirmed = inherited and health.get("mainVerdict") == "ACCEPT"
+    if inherited and health["status"] == "SUSPENDED" and not main_items_confirmed:
         return _empty(
             decision_id,
             objective,
@@ -220,6 +261,7 @@ async def _compute(
             ["INHERITED_RULES_SUSPENDED"],
             catalog_label,
         )
+    suspended_but_main = inherited and health["status"] == "SUSPENDED"
     budget = body.get("budget")
     try:
         result = enumerate_candidates(
@@ -258,7 +300,31 @@ async def _compute(
         )
         for c in result.candidates
     ]
-    decision = DecisionFacts(champion, point.main_item_ordinal, None, None)
+    if (
+        anchor is not None
+        and (point.main_item_ordinal or 0) >= LATE_FROM_ORDINAL
+        and session_factory is not None
+    ):
+        late = await _late_result(
+            session,
+            session_factory,
+            point,
+            view,
+            result,
+            bundle,
+            objective,
+            configs,
+            artifacts_dir,
+            catalog_label,
+            item_rules,
+            tolerated_inventory,
+            body.get("budget"),
+            suspended_but_main,
+        )
+        if late is not None:
+            return late
+    enemy_physical, enemy_magic = await _composition(session, point, configs, patch)
+    decision = DecisionFacts(champion, point.main_item_ordinal, enemy_physical, enemy_magic)
     own_popularity, rules, objective_cfg = load_default(configs, patch)
     (
         popularity,
@@ -288,6 +354,10 @@ async def _compute(
             reason_codes.append("INHERITED_RULES_UNVERIFIED")
     if item_rules.inherited_from is not None:
         reason_codes.append("ITEM_RULES_INHERITED")
+    if tolerated_inventory:
+        reason_codes.append("INVENTORY_TOLERATED_NON_MAIN")
+    if suspended_but_main:
+        reason_codes.append("RULES_CONFIRMED_FOR_MAIN_ITEMS")
     # CC-804: regras confirmadas só em Solo/Duo aplicadas no Flex sem medição própria
     # suficiente; um ACCEPT da fila 440 dispensa o aviso.
     if (
@@ -342,6 +412,8 @@ async def create_analysis(
     body: dict[str, Any],
     idempotency_key: str,
     configs: Path,
+    *,
+    artifacts_dir: Path | None = None,
 ) -> tuple[dict[str, Any], bool]:
     """(result, created). Raises ConflictError on a divergent body for the same key."""
     digest = request_hash(body)
@@ -354,7 +426,14 @@ async def create_analysis(
                 raise ConflictError("IDEMPOTENCY_CONFLICT")
             return {"analysisId": str(existing.id), **existing.result}, False
         decision_id = uuid.UUID(str(body["decisionId"]))
-        result = await _compute(session, decision_id, body, configs)
+        result = await _compute(
+            session,
+            decision_id,
+            body,
+            configs,
+            session_factory=session_factory,
+            artifacts_dir=artifacts_dir,
+        )
     patch = str(result["versions"].get("catalog", "")).split("/")[0]
     active = await resolve_active(session_factory, REGISTRY_TASK, patch)
     registry_version = active.version_id
@@ -376,7 +455,9 @@ async def create_analysis(
                 )
             )
     except IntegrityError:
-        return await create_analysis(session_factory, body, idempotency_key, configs)
+        return await create_analysis(
+            session_factory, body, idempotency_key, configs, artifacts_dir=artifacts_dir
+        )
     return {"analysisId": str(analysis_id), **result}, True
 
 
@@ -388,3 +469,232 @@ async def get_analysis(
     if row is None:
         raise NotFoundError(f"análise {analysis_id} não encontrada")
     return {"analysisId": str(row.id), **row.result}
+
+
+async def _composition(
+    session: AsyncSession, point: DecisionPointModel, configs: Path, patch: str
+) -> tuple[int | None, int | None]:
+    """Inimigos de dano físico (atirador, lutador, assassino) e mágico (mago), pelas tags dos
+    perfis de campeão do patch; (None, None) sem perfis (o termo de composição fica de fora)."""
+    from riftlab.decisions.domain import ParticipantView
+    from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+    from riftlab.profiles.domain import load_profiles
+
+    profiles = load_profiles(configs, patch)
+    if profiles is None:
+        return None, None
+    participants = [
+        ParticipantView.from_participant(p)
+        for p in await SqlAlchemyIngestionRepository(session).list_participants(point.match_id)
+    ]
+    me = next((p for p in participants if p.participant_id == point.participant_id), None)
+    if me is None:
+        return None, None
+    enemies = [profiles.champions.get(p.champion_id) for p in participants if p.team != me.team]
+    if any(e is None for e in enemies):
+        return None, None
+    physical = sum(bool({"Marksman", "Fighter", "Assassin"} & set(e.tags)) for e in enemies if e)
+    magic = sum("Mage" in e.tags for e in enemies if e)
+    return physical, magic
+
+
+async def _late_result(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    point: DecisionPointModel,
+    view: PreDecisionView,
+    candidates: Any,
+    bundle: Any,
+    objective: dict[str, Any],
+    configs: Path,
+    artifacts_dir: Path | None,
+    catalog_label: str,
+    item_rules: Any,
+    tolerated_inventory: bool,
+    budget: Any,
+    suspended_but_main: bool = False,
+) -> dict[str, Any] | None:
+    """Análise do 3º item principal em diante (CC-1504). None quando o patch não tem padrão de
+    late game nem herdável: a análise segue pelo caminho antigo."""
+    from riftlab.ranking.late_engine import late_candidates, load_setup
+
+    prices = {item.item_id: item.price for item in bundle.items}
+    if artifacts_dir is None:
+        import os
+
+        artifacts_dir = Path(os.environ.get("RIFTLAB_LATE_ARTIFACTS_DIR", "/app/artifacts/late"))
+    setup = load_setup(configs, artifacts_dir, bundle.catalog.game_patch, prices)
+    if setup is None:
+        return None
+    built = await late_context(
+        session, session_factory, point, setup.profiles, anchor_ms=view.event_timestamp_ms
+    )
+    assert built is not None
+    context, me, _, _ = built
+    items = {item.item_id: item for item in bundle.items}
+    row = {
+        "championId": me.champion_id,
+        "role": me.role,
+        "ordinal": point.main_item_ordinal,
+        "candidates": [
+            {
+                "itemId": c.item_id,
+                "remainingCost": c.remaining_cost,
+                "ownedComponent": "OWNED_COMPONENT_COMPATIBLE" in c.evidence_codes,
+            }
+            for c in candidates.candidates
+        ],
+        "context": context,
+    }
+    names: dict[int, str | None] = {i: items[i].attributes.get("name") for i in items}
+    names.update(_portuguese_names(configs, bundle.catalog.game_patch))
+    engine, ranked, block = late_candidates(
+        setup,
+        row,
+        names,
+        {i: tuple(items[i].attributes.get("tags") or ()) for i in items},
+        {c.item_id: c.remaining_cost for c in candidates.candidates},
+        {c.item_id: c.affordability.value for c in candidates.candidates},
+        {c.item_id: c.evidence_codes for c in candidates.candidates},
+    )
+    _, _, objective_cfg = load_default(configs, bundle.catalog.game_patch)
+    if objective.get("priority") not in (None, "BALANCED") and ranked:
+        # Mesmo reordenamento explícito do formulário (CC-304), sobre a probabilidade.
+        for entry in ranked:
+            entry["score"] = round(
+                entry["probability"]
+                * (
+                    1
+                    + objective_cfg.weight
+                    * objective_cfg.bonus(objective["priority"], _facts(entry))
+                ),
+                6,
+            )
+        ranked.sort(key=lambda e: (-e["score"], e["itemId"]))
+        for rank, entry in enumerate(ranked, start=1):
+            entry["rank"] = rank
+    reason_codes = ["LATE_MODEL_GATE_FAILED"] if not block.get("gatePassed") else []
+    if block.get("sourcePatch") != bundle.catalog.game_patch:
+        reason_codes.append("LATE_MODEL_INHERITED")
+    if tolerated_inventory:
+        reason_codes.append("INVENTORY_TOLERATED_NON_MAIN")
+    if suspended_but_main:
+        reason_codes.append("RULES_CONFIRMED_FOR_MAIN_ITEMS")
+    if item_rules.inherited_from is not None:
+        reason_codes.append("ITEM_RULES_INHERITED")
+    gold = (point.budget or {}).get("value") if isinstance(point.budget, dict) else None
+    return {
+        "decisionId": str(point.id),
+        "status": "AVAILABLE" if ranked else "INSUFFICIENT_EVIDENCE",
+        "engine": engine,
+        "objective": objective,
+        "versions": {
+            "model": None,
+            "catalog": catalog_label,
+            "features": "situation_v1",
+            "candidates": ALGORITHM_VERSION,
+            "ranking": f"{setup.artifact.metadata.get('version')}/{block.get('sourcePatch')}",
+            "objective": objective_cfg.version,
+            "itemRules": f"{item_rules.inherited_from}.json (herdado)"
+            if item_rules.inherited_from
+            else f"{bundle.catalog.game_patch}.json",
+        },
+        "quality": {
+            "budgetSource": "USER_PROVIDED"
+            if budget
+            else (point.budget or {}).get("origin", "UNKNOWN"),
+            "frameAgeMs": (point.budget or {}).get("ageMs"),
+            "warnings": [] if gold is not None or budget else ["BUDGET_UNKNOWN"],
+            "userGold": int(budget["gold"]) if budget else None,
+        },
+        "support": {
+            "level": "SUPPORTED" if block.get("gatePassed") and not reason_codes else "LIMITED",
+            "reasonCodes": reason_codes or ([] if ranked else ["NO_LEGAL_CANDIDATES"]),
+            "legalCandidates": len(candidates.candidates),
+            "referenceDecisions": block.get("championSupport"),
+            "referenceSource": None,
+        },
+        "candidates": ranked,
+        "late": block,
+        "scoreNote": "Probabilidades estimadas entre os itens plausíveis desta decisão; o padrão "
+        "é a frequência do item para o campeão nesta etapa da build.",
+    }
+
+
+def _facts(entry: dict[str, Any]) -> CandidateFacts:
+    return CandidateFacts(
+        entry["itemId"],
+        entry.get("name"),
+        entry["remainingCost"],
+        entry["affordability"],
+        tuple(entry.get("evidenceCodes") or ()),
+        tuple(entry.get("tags") or ()),
+    )
+
+
+async def late_context(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    point: DecisionPointModel,
+    profiles: Any,
+    *,
+    anchor_ms: int | None = None,
+) -> tuple[dict[str, Any], Any, list[int], dict[int, str | None]] | None:
+    """Contexto situacional da decisão na âncora (o mesmo da análise e do treino), o
+    participante, os campeões inimigos e os nomes dos itens do catálogo da decisão."""
+    from riftlab.decisions.domain import ParticipantView
+    from riftlab.ingestion.repository import SqlAlchemyIngestionRepository
+    from riftlab.matches.timeline import get_match_timeline
+    from riftlab.ml.situation import SituationInput, situation_features
+
+    anchor = point.anchor if isinstance(point.anchor, dict) else None
+    if anchor_ms is None:
+        if anchor is None:
+            return None
+        anchor_ms = int(anchor["timestampMs"])
+    participants = tuple(
+        ParticipantView.from_participant(p)
+        for p in await SqlAlchemyIngestionRepository(session).list_participants(point.match_id)
+    )
+    me = next(p for p in participants if p.participant_id == point.participant_id)
+    timeline = await get_match_timeline(session_factory, point.match_id)
+    context = situation_features(
+        SituationInput(
+            participants,
+            timeline.participants,
+            timeline.kills,
+            timeline.objectives,
+            timeline.gold_frames,
+        ),
+        point.participant_id,
+        anchor_ms,
+        items=profiles.items,
+        champions=profiles.champions,
+    )
+    names: dict[int, str | None] = {}
+    if point.catalog_id is not None:
+        bundle = await _catalog(session, point.catalog_id)
+        names = {item.item_id: item.attributes.get("name") for item in bundle.items}
+    enemies = [p.champion_id for p in participants if p.team != me.team]
+    return context, me, enemies, names
+
+
+def _portuguese_names(configs: Path, patch: str) -> dict[int, str]:
+    """Nomes pt_BR dos itens (trechos do Data Dragon da base de conhecimento), quando houver."""
+    from riftlab.ranking.late_engine import _latest_dir
+
+    found = _latest_dir(configs, patch)
+    path = found[1] / "knowledge.json" if found else None
+    if path is None or not path.exists():
+        return {}
+    return dict(_names_from(str(path), path.stat().st_mtime_ns))
+
+
+@functools.lru_cache(maxsize=4)
+def _names_from(path: str, _mtime: int) -> tuple[tuple[int, str], ...]:
+    document = json.loads(Path(path).read_text(encoding="utf-8"))
+    return tuple(
+        (int(c["itemId"]), c["title"])
+        for c in document.get("chunks", [])
+        if c.get("kind") == "ITEM" and isinstance(c.get("itemId"), int)
+    )

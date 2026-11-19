@@ -4,12 +4,28 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
+from riftlab.catalog.classification import ItemClass
 from riftlab.catalog.domain import Item
 from riftlab.ingestion.final_items import FinalItems
 from riftlab.timeline.application import InventorySnapshot
+from riftlab.timeline.empirical_rules import (
+    SUPPORT_CHAIN_NEXT,
+    SUPPORT_FINAL_ITEM_IDS,
+    TRANSFORM_RESULT_BY_ORIGIN,
+    WORLD_ATLAS_ITEM_ID,
+)
+
+# CC-1504: a mesma linhagem da seleção (etapas do item de suporte contam como o Atlas Mundial;
+# resultados de transformação, como a origem).
+LINEAGE: dict[int, int] = {
+    **{stage: WORLD_ATLAS_ITEM_ID for stage in SUPPORT_CHAIN_NEXT.values()},
+    **{final: WORLD_ATLAS_ITEM_ID for final in SUPPORT_FINAL_ITEM_IDS},
+    **{result: origin for origin, result in TRANSFORM_RESULT_BY_ORIGIN.items()},
+}
+_MAIN_SCOPE = frozenset({ItemClass.MAIN, ItemClass.COMPONENT})
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,3 +77,23 @@ def verdict(clean: int, failures: int, matches: int) -> tuple[str, float | None]
     return (
         "NO_SAMPLE" if clean < 20 or matches < 3 else "ACCEPT" if upper <= 0.10 else "REJECT"
     ), upper
+
+
+def main_closure_failed(
+    predicted: InventorySnapshot, official: FinalItems, classify: Callable[[int], ItemClass]
+) -> bool:
+    """G-FINAL só de itens principais e componentes, com a linhagem nos dois lados (CC-1504).
+
+    É o que a análise usa: quais itens principais são legais e quanto falta para cada um.
+    Botas, consumíveis, sentinelas, trinket e etapas do item de suporte ficam de fora."""
+
+    def scope(pairs: Iterable[tuple[int, int]]) -> Counter[int]:
+        out: Counter[int] = Counter()
+        for item_id, count in pairs:
+            identity = LINEAGE.get(item_id, item_id)
+            if classify(identity) in _MAIN_SCOPE:
+                out[identity] += count
+        return out
+
+    reported = scope((item, 1) for item in official.items if item)
+    return scope(predicted.items) != reported

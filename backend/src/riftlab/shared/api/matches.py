@@ -181,8 +181,13 @@ class DecisionStateSummary(CamelModel):
     reconstruction_rules_health: Literal["OK", "UNVERIFIED", "SUSPENDED"] = "UNVERIFIED"
     reconstruction_rules_verdict: Literal["ACCEPT", "REJECT", "NO_SAMPLE"] | None = None
     reconstruction_rules_wilson_upper: float | None = Field(default=None, ge=0, le=1)
+    # CC-1504: conferência só de itens principais/componentes; ACCEPT libera a análise mesmo
+    # com a herança suspensa pelo inventário completo.
+    reconstruction_rules_main_verdict: Literal["ACCEPT", "REJECT", "NO_SAMPLE"] | None = None
     reason_codes: list[str] = Field(default_factory=list)
     main_item_ordinal: int | None = Field(default=None, ge=1)
+    # CC-1501: instante da âncora de compromisso (null em extrações antigas).
+    anchor_timestamp_ms: int | None = Field(default=None, ge=0)
     budget_source: BudgetSource
     frame_age_ms: int | None = Field(default=None, ge=0)
     stale_frame: bool
@@ -261,6 +266,8 @@ class DecisionVersionInfo(CamelModel):
     reconstruction_rules_health: Literal["OK", "UNVERIFIED", "SUSPENDED"] = "UNVERIFIED"
     reconstruction_rules_verdict: Literal["ACCEPT", "REJECT", "NO_SAMPLE"] | None = None
     reconstruction_rules_wilson_upper: float | None = Field(default=None, ge=0, le=1)
+    reconstruction_rules_main_verdict: Literal["ACCEPT", "REJECT", "NO_SAMPLE"] | None = None
+    reconstruction_rules_main_wilson_upper: float | None = Field(default=None, ge=0, le=1)
     reconstruction_rules_clean_participants: int = Field(default=0, ge=0)
     reconstruction_rules_failures: int = Field(default=0, ge=0)
     reconstruction_rules_patch: str | None = Field(default=None, max_length=20)
@@ -280,6 +287,10 @@ class DecisionState(CamelModel):
     eligible: bool
     main_item_ordinal: int | None = Field(default=None, ge=1)
     reasons: list[DecisionReason] = Field(default_factory=list)
+    # CC-1501: instante da âncora de compromisso (primeira compra depois do item principal
+    # anterior). O inventário, o orçamento e o nível são os da âncora quando ela existe.
+    anchor_timestamp_ms: int | None = Field(default=None, ge=0)
+    inventory_tolerated: bool = False
     inventory: DecisionInventory
     budget: DecisionBudget
     level: ObservedLevel

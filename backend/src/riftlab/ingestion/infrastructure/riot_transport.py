@@ -390,6 +390,29 @@ class RiotHttpTransport:
             )
         return document
 
+    async def fetch_apex_league(self, tier: str) -> list[dict[str, Any]]:
+        """CC-1506: escada de elo alto (CHALLENGER, GRANDMASTER ou MASTER) da Solo/Duo no BR1.
+        Devolve só as entradas (com o PUUID, que nunca é gravado nem registrado)."""
+        paths = {
+            "CHALLENGER": "challengerleagues",
+            "GRANDMASTER": "grandmasterleagues",
+            "MASTER": "masterleagues",
+        }
+        if tier not in paths:
+            raise SourceSchemaError(code="SCHEMA_UNSUPPORTED", detail="tier inválido")
+        body = await self._request_raw(
+            "league",
+            f"/lol/league/v4/{paths[tier]}/by-queue/RANKED_SOLO_5x5",
+            host=BR1_HOST,
+        )
+        document = _parse_json_body("league", body)
+        entries = document.get("entries") if isinstance(document, dict) else None
+        if not isinstance(entries, list):
+            raise SourceSchemaError(
+                code="SCHEMA_UNSUPPORTED", detail="resposta de liga com formato inesperado"
+            )
+        return [e for e in entries if isinstance(e, dict)]
+
     async def fetch_active_game_by_puuid(self, puuid: str) -> dict[str, Any]:
         """Spectator-V5 por PUUID no host fixo BR1 (CC-1211): a partida em andamento, depois da
         tela de carregamento. Fora de partida a Riot responde 404 (SourceNotFoundError)."""

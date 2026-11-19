@@ -146,3 +146,5 @@ class DecisionPointModel(UuidPkMixin, CreatedAtMixin, Base):
     # none_as_null: None grava SQL NULL (não o literal JSON `null`); a restrição
     # eligible_iff_features depende de `features IS NULL` para pontos inelegíveis.
     features: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    # CC-1501 (seleção v3): âncora de compromisso do item principal; NULL nas extrações antigas.
+    anchor: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True), nullable=True)

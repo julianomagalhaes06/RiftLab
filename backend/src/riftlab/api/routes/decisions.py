@@ -139,6 +139,7 @@ async def list_match_decisions(
                     "reconstruction_rules_health": page.health[point.id]["status"],
                     "reconstruction_rules_verdict": page.health[point.id]["verdict"],
                     "reconstruction_rules_wilson_upper": page.health[point.id]["wilsonUpper"],
+                    "reconstruction_rules_main_verdict": page.health[point.id].get("mainVerdict"),
                 }
             )
             for point in page.items
@@ -200,6 +201,7 @@ def _to_summary(point: StoredDecisionPoint) -> DecisionStateSummary:
         eligible=point.eligible,
         reason_codes=[reason.code for reason in public_reasons(point.reasons)],
         main_item_ordinal=point.main_item_ordinal,
+        anchor_timestamp_ms=(point.anchor or {}).get("timestampMs"),
         budget_source=source,
         frame_age_ms=age_ms,
         stale_frame=stale,
@@ -223,6 +225,8 @@ def _to_detail(detail: DecisionDetail) -> DecisionState:
             DecisionReason(code=r.code, sub_reasons=list(r.sub_reasons))
             for r in public_reasons(point.reasons)
         ],
+        anchor_timestamp_ms=(point.anchor or {}).get("timestampMs"),
+        inventory_tolerated=bool((point.anchor or {}).get("tolerated")),
         inventory=DecisionInventory(
             items=[
                 InventoryItem(
@@ -262,6 +266,8 @@ def _to_detail(detail: DecisionDetail) -> DecisionState:
             reconstruction_rules_health=detail.health.get("status", "UNVERIFIED"),
             reconstruction_rules_verdict=detail.health.get("verdict"),
             reconstruction_rules_wilson_upper=detail.health.get("wilsonUpper"),
+            reconstruction_rules_main_verdict=detail.health.get("mainVerdict"),
+            reconstruction_rules_main_wilson_upper=detail.health.get("mainWilsonUpper"),
             reconstruction_rules_clean_participants=detail.health.get("cleanParticipants", 0),
             reconstruction_rules_failures=detail.health.get("failures", 0),
         ),

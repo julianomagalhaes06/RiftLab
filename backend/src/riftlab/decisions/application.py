@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from riftlab.catalog.classification import ItemClassificationTable, classify_catalog
 from riftlab.catalog.domain import CatalogVersion, Item
 from riftlab.catalog.repository import SqlAlchemyCatalogRepository
+from riftlab.decisions.anchoring import AnchorInfo, anchor_points
 from riftlab.decisions.domain import (
     DecisionConfigError,
     DecisionError,
@@ -125,7 +126,9 @@ async def _load_scope(
     return scope_for_origin(origin, load_real_scope(scope_path, window))
 
 
-def _to_stored(point: DecisionPoint, extraction_id: uuid.UUID) -> StoredDecisionPoint:
+def _to_stored(
+    point: DecisionPoint, extraction_id: uuid.UUID, anchor: AnchorInfo | None = None
+) -> StoredDecisionPoint:
     return StoredDecisionPoint(
         id=uuid.uuid4(),
         extraction_id=extraction_id,
@@ -142,6 +145,7 @@ def _to_stored(point: DecisionPoint, extraction_id: uuid.UUID) -> StoredDecision
         reasons=[reason.to_payload() for reason in point.reasons],
         budget=point.budget.to_payload(),
         features=point.features.to_payload() if point.features else None,
+        anchor=anchor.to_payload() if anchor is not None else None,
     )
 
 
@@ -253,17 +257,32 @@ async def extract_decisions(
     match_context = MatchContext.from_match(match)
     marker_id = uuid.uuid4()
     stored: list[StoredDecisionPoint] = []
-    for state in sorted(states, key=lambda s: (s.participant_id, s.event_source_index)):
-        evaluated = evaluate_decision(
-            state,
+    by_participant: dict[int, list[DecisionState]] = {}
+    for state in states:
+        by_participant.setdefault(state.participant_id, []).append(state)
+    for participant_id in sorted(by_participant):
+        own = sorted(by_participant[participant_id], key=lambda s: s.event_source_index)
+        evaluated = [
+            evaluate_decision(
+                state,
+                participants=participants,
+                match=match_context,
+                catalog=catalog,
+                classification=classification,
+                scope=scope,
+            )
+            for state in own
+        ]
+        # CC-1501 (seleção v3): contexto de cada item principal na âncora de compromisso.
+        for point, anchor in anchor_points(
+            own,
+            evaluated,
             participants=participants,
             match=match_context,
-            catalog=catalog,
             classification=classification,
             scope=scope,
-        )
-        if evaluated is not None:
-            stored.append(_to_stored(evaluated, marker_id))
+        ):
+            stored.append(_to_stored(point, marker_id, anchor))
     marker = DecisionExtractionMarker(
         id=marker_id,
         match_id=match_id,

@@ -47,7 +47,7 @@ def linux_server_command(paths: dict[str, Path], port: int, key: Path) -> list[s
         "-ngl",
         "0",
         "-c",
-        "1024",
+        "2048",  # CC-1505: a explicação leva até ~12 fatos no prompt
         "-b",
         "128",
         "-ub",

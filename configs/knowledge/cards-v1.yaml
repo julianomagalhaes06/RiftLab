@@ -1,0 +1,162 @@
+# Cartões de conhecimento do late game (CC-1505), recuperados por GATILHO, não por semelhança.
+# Cada cartão só entra numa explicação quando (1) a condição `when` é verdadeira no contexto
+# situacional da decisão (features de `ml/situation.py`, mais `ordinal`) e (2) o item em
+# discussão tem uma das mecânicas de `mechanics` ou atinge algum mínimo de `stats` (perfis do
+# Data Dragon). O texto é geral e verificável: descreve a mecânica e quando ela costuma valer,
+# nunca promete vitória. Revisar a cada patch que mude a mecânica citada.
+schemaVersion: 1
+version: cards_v1
+cards:
+  - id: antiheal
+    title: Cura inimiga pede Feridas Dolorosas
+    mechanics: [ANTIHEAL]
+    when: {any: [[enemy_healers, ">=", 2], [enemy_items_sustain, ">=", 15]]}
+    text: >-
+      Feridas Dolorosas reduzem a cura que o alvo recebe. Contra campeões que se curam pelas
+      habilidades ou por vampirismo nos itens, o efeito corta boa parte dessa sustentação nas
+      lutas longas.
+    source: Descrição oficial dos itens com Feridas Dolorosas (Data Dragon).
+  - id: antiheal_redundant
+    title: Feridas não acumulam
+    mechanics: [ANTIHEAL]
+    when: {any: [[ally_items_antiheal, ">=", 1], [self_items_antiheal, ">=", 1]]}
+    text: >-
+      O efeito de Feridas Dolorosas não soma entre fontes diferentes. Se você ou um aliado já
+      aplica Feridas, um segundo item com o mesmo efeito acrescenta pouco.
+    source: Mecânica de Feridas Dolorosas (descrição oficial dos itens).
+  - id: armor_vs_physical
+    title: Dano físico concentrado pede Armadura
+    stats: {armor: 30}
+    when: {any: [[enemy_magic_share, "<=", 0.4], [deaths_to_physical, ">=", 3]]}
+    text: >-
+      Armadura reduz o dano físico recebido. Quando a maior parte do dano inimigo é física, cada
+      ponto de Armadura protege mais do que Resistência Mágica.
+    source: Atributo Armadura (descrição oficial dos itens).
+  - id: mr_vs_magic
+    title: Dano mágico concentrado pede Resistência Mágica
+    stats: {mr: 30}
+    when: {any: [[enemy_magic_share, ">=", 0.6], [deaths_to_magic, ">=", 3]]}
+    text: >-
+      Resistência Mágica reduz o dano mágico recebido. Quando a maior parte do dano inimigo é
+      mágica, ela protege mais do que Armadura.
+    source: Atributo Resistência Mágica (descrição oficial dos itens).
+  - id: armor_pen
+    title: Armadura acumulada pede penetração
+    stats: {armor_pen: 20, lethality: 15}
+    when: {any: [[enemy_items_armor, ">=", 150], [enemy_tank, ">=", 2]]}
+    text: >-
+      Penetração de Armadura e Letalidade ignoram parte da Armadura do alvo. Elas rendem mais
+      quando os inimigos já compraram Armadura ou têm tanques na linha de frente.
+    source: Atributos Penetração de Armadura e Letalidade (descrição oficial dos itens).
+  - id: magic_pen
+    title: Resistência Mágica acumulada pede penetração mágica
+    stats: {magic_pen_pct: 20, magic_pen: 10}
+    when: {any: [[enemy_items_mr, ">=", 120], [enemy_tank, ">=", 2]]}
+    text: >-
+      Penetração Mágica ignora parte da Resistência Mágica do alvo e rende mais quando os
+      inimigos já compraram Resistência Mágica.
+    source: Atributo Penetração Mágica (descrição oficial dos itens).
+  - id: stasis_vs_dive
+    title: Assassinos e mergulho pedem Estase
+    mechanics: [STASIS]
+    when: {any: [[enemy_assassin, ">=", 2], [deaths_to_assassin, ">=", 2], [deaths_to_melee, ">=", 3]]}
+    text: >-
+      Estase deixa o campeão invulnerável e imóvel por alguns segundos. Serve para esperar o
+      dano de explosão de quem pula em você e ganhar tempo para os aliados reagirem.
+    source: Mecânica de Estase (descrição oficial dos itens).
+  - id: spell_shield
+    title: Muito controle de grupo pede escudo de feitiço
+    mechanics: [SPELL_SHIELD]
+    when: {all: [[enemy_hard_cc, ">=", 8]]}
+    text: >-
+      Um escudo de feitiço bloqueia a próxima habilidade inimiga. Contra times com muito
+      controle de grupo, ele evita que a primeira habilidade de captura acerte você.
+    source: Mecânica de escudo de feitiço (descrição oficial dos itens).
+  - id: cleanse
+    title: Controle de grupo pesado pede limpeza
+    mechanics: [CLEANSE]
+    when: {all: [[enemy_hard_cc, ">=", 8]]}
+    text: >-
+      Itens com limpeza removem os efeitos de controle de grupo ativos. Valem mais quando o time
+      inimigo depende de prender um alvo para matá-lo.
+    source: Mecânica de limpeza (descrição oficial dos itens).
+  - id: revive
+    title: Partida longa ou muitas mortes valorizam renascer
+    mechanics: [REVIVE]
+    when: {any: [[minute, ">=", 30], [self_deaths, ">=", 5]]}
+    text: >-
+      Renascer devolve o campeão depois de um abate. Em partidas longas, uma morte custa mais
+      tempo de renascimento, e evitar uma delas numa luta decisiva pesa mais.
+    source: Mecânica de renascimento (descrição oficial dos itens).
+  - id: anti_shield
+    title: Escudos inimigos pedem redução de escudo
+    mechanics: [ANTI_SHIELD]
+    when: {any: [[enemy_shielders, ">=", 2], [enemy_items_shield, ">=", 2]]}
+    text: >-
+      Itens que reduzem escudos diminuem a proteção que os inimigos ganham de habilidades e de
+      itens. Rendem mais contra times com vários escudos.
+    source: Descrição oficial dos itens que reduzem escudos.
+  - id: anti_attack_speed
+    title: Atiradores fortes pedem redução de velocidade de ataque
+    mechanics: [ANTI_ATTACK_SPEED]
+    when: {any: [[enemy_items_attack_speed, ">=", 60], [enemy_items_crit, ">=", 50]]}
+    text: >-
+      Itens que reduzem a velocidade de ataque de quem está por perto diminuem o dano de
+      campeões que dependem de ataques básicos.
+    source: Descrição oficial dos itens que reduzem velocidade de ataque.
+  - id: hp_vs_burst
+    title: Inimigo forte pede vida
+    stats: {hp: 300}
+    when: {any: [[top_enemy_kills, ">=", 6], [deaths_to_assassin, ">=", 2]]}
+    text: >-
+      Vida aumenta o dano necessário para abater você e ajuda contra os dois tipos de dano.
+      Pesa mais quando um inimigo já tem vários abates e itens à frente.
+    source: Atributo Vida (descrição oficial dos itens).
+  - id: magic_shield
+    title: Dano mágico de explosão pede escudo mágico
+    mechanics: [MAGIC_SHIELD]
+    when: {any: [[enemy_magic_share, ">=", 0.55], [deaths_to_magic, ">=", 2]]}
+    text: >-
+      Itens com escudo contra dano mágico seguram a primeira explosão de magos e assassinos de
+      dano mágico.
+    source: Descrição oficial dos itens com escudo de dano mágico.
+  - id: lifesteal_free
+    title: Sem Feridas inimigas, vampirismo rende inteiro
+    stats: {lifesteal: 5, omnivamp: 5}
+    when: {all: [[enemy_items_antiheal, "<=", 0]]}
+    text: >-
+      Nenhum inimigo tem item com Feridas Dolorosas neste momento, então a cura do vampirismo
+      não é reduzida.
+    source: Mecânica de Feridas Dolorosas (descrição oficial dos itens).
+  - id: lifesteal_cut
+    title: Feridas inimigas reduzem o vampirismo
+    stats: {lifesteal: 5, omnivamp: 5}
+    when: {all: [[enemy_items_antiheal, ">=", 2]]}
+    text: >-
+      Dois ou mais inimigos já aplicam Feridas Dolorosas: a cura do vampirismo vai render menos
+      nas lutas.
+    source: Mecânica de Feridas Dolorosas (descrição oficial dos itens).
+  - id: behind_gold
+    title: Atrás no ouro, sobreviver pesa mais
+    stats: {armor: 40, mr: 40, hp: 350}
+    when: {all: [[team_gold_diff, "<=", -4000]]}
+    text: >-
+      Com o time atrás no ouro, os inimigos têm mais itens. Atributos defensivos ajudam a
+      continuar vivo nas lutas enquanto o time busca uma virada.
+    source: Princípio geral de build; ouro do time nos quadros da partida.
+  - id: ahead_gold
+    title: À frente no ouro, dano encerra a partida
+    stats: {ad: 40, ap: 70, crit: 20}
+    when: {all: [[team_gold_diff, ">=", 4000]]}
+    text: >-
+      Com o time à frente no ouro, mais dano ajuda a converter a vantagem em objetivos antes que
+      os inimigos completem os itens.
+    source: Princípio geral de build; ouro do time nos quadros da partida.
+  - id: fed_enemy
+    title: Um inimigo concentra os abates
+    stats: {armor: 40, mr: 40, hp: 350}
+    when: {all: [[top_enemy_kill_share, ">=", 0.4], [top_enemy_kills, ">=", 5]]}
+    text: >-
+      Quando um inimigo concentra os abates do time dele, a defesa contra o tipo de dano dele
+      costuma render mais do que contra o time inteiro.
+    source: Princípio geral de build; placar da partida.

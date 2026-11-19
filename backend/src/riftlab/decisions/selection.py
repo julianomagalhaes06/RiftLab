@@ -166,11 +166,12 @@ def _check_catalog_consistency(
 # Linhagem (decisão B da CC-802): a etapa seguinte da cadeia do item de Apoio, a escolha
 # final e o resultado de uma transformação ficam fora do catálogo curado (receita especial),
 # mas continuam a identidade da origem, que é classificável.
-_LINEAGE_IDENTITY: dict[int, int] = {
+LINEAGE_IDENTITY: dict[int, int] = {
     **{stage: WORLD_ATLAS_ITEM_ID for stage in SUPPORT_CHAIN_NEXT.values()},
     **{final: WORLD_ATLAS_ITEM_ID for final in SUPPORT_FINAL_ITEM_IDS},
     **{result: origin for origin, result in TRANSFORM_RESULT_BY_ORIGIN.items()},
 }
+_LINEAGE_IDENTITY = LINEAGE_IDENTITY
 
 
 def _owned_main_units(

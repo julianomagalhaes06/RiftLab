@@ -1,0 +1,11 @@
+# Regras explícitas do motor RULES, v2 (CC-1501). A análise agora acontece na âncora de
+# compromisso (primeira compra depois do item principal anterior): bonificar componentes já
+# possuídos premiava terminar o item que já estava pago e escondia a escolha real. Componente
+# possuído continua visível como evidência ("aproveita componentes"), mas não pontua.
+# Pesos fixados por decisão de projeto, sem ajuste em dados; não validados como melhor compra.
+schemaVersion: 1
+version: rules_v2
+weights:
+  ownedComponent: 0.0        # v1: 2.0
+  remainingCostPer1000: -1.0 # cada 1.000 de ouro ainda a pagar
+  compositionAffinity: 0.5   # armadura × inimigos de dano físico; resistência mágica × dano mágico

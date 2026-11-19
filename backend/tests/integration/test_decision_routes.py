@@ -159,9 +159,9 @@ async def test_demo_0002_list_and_detail_through_the_api(
         "immediatePurchaseAssertable": False,
     }
     assert body["level"] == {"value": 1, "frameAgeMs": 472_000, "absentReason": None}
-    assert body["versions"]["selectionVersion"] == "decision_selection_v2"
+    assert body["versions"]["selectionVersion"] == "decision_selection_v3"
     assert body["versions"]["reconstructionVersion"] == RECONSTRUCTION_ALGORITHM_VERSION
-    assert body["versions"]["scopeVersion"] == "demo_scope_v1"
+    assert body["versions"]["scopeVersion"] == "demo_scope_v2"
     assert body["versions"]["dataDragonVersion"] == "demo-datadragon-1"
     assert body["versions"]["curationRulesVersion"] == "curated_demo_v1"
     assert "100010" not in detail.text and "100010" not in listing.text  # o alvo nunca aparece
@@ -213,9 +213,11 @@ async def test_pagination_over_tied_timestamps_never_repeats_or_loses(
     assert single.json()["nextCursor"] is None  # limite exato: nenhuma página vazia extra
     assert everything[-1]["mainItemOrdinal"] >= 3  # inelegíveis também são listados
     ineligible = [i for i in everything if not i["eligible"]]
+    # CC-1501 (recorte v4): do 3º item em diante qualquer campeão entra; ficam de fora o 7º item
+    # em diante (fora do recorte) e o inventário que estoura os seis espaços (incerto).
     assert ineligible and all(
-        "OUT_OF_SCOPE" in i["reasonCodes"] for i in ineligible
-    )  # ordinal >= 3
+        {"OUT_OF_SCOPE", "INVENTORY_UNCERTAIN"} & set(i["reasonCodes"]) for i in ineligible
+    )
 
 
 @pytest.mark.parametrize("_demo_match", ["DEMO-0002"], indirect=True)
@@ -236,7 +238,7 @@ async def test_new_extraction_between_pages_does_not_change_the_pinned_extractio
     assert first["nextCursor"] is not None
 
     # outra tupla de versões vira a extração CORRENTE entre as páginas
-    monkeypatch.setattr(decisions_selection, "DECISION_SELECTION_VERSION", "decision_selection_v3")
+    monkeypatch.setattr(decisions_selection, "DECISION_SELECTION_VERSION", "decision_selection_v4")
     await extract_decisions(session_factory, match_id, scope_path=_NO_SCOPE_FILE)
     fresh = [i["decisionId"] for i in await _all_pages(app_client, match_id, 1, 100)]
     assert set(fresh).isdisjoint(original)  # sem cursor: a extração nova
@@ -255,9 +257,9 @@ async def test_new_extraction_between_pages_does_not_change_the_pinned_extractio
 
     # o detalhe de um ponto antigo segue disponível, com as versões dele
     old_detail = (await app_client.get(f"/api/v1/decisions/{original[0]}")).json()
-    assert old_detail["versions"]["selectionVersion"] == "decision_selection_v2"
+    assert old_detail["versions"]["selectionVersion"] == "decision_selection_v3"
     new_detail = (await app_client.get(f"/api/v1/decisions/{fresh[0]}")).json()
-    assert new_detail["versions"]["selectionVersion"] == "decision_selection_v3"
+    assert new_detail["versions"]["selectionVersion"] == "decision_selection_v4"
 
 
 # ---------------------------------------------------------------------------

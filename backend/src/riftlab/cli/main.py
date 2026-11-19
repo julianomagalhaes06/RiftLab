@@ -152,6 +152,10 @@ from riftlab.cli.collect import collect_app, report_app  # noqa: E402  (CC-206)
 app.add_typer(collect_app, name="collect")
 app.add_typer(report_app, name="report")
 
+from riftlab.cli.late import late_app  # noqa: E402
+
+app.add_typer(late_app, name="late")
+
 riot_app = typer.Typer(
     help="Spike administrativo de auditoria de acesso real (CC-105). Não é o "
     "importador durável do CC-201.",

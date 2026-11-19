@@ -61,9 +61,9 @@ def service():
     for thread in threads:
         thread.start()
 
-    def post(body):
+    def post(body, path="/interpret"):
         req = urllib.request.Request(
-            f"http://127.0.0.1:{proxy.server_port}/interpret",
+            f"http://127.0.0.1:{proxy.server_port}{path}",
             json.dumps(body).encode(),
             {"Content-Type": "application/json"},
         )
@@ -146,3 +146,37 @@ def test_concurrency_has_no_unbounded_generation_queue(service):
 def test_upstream_cannot_be_an_external_or_credential_bearing_url(url):
     with pytest.raises(argparse.ArgumentTypeError):
         completion_url(url)
+
+
+def test_explain_turns_adapter_off_and_constrains_json(service):
+    """CC-1505: a explicação usa o modelo base (adaptador com escala 0) e JSON restrito."""
+    post, received, options, *_ = service
+    options["content"] = '{"frases":[{"texto":"ok","fontes":["F1"]}]}'
+    messages = [
+        {"role": "system", "content": "regras"},
+        {"role": "user", "content": "Fatos: [F1] algo"},
+    ]
+    status, body = post({"messages": messages}, "/explain")
+    assert status == 200 and body["raw"] == options["content"]
+    assert body["modelVersion"] == "fixture-q4+base"
+    _, request = received[-1]
+    assert request["lora"] == [{"id": 0, "scale": 0.0}]
+    assert request["json_schema"]["required"] == ["frases"]
+    assert request["prompt"].endswith("<|im_start|>assistant\n")
+    assert request["n_predict"] == 320
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"messages": []},
+        {"messages": [{"role": "assistant", "content": "x"}]},
+        {"messages": [{"role": "user", "content": "x" * 12001}]},
+        {"messages": [{"role": "user", "content": "x"}], "extra": 1},
+        {"text": "quero dano"},
+    ],
+)
+def test_explain_rejects_invalid_messages_before_the_model(service, body):
+    post, received, *_ = service
+    assert post(body, "/explain")[0] == 422
+    assert received == []

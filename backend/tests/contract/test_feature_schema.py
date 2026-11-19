@@ -108,4 +108,6 @@ def test_real_scope_yaml_is_parsed_without_being_changed() -> None:
     assert (scope.queues, scope.map_id, scope.role) == ({420, 440}, 11, "BOTTOM")
     assert scope.champion_ids == frozenset({145, 51, 81, 222, 202, 804, 18, 22, 21, 29})
     assert scope.patches == frozenset({"16.19", "16.18"})
-    assert scope.version == "scope_yaml:v3:2026-10-16:16.19,16.18"
+    assert scope.version == "scope_yaml:v4:2026-11-19:16.19,16.18"
+    # v4 (CC-1501): do 3º item principal em diante, qualquer campeão e rota.
+    assert scope.late_from_ordinal == 3

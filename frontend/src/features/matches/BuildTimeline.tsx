@@ -2,15 +2,16 @@ import type { DecisionSummary, MatchTimeline } from "../../shared/api/client";
 import { useItemName } from "../../shared/hooks/useItemName";
 import { Link } from "../../shared/router/Link";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
-import { formatGameTime, ordinalLabel, reasonText } from "./format";
+import { formatGameTime, ordinalLabel, reasonText, rulesBlockAnalysis } from "./format";
 import { decisionsInVisit, isCompletedItem, maxOrder, shopVisits, SKILL_KEYS, skillOrder } from "./matchView";
 
 type ParticipantTimeline = MatchTimeline["participants"][number];
 
 export function DecisionChip({ decision }: { decision: DecisionSummary }) {
-  const canAnalyze = decision.eligible && decision.reconstructionRulesHealth !== "SUSPENDED";
+  const blocked = rulesBlockAnalysis(decision.reconstructionRulesHealth, decision.reconstructionRulesMainVerdict);
+  const canAnalyze = decision.eligible && !blocked;
   const ordinal = ordinalLabel(decision.mainItemOrdinal);
-  const why = decision.reconstructionRulesHealth === "SUSPENDED" ? "Herança suspensa por divergências de inventário neste patch." : (decision.reasonCodes ?? []).map(reasonText).join(" ");
+  const why = blocked ? "Herança suspensa por divergências de inventário neste patch." : (decision.reasonCodes ?? []).map(reasonText).join(" ");
   return (
     <Link
       to={{ name: "decision", decisionId: decision.decisionId }}

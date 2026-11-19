@@ -148,6 +148,7 @@ Nenhum schema-only está montado como rota FastAPI; importar `riftlab.shared.api
 | GET /api/v1/analyses/{id} | UUID | resultado imutável |
 | POST /api/v1/analyses/{id}/feedback | {itemId,grade,reason,rubricVersion,reviewerAlias} + Idempotency-Key | 201/200; grade 0..3 ou null para abstenção |
 | GET /api/v1/analyses/{id}/report | format=json ou html | exportação sem identificadores pessoais |
+| POST /api/v1/analyses/{id}/explanation | {question?} (até 300 caracteres) | late game: até 4 frases com as fontes e os fatos usados; `provider` LOCAL_MODEL (validado) ou RULES; 409 fora do late game |
 | DELETE /api/v1/matches/{id} | `confirm` = o próprio id (query) | 202 `ImportJobAccepted` do job PURGE, consultável em /imports/{jobId} (`kind=PURGE`, `matchId` nulo); expurgo ativo ou já concluído devolve o mesmo job; 404 partida desconhecida; 422 sem confirmação ou diferente (CC-603) |
 | GET /api/v1/matches/{id}/purge-preview | match ID | `PurgePreview` {counts, datasets, models, unverifiableDatasets, limitations}; nada é alterado (CC-603) |
 | POST /api/v1/history/sync | nenhuma | 202 `HistorySyncStatus` QUEUED quando cria a execução; 200 com a execução ativa, a última dentro do intervalo mínimo ou `UNAVAILABLE` (sem chave ou sem conta configurada). Nenhuma chamada à Riot na requisição |

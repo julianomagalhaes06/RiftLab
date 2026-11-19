@@ -1279,3 +1279,72 @@ def report_integrity(
     _emit(data, render_integrity_report(data), as_json)
     if not data["ok"]:
         raise typer.Exit(code=EXIT_BLOCKED)
+
+
+@collect_app.command("apex")
+def collect_apex_command(
+    patch: str = typer.Option(..., help="Patch major.minor vigente (ex.: 16.23)."),
+    start_time: int = typer.Option(..., help="Início do patch em epoch (segundos)."),
+    output_dir: Path = typer.Option(..., help="Diretório privado novo da coleta (.private/...)."),
+    max_players: int = typer.Option(600, min=1, help="Teto de jogadores da escada."),
+    matches_per_player: int = typer.Option(20, min=1, max=100),
+    max_matches: int = typer.Option(6000, min=1, help="Teto de partidas novas."),
+    max_requests: int = typer.Option(14_000, min=1, help="Teto global de requisições."),
+    max_hours: float = typer.Option(8.0, min=0.1, help="Teto de tempo em horas."),
+    known_raw_root: list[Path] | None = typer.Option(
+        None, "--known-raw-root", help="Raiz bruta já coletada, para não baixar de novo."
+    ),
+    env_file: Path | None = typer.Option(None, help="Arquivo de ambiente com a chave Riot."),
+) -> None:
+    """CC-1506: partidas Solo/Duo de Desafiante/Grão-Mestre/Mestre do BR1 no patch vigente.
+    Grava pares brutos na loja privada e um manifesto com a divisão por partida, sem
+    identificador de jogador."""
+    import asyncio
+    import json as _json
+
+    from riftlab.cli.env_file import load_settings
+    from riftlab.collection.apex import ApexPlan, collect_apex, known_match_ids
+    from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+    from riftlab.ingestion.infrastructure.riot_rate_limiter import RiotRateLimiter
+    from riftlab.ingestion.infrastructure.riot_transport import (
+        RiotFetchBudget,
+        RiotHttpTransport,
+    )
+
+    if ".private" not in output_dir.resolve().parts or (output_dir / "manifest.json").exists():
+        raise _blocked("a saída deve ficar em .private e ainda não ter manifesto")
+    settings = load_settings(env_file)
+    if not settings.riot_api_key:
+        raise _blocked("RIFTLAB_RIOT_API_KEY ausente")
+    output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    store = DurableRawMatchStore(output_dir / "raw")
+
+    async def _run() -> dict[str, object]:
+        transport = RiotHttpTransport(
+            api_key=settings.riot_api_key or "",
+            budget=RiotFetchBudget(
+                max_matches=max_matches,
+                max_requests=max_requests,
+                max_attempts_per_request=5,
+                max_total_seconds=max_hours * 3600,
+                request_timeout_seconds=15,
+            ),
+            rate_limiter=RiotRateLimiter(),
+        )
+        try:
+            return await collect_apex(
+                transport,
+                store,
+                ApexPlan(patch, start_time, max_players, matches_per_player, max_matches),
+                known=known_match_ids(known_raw_root or []),
+                log=lambda line: typer.echo(line, err=True),
+            )
+        finally:
+            await transport.aclose()
+
+    manifest = asyncio.run(_run())
+    data = _json.dumps(manifest, indent=1, sort_keys=True) + "\n"
+    (output_dir / "manifest.json").write_text(data)
+    digest = hashlib.sha256(data.encode()).hexdigest()
+    (output_dir / "manifest.json.sha256").write_text(f"{digest}  manifest.json\n")
+    typer.echo(_json.dumps({"counts": manifest["counts"], "sha256": digest}))

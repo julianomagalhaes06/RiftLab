@@ -86,6 +86,10 @@ class AnalysisEngine(StrEnum):
     POPULARITY = "POPULARITY"
     RULES = "RULES"
     CONTEXTUAL_RANKER = "CONTEXTUAL_RANKER"
+    # CC-1504: late game (3º item principal em diante). LATE_CONTEXT = modelo contextual
+    # aprovado no gate; LATE_PRIOR = só o padrão hierárquico (sem modelo ou gate reprovado).
+    LATE_CONTEXT = "LATE_CONTEXT"
+    LATE_PRIOR = "LATE_PRIOR"
 
 
 class ReportFormat(StrEnum):

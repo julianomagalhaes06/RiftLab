@@ -411,7 +411,7 @@ async def test_create_analysis_persists_point_catalog_inheritance_and_idempotent
         repository_root = Path(__file__).resolve().parents[2]
         if not (repository_root / "configs").is_dir():
             repository_root = Path(__file__).resolve().parents[3]
-        for filename in ("rules-v1.yaml", "objective-v1.yaml"):
+        for filename in ("rules-v1.yaml", "rules-v2.yaml", "objective-v1.yaml"):
             shutil.copy2(
                 repository_root / "configs" / "ranking" / filename, configs / "ranking" / filename
             )

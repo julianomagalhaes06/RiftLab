@@ -96,3 +96,14 @@ scripts/local_llm.sh down
 Esse comando preserva os volumes. Ele não encerra o processo externo do modelo.
 Não executar duas sessões de modelo no mesmo socket; usar as orientações do
 [roteiro da demonstração](roteiro-teste-local-llm.md) para sessões interrompidas.
+
+## Explicação com fontes (late game)
+
+A mesma sessão do modelo atende a explicação das análises do 3º item principal em diante
+(`POST /api/v1/analyses/{id}/explanation`, ver [late game](late-game.md)). O `compose.local-llm.yaml`
+liga `RIFTLAB_EXPLAINER=local_model` por padrão; `RIFTLAB_EXPLAINER=rules` volta à resposta
+determinística. O processo local usa o
+modelo base instruído (adaptador do interpretador desligado na requisição) e responde em JSON
+restrito; a API confere cada frase contra os fatos e, sem frase válida, devolve a resposta
+determinística. A pergunta do usuário não é registrada. O contexto do servidor local passou para
+2.048 tokens para caber os fatos.

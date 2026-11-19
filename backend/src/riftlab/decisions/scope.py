@@ -19,7 +19,7 @@ from riftlab.decisions.domain import (
 )
 from riftlab.shared.domain import SourceOrigin
 
-DEMO_SCOPE_VERSION = "demo_scope_v1"
+DEMO_SCOPE_VERSION = "demo_scope_v2"  # v2 (CC-1501): late game a partir do 3º item
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,12 +31,20 @@ class DecisionScope:
     patches: frozenset[str]
     role: str
     champion_ids: frozenset[int]
+    # CC-1501 (recorte v4): a partir desta ordem de item principal, qualquer campeão e rota.
+    late_from_ordinal: int | None = None
 
     def out_of_scope_reasons(
-        self, match: MatchContext, participant: ParticipantView
+        self, match: MatchContext, participant: ParticipantView, ordinal: int | None = None
     ) -> tuple[str, ...]:
         """Sub-motivos (vazio = dentro do recorte). Role ausente nunca casa:
-        `None` não é a role do recorte."""
+        `None` não é a role do recorte. No late game (`ordinal >= late_from_ordinal`) campeão e
+        rota não restringem."""
+        late = (
+            ordinal is not None
+            and self.late_from_ordinal is not None
+            and ordinal >= self.late_from_ordinal
+        )
         reasons: list[str] = []
         if match.queue not in self.queues:
             reasons.append("QUEUE_OUT_OF_SCOPE")
@@ -44,6 +52,8 @@ class DecisionScope:
             reasons.append("MAP_OUT_OF_SCOPE")
         if match.patch not in self.patches:
             reasons.append("PATCH_OUT_OF_SCOPE")
+        if late:
+            return tuple(reasons)
         if participant.role is None:
             reasons.append("ROLE_UNKNOWN")
         elif participant.role != self.role:
@@ -64,6 +74,7 @@ DEMO_SCOPE = DecisionScope(
     patches=frozenset({"DEMO-1", "DEMO-3"}),  # DEMO-3: roteiro da demonstração (CC-605)
     role="BOTTOM",
     champion_ids=frozenset({9001, 9002}),
+    late_from_ordinal=3,
 )
 
 
@@ -115,6 +126,12 @@ def parse_real_scope_document(
         isinstance(champion_ids, list) and bool(champion_ids) and all(map(_is_int, champion_ids)),
         "championIds inválido",
     )
+    late = document.get("lateScope")
+    late_from: int | None = None
+    if late is not None:
+        _require(isinstance(late, dict) and _is_int(late.get("fromOrdinal")), "lateScope inválido")
+        late_from = late["fromOrdinal"]
+        _require(late_from is not None and late_from >= 1, "lateScope.fromOrdinal inválido")
     game_patches: list[str] = []
     window = document.get("patchWindow")
     if window is None:
@@ -153,6 +170,7 @@ def parse_real_scope_document(
         patches=frozenset(game_patches),
         role=role,
         champion_ids=frozenset(champion_ids),
+        late_from_ordinal=late_from,
     )
 
 

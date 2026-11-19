@@ -95,6 +95,8 @@ def make_handler(
             ) if self.path == "/health" else self.send_json(404, {"error": "not_found"})
 
         def do_POST(self) -> None:
+            if self.path == "/explain":
+                return self.explain()
             if self.path != "/interpret":
                 return self.send_json(404, {"error": "not_found"})
             self.connection.settimeout(15)
@@ -157,7 +159,99 @@ def make_handler(
             finally:
                 available.release()
 
+        def explain(self) -> None:
+            """CC-1505: explicação fundamentada. O backend manda as mensagens (sistema + fatos +
+            pergunta) e valida a resposta; aqui só limites de tamanho, adaptador LoRA desligado
+            (modelo base instruído) e saída restrita ao JSON das frases."""
+            self.connection.settimeout(90)
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                return self.send_json(400, {"error": "invalid_length"})
+            if not 0 < length <= EXPLAIN_MAX_BODY or self.headers.get("Transfer-Encoding"):
+                return self.send_json(413, {"error": "body_size"})
+            try:
+                body = json.loads(self.rfile.read(length))
+            except (ValueError, OSError):
+                return self.send_json(400, {"error": "invalid_json"})
+            messages_in = body.get("messages") if isinstance(body, dict) else None
+            if (
+                set(body) != {"messages"}
+                or not isinstance(messages_in, list)
+                or not 1 <= len(messages_in) <= 3
+                or not all(
+                    isinstance(m, dict)
+                    and set(m) == {"role", "content"}
+                    and m["role"] in ("system", "user")
+                    and isinstance(m["content"], str)
+                    for m in messages_in
+                )
+                or sum(len(m["content"]) for m in messages_in) > EXPLAIN_MAX_CHARS
+            ):
+                return self.send_json(422, {"error": "invalid_messages"})
+            if not available.acquire(blocking=False):
+                return self.send_json(429, {"error": "busy"})
+            try:
+                prompt = (
+                    "".join(
+                        f"<|im_start|>{m['role']}\n{m['content']}<|im_end|>\n" for m in messages_in
+                    )
+                    + "<|im_start|>assistant\n"
+                )
+                headers = {"Content-Type": "application/json"}
+                if api_key:
+                    headers["Authorization"] = "Bearer " + api_key
+                payload = {
+                    "prompt": prompt,
+                    "n_predict": 320,
+                    "temperature": 0.2,
+                    "seed": 0,
+                    "cache_prompt": False,
+                    "stream": False,
+                    "lora": [{"id": 0, "scale": 0.0}],
+                    "json_schema": EXPLAIN_SCHEMA,
+                }
+                if relay is not None:
+                    result = relay(payload)
+                else:
+                    request = Request(url, json.dumps(payload).encode(), headers)
+                    with build_opener(ProxyHandler({})).open(request, timeout=85) as response:
+                        data = response.read(65537)
+                    if len(data) > 65536:
+                        raise ValueError("upstream body too large")
+                    result = json.loads(data)
+                raw = result.get("content") if isinstance(result, dict) else None
+                if not isinstance(raw, str):
+                    raise TypeError("invalid upstream content")
+                self.send_json(200, {"raw": raw, "modelVersion": version + "+base"})
+            except (ValueError, TypeError, OSError):
+                self.send_json(502, {"error": "model_unavailable"})
+            finally:
+                available.release()
+
     return Handler
+
+
+EXPLAIN_MAX_BODY = 32768
+EXPLAIN_MAX_CHARS = 12000
+EXPLAIN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "frases": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "texto": {"type": "string", "maxLength": 320},
+                    "fontes": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                },
+                "required": ["texto", "fontes"],
+            },
+        }
+    },
+    "required": ["frases"],
+}
 
 
 def main() -> None:

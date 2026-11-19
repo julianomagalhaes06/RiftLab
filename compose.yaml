@@ -70,6 +70,9 @@ services:
       # Corpos brutos gravados pelo worker, só para leitura: a tela da partida mostra o Riot ID
       # dos participantes lido daqui na hora (CC-1210), sem guardá-lo no banco.
       - riftlab_raw_data:/app/data/raw:ro
+      # CC-1504: modelo CatBoost do late game por patch (arquivo local, fora do Git). Pasta
+      # ausente ou vazia: a análise do 3º item em diante serve só o padrão.
+      - ./artifacts/late:/app/artifacts/late:ro
     depends_on:
       db:
         condition: service_healthy

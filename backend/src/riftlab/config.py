@@ -91,6 +91,9 @@ class Settings(BaseSettings):
     # agregados e versionados em configs/match-review (ausentes ⇒ a revisão sai sem eles).
     match_review_reference_path: str = "/app/configs/match-review/reference-16.19-solo-v1.json"
     win_probability_model_path: str = "/app/configs/match-review/win-probability-16.19-v1.json"
+    # CC-1504: modelo CatBoost do late game por patch (arquivo local, fora do Git). O padrão e o
+    # gate ficam versionados em configs/late/<patch>/; sem o arquivo, a análise serve o padrão.
+    late_artifacts_dir: str = "/app/artifacts/late"
 
     # CC-504: interpretador de objetivo. "rules" (padrão, sem modelo) ou "local_model"
     # (sidecar em loopback, ml/objectives serve). Timeout abre o formulário (RNF03).
@@ -99,6 +102,10 @@ class Settings(BaseSettings):
     objective_model_socket_path: str | None = None
     objective_model_version: str = "local_model_unversioned"
     objective_parser_timeout_seconds: float = 15.0
+    # CC-1505: explicação do late game. "rules" = resposta determinística dos fatos;
+    # "local_model" = o mesmo processo local do interpretador (rota /explain), validado.
+    explainer: str = "rules"
+    explainer_timeout_seconds: float = 60.0
 
     # CC-603: retenção (cc retention). Só lista por padrão; apagar exige --execute.
     match_retention_days: int = 90

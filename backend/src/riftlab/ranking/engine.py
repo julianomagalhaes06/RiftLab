@@ -231,6 +231,9 @@ def explain(
 # CC-704: v2 covers the ten marksmen of the expanded scope (v1, three champions, stays for
 # the history of analyses that recorded it).
 POPULARITY_ARTIFACT_VERSION = "v2"
+# CC-1501: análise na âncora de compromisso, sem bônus por componente possuído (v1 fica no
+# histórico das análises que o registraram).
+RULES_FILE = "rules-v2.yaml"
 
 
 def load_default(configs: Path, patch: str) -> tuple[Popularity | None, Rules, Objective]:
@@ -238,7 +241,7 @@ def load_default(configs: Path, patch: str) -> tuple[Popularity | None, Rules, O
     popularity = Popularity.load(popularity_path) if popularity_path.exists() else None
     return (
         popularity,
-        Rules.load(configs / "ranking" / "rules-v1.yaml"),
+        Rules.load(configs / "ranking" / RULES_FILE),
         Objective.load(configs / "ranking" / "objective-v1.yaml"),
     )
 

@@ -10,6 +10,19 @@
             "title": "Affordability",
             "type": "string"
           },
+          "baseProbability": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseprobability"
+          },
           "baseRank": {
             "anyOf": [
               {
@@ -36,10 +49,43 @@
             "title": "Explanations",
             "type": "array"
           },
+          "isDefault": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isdefault"
+          },
+          "isDeviation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isdeviation"
+          },
           "itemId": {
             "minimum": 0.0,
             "title": "Itemid",
             "type": "integer"
+          },
+          "lift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lift"
           },
           "name": {
             "anyOf": [
@@ -51,6 +97,19 @@
               }
             ],
             "title": "Name"
+          },
+          "probability": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probability"
           },
           "rank": {
             "minimum": 1.0,
@@ -89,7 +148,9 @@
         "enum": [
           "POPULARITY",
           "RULES",
-          "CONTEXTUAL_RANKER"
+          "CONTEXTUAL_RANKER",
+          "LATE_CONTEXT",
+          "LATE_PRIOR"
         ],
         "title": "AnalysisEngine",
         "type": "string"
@@ -116,6 +177,72 @@
           "source"
         ],
         "title": "AnalysisExplanation",
+        "type": "object"
+      },
+      "AnalysisLate": {
+        "additionalProperties": false,
+        "description": "CC-1504: resumo do late game. `defaultItemId` é o item mais comum para o campeão nesta\netapa; `deviationItemIds`, os que esta partida pede bem mais que o normal (lift ≥ log 1,5 e\nprobabilidade ≥ 5%); `claimStrong` libera a frase forte só se o teste do gate a sustentou.",
+        "properties": {
+          "championSupport": {
+            "minimum": 0.0,
+            "title": "Championsupport",
+            "type": "integer"
+          },
+          "claimStrong": {
+            "default": false,
+            "title": "Claimstrong",
+            "type": "boolean"
+          },
+          "defaultItemId": {
+            "minimum": 1.0,
+            "title": "Defaultitemid",
+            "type": "integer"
+          },
+          "deviationItemIds": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Deviationitemids",
+            "type": "array"
+          },
+          "gatePassed": {
+            "title": "Gatepassed",
+            "type": "boolean"
+          },
+          "ordinal": {
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Ordinal",
+            "type": "integer"
+          },
+          "plausibleCandidates": {
+            "minimum": 0.0,
+            "title": "Plausiblecandidates",
+            "type": "integer"
+          },
+          "sourcePatch": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Sourcepatch",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "ordinal",
+          "defaultItemId",
+          "gatePassed",
+          "sourcePatch",
+          "plausibleCandidates",
+          "championSupport"
+        ],
+        "title": "AnalysisLate",
         "type": "object"
       },
       "AnalysisQuality": {
@@ -335,6 +462,16 @@
           },
           "engine": {
             "$ref": "#/components/schemas/AnalysisEngine"
+          },
+          "late": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisLate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "objective": {
             "$ref": "#/components/schemas/ObjectiveForm"
@@ -1450,6 +1587,18 @@
         "additionalProperties": false,
         "description": "GET /decisions/{id} (CC-204): \"snapshot, inventário, fonte de orçamento,\nelegibilidade\" — SÓ informação pré-decisão (ver DecisionStateSummary).",
         "properties": {
+          "anchorTimestampMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchortimestampms"
+          },
           "budget": {
             "$ref": "#/components/schemas/DecisionBudget"
           },
@@ -1469,6 +1618,11 @@
           },
           "inventory": {
             "$ref": "#/components/schemas/DecisionInventory"
+          },
+          "inventoryTolerated": {
+            "default": false,
+            "title": "Inventorytolerated",
+            "type": "boolean"
           },
           "level": {
             "$ref": "#/components/schemas/ObservedLevel"
@@ -1530,6 +1684,18 @@
         "additionalProperties": false,
         "description": "Item de GET /matches/{id}/decisions (CC-204): SÓ informação pré-decisão.\n`decision_id` é o id do PONTO de decisão. Proibido aqui: item comprado,\nclasse do alvo, bloco retrospectivo, features, qualidade cumulativa e\nsubject_hash.",
         "properties": {
+          "anchorTimestampMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchortimestampms"
+          },
           "budgetSource": {
             "$ref": "#/components/schemas/BudgetSource"
           },
@@ -1593,6 +1759,22 @@
             ],
             "title": "Reconstructionruleshealth",
             "type": "string"
+          },
+          "reconstructionRulesMainVerdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ACCEPT",
+                  "REJECT",
+                  "NO_SAMPLE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructionrulesmainverdict"
           },
           "reconstructionRulesVerdict": {
             "anyOf": [
@@ -1810,6 +1992,35 @@
             "title": "Reconstructionruleshealth",
             "type": "string"
           },
+          "reconstructionRulesMainVerdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ACCEPT",
+                  "REJECT",
+                  "NO_SAMPLE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructionrulesmainverdict"
+          },
+          "reconstructionRulesMainWilsonUpper": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructionrulesmainwilsonupper"
+          },
           "reconstructionRulesPatch": {
             "anyOf": [
               {
@@ -1903,6 +2114,157 @@
           "email"
         ],
         "title": "EmailOnly",
+        "type": "object"
+      },
+      "ExplanationFact": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ANALYSIS",
+              "TRIGGER",
+              "CARD",
+              "CASE",
+              "ITEM",
+              "ABILITY"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "text"
+        ],
+        "title": "ExplanationFact",
+        "type": "object"
+      },
+      "ExplanationRequest": {
+        "additionalProperties": false,
+        "description": "CC-1505: pergunta opcional sobre a decisão (até 300 caracteres); sem pergunta, explica\npor que o item mais indicado faz sentido nesta partida.",
+        "properties": {
+          "question": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Question"
+          }
+        },
+        "title": "ExplanationRequest",
+        "type": "object"
+      },
+      "ExplanationResult": {
+        "additionalProperties": false,
+        "description": "Resposta fundamentada: cada frase cita os fatos de onde veio. `provider` LOCAL_MODEL só\nquando o modelo respondeu e alguma frase passou no validador; senão RULES (determinística).",
+        "properties": {
+          "analysisId": {
+            "format": "uuid",
+            "title": "Analysisid",
+            "type": "string"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/ExplanationFact"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "provider": {
+            "enum": [
+              "LOCAL_MODEL",
+              "RULES"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "sentences": {
+            "items": {
+              "$ref": "#/components/schemas/ExplanationSentence"
+            },
+            "title": "Sentences",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "GENERATED",
+              "DETERMINISTIC"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "analysisId",
+          "version",
+          "provider",
+          "status"
+        ],
+        "title": "ExplanationResult",
+        "type": "object"
+      },
+      "ExplanationSentence": {
+        "additionalProperties": false,
+        "properties": {
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "sources"
+        ],
+        "title": "ExplanationSentence",
         "type": "object"
       },
       "FeedbackRequest": {
@@ -2617,6 +2979,18 @@
             "format": "uuid",
             "title": "Attemptid",
             "type": "string"
+          },
+          "commitment": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commitment"
           },
           "comparison": {
             "anyOf": [
@@ -7092,6 +7466,80 @@
           }
         },
         "summary": "Read Analysis",
+        "tags": [
+          "analyses"
+        ]
+      }
+    },
+    "/api/v1/analyses/{analysis_id}/explanation": {
+      "post": {
+        "description": "CC-1505 (late game): fatos recuperados (análise, gatilhos, cartões, situações parecidas,\nitens e habilidades) e até 4 frases, cada uma com as fontes. Sem gravação; a pergunta não é\nregistrada.",
+        "operationId": "post_explanation_api_v1_analyses__analysis_id__explanation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "analysis_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Analysis Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplanationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Por que esta recomendação: resposta fundamentada nos fatos da decisão",
         "tags": [
           "analyses"
         ]

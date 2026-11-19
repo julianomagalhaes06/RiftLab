@@ -398,7 +398,7 @@ def test_out_of_scope_sub_reasons_are_preserved(
 
 
 def test_demo_scope_is_explicit_and_distinct_from_real_scope() -> None:
-    assert DEMO_SCOPE.origin is DEMO and DEMO_SCOPE.version == "demo_scope_v1"
+    assert DEMO_SCOPE.origin is DEMO and DEMO_SCOPE.version == "demo_scope_v2"
     [state] = _states([_buy(0, 1000, 3001)], origin=REAL)
     with pytest.raises(DecisionInputError) as excinfo:  # recorte demo nunca aplicado a dado real
         _evaluate(state, scope=DEMO_SCOPE)
@@ -646,7 +646,7 @@ def test_every_output_carries_all_versions() -> None:
     assert point is not None
     assert point.versions.to_payload() == {
         "reconstructionVersion": RECONSTRUCTION_ALGORITHM_VERSION,
-        "selectionVersion": "decision_selection_v2",
+        "selectionVersion": "decision_selection_v3",
         "featureSchemaVersion": "feature_schema_v1",
         "scopeVersion": "test_scope_v1",
         "catalogId": str(CATALOG_ID),
@@ -798,7 +798,7 @@ async def test_demo_0002_is_eligible_with_stale_frame_budget() -> None:
     assert point.features.values["level"] == 1 and point.features.values["level_age_ms"] == 472_000
     assert point.features.values["self_champion_id"] == 9001
     assert point.features.values["enemy_champion_ids"] == [9002]
-    assert point.versions.scope_version == "demo_scope_v1"
+    assert point.versions.scope_version == "demo_scope_v2"
     assert point.versions.curation_rules_version == "curated_demo_v1"
 
 

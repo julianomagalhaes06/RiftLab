@@ -58,6 +58,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analyses/{analysis_id}/explanation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Por que esta recomendação: resposta fundamentada nos fatos da decisão
+         * @description CC-1505 (late game): fatos recuperados (análise, gatilhos, cartões, situações parecidas,
+         *     itens e habilidades) e até 4 frases, cada uma com as fontes. Sem gravação; a pergunta não é
+         *     registrada.
+         */
+        post: operations["post_explanation_api_v1_analyses__analysis_id__explanation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analyses/{analysis_id}/feedback": {
         parameters: {
             query?: never;
@@ -986,16 +1008,26 @@ export interface components {
         AnalysisCandidate: {
             /** Affordability */
             affordability: string;
+            /** Baseprobability */
+            baseProbability?: number | null;
             /** Baserank */
             baseRank?: number | null;
             /** Evidencecodes */
             evidenceCodes?: string[];
             /** Explanations */
             explanations?: components["schemas"]["AnalysisExplanation"][];
+            /** Isdefault */
+            isDefault?: boolean | null;
+            /** Isdeviation */
+            isDeviation?: boolean | null;
             /** Itemid */
             itemId: number;
+            /** Lift */
+            lift?: number | null;
             /** Name */
             name?: string | null;
+            /** Probability */
+            probability?: number | null;
             /** Rank */
             rank: number;
             /** Remainingcost */
@@ -1010,7 +1042,7 @@ export interface components {
          * @description docs/contracts.md: engine: POPULARITY, RULES, CONTEXTUAL_RANKER.
          * @enum {string}
          */
-        AnalysisEngine: "POPULARITY" | "RULES" | "CONTEXTUAL_RANKER";
+        AnalysisEngine: "POPULARITY" | "RULES" | "CONTEXTUAL_RANKER" | "LATE_CONTEXT" | "LATE_PRIOR";
         /**
          * AnalysisExplanation
          * @description CC-305: frase determinística e o campo real/versão de onde vem.
@@ -1020,6 +1052,35 @@ export interface components {
             source: string;
             /** Text */
             text: string;
+        };
+        /**
+         * AnalysisLate
+         * @description CC-1504: resumo do late game. `defaultItemId` é o item mais comum para o campeão nesta
+         *     etapa; `deviationItemIds`, os que esta partida pede bem mais que o normal (lift ≥ log 1,5 e
+         *     probabilidade ≥ 5%); `claimStrong` libera a frase forte só se o teste do gate a sustentou.
+         */
+        AnalysisLate: {
+            /** Championsupport */
+            championSupport: number;
+            /**
+             * Claimstrong
+             * @default false
+             */
+            claimStrong: boolean;
+            /** Defaultitemid */
+            defaultItemId: number;
+            /** Deviationitemids */
+            deviationItemIds?: number[];
+            /** Gatepassed */
+            gatePassed: boolean;
+            /** Ordinal */
+            ordinal: number;
+            /** Plausiblecandidates */
+            plausibleCandidates: number;
+            /** Sourcepatch */
+            sourcePatch: string;
+            /** Version */
+            version: string;
         };
         /**
          * AnalysisQuality
@@ -1103,6 +1164,7 @@ export interface components {
              */
             decisionId: string;
             engine: components["schemas"]["AnalysisEngine"];
+            late?: components["schemas"]["AnalysisLate"] | null;
             objective: components["schemas"]["ObjectiveForm"];
             quality: components["schemas"]["AnalysisQuality"];
             /** Scorenote */
@@ -1528,6 +1590,8 @@ export interface components {
          *     elegibilidade" — SÓ informação pré-decisão (ver DecisionStateSummary).
          */
         DecisionState: {
+            /** Anchortimestampms */
+            anchorTimestampMs?: number | null;
             budget: components["schemas"]["DecisionBudget"];
             /**
              * Decisionid
@@ -1539,6 +1603,11 @@ export interface components {
             /** Eventsourceindex */
             eventSourceIndex: number;
             inventory: components["schemas"]["DecisionInventory"];
+            /**
+             * Inventorytolerated
+             * @default false
+             */
+            inventoryTolerated: boolean;
             level: components["schemas"]["ObservedLevel"];
             /** Mainitemordinal */
             mainItemOrdinal?: number | null;
@@ -1560,6 +1629,8 @@ export interface components {
          *     subject_hash.
          */
         DecisionStateSummary: {
+            /** Anchortimestampms */
+            anchorTimestampMs?: number | null;
             budgetSource: components["schemas"]["BudgetSource"];
             /**
              * Decisionid
@@ -1584,6 +1655,8 @@ export interface components {
              * @enum {string}
              */
             reconstructionRulesHealth: "OK" | "UNVERIFIED" | "SUSPENDED";
+            /** Reconstructionrulesmainverdict */
+            reconstructionRulesMainVerdict?: ("ACCEPT" | "REJECT" | "NO_SAMPLE") | null;
             /** Reconstructionrulesverdict */
             reconstructionRulesVerdict?: ("ACCEPT" | "REJECT" | "NO_SAMPLE") | null;
             /** Reconstructionruleswilsonupper */
@@ -1665,6 +1738,10 @@ export interface components {
              * @enum {string}
              */
             reconstructionRulesHealth: "OK" | "UNVERIFIED" | "SUSPENDED";
+            /** Reconstructionrulesmainverdict */
+            reconstructionRulesMainVerdict?: ("ACCEPT" | "REJECT" | "NO_SAMPLE") | null;
+            /** Reconstructionrulesmainwilsonupper */
+            reconstructionRulesMainWilsonUpper?: number | null;
             /** Reconstructionrulespatch */
             reconstructionRulesPatch?: string | null;
             /** Reconstructionrulesqueue */
@@ -1684,6 +1761,66 @@ export interface components {
         EmailOnly: {
             /** Email */
             email: string;
+        };
+        /** ExplanationFact */
+        ExplanationFact: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ANALYSIS" | "TRIGGER" | "CARD" | "CASE" | "ITEM" | "ABILITY";
+            /** Text */
+            text: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ExplanationRequest
+         * @description CC-1505: pergunta opcional sobre a decisão (até 300 caracteres); sem pergunta, explica
+         *     por que o item mais indicado faz sentido nesta partida.
+         */
+        ExplanationRequest: {
+            /** Question */
+            question?: string | null;
+        };
+        /**
+         * ExplanationResult
+         * @description Resposta fundamentada: cada frase cita os fatos de onde veio. `provider` LOCAL_MODEL só
+         *     quando o modelo respondeu e alguma frase passou no validador; senão RULES (determinística).
+         */
+        ExplanationResult: {
+            /**
+             * Analysisid
+             * Format: uuid
+             */
+            analysisId: string;
+            /** Facts */
+            facts?: components["schemas"]["ExplanationFact"][];
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "LOCAL_MODEL" | "RULES";
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Sentences */
+            sentences?: components["schemas"]["ExplanationSentence"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "GENERATED" | "DETERMINISTIC";
+            /** Version */
+            version: string;
+        };
+        /** ExplanationSentence */
+        ExplanationSentence: {
+            /** Sources */
+            sources: string[];
+            /** Text */
+            text: string;
         };
         /**
          * FeedbackRequest
@@ -1995,6 +2132,10 @@ export interface components {
              * Format: uuid
              */
             attemptId: string;
+            /** Commitment */
+            commitment?: {
+                [key: string]: unknown;
+            } | null;
             comparison?: components["schemas"]["AnalysisResult"] | null;
             /** Context */
             context: {
@@ -3592,6 +3733,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    post_explanation_api_v1_analyses__analysis_id__explanation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                analysis_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplanationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExplanationResult"];
                 };
             };
             /** @description Not Found */

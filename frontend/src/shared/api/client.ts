@@ -40,6 +40,8 @@ export type LearningAttempt = Schemas["LearningAttemptPublicState"];
 export type AnalysisResult = Schemas["AnalysisResult"];
 export type AnalysisCandidate = Schemas["AnalysisCandidate"];
 export type AnalysisReferenceSource = Schemas["AnalysisReferenceSource"];
+export type AnalysisLate = Schemas["AnalysisLate"];
+export type ExplanationResult = Schemas["ExplanationResult"];
 /** Fila do Painel (CC-904): sem valor, o servidor usa a da partida própria mais recente. */
 export type DashboardQueueParam = "RANKED_SOLO_5x5" | "RANKED_FLEX_SR";
 export type HistorySyncStatus = Schemas["HistorySyncStatus"];
@@ -183,6 +185,8 @@ export interface ApiClient {
     signal?: AbortSignal,
   ): Promise<AnalysisResult>;
   interpretObjective(text: string, signal?: AbortSignal): Promise<ObjectiveInterpretation>;
+  /** CC-1505: resposta com fontes sobre uma análise de late game (pergunta opcional). */
+  explainAnalysis(analysisId: string, question?: string | null, signal?: AbortSignal): Promise<ExplanationResult>;
   getPurgePreview(matchId: string, signal?: AbortSignal): Promise<PurgePreview>;
   /** CC-603: expurgo com confirmação explícita (o próprio id); devolve o job PURGE. */
   purgeMatch(matchId: string, signal?: AbortSignal): Promise<ImportJobAccepted>;
@@ -375,6 +379,11 @@ export function createApiClient(fetchImpl?: typeof fetch): ApiClient {
     // CC-504: o texto é dado; o servidor devolve INTERPRETED (para confirmar) ou NEEDS_INPUT.
     interpretObjective: (text, signal) =>
       request("POST", "/api/v1/objectives/interpret", { body: { text }, signal }),
+    explainAnalysis: (analysisId, question, signal) =>
+      request("POST", `/api/v1/analyses/${enc(analysisId)}/explanation`, {
+        body: question ? { question } : {},
+        signal,
+      }),
     revealAttempt: (attemptId, signal) =>
       studied(request("POST", `/api/v1/learning-attempts/${enc(attemptId)}/reveal`, {
         body: { explicit: true },

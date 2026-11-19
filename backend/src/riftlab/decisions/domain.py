@@ -11,7 +11,7 @@ from riftlab.shared.errors import DomainError
 
 # v2 (CC-1005): itens possuídos que são resultado de linhagem (cadeia do item de Apoio,
 # transformações) contam pela identidade da origem ao classificar o inventário.
-DECISION_SELECTION_VERSION = "decision_selection_v2"
+DECISION_SELECTION_VERSION = "decision_selection_v3"  # v3 (CC-1501): âncora de compromisso
 FEATURE_SCHEMA_VERSION = "feature_schema_v1"
 
 # Códigos de elegibilidade. Os três primeiros são os mínimos do contrato
@@ -187,6 +187,9 @@ class StoredDecisionPoint:
     reasons: list[dict[str, Any]]
     budget: dict[str, Any]
     features: dict[str, Any] | None
+    # CC-1501: âncora de compromisso (AnchorInfo.to_payload); None em extrações antigas e em
+    # pontos que não são item principal completo.
+    anchor: dict[str, Any] | None = None
 
 
 class DecisionRepository(Protocol):

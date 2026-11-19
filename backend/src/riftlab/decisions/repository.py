@@ -97,6 +97,7 @@ class SqlAlchemyDecisionRepository:
                 reasons=point.reasons,
                 budget=point.budget,
                 features=point.features,
+                anchor=point.anchor,
             )
         )
 
@@ -221,4 +222,5 @@ def _point_from_row(row: DecisionPointModel) -> StoredDecisionPoint:
         reasons=row.reasons,
         budget=row.budget,
         features=row.features,
+        anchor=row.anchor,
     )

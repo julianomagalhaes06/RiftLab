@@ -25,6 +25,10 @@ COPY configs/item-rules ./configs/item-rules
 COPY configs/ranking ./configs/ranking
 # Revisão da partida (F1, CC-1003/CC-1004): referência agregada e modelo de chance de vitória.
 COPY configs/match-review ./configs/match-review
+# Late game (CC-1501..1505): perfis do Data Dragon, padrão/gate por patch e cartões do RAG.
+COPY configs/profiles ./configs/profiles
+COPY configs/late ./configs/late
+COPY configs/knowledge ./configs/knowledge
 
 # ---- test: inclui dependencias de dev (pytest/ruff/mypy) e testes ----
 FROM base AS test
@@ -44,7 +48,8 @@ CMD ["pytest"]
 
 # ---- runtime: api e worker compartilham esta imagem, comando definido no compose ----
 FROM base AS runtime
-RUN uv sync --frozen --no-dev
+# CC-1504: o motor de late game lê o modelo CatBoost (grupo ml: catboost + numpy).
+RUN uv sync --frozen --no-dev --group ml
 # Código e dependências permanecem do root e legíveis ao usuário de execução.
 # Somente os dados abaixo precisam de escrita; evitar copiar toda a venv no overlay.
 RUN useradd --create-home --uid 1000 riftlab
@@ -53,7 +58,7 @@ RUN useradd --create-home --uid 1000 riftlab
 # conteudo/permissoes de um caminho ja existente na imagem para dentro do
 # volume na primeira montagem; sem isso o ponto de montagem nasce root:root e
 # o processo riftlab (nao-root) nunca consegue escrever ali.
-RUN mkdir -p /app/data/raw && chown -R riftlab:riftlab /app/data
+RUN mkdir -p /app/data/raw /app/artifacts/late && chown -R riftlab:riftlab /app/data
 USER riftlab
 ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8000

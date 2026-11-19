@@ -11,6 +11,7 @@ import {
   formatGameTime,
   ordinalLabel,
   reasonText,
+  rulesBlockAnalysis,
   subReasonText,
 } from "./format";
 import { ChampionAvatar } from "../history/ChampionAvatar";
@@ -36,6 +37,12 @@ type InventoryItem = NonNullable<DecisionState["inventory"]["items"]>[number];
 
 /** Posições de `items` sem par em `against`, contando repetições (duas Espadas Longas contra uma
  * deixam uma sem par). Quantidade de consumível não conta como item novo. */
+
+/** Instante da decisão: a âncora de compromisso quando existe, senão o da compra. */
+function decisionTimeMs(d: { timestampMs: number; anchorTimestampMs?: number | null }): number {
+  return d.anchorTimestampMs ?? d.timestampMs;
+}
+
 function unmatched(items: InventoryItem[], against: InventoryItem[]): number[] {
   const pool = new Map<number, number>();
   for (const item of against) pool.set(item.itemId, (pool.get(item.itemId) ?? 0) + 1);
@@ -83,6 +90,12 @@ function Inventory({ decision, before }: { decision: DecisionState; before: Deci
       {uncertain ? (
         <p className="notice notice--warning" role="note">
           Inventário incerto: os itens abaixo são o melhor estado reconstruído, sem garantia.
+        </p>
+      ) : null}
+      {decision.inventoryTolerated ? (
+        <p className="muted" role="note" data-testid="inventory-tolerated">
+          Botas, sentinelas ou consumíveis sem registro completo na linha do tempo foram retirados;
+          eles não mudam quais itens principais eram possíveis.
         </p>
       ) : null}
       <div className="inventory-grid">
@@ -161,6 +174,13 @@ function InheritedRules({ decision, patch, queue }: { decision: DecisionState; p
       Análise bloqueada: a amostra atual foi invalidada e precisa de recontagem. A suspensão foi
       mantida pelo REJECT anterior das regras do patch {source}, que encontrou {failures} divergências
       em {n} participantes limpos.
+    </p>
+  );
+  if (health === "SUSPENDED" && decision.versions.reconstructionRulesMainVerdict === "ACCEPT") return (
+    <p className="decision-inherited" role="note" data-testid="rules-main-items-confirmed">
+      A herança das regras do patch {source} foi suspensa pelo inventário completo ({failures} divergências
+      em {n} participantes limpos, quase sempre botas, sentinelas e etapas do item de suporte), mas confere
+      nos itens principais e componentes, que são os que a análise usa. A análise segue com este aviso.
     </p>
   );
   if (health === "SUSPENDED") return (
@@ -269,7 +289,7 @@ function useDecisionContext(matchId: string | null, participantId: number | null
 /** `currentId`: o momento pedido na URL, marcado já no clique, antes de a decisão chegar. */
 function DecisionStrip({ currentId, decisions, durationSeconds }: { currentId: string; decisions: DecisionSummary[]; durationSeconds: number | null }) {
   if (decisions.length < 2) return null;
-  const sorted = [...decisions].sort((a, b) => a.timestampMs - b.timestampMs);
+  const sorted = [...decisions].sort((a, b) => decisionTimeMs(a) - decisionTimeMs(b));
   const index = sorted.findIndex((d) => d.decisionId === currentId);
   const end = Math.max(durationSeconds ? durationSeconds * 1000 : 0, sorted.at(-1)!.timestampMs);
   const previous = index > 0 ? sorted[index - 1] : null;
@@ -277,7 +297,7 @@ function DecisionStrip({ currentId, decisions, durationSeconds }: { currentId: s
   return (
     <nav className="decision-strip" aria-label="Outras decisões deste participante">
       {previous ? (
-        <Link to={{ name: "decision", decisionId: previous.decisionId }} className="decision-strip__step">← {formatGameTime(previous.timestampMs)}</Link>
+        <Link to={{ name: "decision", decisionId: previous.decisionId }} className="decision-strip__step">← {formatGameTime(decisionTimeMs(previous))}</Link>
       ) : <span className="decision-strip__step decision-strip__step--off" aria-hidden="true">←</span>}
       <div className="decision-strip__track">
         {sorted.map((d) => (
@@ -285,24 +305,24 @@ function DecisionStrip({ currentId, decisions, durationSeconds }: { currentId: s
             key={d.decisionId}
             to={{ name: "decision", decisionId: d.decisionId }}
             className={`decision-strip__dot${d.decisionId === currentId ? " decision-strip__dot--current" : ""}${d.eligible ? " decision-strip__dot--eligible" : ""}`}
-            style={{ left: `${(d.timestampMs / end) * 100}%` }}
-            aria-label={`Ir para a decisão em ${formatGameTime(d.timestampMs)}${d.decisionId === currentId ? " (atual)" : ""}`}
+            style={{ left: `${(decisionTimeMs(d) / end) * 100}%` }}
+            aria-label={`Ir para a decisão em ${formatGameTime(decisionTimeMs(d))}${d.decisionId === currentId ? " (atual)" : ""}`}
             aria-current={d.decisionId === currentId ? "true" : undefined}
           >
-            <span className="decision-strip__label" aria-hidden="true">{formatGameTime(d.timestampMs)}</span>
+            <span className="decision-strip__label" aria-hidden="true">{formatGameTime(decisionTimeMs(d))}</span>
           </Link>
         ))}
         {/* Marcador do momento atual: um só, que desliza do anterior para o novo (mostra para onde
             e quanto se andou na partida). `--at` é a posição em % da trilha (cqw no CSS); só
             transform anima e o marcador tem largura zero, então não alarga a página. */}
         {index >= 0 ? (
-          <span className="decision-strip__marker" aria-hidden="true" style={{ "--at": String((sorted[index].timestampMs / end) * 100) } as CSSProperties}>
+          <span className="decision-strip__marker" aria-hidden="true" style={{ "--at": String((decisionTimeMs(sorted[index]) / end) * 100) } as CSSProperties}>
             <span />
           </span>
         ) : null}
       </div>
       {next ? (
-        <Link to={{ name: "decision", decisionId: next.decisionId }} className="decision-strip__step">{formatGameTime(next.timestampMs)} →</Link>
+        <Link to={{ name: "decision", decisionId: next.decisionId }} className="decision-strip__step">{formatGameTime(decisionTimeMs(next))} →</Link>
       ) : <span className="decision-strip__step decision-strip__step--off" aria-hidden="true">→</span>}
     </nav>
   );
@@ -384,6 +404,13 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
   }
 
   const decision = shown!;
+  // CC-1501: a decisão de um item principal começa na âncora de compromisso (primeira compra
+  // depois do item anterior); o instante em que o item ficou pronto segue no HUD.
+  const decidedAt = decisionTimeMs(decision);
+  const blocked = rulesBlockAnalysis(
+    decision.versions.reconstructionRulesHealth,
+    decision.versions.reconstructionRulesMainVerdict,
+  );
   const reasons = decision.reasons ?? [];
   const ordinal = ordinalLabel(decision.mainItemOrdinal);
   const match = context?.match ?? null;
@@ -403,17 +430,17 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         <div className="decision-hero__title">
           <h2 id="decision-heading">
             {participant && match?.localParticipantId === decision.participantId
-              ? `Sua decisão em ${formatGameTime(decision.timestampMs)}`
+              ? `Sua decisão em ${formatGameTime(decidedAt)}`
               : participant
-                ? `Decisão de ${championName(participant)} em ${formatGameTime(decision.timestampMs)}`
-                : `Decisão em ${formatGameTime(decision.timestampMs)} — participante ${decision.participantId}`}
+                ? `Decisão de ${championName(participant)} em ${formatGameTime(decidedAt)}`
+                : `Decisão em ${formatGameTime(decidedAt)} — participante ${decision.participantId}`}
           </h2>
           <p className="decision-hero__meta">
             {participant ? <strong>{championName(participant)}</strong> : null}
             {participant?.role ? <span>{roleShort(participant.role)}</span> : null}
             {ordinal ? <span>{ordinal}</span> : null}
             <span className={`chip badge ${decision.eligible ? "badge--eligible" : "badge--ineligible"}`}>
-              {decision.versions.reconstructionRulesHealth === "SUSPENDED" ? "Análise bloqueada" : decision.eligible ? "Elegível para análise" : "Inelegível para análise"}
+              {blocked ? "Análise bloqueada" : decision.eligible ? "Elegível para análise" : "Inelegível para análise"}
             </span>
           </p>
         </div>
@@ -421,7 +448,12 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         <div className="decision-hud">
           <div className="decision-hud__stat">
             <h3>Momento</h3>
-            <p className="decision-stat__value">{formatGameTime(decision.timestampMs)}</p>
+            <p className="decision-stat__value">{formatGameTime(decidedAt)}</p>
+            {decidedAt !== decision.timestampMs ? (
+              <p className="decision-stat__line" data-testid="completed-at">
+                item pronto em {formatGameTime(decision.timestampMs)}
+              </p>
+            ) : null}
             <Level decision={decision} />
           </div>
           <Budget decision={decision} />
@@ -451,7 +483,7 @@ export function DecisionDetailPage({ decisionId }: { decisionId: string }) {
         {/* De onde vêm os dados: a linha do tempo oficial da Riot até esta decisão. */}
         {/* Id da URL: o rastro (só leitura, vale para qualquer decisão) carrega junto com a decisão. */}
         <DecisionTrace decisionId={decisionId} />
-        {decision.eligible && decision.versions.reconstructionRulesHealth !== "SUSPENDED" ? (
+        {decision.eligible && !blocked ? (
           hasAccount ? <DecisionExperience decisionId={decision.decisionId} /> : (
             <AccountGate
               title="Analise esta compra"

@@ -109,6 +109,29 @@ class AnalysisCandidate(CamelModel):
     evidence_codes: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)  # atributos do catálogo (públicos)
     explanations: list[AnalysisExplanation] = Field(default_factory=list)
+    # CC-1504 (late game): probabilidade estimada entre os itens plausíveis, a do padrão, o
+    # lift (log da razão) e os papéis do item na decisão. Nulos fora do late game.
+    probability: float | None = Field(default=None, ge=0, le=1)
+    base_probability: float | None = Field(default=None, ge=0, le=1)
+    lift: float | None = None
+    is_default: bool | None = None
+    is_deviation: bool | None = None
+
+
+class AnalysisLate(CamelModel):
+    """CC-1504: resumo do late game. `defaultItemId` é o item mais comum para o campeão nesta
+    etapa; `deviationItemIds`, os que esta partida pede bem mais que o normal (lift ≥ log 1,5 e
+    probabilidade ≥ 5%); `claimStrong` libera a frase forte só se o teste do gate a sustentou."""
+
+    version: str = Field(min_length=1, max_length=40)
+    ordinal: int = Field(ge=1, le=6)
+    default_item_id: int = Field(ge=1)
+    deviation_item_ids: list[int] = Field(default_factory=list)
+    gate_passed: bool
+    claim_strong: bool = False
+    source_patch: str = Field(min_length=1, max_length=20)
+    plausible_candidates: int = Field(ge=0)
+    champion_support: int = Field(ge=0)
 
 
 class AnalysisResult(CamelModel):
@@ -127,6 +150,7 @@ class AnalysisResult(CamelModel):
     support: AnalysisSupport
     candidates: list[AnalysisCandidate] = Field(default_factory=list)
     score_note: str | None = None
+    late: AnalysisLate | None = None
 
     @model_validator(mode="after")
     def _no_candidates_without_evidence(self) -> AnalysisResult:
@@ -142,10 +166,47 @@ class AnalysisResult(CamelModel):
         return self
 
 
+class ExplanationRequest(CamelModel):
+    """CC-1505: pergunta opcional sobre a decisão (até 300 caracteres); sem pergunta, explica
+    por que o item mais indicado faz sentido nesta partida."""
+
+    question: str | None = Field(default=None, min_length=1, max_length=300)
+
+
+class ExplanationFact(CamelModel):
+    id: str = Field(min_length=1, max_length=120)
+    kind: Literal["ANALYSIS", "TRIGGER", "CARD", "CASE", "ITEM", "ABILITY"]
+    title: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class ExplanationSentence(CamelModel):
+    text: str = Field(min_length=1, max_length=400)
+    sources: list[str] = Field(min_length=1)
+
+
+class ExplanationResult(CamelModel):
+    """Resposta fundamentada: cada frase cita os fatos de onde veio. `provider` LOCAL_MODEL só
+    quando o modelo respondeu e alguma frase passou no validador; senão RULES (determinística)."""
+
+    analysis_id: UUID
+    version: str = Field(min_length=1, max_length=40)
+    provider: Literal["LOCAL_MODEL", "RULES"]
+    status: Literal["GENERATED", "DETERMINISTIC"]
+    sentences: list[ExplanationSentence] = Field(default_factory=list)
+    facts: list[ExplanationFact] = Field(default_factory=list)
+    reason_codes: list[str] = Field(default_factory=list)
+
+
 __all__ = [
     "MINIMUM_ANALYSIS_REASON_CODES",
+    "ExplanationFact",
+    "ExplanationRequest",
+    "ExplanationResult",
+    "ExplanationSentence",
     "AnalysisCandidate",
     "AnalysisExplanation",
+    "AnalysisLate",
     "AnalysisQuality",
     "AnalysisReferenceSource",
     "AnalysisRequest",

@@ -17,6 +17,7 @@ import { useItemName } from "../../shared/hooks/useItemName";
 import { ItemIcon } from "../../shared/ui/ItemIcon";
 import "../review/review.css";
 import { count } from "../../shared/text/count";
+import { CommitmentNote, LateExplanation, LateMarks, LateSummary } from "./LateInsight";
 
 /**
  * Jornada de estudo de uma decisão (CC-304/305, docs/learning-design.md): escolher o
@@ -27,7 +28,9 @@ import { count } from "../../shared/text/count";
 
 const ENGINE_TEXT: Readonly<Record<string, string>> = {
   POPULARITY: "Popularidade nas decisões de referência deste campeão nesta etapa da build",
-  RULES: "Regras explícitas (aproveitar componentes e custo restante)",
+  RULES: "Regras explícitas (custo restante e composição inimiga)",
+  LATE_CONTEXT: "Modelo de late game: padrão do campeão ajustado pelo contexto desta partida",
+  LATE_PRIOR: "Padrão de late game do campeão nesta etapa da build",
 };
 
 const REASON_TEXT: Readonly<Record<string, string>> = {
@@ -55,6 +58,10 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
   POPULARITY_SOURCE_CATALOG_IDENTITY_MISMATCH: "O catálogo não corresponde à identidade congelada da referência; foi usado o critério de regras explícitas.",
   POPULARITY_SOURCE_PATCH_NOT_PREVIOUS: "A referência não pertence a um patch numérico anterior; foi usado o critério de regras explícitas.",
   NO_INHERITED_POPULARITY_FOR_CELL: "Após o filtro do catálogo não restaram decisões de referência para esta célula; foi usado o critério de regras explícitas.",
+  LATE_MODEL_GATE_FAILED: "O modelo contextual de late game não passou no teste pré-registrado (ou não está instalado); a ordem é só o padrão do campeão.",
+  LATE_MODEL_INHERITED: "A referência de late game vem do último patch medido, não do patch desta partida.",
+  INVENTORY_TOLERATED_NON_MAIN: "Botas, sentinelas ou consumíveis sem registro completo foram retirados do inventário; eles não mudam os itens principais possíveis.",
+  ANCHOR_STATE_MISSING: "O momento em que esta escolha começou não pôde ser lido.",
 };
 
 function engineText(engine: string, referenceSource?: AnalysisReferenceSource | null): string {
@@ -69,12 +76,13 @@ function reasonText(code: string): string {
   return REASON_TEXT[code] ?? `Motivo: ${code}`;
 }
 
-export function Comparison({ comparison, selectedItemId, historicalItemId, headingRef, objectiveSource }: {
+export function Comparison({ comparison, selectedItemId, historicalItemId, headingRef, objectiveSource, commitment }: {
   comparison: AnalysisResult | null;
   selectedItemId?: number | null;
   historicalItemId?: number | null;
   headingRef: RefObject<HTMLHeadingElement | null>;
   objectiveSource?: string;
+  commitment?: Record<string, unknown> | null;
 }) {
   const name = useItemName();
   if (!comparison) {
@@ -92,6 +100,8 @@ export function Comparison({ comparison, selectedItemId, historicalItemId, headi
         Objetivo: {objectiveLabel(comparison.objective.priority)} ({objectiveSource ?? objectiveOrigin(comparison.objective)}) ·
         Critério: {engineText(comparison.engine, referenceSource)}
       </p>
+      {comparison.late ? <LateSummary late={comparison.late} /> : null}
+      <CommitmentNote commitment={commitment} />
       {referenceSource ? (
         <p className="muted" data-testid="reference-source">
           {referenceSource.type === "INHERITED"
@@ -140,6 +150,7 @@ export function Comparison({ comparison, selectedItemId, historicalItemId, headi
                     <span className="comparison-card__slot"><ItemIcon itemId={candidate.itemId} /></span>
                     <strong className="comparison-card__name">{candidate.rank}. {name(candidate)}</strong>
                   </div>
+                  <LateMarks candidate={candidate} late={comparison.late} />
                   {chosen || historical || moved ? (
                     <p className="comparison-card__marks">
                       {chosen ? <span className="tag-chosen">sua escolha</span> : null}
@@ -166,6 +177,7 @@ export function Comparison({ comparison, selectedItemId, historicalItemId, headi
           ))}
         </>
       )}
+      {comparison.late && candidates.length > 0 ? <LateExplanation analysisId={comparison.analysisId} /> : null}
       {historicalItemId != null &&
       !candidates.some((candidate) => candidate.itemId === historicalItemId) ? (
         <p className="muted">A compra feita na partida não está entre as alternativas mostradas.</p>
@@ -533,7 +545,7 @@ export function StudyPanel({ decisionId }: { decisionId: string }) {
         ) : null}
       </div>
       {error ? <ErrorNotice error={error} /> : null}
-      {revealed ? <Comparison comparison={attempt.comparison ?? null} selectedItemId={attempt.selectedItemId} historicalItemId={attempt.historicalItemId} headingRef={comparisonHeading} /> : null}
+      {revealed ? <Comparison comparison={attempt.comparison ?? null} selectedItemId={attempt.selectedItemId} historicalItemId={attempt.historicalItemId} headingRef={comparisonHeading} commitment={attempt.commitment} /> : null}
       {revealed ? <Scenario decisionId={decisionId} comparison={attempt.comparison ?? null} /> : null}
       {revealed ? <Reanalysis decisionId={decisionId} comparison={attempt.comparison ?? null} /> : null}
       {revealed ? <Reflection attempt={attempt} onSaved={setAttempt} /> : null}

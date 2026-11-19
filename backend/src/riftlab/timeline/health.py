@@ -34,7 +34,7 @@ from riftlab.timeline.application import (
     _referenced_item_ids,
     reconstruct_participant,
 )
-from riftlab.timeline.closure import closure_detail, verdict
+from riftlab.timeline.closure import closure_detail, main_closure_failed, verdict
 from riftlab.timeline.empirical_rules import EmpiricalRules, apply_role_prepasses
 from riftlab.timeline.models import MatchReconstructionModel
 from riftlab.timeline.repository import SqlAlchemyTimelineRepository
@@ -52,6 +52,10 @@ class PatchRuleHealthModel(UuidPkMixin, Base):
             name="health_counts",
         ),
         CheckConstraint("verdict IN ('ACCEPT', 'REJECT', 'NO_SAMPLE')", name="health_verdict"),
+        CheckConstraint(
+            "main_verdict IS NULL OR main_verdict IN ('ACCEPT', 'REJECT', 'NO_SAMPLE')",
+            name="health_main_verdict",
+        ),
         CheckConstraint(
             "NOT is_invalidation OR (verdict = 'NO_SAMPLE' AND clean_participants = 0 "
             "AND failures = 0 AND contributing_matches = 0 AND wilson_upper IS NULL)",
@@ -75,6 +79,11 @@ class PatchRuleHealthModel(UuidPkMixin, Base):
     contributing_matches: Mapped[int] = mapped_column(Integer)
     wilson_upper: Mapped[float | None] = mapped_column(Float)
     verdict: Mapped[str] = mapped_column(String)
+    # CC-1504: mesma amostra, só itens principais e componentes com a linhagem (None = linha
+    # anterior à medida ou contribuição sem a medida).
+    main_failures: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    main_wilson_upper: Mapped[float | None] = mapped_column(Float, nullable=True)
+    main_verdict: Mapped[str | None] = mapped_column(String, nullable=True)
     is_invalidation: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false")
     )
@@ -114,6 +123,7 @@ class MatchRuleHealthContributionModel(Base):
     rules_fingerprint: Mapped[str | None] = mapped_column(String(64))
     clean_participants: Mapped[int] = mapped_column(Integer)
     failures: Mapped[int] = mapped_column(Integer)
+    main_failures: Mapped[int | None] = mapped_column(Integer, nullable=True)
     marker_key: Mapped[str] = mapped_column(String(32))
     officials: Mapped[int] = mapped_column(Integer)
     computed_at: Mapped[datetime] = mapped_column(
@@ -161,6 +171,10 @@ def public_health(
         "failures": display_row.failures if display_row else 0,
         "verdict": row.verdict if row else None,
         "wilsonUpper": row.wilson_upper if row else None,
+        # CC-1504: G-FINAL só de itens principais/componentes. ACCEPT aqui libera a análise de
+        # itens principais mesmo com a herança suspensa pelo inventário completo.
+        "mainVerdict": row.main_verdict if row else None,
+        "mainWilsonUpper": row.main_wilson_upper if row else None,
     }
 
 
@@ -300,6 +314,7 @@ async def _contribution(session: AsyncSession, match: MatchModel) -> dict[str, A
         "rules_fingerprint": fingerprint(provenance),
         "clean_participants": 0,
         "failures": 0,
+        "main_failures": 0,
     }
     officials = (
         await session.scalars(
@@ -313,6 +328,10 @@ async def _contribution(session: AsyncSession, match: MatchModel) -> dict[str, A
         return result
     bundle = await _catalog(session, marker.catalog_id)
     full_catalog = {i.item_id: i for i in bundle.items}
+
+    def table_class(item_id: int) -> Any:
+        return bundle.classification.classify(item_id).item_class
+
     repo = SqlAlchemyCatalogRepository(session)
     events = await SqlAlchemyTimelineRepository(session).list_events(match.match_id)
     # O replay usa o mesmo contexto de catálogo da reconstrução (domínio FULL
@@ -353,6 +372,9 @@ async def _contribution(session: AsyncSession, match: MatchModel) -> dict[str, A
         failed = closure_detail(replay.final_inventory, final, full_catalog).failed
         result["clean_participants"] += 1
         result["failures"] += int(failed)
+        result["main_failures"] += int(
+            main_closure_failed(replay.final_inventory, final, table_class)
+        )
     return result
 
 
@@ -396,6 +418,7 @@ async def _refresh_contributions(session: AsyncSession, patch: str, only: str | 
                 rules_fingerprint=found["rules_fingerprint"] if found else None,
                 clean_participants=found["clean_participants"] if found else 0,
                 failures=found["failures"] if found else 0,
+                main_failures=found["main_failures"] if found else 0,
                 marker_key=marker_key,
                 officials=officials,
             )
@@ -426,7 +449,9 @@ async def _aggregate(session: AsyncSession, patch: str) -> list[dict[str, Any]]:
             .order_by(MatchRuleHealthContributionModel.match_id)
         )
     ).scalars()
-    groups: dict[tuple[str, str, str, int | None], list[int]] = defaultdict(lambda: [0, 0, 0])
+    groups: dict[tuple[str, str, str, int | None], list[int]] = defaultdict(lambda: [0, 0, 0, 0])
+    # Contribuição gravada antes da medida de itens principais: o grupo fica sem ela.
+    unmeasured: set[tuple[str, str, str, int | None]] = set()
     for row in rows:
         assert row.application and row.source_patch and row.rules_fingerprint
         key = (row.application, row.source_patch, row.rules_fingerprint)
@@ -437,9 +462,18 @@ async def _aggregate(session: AsyncSession, patch: str) -> list[dict[str, Any]]:
             group[0] += row.clean_participants
             group[1] += row.failures
             group[2] += int(row.clean_participants > 0)
+            if row.main_failures is None:
+                unmeasured.add((*key, queue))
+            else:
+                group[3] += row.main_failures
     reports = []
-    for (application, source, fp, queue), (n, k, contributing) in groups.items():
+    for (application, source, fp, queue), (n, k, contributing, k_main) in groups.items():
         outcome, upper = verdict(n, k, contributing)
+        main_outcome, main_upper = (
+            (None, None)
+            if (application, source, fp, queue) in unmeasured
+            else verdict(n, k_main, contributing)
+        )
         session.add(
             PatchRuleHealthModel(
                 game_patch=patch,
@@ -453,6 +487,9 @@ async def _aggregate(session: AsyncSession, patch: str) -> list[dict[str, Any]]:
                 contributing_matches=contributing,
                 wilson_upper=upper,
                 verdict=outcome,
+                main_failures=None if main_outcome is None else k_main,
+                main_wilson_upper=main_upper,
+                main_verdict=main_outcome,
             )
         )
         reports.append(
@@ -466,6 +503,8 @@ async def _aggregate(session: AsyncSession, patch: str) -> list[dict[str, Any]]:
                 contributingMatches=contributing,
                 wilsonUpper=upper,
                 verdict=outcome,
+                mainFailures=None if main_outcome is None else k_main,
+                mainVerdict=main_outcome,
             )
         )
     return reports

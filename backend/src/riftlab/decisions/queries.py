@@ -289,7 +289,19 @@ async def get_decision_detail(
         point = await decisions.get_point(decision_id)
         if point is None:
             raise NotFoundError(f"decisão {decision_id} não encontrada")
-        inventory, level = await decisions.get_pre_decision_context(point.decision_state_id)
+        # CC-1501: o contexto mostrado é o da âncora de compromisso, sem os itens cuja dúvida foi
+        # tolerada (botas, consumíveis, trinket); extrações antigas usam o instante da compra.
+        anchor = point.anchor or {}
+        context_state = (
+            uuid.UUID(str(anchor["stateId"])) if anchor.get("stateId") else point.decision_state_id
+        )
+        inventory, level = await decisions.get_pre_decision_context(context_state)
+        removed = {str(i) for i in anchor.get("removedItemIds", [])}
+        if removed:
+            inventory = {
+                **inventory,
+                "items": {k: v for k, v in inventory.get("items", {}).items() if k not in removed},
+            }
         provenance = await decisions.get_rules_provenance(point.decision_state_id)
         application, rules_patch = rules_origin(provenance)
         from riftlab.timeline.health import health_for_state

@@ -11,6 +11,8 @@ services:
       RIFTLAB_OBJECTIVE_MODEL_URL: http://localhost/interpret
       RIFTLAB_OBJECTIVE_MODEL_SOCKET_PATH: /run/riftlab-objective/interpret.sock
       RIFTLAB_OBJECTIVE_MODEL_VERSION: qwen2.5-1.5b-lora-v3-q4_k_m
+      # CC-1505: a mesma sessão responde a explicação com fontes do late game (rota /explain).
+      RIFTLAB_EXPLAINER: ${RIFTLAB_EXPLAINER:-local_model}
     volumes:
       - type: bind
         source: ${RIFTLAB_LOCAL_MODEL_SOCKET_DIR:?Defina o diretorio privado do socket}
