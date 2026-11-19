@@ -15,6 +15,8 @@ from typing import Any
 
 import typer
 
+from riftlab.shared.numeric import is_ascii_digits
+
 late_app = typer.Typer(
     help="Late game (3º–6º item principal, qualquer campeão): dados, modelo e conhecimento.",
     no_args_is_help=True,
@@ -322,6 +324,7 @@ def _load_split_matrices(
             metas[split].append(
                 {
                     "matchId": row["matchId"],
+                    "participantId": row["participantId"],
                     "championId": row["championId"],
                     "role": row.get("role"),
                     "ordinal": row["ordinal"],
@@ -394,8 +397,6 @@ def _scored(model: Any, matrix: Any, metas: list[dict[str, Any]], space: Any) ->
 
 
 def _catalog_prices(item_json: Path) -> dict[int, int]:
-    from riftlab.shared.numeric import is_ascii_digits
-
     document = json.loads(item_json.read_bytes())
     return {
         int(k): int(v["gold"]["total"])
@@ -633,3 +634,101 @@ def late_publish(
     shutil.copyfile(artifact / "prior.json", local / "prior.json")
     (local / "metadata.json").write_text(json.dumps(metadata, indent=1, sort_keys=True) + "\n")
     typer.echo(json.dumps({"gate": gate, "configs": str(target), "model": str(local)}))
+
+
+@late_app.command("review-sample")
+def late_review_sample(
+    rows_path: Path = typer.Option(..., "--rows"),
+    item_json: Path = typer.Option(..., help="item.json pt_BR do patch (nomes)."),
+    patch: str = typer.Option(...),
+    artifact: Path = typer.Option(..., help="Diretório do artefato treinado."),
+    output: Path = typer.Option(..., help="Pasta privada nova da revisão cega."),
+    size: int = typer.Option(40, min=4, max=400),
+    seed: int = typer.Option(1503),
+) -> None:
+    """P5: revisão cega na VALIDAÇÃO. Para cada decisão (metade com desvio sugerido), duas
+    opções em ordem aleatória (escolha do modelo × padrão do campeão) e a situação em texto;
+    o revisor marca óbvia/útil/errada para cada opção. O gabarito fica em arquivo separado."""
+    import random
+
+    from riftlab.ml.late_eval import Scored, deviation_item
+    from riftlab.ml.late_model import LateArtifact
+    from riftlab.profiles.domain import load_profiles
+
+    _require_new_private(output)
+    profiles = load_profiles(_CONFIGS, patch)
+    assert profiles is not None
+    loaded = LateArtifact.load(artifact, profiles.items, _catalog_prices(item_json))
+    names = {
+        int(k): v["name"]
+        for k, v in json.loads(item_json.read_bytes())["data"].items()
+        if is_ascii_digits(str(k))
+    }
+    champions = {c.champion_id: c.text_id for c in profiles.champions.values()}
+    data = _load_split_matrices(
+        rows_path, loaded.prior, loaded.space, loaded.top_k, ("validation",)
+    )
+    matrix, meta = data["validation"]
+    scored = _scored(loaded.model, matrix, meta, loaded.space)
+    with_dev = [s for s in scored if deviation_item(s) is not None]
+    without = [s for s in scored if deviation_item(s) is None]
+    rng = random.Random(seed)
+    sample = rng.sample(with_dev, min(size // 2, len(with_dev)))
+    sample += rng.sample(without, min(size - len(sample), len(without)))
+    rng.shuffle(sample)
+    contexts = {
+        (r["matchId"], r["participantId"], r["ordinal"]): r["context"]
+        for r in read_jsonl_gz(rows_path)
+        if r["split"] == "validation"
+    }
+    sheet, key = [], []
+    for number, item in enumerate(sample, 1):
+        s: Scored = item
+        ids = list(s.ids)
+        model_pick = ids[int(max(range(len(ids)), key=lambda i: s.model[i]))]
+        default = ids[int(max(range(len(ids)), key=lambda i: s.base[i]))]
+        options = [("MODEL", model_pick), ("DEFAULT", default)]
+        rng.shuffle(options)
+        row = s.row
+        context = contexts.get((row["matchId"], row["participantId"], row["ordinal"]), {})
+        sheet.append(
+            {
+                "numero": number,
+                "campeao": champions.get(int(row["championId"]), str(row["championId"])),
+                "rota": row.get("role"),
+                "item": f"{row['ordinal']}º item principal",
+                "situacao": {
+                    k: context.get(k)
+                    for k in (
+                        "minute",
+                        "enemy_healers",
+                        "enemy_magic_share",
+                        "enemy_items_armor",
+                        "enemy_items_mr",
+                        "enemy_assassin",
+                        "self_deaths",
+                        "team_gold_diff",
+                    )
+                },
+                "opcoes": {
+                    letter: names.get(item_id, str(item_id))
+                    for letter, (_, item_id) in zip("AB", options, strict=True)
+                },
+                "avaliacao": {"A": None, "B": None, "valores": ["ÓBVIA", "ÚTIL", "ERRADA"]},
+            }
+        )
+        key.append(
+            {
+                "numero": number,
+                "A": options[0][0],
+                "B": options[1][0],
+                "mesmoItem": model_pick == default,
+                "compraHistorica": names.get(int(row["targetItemId"])),
+            }
+        )
+    output.mkdir(parents=True, mode=0o700)
+    (output / "folha-revisao.json").write_text(json.dumps(sheet, ensure_ascii=False, indent=1))
+    (output / "gabarito.json").write_text(json.dumps(key, ensure_ascii=False, indent=1))
+    typer.echo(
+        json.dumps({"decisoes": len(sheet), "comDesvio": sum(1 for k in key if not k["mesmoItem"])})
+    )

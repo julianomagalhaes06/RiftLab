@@ -125,3 +125,21 @@ def test_gate_requires_all_three_rules():
     assert not decide_gate(report(0.01, 0.02, 0.55, 1.9))["passed"]
     assert not decide_gate(report(-0.01, -0.01, 0.55, 1.9))["passed"]
     assert not decide_gate(report(-0.01, 0.02, 0.48, 1.9))["passed"]
+
+
+def test_validator_drops_invented_reasoning_even_with_grounded_numbers():
+    facts = [Fact("item:3036", "ITEM", "Lembranças", "Lembranças: 35% de Penetração de Armadura.")]
+    raw = json.dumps(
+        {
+            "frases": [
+                {
+                    "texto": "Com 35% de Penetração de Armadura, protege na defesa.",
+                    "fontes": ["item:3036"],
+                },
+                {"texto": "Dá 35% de Penetração de Armadura.", "fontes": ["item:3036"]},
+            ]
+        }
+    )
+    valid, dropped = validate_answer(raw, facts, [])
+    assert [v["text"] for v in valid] == ["Dá 35% de Penetração de Armadura."]
+    assert dropped == ["WORDS_NOT_IN_SOURCES"]

@@ -24,6 +24,14 @@ MAX_SENTENCES = 4
 MAX_SENTENCE_CHARS = 320
 MAX_QUESTION_CHARS = 300
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
+_WORD = re.compile(r"[a-z]{5,}")
+# Fração mínima das palavras de conteúdo da frase (5+ letras, comparadas pelo radical de 5
+# letras) que precisa aparecer nos fatos citados: barra raciocínio inventado com número certo.
+MIN_LEXICAL_SUPPORT = 0.6
+_CONNECTORS = frozenset(
+    "porque quando ainda assim entao mesmo nesta neste essa esse isso pelos pelas sobre "
+    "partida indicado recomendado melhor ajuda ajudam vale valem item itens".split()
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,6 +190,15 @@ def build_prompt(facts: Sequence[Fact], question: str | None, ordinal: int) -> l
     ]
 
 
+def lexical_support(folded_text: str, folded_cited: str) -> float:
+    """Fração das palavras de conteúdo da frase cujo radical (5 letras) está nos fatos citados."""
+    stems = {w[:5] for w in _WORD.findall(folded_cited)}
+    words = [w for w in _WORD.findall(folded_text) if w not in _CONNECTORS]
+    if not words:
+        return 1.0
+    return sum(w[:5] in stems for w in words) / len(words)
+
+
 def validate_answer(
     raw: str, facts: Sequence[Fact], known_names: Iterable[str]
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -219,6 +236,9 @@ def validate_answer(
         if any(_fold(name) in folded_text and _fold(name) not in folded_cited for name in names):
             dropped.append("NAME_NOT_IN_SOURCES")
             continue
+        if lexical_support(folded_text, folded_cited) < MIN_LEXICAL_SUPPORT:
+            dropped.append("WORDS_NOT_IN_SOURCES")
+            continue
         valid.append({"text": text.strip(), "sources": list(dict.fromkeys(sources))})
     return valid, dropped
 
@@ -230,6 +250,7 @@ __all__ = [
     "build_prompt",
     "deterministic_answer",
     "gather_facts",
+    "lexical_support",
     "question_facts",
     "validate_answer",
 ]

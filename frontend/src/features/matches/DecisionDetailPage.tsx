@@ -294,6 +294,19 @@ function DecisionStrip({ currentId, decisions, durationSeconds }: { currentId: s
   const end = Math.max(durationSeconds ? durationSeconds * 1000 : 0, sorted.at(-1)!.timestampMs);
   const previous = index > 0 ? sorted[index - 1] : null;
   const next = index >= 0 && index < sorted.length - 1 ? sorted[index + 1] : null;
+  // Rótulos a menos de 6% da trilha de outro já mostrado se sobrepõem: o rótulo some, o ponto
+  // continua clicável e com o horário no nome acessível. O momento atual sempre tem rótulo.
+  const at = (d: DecisionSummary) => (decisionTimeMs(d) / end) * 100;
+  const labeled = new Set<string>();
+  const anchorsShown: number[] = index >= 0 ? [at(sorted[index])] : [];
+  if (index >= 0) labeled.add(sorted[index].decisionId);
+  for (const d of sorted) {
+    if (labeled.has(d.decisionId)) continue;
+    if (anchorsShown.every((x) => Math.abs(x - at(d)) >= 6)) {
+      labeled.add(d.decisionId);
+      anchorsShown.push(at(d));
+    }
+  }
   return (
     <nav className="decision-strip" aria-label="Outras decisões deste participante">
       {previous ? (
@@ -309,7 +322,9 @@ function DecisionStrip({ currentId, decisions, durationSeconds }: { currentId: s
             aria-label={`Ir para a decisão em ${formatGameTime(decisionTimeMs(d))}${d.decisionId === currentId ? " (atual)" : ""}`}
             aria-current={d.decisionId === currentId ? "true" : undefined}
           >
-            <span className="decision-strip__label" aria-hidden="true">{formatGameTime(decisionTimeMs(d))}</span>
+            {labeled.has(d.decisionId) ? (
+              <span className="decision-strip__label" aria-hidden="true">{formatGameTime(decisionTimeMs(d))}</span>
+            ) : null}
           </Link>
         ))}
         {/* Marcador do momento atual: um só, que desliza do anterior para o novo (mostra para onde
