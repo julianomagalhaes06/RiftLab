@@ -466,6 +466,36 @@ O gate do produto passou (ECE ≤ 0,05 e ganho ≥ 0,20, com o limite inferior d
 Momentos-chave são as maiores variações de um minuto para o outro, com os abates e objetivos
 do intervalo. É correlação: a tela diz quando a chance estimada mudou, não por quê.
 
+## 9.6 Late game para qualquer campeão (CC-1501–1506)
+
+**Momento da decisão.** No instante em que o item principal ficava pronto (16.127 decisões de
+1º/2º item, 16.19), 99,5% dos alvos usavam componente já possuído, a mediana do preço já pago
+era 68% e 52,1% das compras não tinham alternativa que aproveitasse o ouro pago. Do 2º item em
+diante a decisão passou a ser avaliada na âncora de compromisso (primeira compra depois do item
+anterior); ver [late game](late-game.md).
+
+**Dados.** Corpus 16.19 v3 inteiro (10.662 partidas, todos os participantes): 109.425 decisões
+do 3º ao 6º item principal (63.490 / 31.326 / 11.935 / 2.674); topo 21.318, selva 25.492, meio
+22.562, atirador 30.849, suporte 9.203.
+
+**Inventário tolerado.** Divergência de itens principais no fim da partida contra os itens
+oficiais: 3,1% sem incerteza (64.858 participantes), 4,7% com incerteza só de botas, consumíveis,
+trinket e cadeia do item de suporte (32.244) e 11,6% com incerteza que importa (9.518).
+
+**Saúde por itens principais.** Nos patches 16.20–16.22, o G-FINAL completo reprovava a herança
+(22–25% dos participantes limpos divergiam, quase tudo etapa final do item de suporte,
+Muramana/Seráfico e Braçadeira). Restrito a itens principais e componentes, com a linhagem nos
+dois lados: 0 divergências em 165 (16.20 Solo/Duo), 401 (16.21) e 40 (16.22) participantes limpos.
+
+**Vantagem ajustada (exploratório, não usada no ranking).** Resultado − chance de vitória do
+time na âncora, treino + validação (93.164 decisões): antecura com inimigos curadores −1,4 p.p.
+(IC −2,7 a −0,1), penetração contra 150+ de armadura −3,8 p.p. (−6,6 a −1,3), resistência
+mágica contra dano ≥ 60% mágico +2,0 p.p. (−1,6 a +5,4), armadura contra dano ≤ 40% mágico
++0,8 p.p. (−0,5 a +2,1), estase contra assassinos +0,1 p.p. (−0,9 a +1,2). O desvio é mostrado
+como descrição do que jogadores fazem, não como garantia de vitória.
+
+**Modelo contextual.** Treino em andamento; o teste único pré-registrado ainda não foi aberto.
+
 ## 10. Limitações e próximos passos
 
 - **Pertinência:** concluir a revisão de especialistas (CC-602) e reportar a concordância.

@@ -29,12 +29,12 @@ describe("LateInsight (CC-1504/1505)", () => {
     const { rerender } = render(
       <LateMarks late={LATE} candidate={{ ...base, itemId: 3033, probability: 0.41, baseProbability: 0.09, isDeviation: true, isDefault: false }} />,
     );
-    expect(screen.getByText("esta partida pede")).toBeInTheDocument();
+    expect(screen.getByText("mais comprado nesta situação")).toBeInTheDocument();
     expect(screen.getByText("41% nesta partida · 9% no padrão")).toBeInTheDocument();
     rerender(
       <LateMarks late={{ ...LATE, claimStrong: false }} candidate={{ ...base, itemId: 3033, probability: 0.41, baseProbability: 0.09, isDeviation: true, isDefault: false }} />,
     );
-    expect(screen.getByText("vale considerar nesta partida")).toBeInTheDocument();
+    expect(screen.getByText("vale considerar nesta situação")).toBeInTheDocument();
     rerender(
       <LateMarks late={{ ...LATE, gatePassed: false }} candidate={{ ...base, itemId: 3031, probability: 0.5, baseProbability: 0.5, isDefault: true, isDeviation: false }} />,
     );

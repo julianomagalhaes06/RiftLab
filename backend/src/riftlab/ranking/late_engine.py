@@ -236,6 +236,8 @@ def late_dir(configs: Path, patch: str) -> Path:
 
 
 def _latest_dir(configs: Path, patch: str) -> tuple[str, Path] | None:
+    """O artefato do próprio patch; senão o do patch mais próximo (empate: o anterior). Itens
+    mudam nos dois sentidos, então o vizinho mais perto representa melhor a partida."""
     from riftlab.shared.numeric import patch_order_key
 
     own = late_dir(configs, patch)
@@ -244,15 +246,16 @@ def _latest_dir(configs: Path, patch: str) -> tuple[str, Path] | None:
     key = patch_order_key(patch)
     if key is None:
         return None
+
+    def distance(other: tuple[int, int]) -> tuple[int, int]:
+        major, minor = key
+        gap = abs((other[0] - major) * 30 + (other[1] - minor))
+        return gap, 0 if other < key else 1
+
     candidates = sorted(
-        (
-            (k, p.name, p)
-            for p in (configs / "late").glob("*")
-            if (p / "prior.json").exists()
-            and (k := patch_order_key(p.name)) is not None
-            and k < key
-        ),
-        reverse=True,
+        (distance(k), p.name, p)
+        for p in (configs / "late").glob("*")
+        if (p / "prior.json").exists() and (k := patch_order_key(p.name)) is not None
     )
     return (candidates[0][1], candidates[0][2]) if candidates else None
 

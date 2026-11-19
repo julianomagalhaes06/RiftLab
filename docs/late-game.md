@@ -59,11 +59,32 @@ Dados: `cc late build-rows` (corpus bruto, sem banco) gerou 109.425 decisões do
 ## 4. Avaliação (o que não é óbvio)
 
 `ml/late_eval.py` mede por fatia: ordem do item, tipo da compra e **desvio** (alvo ≠ 1º do
-padrão). A frase da tela ("esta partida pede X") é medida como afirmação: taxa observada dos
-desvios mostrados contra a esperada pelo padrão. IC 95% por bootstrap de partidas. O gate foi
+padrão). A marca da tela ("mais comprado nesta situação") é medida como afirmação: taxa
+observada dos desvios mostrados contra a esperada pelo padrão. IC 95% por bootstrap de partidas. O gate foi
 registrado antes de qualquer métrica (log-perda geral, acerto@3 nos desvios e 5º+ item) e o teste
 é lido uma vez por `cc late evaluate-test`; sem aprovação, o produto serve só o padrão
 (`LATE_PRIOR`). Resultados em `docs/results.md`.
+
+### Vantagem ajustada pelo estado (pesquisa)
+
+Para saber se o item situacional "faz vencer mais", a vantagem de cada decisão foi medida como
+resultado − chance de vitória do time no instante da âncora (modelo de chance de vitória já
+aprovado), em treino + validação do 16.19 (93.164 decisões, IC 95% por partida). Diferença entre
+quem comprou e quem não comprou o tipo de item com o gatilho presente:
+
+| Item | Gatilho | Diferença |
+|---|---|---|
+| Antecura | inimigos com cura | −1,4 p.p. (−2,7 a −0,1) |
+| Penetração de armadura | inimigos com 150+ de armadura | −3,8 p.p. (−6,6 a −1,3) |
+| Resistência mágica | dano inimigo ≥ 60% mágico | +2,0 p.p. (−1,6 a +5,4) |
+| Armadura | dano inimigo ≤ 40% mágico | +0,8 p.p. (−0,5 a +2,1) |
+| Estase | assassinos ou mortes para assassino | +0,1 p.p. (−0,9 a +1,2) |
+
+Nenhum tipo de item mostrou vantagem positiva com o intervalo acima de zero, e antecura e
+penetração ficaram negativas. É dado observacional: quem compra antecura ou penetração costuma
+estar perdendo para curadores e tanques de um jeito que a chance de vitória do minuto não capta.
+Por isso o desvio é apresentado como descrição (o que jogadores compram nessa situação), nunca
+como garantia de vitória, e a vantagem não entra no ranking.
 
 ## 5. Explicação com fontes (RAG)
 

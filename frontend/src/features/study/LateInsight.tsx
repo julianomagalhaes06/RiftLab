@@ -21,7 +21,7 @@ export function LateMarks({ candidate, late }: { candidate: AnalysisCandidate; l
       {candidate.isDefault ? <span className="late-tag late-tag--default">padrão do campeão</span> : null}
       {candidate.isDeviation ? (
         <span className="late-tag late-tag--deviation">
-          {late.claimStrong ? "esta partida pede" : "vale considerar nesta partida"}
+          {late.claimStrong ? "mais comprado nesta situação" : "vale considerar nesta situação"}
         </span>
       ) : null}
       {now && usual ? (
@@ -39,7 +39,7 @@ export function LateSummary({ late }: { late: AnalysisLate }) {
     <p className="muted" data-testid="late-summary">
       {late.ordinal}º item principal (botas fora da contagem) ·{" "}
       {late.gatePassed
-        ? "modelo contextual aprovado no teste pré-registrado: a ordem considera a composição, os itens dos inimigos, o placar e quem matou você"
+        ? "modelo contextual aprovado no teste pré-registrado: a ordem considera a composição, os itens dos inimigos, o placar e quem matou você. Descreve o que jogadores compram nessa situação; não promete vitória"
         : "sem modelo contextual aprovado para este patch: a ordem é o padrão do campeão nesta etapa"}
       {late.sourcePatch ? ` · referência do patch ${late.sourcePatch}` : ""}
       {late.championSupport > 0 ? ` · ${late.championSupport} decisões deste campeão nesta etapa` : ""}.

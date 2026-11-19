@@ -36,7 +36,9 @@ _TOKEN = re.compile(r"\bRGAPI-[A-Za-z0-9-]+|\b[A-Za-z0-9_-]{32,}\b")
 
 ENGINE_TEXT = {
     "POPULARITY": "Popularidade nas decisões de referência deste campeão nesta etapa da build",
-    "RULES": "Regras explícitas (aproveitar componentes e custo restante)",
+    "RULES": "Regras explícitas (custo restante e composição inimiga)",
+    "LATE_CONTEXT": "Modelo de late game: padrão do campeão ajustado pelo contexto da partida",
+    "LATE_PRIOR": "Padrão de late game do campeão nesta etapa da build",
     "CONTEXTUAL_RANKER": "Modelo contextual registrado",
 }
 PRIORITY_TEXT = {
