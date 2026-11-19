@@ -1,0 +1,15 @@
+{
+ "gate": {
+  "claimStrong": false,
+  "note": "Só o padrão (LatePrior, treino de late-16.19-v2). O modelo contextual ainda não passou pelo teste único pré-registrado; cc late publish substitui este arquivo.",
+  "passed": false
+ },
+ "patch": "16.19",
+ "priorVersion": "late_prior_v1",
+ "rowsSha256": "d7db9e3cbc0160251baeb6a6ed21c7287c9cff513a80dda37e0877b49520badf",
+ "space": {
+  "contextNumeric": []
+ },
+ "topK": 30,
+ "version": "late_context_v2"
+}
