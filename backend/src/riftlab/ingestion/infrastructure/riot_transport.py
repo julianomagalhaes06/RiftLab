@@ -413,6 +413,26 @@ class RiotHttpTransport:
             )
         return [e for e in entries if isinstance(e, dict)]
 
+    async def fetch_league_division(
+        self, tier: str, division: str, page: int
+    ) -> list[dict[str, Any]]:
+        """CC-1506: uma página da escada Solo/Duo de um tier com divisões (só DIAMOND) no BR1.
+        Devolve as entradas (com o PUUID, que nunca é gravado nem registrado)."""
+        if tier != "DIAMOND" or division not in ("I", "II", "III", "IV") or not 1 <= page <= 100:
+            raise SourceSchemaError(code="SCHEMA_UNSUPPORTED", detail="divisão inválida")
+        body = await self._request_raw(
+            "league",
+            f"/lol/league/v4/entries/RANKED_SOLO_5x5/{tier}/{division}",
+            params={"page": str(page)},
+            host=BR1_HOST,
+        )
+        document = _parse_json_body("league", body)
+        if not isinstance(document, list):
+            raise SourceSchemaError(
+                code="SCHEMA_UNSUPPORTED", detail="resposta de divisão com formato inesperado"
+            )
+        return [e for e in document if isinstance(e, dict)]
+
     async def fetch_active_game_by_puuid(self, puuid: str) -> dict[str, Any]:
         """Spectator-V5 por PUUID no host fixo BR1 (CC-1211): a partida em andamento, depois da
         tela de carregamento. Fora de partida a Riot responde 404 (SourceNotFoundError)."""

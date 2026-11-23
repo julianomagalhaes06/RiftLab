@@ -1291,6 +1291,13 @@ def collect_apex_command(
     max_matches: int = typer.Option(6000, min=1, help="Teto de partidas novas."),
     max_requests: int = typer.Option(14_000, min=1, help="Teto global de requisições."),
     max_hours: float = typer.Option(8.0, min=0.1, help="Teto de tempo em horas."),
+    tiers: str = typer.Option(
+        "CHALLENGER,GRANDMASTER,MASTER",
+        help="Tiers das sementes, em ordem (CHALLENGER, GRANDMASTER, MASTER, DIAMOND).",
+    ),
+    skip_players: int = typer.Option(
+        0, min=0, help="Pula os primeiros N jogadores da ordem (já listados numa rodada anterior)."
+    ),
     known_raw_root: list[Path] | None = typer.Option(
         None, "--known-raw-root", help="Raiz bruta já coletada, para não baixar de novo."
     ),
@@ -1313,6 +1320,11 @@ def collect_apex_command(
 
     if ".private" not in output_dir.resolve().parts or (output_dir / "manifest.json").exists():
         raise _blocked("a saída deve ficar em .private e ainda não ter manifesto")
+    from riftlab.collection.apex import TIERS
+
+    tier_list = tuple(t.strip().upper() for t in tiers.split(",") if t.strip())
+    if not tier_list or any(t not in TIERS for t in tier_list):
+        raise _blocked(f"tiers aceitos: {', '.join(TIERS)}")
     settings = load_settings(env_file)
     if not settings.riot_api_key:
         raise _blocked("RIFTLAB_RIOT_API_KEY ausente")
@@ -1335,7 +1347,15 @@ def collect_apex_command(
             return await collect_apex(
                 transport,
                 store,
-                ApexPlan(patch, start_time, max_players, matches_per_player, max_matches),
+                ApexPlan(
+                    patch,
+                    start_time,
+                    max_players,
+                    matches_per_player,
+                    max_matches,
+                    tier_list,
+                    skip_players,
+                ),
                 known=known_match_ids(known_raw_root or []),
                 log=lambda line: typer.echo(line, err=True),
             )

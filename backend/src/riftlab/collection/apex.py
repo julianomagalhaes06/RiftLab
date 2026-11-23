@@ -23,8 +23,10 @@ from typing import Any
 
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
 
-APEX_VERSION = "apex_collection_v1"
-TIERS = ("CHALLENGER", "GRANDMASTER", "MASTER")
+APEX_VERSION = "apex_collection_v2"  # v2: Diamante, jogadores pulados e tier de cada partida
+APEX_TIERS = ("CHALLENGER", "GRANDMASTER", "MASTER")
+TIERS = (*APEX_TIERS, "DIAMOND")
+DIVISIONS = ("I", "II", "III", "IV")
 SOLO_QUEUE = 420
 
 
@@ -35,6 +37,8 @@ class ApexPlan:
     max_players: int
     matches_per_player: int
     max_matches: int
+    tiers: tuple[str, ...] = APEX_TIERS
+    skip_players: int = 0  # já listados numa rodada anterior (a ordem é a mesma)
 
 
 def split_of(match_id: str) -> str:
@@ -64,21 +68,46 @@ async def collect_apex(
     """Executa a coleta e devolve o manifesto (sem identificador de jogador)."""
     counts: Counter[str] = Counter()
     started = time.monotonic()
-    players: list[tuple[int, str]] = []
-    for tier in TIERS:
+    needed = plan.skip_players + plan.max_players
+    # Ordem estável: tiers de elite pela pontuação (escala única); depois Diamante I a IV,
+    # cada divisão pela pontuação. Uma rodada seguinte pula os primeiros `skip_players`.
+    apex: list[tuple[int, str, str]] = []
+    for tier in (t for t in plan.tiers if t in APEX_TIERS):
         entries = await transport.fetch_apex_league(tier)
         counts[f"LADDER_{tier}"] = len(entries)
-        players.extend(
-            (int(e.get("leaguePoints") or 0), str(e["puuid"]))
+        apex.extend(
+            (int(e.get("leaguePoints") or 0), str(e["puuid"]), tier)
             for e in entries
             if isinstance(e.get("puuid"), str) and e["puuid"]
         )
-        if len(players) >= plan.max_players:
+        if len(apex) >= needed and "DIAMOND" not in plan.tiers:
             break
-    players.sort(key=lambda p: -p[0])
+    players: list[tuple[str, str]] = [(p, t) for _, p, t in sorted(apex, key=lambda x: -x[0])]
+    if "DIAMOND" in plan.tiers:
+        for division in DIVISIONS:
+            if len(players) >= needed:
+                break
+            page = 1
+            chunk: list[tuple[int, str]] = []
+            while len(players) + len(chunk) < needed:
+                entries = await transport.fetch_league_division("DIAMOND", division, page)
+                if not entries:
+                    break
+                counts[f"LADDER_DIAMOND_{division}"] += len(entries)
+                chunk.extend(
+                    (int(e.get("leaguePoints") or 0), str(e["puuid"]))
+                    for e in entries
+                    if isinstance(e.get("puuid"), str) and e["puuid"]
+                )
+                page += 1
+            players.extend(
+                (p, f"DIAMOND_{division}") for _, p in sorted(chunk, key=lambda x: -x[0])
+            )
+    players = players[plan.skip_players : needed]
     seen: set[str] = set(known or ())
     collected: list[str] = []
-    for index, (_, puuid) in enumerate(players[: plan.max_players]):
+    tier_of: dict[str, str] = {}
+    for index, (puuid, tier) in enumerate(players):
         if len(collected) >= plan.max_matches:
             break
         ids = await transport.list_match_ids_by_puuid(
@@ -89,6 +118,7 @@ async def collect_apex(
             start_time=plan.start_time,
         )
         counts["PLAYERS_LISTED"] += 1
+        counts[f"PLAYERS_{tier}"] += 1
         for match_id in ids:
             if len(collected) >= plan.max_matches:
                 break
@@ -104,7 +134,9 @@ async def collect_apex(
             store.store(match_id, "match", match.body, match.sha256)
             store.store(match_id, "timeline", timeline.body, timeline.sha256)
             collected.append(match_id)
+            tier_of[match_id] = tier
             counts["MATCHES_STORED"] += 1
+            counts[f"MATCHES_{tier}"] += 1
         if log is not None and (index + 1) % 25 == 0:
             log(
                 json.dumps(
@@ -123,7 +155,10 @@ async def collect_apex(
         "schemaVersion": APEX_VERSION,
         "patch": plan.patch,
         "queue": SOLO_QUEUE,
-        "tiers": list(TIERS),
+        "tiers": list(plan.tiers),
+        "skipPlayers": plan.skip_players,
+        # Tier da semente que trouxe cada partida (sem identificador de jogador).
+        "matchTier": dict(sorted(tier_of.items())),
         "startTime": plan.start_time,
         "requests": transport.requests_made,
         "seconds": round(time.monotonic() - started, 1),
