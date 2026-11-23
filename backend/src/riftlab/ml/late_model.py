@@ -24,10 +24,12 @@ from typing import Any
 
 import numpy as np
 
-from riftlab.ml.situation import CATEGORICAL_CONTEXT
 from riftlab.profiles.domain import ITEM_STATS, ItemProfile
 
 LATE_MODEL_VERSION = "late_context_v2"
+# Features categóricas do contexto (`ml/situation.py` as produz como texto). Ficam aqui para o
+# treino não importar a camada de banco (o pacote do Colab só leva catboost/numpy/typer/pyyaml).
+CATEGORICAL_CONTEXT = ("self_champion_id", "self_role", "self_primary_tag", "top_enemy_tag")
 PRIOR_VERSION = "late_prior_v1"
 DEFAULT_TOP_K = 30
 ITEM_MECHANIC_FEATURES = (

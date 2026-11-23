@@ -416,9 +416,15 @@ def late_train(
     learning_rate: float = typer.Option(0.1),
     iterations: int = typer.Option(1500),
     threads: int = typer.Option(5),
+    task_type: str = typer.Option(
+        "CPU",
+        help="CPU ou GPU (Colab). Árvores de GPU não são idênticas às de CPU: desvio declarado.",
+    ),
 ) -> None:
     """Padrão hierárquico + CatBoost (softmax por decisão) escolhido na validação. O teste não
     é lido aqui."""
+    if task_type not in ("CPU", "GPU"):
+        raise typer.BadParameter("task_type deve ser CPU ou GPU")
     from catboost import CatBoost
 
     from riftlab.ml.late_eval import evaluate
@@ -477,7 +483,11 @@ def late_train(
             # atributo: o contexto já entra explícito nas features de confronto.
             "max_ctr_complexity": 1,
             "border_count": 64,
+            "task_type": task_type,
         }
+        if task_type == "GPU":
+            params.pop("thread_count")
+            params["devices"] = "0"
         t0 = time.monotonic()
         model = CatBoost(params)
         model.fit(train_pool, eval_set=val_pool, use_best_model=True, log_cout=sys.stderr)
@@ -556,9 +566,14 @@ def late_evaluate_test(
     profiles = load_profiles(_CONFIGS, patch)
     assert profiles is not None
     loaded = LateArtifact.load(artifact, profiles.items, _catalog_prices(item_json))
-    marker.write_text(json.dumps({"preregistrationSha256": sealed, "openedAt": time.time()}))
+    if loaded.model is None:
+        typer.echo("BLOCKED: artefato sem model.cbm", err=True)
+        raise typer.Exit(code=1)
+    # Carregar o artefato e montar a matriz do teste ainda não revela métrica: um erro aqui não
+    # queima o teste único. A marca é gravada logo antes da primeira previsão no teste.
     data = _load_split_matrices(rows_path, loaded.prior, loaded.space, loaded.top_k, ("test",))
     matrix, meta = data["test"]
+    marker.write_text(json.dumps({"preregistrationSha256": sealed, "openedAt": time.time()}))
     report = evaluate(_scored(loaded.model, matrix, meta, loaded.space))
     (artifact / "test-report.json").write_text(json.dumps(report, indent=1, sort_keys=True))
     typer.echo(

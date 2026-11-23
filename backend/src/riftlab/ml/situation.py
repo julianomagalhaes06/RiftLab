@@ -31,7 +31,6 @@ BOOTS = "BOOTS"
 # Atributos somados dos itens completos de um lado (inimigos ou aliados).
 SIDE_ITEM_STATS = ("ad", "ap", "armor", "mr", "hp", "crit", "attack_speed", "lethality")
 SIDE_MECHANICS = ("ANTIHEAL", "STASIS", "SPELL_SHIELD", "REVIVE", "CLEANSE", "SHIELD")
-CATEGORICAL_CONTEXT = ("self_champion_id", "self_role", "self_primary_tag", "top_enemy_tag")
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,7 +254,6 @@ def situation_features(
 
 
 __all__ = [
-    "CATEGORICAL_CONTEXT",
     "SITUATION_VERSION",
     "SituationInput",
     "owned_main_items",
