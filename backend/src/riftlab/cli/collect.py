@@ -1331,6 +1331,11 @@ def collect_apex_command(
     output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     store = DurableRawMatchStore(output_dir / "raw")
 
+    def _save_partial(partial: dict[str, object]) -> None:
+        (output_dir / "manifest.partial.json").write_text(
+            _json.dumps(partial, indent=1, sort_keys=True) + "\n"
+        )
+
     async def _run() -> dict[str, object]:
         transport = RiotHttpTransport(
             api_key=settings.riot_api_key or "",
@@ -1358,6 +1363,8 @@ def collect_apex_command(
                 ),
                 known=known_match_ids(known_raw_root or []),
                 log=lambda line: typer.echo(line, err=True),
+                # Manifesto parcial durante a coleta: uma queda não perde a divisão nem os tiers.
+                checkpoint=_save_partial,
             )
         finally:
             await transport.aclose()

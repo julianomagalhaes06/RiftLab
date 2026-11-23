@@ -11,6 +11,7 @@ import pytest
 
 from riftlab.collection.apex import ApexPlan, collect_apex, split_of
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
+from riftlab.shared.errors import SourceError
 
 
 @dataclass
@@ -118,3 +119,39 @@ async def test_second_round_skips_players_already_listed_and_goes_down_to_diamon
     }
     assert manifest["counts"]["PLAYERS_DIAMOND_I"] == 2 and manifest["skipPlayers"] == 2
     assert "puuid" not in json.dumps(manifest)
+
+
+class FlakyTransport(FakeTransport):
+    """Rede cai em algumas chamadas de partida (como o Wi-Fi às 13h33 de 23/11)."""
+
+    def __init__(self, failures: int) -> None:
+        super().__init__()
+        self.failures = failures
+
+    async def fetch_match(self, match_id: str) -> _Body:
+        if self.failures > 0:
+            self.failures -= 1
+            raise SourceError(code="UPSTREAM_UNAVAILABLE", detail="falha de rede após 5 tentativas")
+        return await super().fetch_match(match_id)
+
+
+@pytest.mark.asyncio
+async def test_network_outage_waits_and_retries_then_stops_with_partial_manifest(tmp_path: Path):
+    waits: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    plan = ApexPlan("16.23", 1_700_000_000, 10, 20, 100)
+    short = await collect_apex(
+        FlakyTransport(2), DurableRawMatchStore(tmp_path / "a"), plan, sleep=fake_sleep
+    )
+    assert waits == [30, 60] and short["counts"]["NETWORK_WAITS"] == 2
+    assert short["counts"]["MATCHES_STORED"] == 3 and "STOPPED_NETWORK" not in short["counts"]
+
+    waits.clear()
+    long = await collect_apex(
+        FlakyTransport(100), DurableRawMatchStore(tmp_path / "b"), plan, sleep=fake_sleep
+    )
+    assert long["counts"]["STOPPED_NETWORK"] == 1 and len(waits) == 7
+    assert long["counts"].get("MATCHES_STORED", 0) == 0 and "split" in long
