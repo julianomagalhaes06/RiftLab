@@ -9,9 +9,21 @@ from pathlib import Path
 
 import pytest
 
-from riftlab.collection.apex import ApexPlan, collect_apex, split_of
+from riftlab.collection.apex import (
+    APEX_TIERS,
+    MAX_CONSECUTIVE_FAILURES,
+    ApexPlan,
+    collect_apex,
+    split_of,
+)
 from riftlab.ingestion.infrastructure.raw_store import DurableRawMatchStore
-from riftlab.shared.errors import SourceError
+from riftlab.shared.errors import (
+    SourceAuthError,
+    SourceError,
+    SourceNotFoundError,
+    SourceRateLimitedError,
+    SourceSchemaError,
+)
 
 
 @dataclass
@@ -189,3 +201,138 @@ async def test_matches_from_other_platforms_are_skipped_without_fetching(tmp_pat
     assert transport.fetched == ["BR1_8"]
     assert manifest["counts"]["OTHER_PLATFORM"] == 1
     assert manifest["counts"]["MATCHES_STORED"] == 1
+
+
+class BrokenItems(FakeTransport):
+    """Cada partida falha de um jeito: 404, formato inesperado e defeito no nosso código."""
+
+    async def fetch_match(self, match_id: str) -> _Body:
+        if match_id == "BR1_1":
+            raise SourceNotFoundError(code="RIOT_NOT_FOUND", detail="match não encontrado")
+        if match_id == "BR1_2":
+            raise SourceSchemaError(code="SCHEMA_UNSUPPORTED", detail="corpo inválido")
+        return await super().fetch_match(match_id)
+
+    async def fetch_timeline(self, match_id: str) -> _Body:
+        if match_id == "BR1_4":
+            raise KeyError("frames")
+        return await super().fetch_timeline(match_id)
+
+    async def list_match_ids_by_puuid(self, puuid, *, queue, start, count, start_time):
+        if puuid == "puuid-d1a":
+            raise SourceSchemaError(code="SCHEMA_UNSUPPORTED", detail="lista inválida")
+        return await super().list_match_ids_by_puuid(
+            puuid, queue=queue, start=start, count=count, start_time=start_time
+        )
+
+
+@pytest.mark.asyncio
+async def test_item_errors_skip_only_that_player_or_match_and_the_round_goes_on(tmp_path: Path):
+    lines: list[str] = []
+    plan = ApexPlan("16.23", 1_700_000_000, 10, 20, 100, (*APEX_TIERS, "DIAMOND"))
+    manifest = await collect_apex(
+        BrokenItems(), DurableRawMatchStore(tmp_path / "raw"), plan, log=lines.append
+    )
+    counts = manifest["counts"]
+    assert counts["SKIPPED_MATCH_RIOT_NOT_FOUND"] == 1
+    assert counts["SKIPPED_MATCH_SCHEMA_UNSUPPORTED"] == 1
+    assert counts["SKIPPED_MATCH_UNEXPECTED"] == 1
+    assert counts["SKIPPED_PLAYER_SCHEMA_UNSUPPORTED"] == 1
+    assert sorted(manifest["matchTier"]) == ["BR1_6", "BR1_7"]  # as outras seguiram
+    assert not any(k.startswith("STOPPED") for k in counts)
+    assert any("KeyError em test_apex_collection.py" in line for line in lines)
+    assert "puuid" not in json.dumps(manifest) and "puuid" not in "".join(lines)
+
+
+class ExpiredKey(FakeTransport):
+    async def fetch_match(self, match_id: str) -> _Body:
+        if match_id == "BR1_2":
+            raise SourceAuthError(code="RIOT_AUTH_FAILED", detail="status 403")
+        return await super().fetch_match(match_id)
+
+
+@pytest.mark.asyncio
+async def test_rejected_key_stops_the_round_with_the_manifest_of_what_was_stored(tmp_path: Path):
+    plan = ApexPlan("16.23", 1_700_000_000, 10, 20, 100)
+    manifest = await collect_apex(ExpiredKey(), DurableRawMatchStore(tmp_path / "raw"), plan)
+    assert manifest["counts"]["STOPPED_AUTH"] == 1
+    assert list(manifest["matchTier"]) == ["BR1_1"]
+
+
+class LocalBudget(FakeTransport):
+    """Como o transporte real: avisa o orçamento local esgotado e levanta o erro de rede."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.observer = None
+
+    def set_local_budget_observer(self, observer) -> None:
+        self.observer = observer
+
+    async def fetch_match(self, match_id: str) -> _Body:
+        if match_id == "BR1_2":
+            self.observer("match", "LOCAL_TIME_BUDGET")
+            raise SourceError(code="UPSTREAM_UNAVAILABLE", detail="orçamento local esgotado")
+        return await super().fetch_match(match_id)
+
+
+@pytest.mark.asyncio
+async def test_local_budget_stops_at_once_without_network_waits(tmp_path: Path):
+    waits: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    plan = ApexPlan("16.23", 1_700_000_000, 10, 20, 100)
+    manifest = await collect_apex(
+        LocalBudget(), DurableRawMatchStore(tmp_path / "raw"), plan, sleep=fake_sleep
+    )
+    assert manifest["counts"]["STOPPED_LOCAL_TIME_BUDGET"] == 1 and waits == []
+    assert list(manifest["matchTier"]) == ["BR1_1"]
+
+
+class RateLimitedOnce(FakeTransport):
+    def __init__(self) -> None:
+        super().__init__()
+        self.limited = False
+
+    async def fetch_timeline(self, match_id: str) -> _Body:
+        if not self.limited:
+            self.limited = True
+            raise SourceRateLimitedError(
+                code="RIOT_RATE_LIMITED", detail="limite", retry_after_seconds=90
+            )
+        return await super().fetch_timeline(match_id)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_waits_the_retry_after_and_repeats_the_call(tmp_path: Path):
+    waits: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    plan = ApexPlan("16.23", 1_700_000_000, 10, 20, 100)
+    manifest = await collect_apex(
+        RateLimitedOnce(), DurableRawMatchStore(tmp_path / "raw"), plan, sleep=fake_sleep
+    )
+    assert waits == [90] and manifest["counts"]["RATE_LIMIT_WAITS"] == 1
+    assert sorted(manifest["matchTier"]) == ["BR1_1", "BR1_2", "BR1_4"]
+
+
+class AlwaysMissing(FakeTransport):
+    async def list_match_ids_by_puuid(self, puuid, *, queue, start, count, start_time):
+        return [f"BR1_{n}" for n in range(100, 140)]
+
+    async def fetch_match(self, match_id: str) -> _Body:
+        self.requests_made += 1
+        raise SourceNotFoundError(code="RIOT_NOT_FOUND", detail="match não encontrado")
+
+
+@pytest.mark.asyncio
+async def test_many_consecutive_failures_stop_instead_of_burning_the_budget(tmp_path: Path):
+    transport = AlwaysMissing()
+    plan = ApexPlan("16.23", 1_700_000_000, 10, 20, 100)
+    manifest = await collect_apex(transport, DurableRawMatchStore(tmp_path / "raw"), plan)
+    assert manifest["counts"]["STOPPED_REPEATED_FAILURES"] == 1
+    assert manifest["counts"]["SKIPPED_MATCH_RIOT_NOT_FOUND"] == MAX_CONSECUTIVE_FAILURES
