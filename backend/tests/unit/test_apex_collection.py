@@ -168,3 +168,24 @@ async def test_diamond_only_round_spreads_players_across_divisions(tmp_path: Pat
     manifest = await collect_apex(transport, DurableRawMatchStore(tmp_path / "raw"), plan)
     assert transport.listed == ["puuid-d1a", "puuid-d2"]  # 1 por divisão; III e IV vazias
     assert manifest["counts"]["PLAYERS_DIAMOND_II"] == 1
+
+
+@pytest.mark.asyncio
+async def test_matches_from_other_platforms_are_skipped_without_fetching(tmp_path: Path):
+    class TransferredAccount(FakeTransport):
+        fetched: list[str]
+
+        async def list_match_ids_by_puuid(self, puuid, *, queue, start, count, start_time):
+            self.requests_made += 1
+            return ["LA1_1599", "BR1_8"]
+
+        async def fetch_match(self, match_id: str) -> _Body:
+            self.fetched = [*getattr(self, "fetched", []), match_id]
+            return await super().fetch_match(match_id)
+
+    transport = TransferredAccount()
+    plan = ApexPlan("16.23", 1_700_000_000, 1, 20, 100, ("DIAMOND",))
+    manifest = await collect_apex(transport, DurableRawMatchStore(tmp_path / "raw"), plan)
+    assert transport.fetched == ["BR1_8"]
+    assert manifest["counts"]["OTHER_PLATFORM"] == 1
+    assert manifest["counts"]["MATCHES_STORED"] == 1

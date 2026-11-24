@@ -31,6 +31,9 @@ APEX_TIERS = ("CHALLENGER", "GRANDMASTER", "MASTER")
 TIERS = (*APEX_TIERS, "DIAMOND")
 DIVISIONS = ("I", "II", "III", "IV")
 SOLO_QUEUE = 420
+# A listagem por PUUID (americas) traz partidas de qualquer servidor das Américas: uma conta
+# transferida para o BR1 tem histórico em LA1/NA1 etc. O corpus é só do BR1.
+PLATFORM_PREFIX = "BR1_"
 # Queda de rede (Wi-Fi, DNS): espera e tenta de novo a mesma chamada; ~22 min no total antes de
 # encerrar a rodada com o manifesto parcial. Erro de chave ou de cota não entra aqui.
 OUTAGE_WAITS = (30, 60, 120, 240, 300, 300, 300)
@@ -192,6 +195,10 @@ async def collect_apex(
                     break
                 if match_id in seen:
                     counts["DUPLICATE"] += 1
+                    continue
+                if not match_id.startswith(PLATFORM_PREFIX):
+                    counts["OTHER_PLATFORM"] += 1
+                    seen.add(match_id)
                     continue
                 match = await _patient(
                     functools.partial(transport.fetch_match, match_id), counts, sleep, log
