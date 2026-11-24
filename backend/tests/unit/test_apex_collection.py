@@ -49,6 +49,8 @@ class FakeTransport:
                 {"puuid": "puuid-d1b", "leaguePoints": 10},
                 {"puuid": "puuid-d1a", "leaguePoints": 80},
             ]
+        if division == "II" and page == 1:
+            return [{"puuid": "puuid-d2", "leaguePoints": 50}]
         return []
 
     async def list_match_ids_by_puuid(self, puuid, *, queue, start, count, start_time):
@@ -60,6 +62,7 @@ class FakeTransport:
             "puuid-gm": ["BR1_4"],
             "puuid-d1a": ["BR1_5"],
             "puuid-d1b": ["BR1_6"],
+            "puuid-d2": ["BR1_7"],
         }[puuid]
 
     async def fetch_match(self, match_id: str) -> _Body:
@@ -110,14 +113,15 @@ async def test_second_round_skips_players_already_listed_and_goes_down_to_diamon
         skip_players=2,
     )
     manifest = await collect_apex(transport, store, plan)
-    # Elite pela pontuação (top, low, gm) e Diamante I pela pontuação (d1a, d1b); pula 2.
-    assert transport.listed == ["puuid-gm", "puuid-d1a", "puuid-d1b"]
+    # Elite pela pontuação (top, low, gm); Diamante com divisões intercaladas (d1a, d2, d1b);
+    # pula 2.
+    assert transport.listed == ["puuid-gm", "puuid-d1a", "puuid-d2"]
     assert manifest["matchTier"] == {
         "BR1_4": "GRANDMASTER",
         "BR1_5": "DIAMOND_I",
-        "BR1_6": "DIAMOND_I",
+        "BR1_7": "DIAMOND_II",
     }
-    assert manifest["counts"]["PLAYERS_DIAMOND_I"] == 2 and manifest["skipPlayers"] == 2
+    assert manifest["counts"]["PLAYERS_DIAMOND_I"] == 1 and manifest["skipPlayers"] == 2
     assert "puuid" not in json.dumps(manifest)
 
 
@@ -155,3 +159,12 @@ async def test_network_outage_waits_and_retries_then_stops_with_partial_manifest
     )
     assert long["counts"]["STOPPED_NETWORK"] == 1 and len(waits) == 7
     assert long["counts"].get("MATCHES_STORED", 0) == 0 and "split" in long
+
+
+@pytest.mark.asyncio
+async def test_diamond_only_round_spreads_players_across_divisions(tmp_path: Path):
+    transport = FakeTransport()
+    plan = ApexPlan("16.23", 1_700_000_000, 4, 20, 100, ("DIAMOND",))
+    manifest = await collect_apex(transport, DurableRawMatchStore(tmp_path / "raw"), plan)
+    assert transport.listed == ["puuid-d1a", "puuid-d2"]  # 1 por divisão; III e IV vazias
+    assert manifest["counts"]["PLAYERS_DIAMOND_II"] == 1

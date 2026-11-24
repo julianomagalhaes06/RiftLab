@@ -99,8 +99,9 @@ async def collect_apex(
     counts: Counter[str] = Counter()
     started = time.monotonic()
     needed = plan.skip_players + plan.max_players
-    # Ordem estável: tiers de elite pela pontuação (escala única); depois Diamante I a IV,
-    # cada divisão pela pontuação. Uma rodada seguinte pula os primeiros `skip_players`.
+    # Ordem estável: tiers de elite pela pontuação (escala única); depois o Diamante, com as
+    # divisões I a IV intercaladas (cada uma pela pontuação). Uma rodada seguinte pula os
+    # primeiros `skip_players`.
     apex: list[tuple[int, str, str]] = []
     for tier in (t for t in plan.tiers if t in APEX_TIERS):
         entries = await _patient(
@@ -115,13 +116,15 @@ async def collect_apex(
         if len(apex) >= needed and "DIAMOND" not in plan.tiers:
             break
     players: list[tuple[str, str]] = [(p, t) for _, p, t in sorted(apex, key=lambda x: -x[0])]
-    if "DIAMOND" in plan.tiers:
+    if "DIAMOND" in plan.tiers and len(players) < needed:
+        # Parte igual de cada divisão (I a IV), intercaladas: se o teto de partidas chegar antes,
+        # as quatro divisões já estão representadas (variedade de jogadores).
+        share = -(-(needed - len(players)) // len(DIVISIONS))
+        by_division: list[list[tuple[str, str]]] = []
         for division in DIVISIONS:
-            if len(players) >= needed:
-                break
             page = 1
             chunk: list[tuple[int, str]] = []
-            while len(players) + len(chunk) < needed:
+            while len(chunk) < share:
                 entries = await _patient(
                     functools.partial(transport.fetch_league_division, "DIAMOND", division, page),
                     counts,
@@ -137,9 +140,10 @@ async def collect_apex(
                     if isinstance(e.get("puuid"), str) and e["puuid"]
                 )
                 page += 1
-            players.extend(
-                (p, f"DIAMOND_{division}") for _, p in sorted(chunk, key=lambda x: -x[0])
-            )
+            ordered = sorted(chunk, key=lambda x: -x[0])[:share]
+            by_division.append([(p, f"DIAMOND_{division}") for _, p in ordered])
+        for position in range(share):
+            players.extend(group[position] for group in by_division if position < len(group))
     players = players[plan.skip_players : needed]
     seen: set[str] = set(known or ())
     collected: list[str] = []
