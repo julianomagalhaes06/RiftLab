@@ -1,11 +1,12 @@
 """Monta o pacote auditado e o notebook do treino de late game no Colab (CC-1503).
 
-Saída (privada, tem dados de partidas): `.private/colab/sprint15-cc1503/`
-- `riftlab-cc1503-colab-input.zip`: código do backend, perfis 16.19, linhas de late game,
-  item.json do Data Dragon e os pré-registros selados;
-- `riftlab-cc1503-treino-colab.ipynb`: confere o SHA-256 do ZIP e de cada arquivo, roda
-  `run_cc1503.py` e exporta `riftlab-cc1503-resultados.zip`;
-- `SHA256SUMS`.
+Treino conjunto 16.23 (elo alto, gate) + 16.19, pré-registro 04.
+Saída (privada, tem dados de partidas): `.private/colab/sprint15-cc1503-1623/`
+- `riftlab-cc1503-1623-colab-input.zip`: código do backend, perfis 16.19 e 16.23, linhas de
+  late game dos dois patches, item.json do Data Dragon e o pré-registro selado;
+- `riftlab-cc1503-1623-treino-colab.ipynb`: confere o SHA-256 do ZIP e de cada arquivo, roda
+  `run_cc1503.py` e exporta `riftlab-cc1503-1623-resultados.zip`;
+- `SHA256SUMS` e `COMO-USAR.md`.
 
 Uso (na raiz do repositório): python ml/late/colab/build_cc1503_notebook.py
 """
@@ -19,28 +20,46 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-OUT = ROOT / ".private" / "colab" / "sprint15-cc1503"
-ZIP_NAME = "riftlab-cc1503-colab-input.zip"
-NOTEBOOK_NAME = "riftlab-cc1503-treino-colab.ipynb"
-RESULT_NAME = "riftlab-cc1503-resultados.zip"
+OUT = ROOT / ".private" / "colab" / "sprint15-cc1503-1623"
+ZIP_NAME = "riftlab-cc1503-1623-colab-input.zip"
+NOTEBOOK_NAME = "riftlab-cc1503-1623-treino-colab.ipynb"
+RESULT_NAME = "riftlab-cc1503-1623-resultados.zip"
 PRIVATE_FILES = (
+    ".private/dataset/late-16.23-v3.jsonl.gz",
+    ".private/dataset/late-16.23-v3.jsonl.gz.sha256",
     ".private/dataset/late-16.19-v2.jsonl.gz",
     ".private/dataset/late-16.19-v2.jsonl.gz.sha256",
+    ".private/research/data-dragon/item-16.23.1-en_US.json",
+    ".private/research/data-dragon/item-16.23.1-pt_BR.json",
     ".private/research/data-dragon/item-16.19.1-en_US.json",
-    ".private/research/data-dragon/item-16.19.1-pt_BR.json",
-    ".private/validation/sprint-15/CC-1503/01-pre-registro.md",
-    ".private/validation/sprint-15/CC-1503/01-pre-registro.md.sha256",
-    ".private/validation/sprint-15/CC-1503/02-emenda-pre-registro.md",
-    ".private/validation/sprint-15/CC-1503/02-emenda-pre-registro.md.sha256",
-    ".private/validation/sprint-15/CC-1503/03-emenda-colab.md",
-    ".private/validation/sprint-15/CC-1503/03-emenda-colab.md.sha256",
+    ".private/validation/sprint-15/CC-1503/04-pre-registro-16.23.md",
+    ".private/validation/sprint-15/CC-1503/04-pre-registro-16.23.md.sha256",
 )
 PUBLIC_FILES = (
     "configs/profiles/profiles-16.19.json",
+    "configs/profiles/profiles-16.23.json",
     "ml/late/colab/run_cc1503.py",
     "backend/pyproject.toml",
 )
 PACKAGES = {"catboost": "1.2.10", "typer": "0.27.2", "pyyaml": "6.0.3"}
+
+
+GUIDE = """# Treino do late game no Colab (CC-1503, 16.23 + 16.19)
+
+1. Abra https://colab.research.google.com → Arquivo → Fazer upload de notebook →
+   `{nb}`.
+2. Ambiente de execução → Alterar tipo de ambiente → **GPU T4** → Salvar.
+3. Execute as células 1 a 5 em ordem. Na 2, autorize o Google Drive. Na 3, envie
+   `{zip}` (não descompacte).
+4. A célula 4 faz: fumaça (~2 min) → treino completo (GPU, dezenas de minutos) → teste único →
+   gate → folha de revisão cega. Se a sessão cair, rode tudo de novo com o mesmo ZIP: o que já
+   terminou é pulado. Se aparecer "o teste começou numa sessão anterior", não insista: vá para a
+   célula 5 e devolva o ZIP.
+5. A célula 5 baixa `{result}`. Coloque em
+   `.private/colab/sprint15-cc1503-1623/retorno/` e avise o Claude.
+
+Conferência: `sha256sum -c SHA256SUMS` nesta pasta (ZIP {zip_sha}…, notebook {nb_sha}…).
+"""
 
 
 def sha256(path: Path) -> str:
@@ -54,9 +73,9 @@ def collect() -> list[str]:
     missing = [f for f in files if not (ROOT / f).is_file()]
     if missing:
         raise SystemExit(f"arquivos ausentes: {missing}")
-    # Os pré-registros têm de bater com os selos antes de sair da máquina.
+    # Pré-registro e linhas têm de bater com os selos antes de sair da máquina.
     for document in PRIVATE_FILES:
-        if document.endswith(".md"):
+        if document.endswith((".md", ".jsonl.gz")):
             sealed = (ROOT / (document + ".sha256")).read_text().split()[0]
             if sha256(ROOT / document) != sealed:
                 raise SystemExit(f"{document} difere do selo")
@@ -71,14 +90,18 @@ def build_zip(files: list[str]) -> dict[str, str]:
     manifest = {f: sha256(ROOT / f) for f in files}
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name in files:
-            info = zipfile.ZipInfo(name, date_time=(2026, 11, 23, 0, 0, 0))
+            info = zipfile.ZipInfo(name, date_time=(2026, 11, 24, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(info, (ROOT / name).read_bytes())
     return manifest
 
 
 def md(text: str) -> dict:
-    return {"cell_type": "markdown", "metadata": {}, "source": text.strip().splitlines(True)}
+    return {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": text.strip().splitlines(True),
+    }
 
 
 def code(text: str) -> dict:
@@ -94,10 +117,11 @@ def code(text: str) -> dict:
 def notebook(zip_sha: str, manifest: dict[str, str]) -> dict:
     cells = [
         md(f"""
-# RiftLab — treino do modelo de late game (CC-1503)
+# RiftLab — treino do modelo de late game (CC-1503, 16.23 + 16.19)
 
-Treina o modelo contextual do 3º ao 6º item principal (qualquer campeão) com as linhas do
-corpus 16.19, abre o teste **uma única vez** com os pré-registros selados e decide o gate.
+Treina o modelo contextual do 3º ao 6º item principal (qualquer campeão) com as partidas de
+elo alto do 16.23 e o corpus 16.19, abre o teste **uma única vez** com o pré-registro 04 selado
+e decide o gate no teste do 16.23 (o do 16.19 é secundário).
 
 1. **Ambiente de execução → Alterar tipo → GPU T4.**
 2. Execute as células em ordem. Autorize o Drive: o registro guarda cada etapa concluída e
@@ -132,7 +156,7 @@ from google.colab import drive
 drive.mount('/content/drive')
 from pathlib import Path
 EXPECTED_ZIP_SHA = '{zip_sha}'
-JOURNAL = Path('/content/drive/MyDrive/RiftLab/cc1503') / EXPECTED_ZIP_SHA[:16]
+JOURNAL = Path('/content/drive/MyDrive/RiftLab/cc1503-1623') / EXPECTED_ZIP_SHA[:16]
 JOURNAL.mkdir(parents=True, exist_ok=True)
 print('Registro:', JOURNAL)
 print('Etapas já concluídas:', sorted(p.name for p in JOURNAL.iterdir()))
@@ -207,7 +231,22 @@ def main() -> None:
     sums = "".join(f"{sha256(OUT / n)}  {n}\n" for n in (ZIP_NAME, NOTEBOOK_NAME))
     (OUT / "SHA256SUMS").write_text(sums)
     size = (OUT / ZIP_NAME).stat().st_size / 2**20
-    summary = {"zip": ZIP_NAME, "sha256": zip_sha, "files": len(files), "MiB": round(size, 1)}
+    nb_sha = sha256(OUT / NOTEBOOK_NAME)
+    (OUT / "COMO-USAR.md").write_text(
+        GUIDE.format(
+            zip=ZIP_NAME,
+            nb=NOTEBOOK_NAME,
+            result=RESULT_NAME,
+            zip_sha=zip_sha[:8],
+            nb_sha=nb_sha[:8],
+        )
+    )
+    summary = {
+        "zip": ZIP_NAME,
+        "sha256": zip_sha,
+        "files": len(files),
+        "MiB": round(size, 1),
+    }
     print(json.dumps(summary))
     sys.stdout.flush()
 

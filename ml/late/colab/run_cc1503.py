@@ -1,14 +1,15 @@
 """CC-1503 no Colab: fumaça, treino do modelo de late game, teste único, gate e revisão cega.
 
-Executado pelo notebook `riftlab-cc1503-treino-colab.ipynb` a partir do pacote auditado. Cada
-etapa grava o resultado no registro persistente (Drive) e é pulada quando já concluída:
+Treino conjunto 16.23 (elo alto, patch servido e do gate) + 16.19 (pré-registro 04).
+Executado pelo notebook `riftlab-cc1503-1623-treino-colab.ipynb` a partir do pacote auditado.
+Cada etapa grava o resultado no registro persistente (Drive) e é pulada quando já concluída:
 
-1. fumaça: recorte de treino e validação (nenhuma linha de teste), 20 árvores; decide o
-   dispositivo (GPU; CPU só se a GPU recusar a perda ou o peso por decisão — emenda 03);
-2. treino completo (`cc late train`), parâmetros da emenda 02;
-3. teste único (`cc late evaluate-test`) com os pré-registros 01, 02 e 03 selados — uma marca
-   no registro impede uma segunda abertura, mesmo em outra sessão;
-4. gate (`ml.late_gate.decide_gate`) e revisão cega (`cc late review-sample`).
+1. fumaça: recorte de treino e validação dos dois patches (nenhuma linha de teste), 20 árvores;
+   decide o dispositivo (GPU; CPU só se a GPU recusar a perda ou o peso por decisão);
+2. treino completo (`cc late train` com o 16.19 como patch extra), parâmetros do pré-registro;
+3. teste único (`cc late evaluate-test`) com o pré-registro 04 selado: o do 16.23 decide o gate,
+   o do 16.19 é secundário; uma marca no registro impede uma segunda abertura;
+4. gate (`ml.late_gate.decide_gate`) e revisão cega (`cc late review-sample`, validação 16.23).
 
 Uso: python run_cc1503.py --root /content/riftlab \
        --journal /content/drive/MyDrive/RiftLab/cc1503/<sha-do-pacote>
@@ -27,18 +28,43 @@ import time
 from collections import Counter
 from pathlib import Path
 
-PATCH = "16.19"
-ROWS = ".private/dataset/late-16.19-v2.jsonl.gz"
-ITEM_EN = ".private/research/data-dragon/item-16.19.1-en_US.json"
-ITEM_PT = ".private/research/data-dragon/item-16.19.1-pt_BR.json"
-PREREG = [
-    ".private/validation/sprint-15/CC-1503/01-pre-registro.md",
-    ".private/validation/sprint-15/CC-1503/02-emenda-pre-registro.md",
-    ".private/validation/sprint-15/CC-1503/03-emenda-colab.md",
+PATCH = "16.23"
+ROWS = ".private/dataset/late-16.23-v3.jsonl.gz"
+ITEM_EN = ".private/research/data-dragon/item-16.23.1-en_US.json"
+ITEM_PT = ".private/research/data-dragon/item-16.23.1-pt_BR.json"
+# Patch extra do treino conjunto: (patch, linhas, item.json en_US).
+EXTRA = [
+    (
+        "16.19",
+        ".private/dataset/late-16.19-v2.jsonl.gz",
+        ".private/research/data-dragon/item-16.19.1-en_US.json",
+    )
 ]
-ARTIFACT = ".private/artifacts/late-16.19-v2"
-ARTIFACT_FILES = ("model.cbm", "prior.json", "metadata.json", "validation-report.json")
-SMOKE_LIMITS = {"train": 1500, "validation": 400}  # nenhuma linha de teste
+SERVING_ELO = "MASTER_PLUS"
+PREREG_NAME = "validation/sprint-15/CC-1503/04-pre-registro-16.23.md"
+PREREG = [".private/" + PREREG_NAME]
+ARTIFACT = ".private/artifacts/late-16.23-v3"
+ARTIFACT_FILES = (
+    "model.cbm",
+    "prior.json",
+    *(f"prior-{patch}.json" for patch, _, _ in EXTRA),
+    "metadata.json",
+    "validation-report.json",
+)
+SMOKE_LIMITS = {"train": 1500, "validation": 400}  # por patch; nenhuma linha de teste
+
+
+def extra_args(root: Path, rows: dict[str, Path] | None = None) -> list[str]:
+    out: list[str] = []
+    for patch, path, items in EXTRA:
+        out += [
+            "--extra-patch",
+            patch,
+            "--extra-rows",
+            str((rows or {}).get(patch, root / path)),
+        ]
+        out += ["--extra-item-json", str(root / items)]
+    return out
 
 
 def log(message: str) -> None:
@@ -47,8 +73,17 @@ def log(message: str) -> None:
 
 def cc(root: Path, journal: Path, name: str, *args: str) -> None:
     """`cc late <args>` num subprocesso, com o log em tempo real e salvo no registro."""
-    env = {**os.environ, "PYTHONPATH": str(root / "backend" / "src"), "PYTHONUNBUFFERED": "1"}
-    command = [sys.executable, "-c", "from riftlab.cli.late import late_app; late_app()", *args]
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(root / "backend" / "src"),
+        "PYTHONUNBUFFERED": "1",
+    }
+    command = [
+        sys.executable,
+        "-c",
+        "from riftlab.cli.late import late_app; late_app()",
+        *args,
+    ]
     path = journal / f"{name}.log"
     with (
         path.open("a") as output,
@@ -68,7 +103,9 @@ def cc(root: Path, journal: Path, name: str, *args: str) -> None:
             output.write(line)
             output.flush()
     if process.returncode != 0:
-        raise SystemExit(f"etapa {name} falhou (código {process.returncode}); ver {path}")
+        raise SystemExit(
+            f"etapa {name} falhou (código {process.returncode}); ver {path}"
+        )
 
 
 def smoke(root: Path, journal: Path, task_type: str) -> str:
@@ -79,15 +116,22 @@ def smoke(root: Path, journal: Path, task_type: str) -> str:
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True)
     counts: Counter[str] = Counter()
-    subset = folder / "rows.jsonl.gz"
-    with gzip.open(root / ROWS, "rt") as source, gzip.open(subset, "wt") as target:
-        for line in source:
-            split = json.loads(line)["split"]
-            if split in SMOKE_LIMITS and counts[split] < SMOKE_LIMITS[split]:
-                counts[split] += 1
-                target.write(line)
-            if all(counts[k] >= v for k, v in SMOKE_LIMITS.items()):
-                break
+    subsets: dict[str, Path] = {}
+    for patch, path in [(PATCH, ROWS), *((p, r) for p, r, _ in EXTRA)]:
+        subsets[patch] = folder / f"rows-{patch}.jsonl.gz"
+        with (
+            gzip.open(root / path, "rt") as source,
+            gzip.open(subsets[patch], "wt") as target,
+        ):
+            for line in source:
+                split = json.loads(line)["split"]
+                key = f"{patch}:{split}"
+                if split in SMOKE_LIMITS and counts[key] < SMOKE_LIMITS[split]:
+                    counts[key] += 1
+                    target.write(line)
+                if all(counts[f"{patch}:{k}"] >= v for k, v in SMOKE_LIMITS.items()):
+                    break
+    subset = subsets[PATCH]
     chosen = task_type
     for attempt in [task_type, "CPU"] if task_type == "GPU" else [task_type]:
         out = folder / f"artifact-{attempt.lower()}"
@@ -111,6 +155,7 @@ def smoke(root: Path, journal: Path, task_type: str) -> str:
                 attempt,
                 "--threads",
                 "2",
+                *extra_args(root, subsets),
             )
             chosen = attempt
             break
@@ -167,11 +212,16 @@ def train(root: Path, journal: Path, task_type: str) -> None:
         task_type,
         "--threads",
         str(os.cpu_count() or 2),
+        "--serving-elo",
+        SERVING_ELO,
+        *extra_args(root),
     )
     saved.mkdir(parents=True, exist_ok=True)
     for name in ARTIFACT_FILES:
         shutil.copy2(local / name, saved / name)
-    log(f"treino concluído em {round((time.time() - started) / 60, 1)} min; artefato no registro")
+    log(
+        f"treino concluído em {round((time.time() - started) / 60, 1)} min; artefato no registro"
+    )
 
 
 def test_once(root: Path, journal: Path) -> dict:
@@ -200,11 +250,20 @@ def test_once(root: Path, journal: Path) -> dict:
     ]
     for document in PREREG:
         args += ["--preregistration", str(root / document)]
+    args += extra_args(root)
     try:
         cc(root, journal, "test", *args)
     finally:
         if (local / "TEST_OPENED").exists():
             shutil.copy2(local / "TEST_OPENED", journal / "TEST_OPENED")
+    for (
+        patch,
+        _,
+        _,
+    ) in EXTRA:  # secundários; copiados antes do principal (marca de concluído)
+        shutil.copy2(
+            local / f"test-report-{patch}.json", journal / f"test-report-{patch}.json"
+        )
     shutil.copy2(local / "test-report.json", report_path)
     return json.loads(report_path.read_text())
 
@@ -223,7 +282,7 @@ def gate_and_review(root: Path, journal: Path, report: dict) -> None:
     sys.path.insert(0, str(root / "backend" / "src"))
     from riftlab.ml.late_gate import decide_gate
 
-    gate = decide_gate(report)
+    gate = decide_gate(report, PREREG_NAME)
     (journal / "gate.json").write_text(json.dumps(gate, indent=1, ensure_ascii=False))
     log(f"gate: {gate}")
     review = journal / "revisao-cega-v1"
@@ -252,18 +311,40 @@ def gate_and_review(root: Path, journal: Path, report: dict) -> None:
 
 def summary(journal: Path) -> None:
     report = json.loads((journal / "test-report.json").read_text())
-    validation = json.loads((journal / "artifact" / "validation-report.json").read_text())
-    lines = {"gate": json.loads((journal / "gate.json").read_text())}
-    for name in ("all", "deviation", "ordinal:5+", "deviation:ordinal:5+"):
+    validation = json.loads(
+        (journal / "artifact" / "validation-report.json").read_text()
+    )
+    lines: dict = {"gate": json.loads((journal / "gate.json").read_text())}
+    names = (
+        "all",
+        "deviation",
+        "ordinal:5+",
+        "deviation:ordinal:5+",
+        "elo:MASTER_PLUS",
+        "elo:DIAMOND",
+        "elo:MASTER_PLUS:ordinal:5+",
+        "elo:DIAMOND:ordinal:5+",
+    )
+    for name in names:
         if name in report:
-            lines[f"teste {name}"] = {
+            lines[f"teste {PATCH} {name}"] = {
                 "decisões": report[name]["decisions"],
                 **{k: round(v, 4) for k, v in report[name]["point"].items()},
                 "ic95": report[name].get("ci95"),
             }
-    lines["frase do desvio (teste)"] = report.get("deviationClaims")
-    lines["validação all"] = validation["validation"]["all"]["point"]
-    (journal / "resumo.json").write_text(json.dumps(lines, indent=1, ensure_ascii=False))
+    lines[f"frase do desvio (teste {PATCH})"] = report.get("deviationClaims")
+    for patch, _, _ in EXTRA:
+        secondary = json.loads((journal / f"test-report-{patch}.json").read_text())
+        for name in ("all", "ordinal:5+"):
+            if name in secondary:
+                lines[f"teste {patch} (secundário) {name}"] = {
+                    "decisões": secondary[name]["decisions"],
+                    **{k: round(v, 4) for k, v in secondary[name]["point"].items()},
+                }
+    lines[f"validação {PATCH} all"] = validation["validation"]["all"]["point"]
+    (journal / "resumo.json").write_text(
+        json.dumps(lines, indent=1, ensure_ascii=False)
+    )
     print(json.dumps(lines, indent=1, ensure_ascii=False))
 
 

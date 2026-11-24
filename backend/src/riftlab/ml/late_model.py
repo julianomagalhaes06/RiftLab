@@ -26,10 +26,15 @@ import numpy as np
 
 from riftlab.profiles.domain import ITEM_STATS, ItemProfile
 
-LATE_MODEL_VERSION = "late_context_v2"
+LATE_MODEL_VERSION = "late_context_v3"  # v3: patch e elo como categóricas
 # Features categóricas do contexto (`ml/situation.py` as produz como texto). Ficam aqui para o
 # treino não importar a camada de banco (o pacote do Colab só leva catboost/numpy/typer/pyyaml).
 CATEGORICAL_CONTEXT = ("self_champion_id", "self_role", "self_primary_tag", "top_enemy_tag")
+# Categóricas da linha (não da situação): patch e faixa de elo do corpus. Num treino com mais de
+# um patch, o modelo separa o que é meta do patch e o que é elo do que a partida pede. Ao servir,
+# vêm de `rowDefaults` do artefato (patch servido, elo de referência).
+ROW_CATEGORICAL = ("patch", "elo")
+MIXED_ELO = "MIXED"  # corpus sem seleção de elo (ex.: 16.19)
 PRIOR_VERSION = "late_prior_v1"
 DEFAULT_TOP_K = 30
 ITEM_MECHANIC_FEATURES = (
@@ -49,6 +54,24 @@ ITEM_MECHANIC_FEATURES = (
 )
 # Peso das decisões por ordem: o foco do late game é o 5º e o 6º item.
 ORDINAL_WEIGHTS = {3: 1.0, 4: 1.25, 5: 2.0, 6: 2.0}
+
+
+def elo_group(tier: str | None) -> str:
+    """Faixa de elo da semente que trouxe a partida (manifesto da coleta de elo alto)."""
+    if not tier:
+        return MIXED_ELO
+    if tier.startswith("DIAMOND"):
+        return "DIAMOND"
+    if tier in {
+        "CHALLENGER",
+        "GRANDMASTER",
+        "MASTER",
+        "CHALLENGER_OR_GRANDMASTER",
+        "MASTER_OR_GRANDMASTER",
+    }:
+        return "MASTER_PLUS"
+    return MIXED_ELO
+
 
 # ---------------------------------------------------------------- padrão hierárquico
 
@@ -178,6 +201,8 @@ class FeatureSpace:
     context_numeric: tuple[str, ...]
     item_index: Mapping[int, int]
     item_matrix: np.ndarray  # itens × (atributos + mecânicas + preço)
+    # Artefatos antigos não guardavam a lista: valem as categóricas da situação.
+    categorical_context: tuple[str, ...] = CATEGORICAL_CONTEXT
 
     @property
     def numeric_names(self) -> tuple[str, ...]:
@@ -185,7 +210,7 @@ class FeatureSpace:
 
     @property
     def categorical_names(self) -> tuple[str, ...]:
-        return (*CATEGORICAL_CONTEXT, *CANDIDATE_CATEGORICAL)
+        return (*self.categorical_context, *CANDIDATE_CATEGORICAL)
 
     @classmethod
     def build(
@@ -193,6 +218,7 @@ class FeatureSpace:
         context_numeric: Sequence[str],
         profiles: Mapping[int, ItemProfile],
         prices: Mapping[int, int],
+        categorical_context: Sequence[str] = CATEGORICAL_CONTEXT,
     ) -> FeatureSpace:
         ids = sorted(set(profiles) | set(prices))
         width = len(ITEM_STATS) + len(ITEM_MECHANIC_FEATURES) + 1
@@ -206,10 +232,18 @@ class FeatureSpace:
                 ]
             if item in prices:
                 matrix[row, -1] = prices[item]
-        return cls(tuple(context_numeric), {item: i for i, item in enumerate(ids)}, matrix)
+        return cls(
+            tuple(context_numeric),
+            {item: i for i, item in enumerate(ids)},
+            matrix,
+            tuple(categorical_context),
+        )
 
     def to_document(self) -> dict[str, Any]:
-        return {"contextNumeric": list(self.context_numeric)}
+        return {
+            "contextNumeric": list(self.context_numeric),
+            "categoricalContext": list(self.categorical_context),
+        }
 
 
 def _ctx(context: Mapping[str, Any], name: str) -> float:
@@ -285,9 +319,10 @@ def decision_block(
             matchup,
         ]
     ).astype(np.float32)
-    categorical = np.empty((k, len(CATEGORICAL_CONTEXT) + 1), dtype=object)
-    for j, name in enumerate(CATEGORICAL_CONTEXT):
-        categorical[:, j] = str(context.get(name, "NONE"))
+    categorical = np.empty((k, len(space.categorical_context) + 1), dtype=object)
+    for j, name in enumerate(space.categorical_context):
+        value = row.get(name) if name in ROW_CATEGORICAL else context.get(name)
+        categorical[:, j] = "NONE" if value is None else str(value)
     categorical[:, -1] = [str(i) for i in candidate_ids]
     return numeric, categorical
 
@@ -393,8 +428,15 @@ class LateArtifact:
     top_k: int
     metadata: Mapping[str, Any]
 
+    def _with_defaults(self, row: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Patch e elo que a linha servida não traz: os de referência do artefato."""
+        defaults = self.metadata.get("rowDefaults") or {}
+        missing = {k: v for k, v in defaults.items() if row.get(k) is None}
+        return {**row, **missing} if missing else row
+
     def score(self, row: Mapping[str, Any]) -> tuple[list[int], np.ndarray, np.ndarray]:
         """(candidatos plausíveis, P padrão, P contexto). Sem modelo, contexto = padrão."""
+        row = self._with_defaults(row)
         ids, q = plausible(row, self.prior, self.top_k)
         if self.model is None or not ids:
             return ids, q, q
@@ -412,6 +454,7 @@ class LateArtifact:
 
     def contributions(self, row: Mapping[str, Any]) -> tuple[list[int], np.ndarray]:
         """Valores SHAP (candidatos × features numéricas+categóricas) da decisão."""
+        row = self._with_defaults(row)
         ids, q = plausible(row, self.prior, self.top_k)
         numeric, categorical = decision_block(row, ids, q, self.space)
         matrix = Matrix(
@@ -449,7 +492,12 @@ class LateArtifact:
     ) -> LateArtifact:
         metadata = json.loads((directory / "metadata.json").read_text())
         prior = LatePrior.from_document(json.loads((directory / "prior.json").read_text()))
-        space = FeatureSpace.build(metadata["space"]["contextNumeric"], profiles, prices)
+        space = FeatureSpace.build(
+            metadata["space"]["contextNumeric"],
+            profiles,
+            prices,
+            metadata["space"].get("categoricalContext", CATEGORICAL_CONTEXT),
+        )
         model = None
         if (directory / "model.cbm").exists():
             from catboost import CatBoost
@@ -460,10 +508,13 @@ class LateArtifact:
 
 
 __all__ = [
+    "CATEGORICAL_CONTEXT",
     "DEFAULT_TOP_K",
     "LATE_MODEL_VERSION",
     "MATCHUP",
+    "MIXED_ELO",
     "ORDINAL_WEIGHTS",
+    "ROW_CATEGORICAL",
     "FeatureSpace",
     "LateArtifact",
     "LatePrior",
@@ -471,6 +522,7 @@ __all__ = [
     "build_matrix",
     "context_columns",
     "decision_block",
+    "elo_group",
     "make_pool",
     "plausible",
     "softmax_by_group",

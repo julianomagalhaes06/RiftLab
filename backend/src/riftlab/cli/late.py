@@ -9,7 +9,7 @@ import os
 import sys
 import time
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +50,29 @@ def read_jsonl_gz(path: Path) -> Iterator[dict[str, Any]]:
     with gzip.open(path, "rb") as handle:
         for line in handle:
             yield json.loads(line)
+
+
+def _source_rows(path: Path, patch: str) -> Iterator[dict[str, Any]]:
+    """Linhas de um patch com `patch` e `elo` preenchidos quando ausentes (linhas v2 do 16.19:
+    corpus sem seleção de elo)."""
+    from riftlab.ml.late_model import MIXED_ELO
+
+    for row in read_jsonl_gz(path):
+        if row.get("patch") is None:
+            row["patch"] = patch
+        if row.get("elo") is None:
+            row["elo"] = MIXED_ELO
+        yield row
+
+
+def _extra_sources(
+    patches: list[str] | None, rows: list[Path] | None, item_jsons: list[Path] | None
+) -> list[tuple[str, Path, Path]]:
+    """Patches extras do treino conjunto: (patch, linhas, item.json), na ordem dada."""
+    patches, rows, item_jsons = patches or [], rows or [], item_jsons or []
+    if not len(patches) == len(rows) == len(item_jsons):
+        raise typer.BadParameter("--extra-patch, --extra-rows e --extra-item-json em pares")
+    return list(zip(patches, rows, item_jsons, strict=True))
 
 
 def _fetch_data_dragon(version: str, locale: str, name: str, cache: Path) -> bytes:
@@ -247,6 +270,17 @@ def late_build_rows(
     }
     counts: Counter[str] = Counter()
     started = time.monotonic()
+    from riftlab.ml.late_model import elo_group
+
+    # Faixa de elo da semente de cada partida (coleta de elo alto); corpus sem tier = MIXED.
+    tier_of: dict[str, str] = corpus.get("matchTier") or {}
+
+    def tagged(found: list[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+        for row in found:
+            row["patch"] = patch
+            row["elo"] = elo_group(tier_of.get(str(row["matchId"])))
+            counts[f"ELO_{row['elo']}"] += 1
+            yield row
 
     def rows() -> Iterator[dict[str, Any]]:
         with ProcessPoolExecutor(
@@ -258,7 +292,7 @@ def late_build_rows(
             for done, (found, diag) in enumerate(pool.map(_extract, pairs, chunksize=8), 1):
                 counts.update(diag)
                 counts["ROWS"] += len(found)
-                yield from found
+                yield from tagged(found)
                 if done % 500 == 0:
                     typer.echo(
                         json.dumps(
@@ -277,7 +311,7 @@ def late_build_rows(
         for p in (manifest, item_json, profile_path, _CONFIGS / "empirical-rules.yaml")
     }
     report = {
-        "schemaVersion": "late_rows_v2",
+        "schemaVersion": "late_rows_v2",  # + patch e elo por linha
         "patch": patch,
         "processed": len(pairs),
         "partial": bool(limit),
@@ -301,10 +335,11 @@ def _intern_categories(matrix: Any) -> None:
 
 
 def _load_split_matrices(
-    rows_path: Path, prior: Any, space: Any, top_k: int, splits: tuple[str, ...]
+    rows: Iterable[dict[str, Any]], prior: Any, space: Any, top_k: int, splits: tuple[str, ...]
 ) -> dict[str, tuple[Any, list[dict[str, Any]]]]:
     """Uma passada: por divisão, a matriz (alvo fora do conjunto fica, conta como erro) e os
-    metadados mínimos de cada decisão. Linhas inteiras nunca ficam todas na memória."""
+    metadados mínimos de cada decisão. Linhas inteiras nunca ficam todas na memória. As linhas
+    são de um patch só (o padrão e o espaço de features são os dele)."""
     import numpy as np
 
     from riftlab.ml.late_model import Matrix, build_matrix
@@ -331,6 +366,8 @@ def _load_split_matrices(
                     "targetItemId": row["targetItemId"],
                     "targetLegal": row["targetLegal"],
                     "completion": {"kind": (row.get("completion") or {}).get("kind")},
+                    "patch": row.get("patch"),
+                    "elo": row.get("elo"),
                     "ids": ids,
                     "base": q,
                 }
@@ -339,7 +376,7 @@ def _load_split_matrices(
         parts[split].append(matrix)
         chunk[split] = []
 
-    for row in read_jsonl_gz(rows_path):
+    for row in rows:
         split = row["split"]
         if split in chunk:
             chunk[split].append(row)
@@ -359,6 +396,23 @@ def _load_split_matrices(
         )
         out[split] = (merged, metas[split])
     return out
+
+
+def _concat(parts: list[Any]) -> Any:
+    """Matrizes de vários patches empilhadas, com os grupos (decisões) renumerados."""
+    import numpy as np
+
+    from riftlab.ml.late_model import Matrix
+
+    offsets = np.cumsum([0] + [len(m.group_weights) for m in parts[:-1]])
+    return Matrix(
+        np.vstack([m.numeric for m in parts]),
+        np.vstack([m.categorical for m in parts]),
+        np.concatenate([m.labels for m in parts]),
+        np.concatenate([m.groups + int(o) for m, o in zip(parts, offsets, strict=True)]),
+        np.concatenate([m.group_weights for m in parts]),
+        [],
+    )
 
 
 def _subset_with_target(matrix: Any) -> Any:
@@ -405,12 +459,34 @@ def _catalog_prices(item_json: Path) -> dict[int, int]:
     }
 
 
+_EXTRA_HELP = (
+    "Patch extra do treino conjunto (repetível, em par com --extra-rows/--extra-item-json)."
+)
+
+
+def _patch_space(patch: str, item_json: Path, columns: Any, categorical: Any) -> Any:
+    from riftlab.ml.late_model import FeatureSpace
+    from riftlab.profiles.domain import load_profiles
+
+    profiles = load_profiles(_CONFIGS, patch)
+    if profiles is None:
+        typer.echo(f"BLOCKED: perfis do patch {patch} ausentes", err=True)
+        raise typer.Exit(code=1)
+    return FeatureSpace.build(columns, profiles.items, _catalog_prices(item_json), categorical)
+
+
 @late_app.command("train")
 def late_train(
-    rows_path: Path = typer.Option(..., "--rows", help="Linhas privadas (.jsonl.gz)."),
+    rows_path: Path = typer.Option(..., "--rows", help="Linhas privadas do patch servido."),
     item_json: Path = typer.Option(..., help="item.json do Data Dragon do patch (preços)."),
-    patch: str = typer.Option(..., help="Patch das linhas."),
+    patch: str = typer.Option(..., help="Patch servido (o do gate)."),
     output_dir: Path = typer.Option(..., help="Diretório privado novo do artefato."),
+    extra_patch: list[str] = typer.Option(None, help=_EXTRA_HELP),
+    extra_rows: list[Path] = typer.Option(None, help="Linhas do patch extra."),
+    extra_item_json: list[Path] = typer.Option(None, help="item.json do patch extra."),
+    serving_elo: str = typer.Option(
+        "MASTER_PLUS", help="Faixa de elo de referência ao servir (MASTER_PLUS, DIAMOND, MIXED)."
+    ),
     top_k: int = typer.Option(30, min=5, max=80),
     depth: str = typer.Option("6", help="Profundidades da grade, separadas por vírgula."),
     learning_rate: float = typer.Option(0.1),
@@ -422,48 +498,78 @@ def late_train(
     ),
 ) -> None:
     """Padrão hierárquico + CatBoost (softmax por decisão) escolhido na validação. O teste não
-    é lido aqui."""
+    é lido aqui.
+
+    Treino conjunto: cada patch tem o próprio padrão (frequências do treino dele, que geram o
+    conjunto plausível e a feature do padrão) e os próprios atributos e preços de item; patch e
+    elo entram como categóricas. A parada antecipada e a grade usam só a validação do patch
+    servido; o artefato serve o padrão desse patch."""
     if task_type not in ("CPU", "GPU"):
         raise typer.BadParameter("task_type deve ser CPU ou GPU")
     from catboost import CatBoost
 
     from riftlab.ml.late_eval import evaluate
     from riftlab.ml.late_model import (
+        CATEGORICAL_CONTEXT,
         LATE_MODEL_VERSION,
-        FeatureSpace,
+        ROW_CATEGORICAL,
         LateArtifact,
         LatePrior,
         context_columns,
         make_pool,
     )
-    from riftlab.profiles.domain import load_profiles
 
     _require_new_private(output_dir)
+    sources = [
+        (patch, rows_path, item_json),
+        *_extra_sources(extra_patch, extra_rows, extra_item_json),
+    ]
+    if len({p for p, _, _ in sources}) != len(sources):
+        raise typer.BadParameter("um patch por fonte")
     started = time.monotonic()
-    prior = LatePrior.fit(r for r in read_jsonl_gz(rows_path) if r["split"] == "train")
-    first = next(read_jsonl_gz(rows_path))
-    profiles = load_profiles(_CONFIGS, patch)
-    if profiles is None:
-        typer.echo("BLOCKED: perfis do patch ausentes", err=True)
-        raise typer.Exit(code=1)
-    space = FeatureSpace.build(
-        context_columns(first["context"]), profiles.items, _catalog_prices(item_json)
-    )
-    data = _load_split_matrices(rows_path, prior, space, top_k, ("train", "validation"))
-    train_matrix, _ = data["train"]
-    val_matrix, val_meta = data["validation"]
-    train_pool = make_pool(_subset_with_target(train_matrix), space)
+    columns = context_columns(next(read_jsonl_gz(rows_path))["context"])
+    categorical = (*CATEGORICAL_CONTEXT, *ROW_CATEGORICAL)
+    priors: dict[str, Any] = {}
+    spaces: dict[str, Any] = {}
+    train_parts: list[Any] = []
+    validation: dict[str, tuple[Any, list[dict[str, Any]]]] = {}
+    for source_patch, source_rows, source_items in sources:
+        if context_columns(next(read_jsonl_gz(source_rows))["context"]) != columns:
+            typer.echo(f"BLOCKED: contexto do {source_patch} com outras colunas", err=True)
+            raise typer.Exit(code=1)
+        priors[source_patch] = LatePrior.fit(
+            r for r in _source_rows(source_rows, source_patch) if r["split"] == "train"
+        )
+        spaces[source_patch] = _patch_space(source_patch, source_items, columns, categorical)
+        data = _load_split_matrices(
+            _source_rows(source_rows, source_patch),
+            priors[source_patch],
+            spaces[source_patch],
+            top_k,
+            ("train", "validation"),
+        )
+        train_parts.append(_subset_with_target(data["train"][0]))
+        validation[source_patch] = data["validation"]
+        del data
+    space = spaces[patch]
+    train_matrix = _concat(train_parts) if len(train_parts) > 1 else train_parts[0]
+    del train_parts
+    val_matrix, val_meta = validation[patch]
+    train_pool = make_pool(train_matrix, space)
     val_pool = make_pool(_subset_with_target(val_matrix), space)
     typer.echo(
         json.dumps(
             {
                 "trainRows": int(train_matrix.numeric.shape[0]),
+                "trainDecisions": len(train_matrix.group_weights),
+                "patches": [p for p, _, _ in sources],
                 "features": len(space.numeric_names) + len(space.categorical_names),
                 "loadSeconds": round(time.monotonic() - started),
             }
         ),
         err=True,
     )
+    del train_matrix
     grid = []
     best: tuple[float, Any, dict[str, Any]] | None = None
     for d in (int(x) for x in depth.split(",")):
@@ -479,7 +585,7 @@ def late_train(
             "thread_count": threads,
             "verbose": 50,
             "allow_writing_files": False,
-            # Sem combinações de categóricas (caras em 2 milhões de linhas) e 64 faixas por
+            # Sem combinações de categóricas (caras em milhões de linhas) e 64 faixas por
             # atributo: o contexto já entra explícito nas features de confronto.
             "max_ctr_complexity": 1,
             "border_count": 64,
@@ -507,22 +613,45 @@ def late_train(
     model = best[1]
     report: dict[str, Any] = {
         "validation": evaluate(_scored(model, val_matrix, val_meta, space)),
+        "validationByPatch": {
+            p: evaluate(_scored(model, m, meta, spaces[p]))
+            for p, (m, meta) in validation.items()
+            if p != patch
+        },
         "grid": grid,
     }
     importance = sorted(
-        zip(model.feature_names_, model.get_feature_importance(), strict=True),
+        zip(
+            model.feature_names_,
+            # Perda de ranking: o padrão (LossFunctionChange) exige o treino inteiro de novo.
+            model.get_feature_importance(type="PredictionValuesChange"),
+            strict=True,
+        ),
         key=lambda kv: -kv[1],
     )[:40]
     metadata = {
         "version": LATE_MODEL_VERSION,
         "patch": patch,
         "rowsSha256": hashlib.sha256(rows_path.read_bytes()).hexdigest(),
+        "sources": [
+            {
+                "patch": p,
+                "rowsSha256": hashlib.sha256(r.read_bytes()).hexdigest(),
+                "itemJsonSha256": hashlib.sha256(i.read_bytes()).hexdigest(),
+                "served": p == patch,
+            }
+            for p, r, i in sources
+        ],
+        "rowDefaults": {"patch": patch, "elo": serving_elo},
         "params": {k: v for k, v in best[2].items() if k != "verbose"},
         "trainSeconds": round(time.monotonic() - started),
         "testOpened": False,
         "topFeatures": [[n, round(float(v), 3)] for n, v in importance],
     }
-    LateArtifact(model, prior, space, top_k, metadata).save(output_dir)
+    LateArtifact(model, priors[patch], space, top_k, metadata).save(output_dir)
+    for p, prior in priors.items():
+        if p != patch:  # padrão de cada patch extra, para avaliar o teste dele
+            (output_dir / f"prior-{p}.json").write_text(json.dumps(prior.to_document()))
     (output_dir / "validation-report.json").write_text(json.dumps(report, indent=1, sort_keys=True))
     summary = {
         name: report["validation"][name]["point"]
@@ -546,10 +675,15 @@ def late_evaluate_test(
     preregistration: list[Path] = typer.Option(
         ..., help="Pré-registro do gate e emendas, cada um com .sha256 (repetível)."
     ),
+    extra_patch: list[str] = typer.Option(None, help="Patch extra (teste secundário, repetível)."),
+    extra_rows: list[Path] = typer.Option(None, help="Linhas do patch extra."),
+    extra_item_json: list[Path] = typer.Option(None, help="item.json do patch extra."),
 ) -> None:
-    """Teste único: exige o pré-registro selado e grava a marca de teste aberto."""
+    """Teste único: exige o pré-registro selado e grava a marca de teste aberto. O relatório
+    do gate é o do patch servido (`test-report.json`); cada patch extra tem o seu
+    (`test-report-<patch>.json`, secundário), aberto na mesma vez."""
     from riftlab.ml.late_eval import evaluate
-    from riftlab.ml.late_model import LateArtifact
+    from riftlab.ml.late_model import LateArtifact, LatePrior
     from riftlab.profiles.domain import load_profiles
 
     marker = artifact / "TEST_OPENED"
@@ -569,18 +703,46 @@ def late_evaluate_test(
     if loaded.model is None:
         typer.echo("BLOCKED: artefato sem model.cbm", err=True)
         raise typer.Exit(code=1)
-    # Carregar o artefato e montar a matriz do teste ainda não revela métrica: um erro aqui não
-    # queima o teste único. A marca é gravada logo antes da primeira previsão no teste.
-    data = _load_split_matrices(rows_path, loaded.prior, loaded.space, loaded.top_k, ("test",))
-    matrix, meta = data["test"]
-    marker.write_text(json.dumps({"preregistrationSha256": sealed, "openedAt": time.time()}))
-    report = evaluate(_scored(loaded.model, matrix, meta, loaded.space))
-    (artifact / "test-report.json").write_text(json.dumps(report, indent=1, sort_keys=True))
-    typer.echo(
-        json.dumps(
-            {k: report[k] for k in ("all", "deviation", "ordinal:5+") if k in report}, indent=1
+    # Carregar o artefato e montar as matrizes do teste ainda não revela métrica: um erro aqui
+    # não queima o teste único. A marca é gravada logo antes da primeira previsão no teste.
+    tests = {
+        patch: (
+            *_load_split_matrices(
+                _source_rows(rows_path, patch), loaded.prior, loaded.space, loaded.top_k, ("test",)
+            )["test"],
+            loaded.space,
         )
-    )
+    }
+    for source_patch, source_rows, source_items in _extra_sources(
+        extra_patch, extra_rows, extra_item_json
+    ):
+        prior = LatePrior.from_document(
+            json.loads((artifact / f"prior-{source_patch}.json").read_text())
+        )
+        space = _patch_space(
+            source_patch,
+            source_items,
+            loaded.space.context_numeric,
+            loaded.space.categorical_context,
+        )
+        matrix, meta = _load_split_matrices(
+            _source_rows(source_rows, source_patch), prior, space, loaded.top_k, ("test",)
+        )["test"]
+        tests[source_patch] = (matrix, meta, space)
+    marker.write_text(json.dumps({"preregistrationSha256": sealed, "openedAt": time.time()}))
+    for test_patch, (matrix, meta, space) in tests.items():
+        report = evaluate(_scored(loaded.model, matrix, meta, space))
+        name = "test-report.json" if test_patch == patch else f"test-report-{test_patch}.json"
+        (artifact / name).write_text(json.dumps(report, indent=1, sort_keys=True))
+        typer.echo(
+            json.dumps(
+                {
+                    "patch": test_patch,
+                    **{k: report[k] for k in ("all", "deviation", "ordinal:5+") if k in report},
+                },
+                indent=1,
+            )
+        )
 
 
 @late_app.command("knowledge")
@@ -625,6 +787,10 @@ def late_publish(
     artifacts_root: Path = typer.Option(
         _ROOT / "artifacts" / "late", help="Destino local (fora do Git) do model.cbm."
     ),
+    preregistration: str = typer.Option(
+        "validation/sprint-15/CC-1503/01-pre-registro.md",
+        help="Pré-registro do gate (caminho em .private), registrado no metadado.",
+    ),
 ) -> None:
     """Versiona o padrão e o resultado do gate em configs/late/<patch>/ e copia o modelo para a
     pasta local montada na API. O gate vem do relatório do teste único (test-report.json)."""
@@ -637,7 +803,7 @@ def late_publish(
     if not report_path.exists():
         typer.echo("BLOCKED: o teste único ainda não foi rodado", err=True)
         raise typer.Exit(code=1)
-    gate = decide_gate(json.loads(report_path.read_text()))
+    gate = decide_gate(json.loads(report_path.read_text()), preregistration)
     metadata["gate"] = gate
     target = _CONFIGS / "late" / patch
     target.mkdir(parents=True, exist_ok=True)
@@ -681,7 +847,7 @@ def late_review_sample(
     }
     champions = {c.champion_id: c.text_id for c in profiles.champions.values()}
     data = _load_split_matrices(
-        rows_path, loaded.prior, loaded.space, loaded.top_k, ("validation",)
+        _source_rows(rows_path, patch), loaded.prior, loaded.space, loaded.top_k, ("validation",)
     )
     matrix, meta = data["validation"]
     scored = _scored(loaded.model, matrix, meta, loaded.space)

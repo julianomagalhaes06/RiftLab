@@ -1,6 +1,7 @@
 """Decisão do gate do late game (CC-1503) a partir do relatório do teste único. Puro.
 
-Regras do pré-registro `validation/sprint-15/CC-1503/01-pre-registro.md`:
+Regras do pré-registro `validation/sprint-15/CC-1503/01-pre-registro.md` (mantidas no
+`04-pre-registro-16.23.md`, que passa o gate para o teste do 16.23):
 - G1: Δ log-perda (modelo − padrão) em todas as decisões, limite superior do IC 95% < 0.
 - G2: Δ acerto@3 nos desvios, limite inferior do IC 95% > 0.
 - G3: no 5º+ item, Δ acerto@3 pontual ≥ −0,01 e Δ log-perda pontual < 0.
@@ -13,7 +14,10 @@ from collections.abc import Mapping
 from typing import Any
 
 
-def decide_gate(report: Mapping[str, Any]) -> dict[str, Any]:
+def decide_gate(
+    report: Mapping[str, Any],
+    preregistration: str = "validation/sprint-15/CC-1503/01-pre-registro.md",
+) -> dict[str, Any]:
     all_ = report["all"]
     deviation = report["deviation"]
     late = report["ordinal:5+"]
@@ -32,7 +36,7 @@ def decide_gate(report: Mapping[str, Any]) -> dict[str, Any]:
         "G3": g3,
         "passed": bool(g1 and g2 and g3),
         "claimStrong": strong,
-        "preregistration": "validation/sprint-15/CC-1503/01-pre-registro.md",
+        "preregistration": preregistration,
     }
 
 

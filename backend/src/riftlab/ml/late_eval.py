@@ -91,6 +91,11 @@ def slices(row: Mapping[str, Any], scored: Scored) -> list[str]:
             names.append("deviation:ordinal:5+")
     if not row.get("targetLegal"):
         names.append("target_illegal")
+    elo = row.get("elo")
+    if elo:  # faixa de elo do corpus (descritivo; o gate usa só os recortes acima)
+        names.append(f"elo:{elo}")
+        if int(row["ordinal"]) >= 5:
+            names.append(f"elo:{elo}:ordinal:5+")
     return names
 
 
