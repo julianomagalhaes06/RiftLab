@@ -533,7 +533,22 @@ Limites:
   item é melhor. A vantagem ajustada acima não mostrou ganho.
 - O treino parou no limite pré-registrado de 1.500 árvores, com a validação ainda melhorando
   devagar.
-- A revisão cega P5 (40 decisões da validação) está pronta e ainda não tem respostas.
+
+**Revisão cega (P5, descritiva, sem critério pré-registrado).** Um único revisor, o próprio autor
+do projeto, avaliou às cegas 40 decisões da validação do 16.23. Cada decisão mostrava duas
+opções em ordem aleatória: a 1ª escolha do modelo e o padrão do campeão.
+
+| Situação | Decisões | Modelo (útil / óbvia / errada) | Padrão (útil / óbvia / errada) |
+|---|---|---|---|
+| Mesmo item nas duas opções | 28 | 12 / 12 / 4 | o mesmo item, com a mesma nota em todas |
+| Itens diferentes | 12 | 8 / 3 / 1 | 7 / 2 / 3 |
+
+- **Nos 12 pares diferentes:** o modelo ficou melhor em 4, pior em 2 e empatou em 6 (ordem
+  errada < óbvia < útil; teste do sinal p = 0,69).
+- **Leitura:** com essa amostra e um revisor, não há diferença demonstrada. Só dá para dizer que
+  a escolha do modelo não pareceu pior que o padrão.
+- **Limite da folha:** ela comparou a 1ª escolha do modelo. Quando ela coincide com o padrão, a
+  tela ainda pode mostrar um desvio ("vale considerar"), e esse desvio não foi avaliado.
 
 ## 10. Limitações e próximos passos
 
@@ -549,8 +564,9 @@ Limites:
   de tanque não estabelecem efeito contextual; a medição maior não confirmou esse
   sinal de forma robusta. Qualquer nova experiência exige protocolo separado.
   O late game para qualquer campeão (§9.6) foi aprovado no 16.23 com elo alto do BR1.
-  A revisão cega desse modelo está sem respostas. Patches novos exigem coleta e pré-registro
-  próprios.
+  A revisão cega desse modelo teve um revisor e 12 pares com itens diferentes, sem diferença
+  demonstrada. Falta avaliar o desvio mostrado na tela, com mais revisores. Patches novos exigem
+  coleta e pré-registro próprios.
 - **Interpretador:** uma nova rodada de ajuste exigiria teste novo, mais exemplos de injeção,
   frases vagas e exclusões, e decodificação restrita com abstenção.
 - **Todos os campeões (§9.3–9.5):** as regras novas foram confirmadas no 16.19 e no 16.20
