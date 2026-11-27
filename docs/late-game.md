@@ -63,7 +63,18 @@ padrão). A marca da tela ("mais comprado nesta situação") é medida como afir
 observada dos desvios mostrados contra a esperada pelo padrão. IC 95% por bootstrap de partidas. O gate foi
 registrado antes de qualquer métrica (log-perda geral, acerto@3 nos desvios e 5º+ item) e o teste
 é lido uma vez por `cc late evaluate-test`; sem aprovação, o produto serve só o padrão
-(`LATE_PRIOR`). Resultados em `docs/results.md`.
+(`LATE_PRIOR`).
+
+O modelo do 16.23 passou nas três regras do gate no teste único (`LATE_CONTEXT`):
+
+| Fatia | Acerto@3 (padrão → modelo) |
+|---|---|
+| Todas as decisões | 68,7% → 73,6% |
+| Desvios | 49,8% → 58,0% |
+| 5º/6º item | 59,0% → 64,2% |
+
+A log-perda caiu de 2,13 para 1,93. Os números completos e os resultados secundários estão em
+`docs/results.md` §9.6.
 
 ### Vantagem ajustada pelo estado (pesquisa)
 
@@ -108,6 +119,27 @@ Desafiante, Grão-Mestre e Mestre do BR1 (PUUID só em memória; manifesto só c
 divisão). Com essas partidas, `cc late build-rows` e `cc late train` produzem a referência de elo
 alto do patch.
 
+A coleta segue até a meta mesmo com erro de um jogador ou de uma partida, que só é pulado e
+contado. Ela para, sempre gravando o manifesto, apenas por:
+
+- chave inválida;
+- orçamento local;
+- limite de taxa persistente;
+- falha de rede;
+- 25 falhas seguidas.
+
+O 16.23 usou Desafiante a Diamante I–IV (6.000 partidas). Cada linha leva o `elo` da semente
+(`MASTER_PLUS` ou `DIAMOND`) e o `patch`.
+
+`cc late train --extra-patch` treina um modelo com vários patches:
+
+- Cada patch tem o próprio padrão (`prior-<patch>.json`), atributos e preços.
+- Patch e elo entram como categóricas.
+- A parada antecipada usa a validação do patch servido.
+
+Ao servir, o artefato usa `metadata.rowDefaults` (`patch` do artefato, `elo=MASTER_PLUS`): a
+referência é o que o elo alto compra no patch atual.
+
 ## Comandos
 
 ```sh
@@ -119,6 +151,11 @@ cc late evaluate-test --rows <linhas> --item-json <item.json> --patch 16.19 \
   --artifact <artefato> --preregistration <pré-registro>
 cc late publish --artifact <artefato> --patch 16.19
 cc late knowledge --patch 16.19 --data-dragon-version 16.19.1 --rows <linhas>
+
+# treino conjunto (16.23 servido, 16.19 extra; o mesmo par de opções no evaluate-test)
+cc late train --rows <linhas-16.23> --item-json <item-16.23.json> --patch 16.23 \
+  --output-dir <artefato> --extra-patch 16.19 --extra-rows <linhas-16.19> \
+  --extra-item-json <item-16.19.json>
 ```
 
 O modelo (`model.cbm`) fica em `artifacts/late/<patch>/`, fora do Git, montado na API; o padrão e

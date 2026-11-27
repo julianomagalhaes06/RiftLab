@@ -1,0 +1,329 @@
+{
+ "gate": {
+  "G1": true,
+  "G2": true,
+  "G3": true,
+  "claimStrong": true,
+  "passed": true,
+  "preregistration": "validation/sprint-15/CC-1503/04-pre-registro-16.23.md"
+ },
+ "params": {
+  "allow_writing_files": false,
+  "border_count": 64,
+  "depth": 6,
+  "devices": "0",
+  "eval_metric": "QuerySoftMax",
+  "iterations": 1500,
+  "learning_rate": 0.1,
+  "loss_function": "QuerySoftMax",
+  "max_ctr_complexity": 1,
+  "od_type": "Iter",
+  "od_wait": 60,
+  "random_seed": 1503,
+  "task_type": "GPU"
+ },
+ "patch": "16.23",
+ "rowDefaults": {
+  "elo": "MASTER_PLUS",
+  "patch": "16.23"
+ },
+ "rowsSha256": "e2fc10761fe10b8577df1ed580b57d5f202f08d6c8c8c4f38b0c761751a13e0c",
+ "sources": [
+  {
+   "itemJsonSha256": "06f6d99d4c1450741d338b42163c64b9a5fc688f864ddd09baa40273cdd9ece2",
+   "patch": "16.23",
+   "rowsSha256": "e2fc10761fe10b8577df1ed580b57d5f202f08d6c8c8c4f38b0c761751a13e0c",
+   "served": true
+  },
+  {
+   "itemJsonSha256": "72c996d05a316ca194c0f5c02b25016a553bd204a974db09b4312c40cee3d477",
+   "patch": "16.19",
+   "rowsSha256": "d7db9e3cbc0160251baeb6a6ed21c7287c9cff513a80dda37e0877b49520badf",
+   "served": false
+  }
+ ],
+ "space": {
+  "categoricalContext": [
+   "self_champion_id",
+   "self_role",
+   "self_primary_tag",
+   "top_enemy_tag",
+   "patch",
+   "elo"
+  ],
+  "contextNumeric": [
+   "ally_assassin",
+   "ally_attack",
+   "ally_defense",
+   "ally_fighter",
+   "ally_hard_cc",
+   "ally_healers",
+   "ally_items",
+   "ally_items_ad",
+   "ally_items_antiheal",
+   "ally_items_ap",
+   "ally_items_ap_share",
+   "ally_items_armor",
+   "ally_items_attack_speed",
+   "ally_items_cleanse",
+   "ally_items_crit",
+   "ally_items_hp",
+   "ally_items_lethality",
+   "ally_items_mr",
+   "ally_items_revive",
+   "ally_items_shield",
+   "ally_items_spell_shield",
+   "ally_items_stasis",
+   "ally_items_sustain",
+   "ally_mage",
+   "ally_magic",
+   "ally_magic_share",
+   "ally_marksman",
+   "ally_melee",
+   "ally_shielders",
+   "ally_stealth",
+   "ally_support",
+   "ally_tank",
+   "barons_diff",
+   "deaths_to_assassin",
+   "deaths_to_magic",
+   "deaths_to_melee",
+   "deaths_to_physical",
+   "dragons_diff",
+   "enemy_assassin",
+   "enemy_attack",
+   "enemy_barons",
+   "enemy_defense",
+   "enemy_fighter",
+   "enemy_hard_cc",
+   "enemy_healers",
+   "enemy_items",
+   "enemy_items_ad",
+   "enemy_items_antiheal",
+   "enemy_items_ap",
+   "enemy_items_ap_share",
+   "enemy_items_armor",
+   "enemy_items_attack_speed",
+   "enemy_items_cleanse",
+   "enemy_items_crit",
+   "enemy_items_hp",
+   "enemy_items_lethality",
+   "enemy_items_mr",
+   "enemy_items_revive",
+   "enemy_items_shield",
+   "enemy_items_spell_shield",
+   "enemy_items_stasis",
+   "enemy_items_sustain",
+   "enemy_kills",
+   "enemy_mage",
+   "enemy_magic",
+   "enemy_magic_share",
+   "enemy_marksman",
+   "enemy_melee",
+   "enemy_shielders",
+   "enemy_stealth",
+   "enemy_support",
+   "enemy_tank",
+   "kill_diff",
+   "lane_gold_diff",
+   "minute",
+   "richest_enemy_gold_share",
+   "self_assists",
+   "self_deaths",
+   "self_gold_share",
+   "self_has_boots",
+   "self_items",
+   "self_items_ad",
+   "self_items_antiheal",
+   "self_items_ap",
+   "self_items_ap_share",
+   "self_items_armor",
+   "self_items_attack_speed",
+   "self_items_cleanse",
+   "self_items_crit",
+   "self_items_hp",
+   "self_items_lethality",
+   "self_items_mr",
+   "self_items_revive",
+   "self_items_shield",
+   "self_items_spell_shield",
+   "self_items_stasis",
+   "self_items_sustain",
+   "self_kills",
+   "self_magic_share",
+   "self_melee",
+   "team_gold_diff",
+   "team_kills",
+   "top_enemy_kill_share",
+   "top_enemy_kills",
+   "top_enemy_magic_share",
+   "towers_diff"
+  ]
+ },
+ "testOpened": true,
+ "topFeatures": [
+  [
+   "prior_log",
+   54.031
+  ],
+  [
+   "prior_rank",
+   6.017
+  ],
+  [
+   "cand_owned_component",
+   4.48
+  ],
+  [
+   "self_items_ap",
+   3.835
+  ],
+  [
+   "cand_ap",
+   2.378
+  ],
+  [
+   "m_ap_fit",
+   1.895
+  ],
+  [
+   "cand_item_id",
+   1.276
+  ],
+  [
+   "self_items_lethality",
+   1.269
+  ],
+  [
+   "cand_remaining_cost",
+   1.269
+  ],
+  [
+   "self_items_crit",
+   1.242
+  ],
+  [
+   "self_items_ad",
+   1.103
+  ],
+  [
+   "cand_ad",
+   0.946
+  ],
+  [
+   "self_items_hp",
+   0.854
+  ],
+  [
+   "cand_lethality",
+   0.854
+  ],
+  [
+   "self_items_ap_share",
+   0.838
+  ],
+  [
+   "m_ad_fit",
+   0.817
+  ],
+  [
+   "cand_price",
+   0.781
+  ],
+  [
+   "m_mr_vs_magic",
+   0.719
+  ],
+  [
+   "cand_crit_damage",
+   0.683
+  ],
+  [
+   "cand_crit",
+   0.645
+  ],
+  [
+   "cand_mr",
+   0.604
+  ],
+  [
+   "enemy_items_ap_share",
+   0.538
+  ],
+  [
+   "self_items_attack_speed",
+   0.526
+  ],
+  [
+   "m_armor_vs_physical",
+   0.525
+  ],
+  [
+   "m_armorpen_vs_armor",
+   0.463
+  ],
+  [
+   "self_magic_share",
+   0.452
+  ],
+  [
+   "cand_armor_pen",
+   0.396
+  ],
+  [
+   "cand_hp",
+   0.372
+  ],
+  [
+   "cand_attack_speed",
+   0.371
+  ],
+  [
+   "self_champion_id",
+   0.363
+  ],
+  [
+   "self_items_armor",
+   0.337
+  ],
+  [
+   "cand_armor",
+   0.333
+  ],
+  [
+   "self_items",
+   0.317
+  ],
+  [
+   "self_role",
+   0.264
+  ],
+  [
+   "m_revive_vs_deaths",
+   0.263
+  ],
+  [
+   "cand_antiheal",
+   0.256
+  ],
+  [
+   "self_primary_tag",
+   0.248
+  ],
+  [
+   "self_gold_share",
+   0.236
+  ],
+  [
+   "enemy_items_hp",
+   0.212
+  ],
+  [
+   "cand_magic_pen",
+   0.202
+  ]
+ ],
+ "topK": 30,
+ "trainSeconds": 1380,
+ "version": "late_context_v3"
+}

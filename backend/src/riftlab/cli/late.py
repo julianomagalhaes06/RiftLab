@@ -805,6 +805,8 @@ def late_publish(
         raise typer.Exit(code=1)
     gate = decide_gate(json.loads(report_path.read_text()), preregistration)
     metadata["gate"] = gate
+    # O treino grava False; a marca do teste único (evaluate-test) é a fonte da verdade.
+    metadata["testOpened"] = (artifact / "TEST_OPENED").exists()
     target = _CONFIGS / "late" / patch
     target.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(artifact / "prior.json", target / "prior.json")

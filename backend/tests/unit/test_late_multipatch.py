@@ -214,3 +214,30 @@ def test_joint_training_serves_the_gate_patch_and_opens_each_test_once(tmp_path:
     bare = _row(random.Random(3), "test", 5, None)
     ids, base, ctx = loaded.score(bare)  # sem patch/elo: os de referência do artefato
     assert len(ids) == 5 and ctx.sum() == pytest.approx(1.0)
+
+
+def test_publish_records_that_the_single_test_was_opened(tmp_path: Path, monkeypatch):
+    import riftlab.cli.late as late_cli
+
+    artifact = tmp_path / "artifact"
+    artifact.mkdir()
+    (artifact / "metadata.json").write_text(json.dumps({"patch": "16.23", "testOpened": False}))
+    (artifact / "prior.json").write_text("{}")
+    (artifact / "model.cbm").write_bytes(b"cbm")
+    (artifact / "test-report.json").write_text("{}")
+    monkeypatch.setattr(late_cli, "_CONFIGS", tmp_path / "configs")
+    import riftlab.ml.late_gate as late_gate
+
+    monkeypatch.setattr(late_gate, "decide_gate", lambda report, prereg: {"passed": True})
+    args = ["publish", "--artifact", str(artifact), "--patch", "16.23"]
+    args += ["--artifacts-root", str(tmp_path / "local")]
+    runner = CliRunner()
+    assert runner.invoke(late_app, args).exit_code == 0
+    published = tmp_path / "configs" / "late" / "16.23" / "metadata.json"
+    assert json.loads(published.read_text())["testOpened"] is False
+    (artifact / "TEST_OPENED").write_text("{}")
+    assert runner.invoke(late_app, args).exit_code == 0
+    metadata = json.loads(published.read_text())
+    assert metadata["testOpened"] is True and metadata["gate"] == {"passed": True}
+    local = json.loads((tmp_path / "local" / "16.23" / "metadata.json").read_text())
+    assert local["testOpened"] is True

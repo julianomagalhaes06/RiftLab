@@ -494,7 +494,46 @@ mágica contra dano ≥ 60% mágico +2,0 p.p. (−1,6 a +5,4), armadura contra d
 +0,8 p.p. (−0,5 a +2,1), estase contra assassinos +0,1 p.p. (−0,9 a +1,2). O desvio é mostrado
 como descrição do que jogadores fazem, não como garantia de vitória.
 
-**Modelo contextual.** Treino em andamento; o teste único pré-registrado ainda não foi aberto.
+**Elo alto no 16.23.** 6.000 partidas Solo/Duo do BR1 no 16.23, a partir de 18/11/2026. As
+sementes vieram das escadas de Desafiante, Grão-Mestre, Mestre e Diamante I–IV, e partidas de
+outros servidores (contas transferidas) ficaram fora. São 50.512 decisões do 3º ao 6º item,
+divididas por partida em 80/10/10.
+
+**Modelo contextual (CC-1503, pré-registro 04).** Um único CatBoost foi treinado com o 16.23 e o
+16.19 juntos, com patch e elo como features. Cada patch usa o próprio padrão e os próprios
+atributos e preços de item. O treino rodou no Colab (GPU T4) e terminou com 1.493 árvores.
+
+O teste único foi feito no 16.23: 5.171 decisões em 519 partidas. Outras 52 linhas não têm
+nenhum candidato e não entram em modelo nenhum.
+
+| Fatia | Decisões | Acerto@3 (padrão → modelo) | Log-perda (padrão → modelo) | IC 95% da regra |
+|---|---|---|---|---|
+| Todas | 5.171 | 68,7% → 73,6% | 2,13 → 1,93 | Δ log-perda −0,217 a −0,186 |
+| Desvios | 3.228 | 49,8% → 58,0% | 2,87 → 2,65 | Δ acerto@3 +6,9 a +9,5 p.p. |
+| 5º+ item | 517 | 59,0% → 64,2% | 2,68 → 2,48 | Δ acerto@3 +2,2 a +8,3 p.p. |
+
+- **Gate:** G1, G2 e G3 aprovados.
+- **Acerto@1:** sobe de 37,6% para 43,0%.
+- **Desvios mostrados:** aparecem em 51% das decisões. O item mostrado foi o comprado em 28,2%
+  dos casos, contra 11,5% esperados pelo padrão (2,5×), o que dá a afirmação forte.
+- **Produto:** passa a servir `LATE_CONTEXT` no 16.23 e no 16.22, que tem o 16.23 como patch
+  mais próximo.
+
+Resultados secundários, que não decidem o gate:
+
+- **Teste do 16.19, mesmo modelo** (16.092 decisões): acerto@3 de 68,4% para 73,1%, log-perda de
+  2,17 para 2,00 (IC do Δ −0,186 a −0,169). No 5º+ item, acerto@3 de 60,0% para 65,9%.
+- **Por elo no teste do 16.23:** acerto@3 de 69,2% para 73,5% no Mestre+ (2.980 decisões) e de
+  68,0% para 73,7% no Diamante (2.191). No 5º+ item, o IC do Δ acerto@3 fica acima de zero nos
+  dois grupos.
+
+Limites:
+
+- É imitação ponderada pelo contexto: o modelo prevê o que o elo alto compra e não prova que o
+  item é melhor. A vantagem ajustada acima não mostrou ganho.
+- O treino parou no limite pré-registrado de 1.500 árvores, com a validação ainda melhorando
+  devagar.
+- A revisão cega P5 (40 decisões da validação) está pronta e ainda não tem respostas.
 
 ## 10. Limitações e próximos passos
 
@@ -509,6 +548,9 @@ como descrição do que jogadores fazem, não como garantia de vitória.
   respostas humanas. O diagnóstico histórico do corpus menor e o proxy por tags
   de tanque não estabelecem efeito contextual; a medição maior não confirmou esse
   sinal de forma robusta. Qualquer nova experiência exige protocolo separado.
+  O late game para qualquer campeão (§9.6) foi aprovado no 16.23 com elo alto do BR1.
+  A revisão cega desse modelo está sem respostas. Patches novos exigem coleta e pré-registro
+  próprios.
 - **Interpretador:** uma nova rodada de ajuste exigiria teste novo, mais exemplos de injeção,
   frases vagas e exclusões, e decodificação restrita com abstenção.
 - **Todos os campeões (§9.3–9.5):** as regras novas foram confirmadas no 16.19 e no 16.20
