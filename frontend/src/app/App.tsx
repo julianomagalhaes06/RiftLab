@@ -32,6 +32,7 @@ import { UserMenu } from "../features/auth/UserMenu";
 import { AccountPage } from "../features/auth/AccountPage";
 import { AccountNotice } from "../features/auth/AccountNotice";
 import { HomePage } from "../features/home/HomePage";
+import { BrandMark } from "../shared/ui/BrandMark";
 import "./App.css";
 import "../design/concept-c.css";
 
@@ -204,7 +205,7 @@ function AppContent() {
           <div className="app__topbar">
             <h1>
               <Link to="/" className="app__brand">
-                <span className="app__mark" aria-hidden="true">R</span>RiftLab
+                <BrandMark />RiftLab
               </Link>
             </h1>
             <MainNav route={route} />

@@ -90,7 +90,7 @@ Espaço e forma: chanfro `--cut` 8 px (superfícies), `--cut-chip` 6 px (retrato
 
 ## Moldura
 
-- **Topo** (64 px, linha `nline` embaixo): marca (hexágono roxo + "RiftLab"); abas com
+- **Topo** (64 px, linha `nline` embaixo): marca (cristal fendido + "RiftLab"); abas com
   ícone de 18 px (Início, Painel, Campeões, Histórico; a antiga aba Minha posição saiu em
   09/11/2026 e o elo ficou no card do Painel), ativa em `ntext` 600 com ícone
   `accent` e barra de 2 px `accent-strong` embaixo; busca Nome#TAG compacta; chip do perfil da
@@ -353,6 +353,11 @@ Revisão com as skills better-ui e ui-ux-pro-max (09/11/2026), conferida em
   endereço responde; as mais recentes ainda não estão lá.
 - Emblemas de elo: pacote oficial "Ranked Emblems Latest" (`frontend/public/ranked-emblems/`).
 - O rodapé mantém os créditos e o aviso de que o RiftLab não é endossado pela Riot Games.
+- Marca: o cristal fendido (escolhido em 27/11/2026), com facetas roxas e costura dourada.
+  - No topo: `shared/ui/BrandMark.tsx`, com cores nos tokens `--brand-*`.
+  - Ícones da aba: `public/favicon.svg`, `public/favicon.ico` (16, 32 e 48 px) e
+    `public/apple-touch-icon.png` (180 px, sobre o fundo `n0`).
+  - É provisória: as outras opções ficaram guardadas para uma troca futura.
 
 ## Ao criar ou mudar uma tela
 

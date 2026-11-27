@@ -157,6 +157,12 @@
   --gold-surface: #2a2216;
   /* Texto em destaque (o maior número da série): ≥ 4,5:1 sobre n1/n2 e sobre a tinta do resultado. */
   --gold-text: #e3bd62;
+  /* Marca: cristal fendido (27/11/2026), facetas em roxo e costura dourada. Só decorativo. */
+  --brand-facet-deep: #5f45d6;
+  --brand-facet-light: var(--accent);
+  --brand-facet: var(--accent-strong);
+  --brand-facet-mid: #7558f2;
+  --brand-seam: var(--gold-text);
   --slot-bg: #0a0b0f;
   --panel-sheen: linear-gradient(180deg, rgb(255 255 255 / .04), rgb(255 255 255 / 0) 120px);
   --hud-bg: rgb(15 16 19 / .8);

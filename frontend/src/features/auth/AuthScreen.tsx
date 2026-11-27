@@ -7,6 +7,7 @@ import { Link } from "../../shared/router/Link";
 import { loginPath } from "../../shared/router/routes";
 import { emblemSrc, type Tier } from "../ranked/tiers";
 import { useAuth } from "./authContext";
+import { BrandMark } from "../../shared/ui/BrandMark";
 import "./auth.css";
 
 export type AuthMode = "login" | "register" | "forgot";
@@ -356,7 +357,7 @@ export function AuthScreen({ mode, next, welcome = null }: { mode: Mode; next: s
   return (
     <div className="auth-page">
       <header className="auth-top">
-        <Link to="/" className="auth-top__brand"><span className="app__mark" aria-hidden="true">R</span>RiftLab</Link>
+        <Link to="/" className="auth-top__brand"><BrandMark />RiftLab</Link>
         <div className="auth-top__tools">
           <Link to={next ?? "/"} className="auth-top__back">Continuar sem conta</Link>
         </div>

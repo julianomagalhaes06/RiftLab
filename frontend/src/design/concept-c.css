@@ -14,7 +14,13 @@
 }
 .app__topbar h1 { margin: 0; font-size: 1.25rem; font-weight: 600; flex: none; }
 .app__brand { display: inline-flex; align-items: center; gap: 12px; font: 600 1.25rem var(--font-display); letter-spacing: 0; }
-.app__mark { width: 28px; height: 30px; display: inline-grid; place-items: center; background: var(--accent-strong); color: var(--on-accent); font: 700 15px var(--font-display); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+/* Marca: cristal fendido (shared/ui/BrandMark.tsx); as cores vêm dos tokens --brand-*. */
+.brand-mark { width: 19px; height: 32px; flex: none; overflow: visible; }
+.brand-mark__deep { fill: var(--brand-facet-deep); }
+.brand-mark__light { fill: var(--brand-facet-light); }
+.brand-mark__base { fill: var(--brand-facet); }
+.brand-mark__mid { fill: var(--brand-facet-mid); }
+.brand-mark__seam { fill: none; stroke: var(--brand-seam); stroke-width: 3.2; stroke-linejoin: miter; }
 .app a.app__brand { color: var(--ntext); }
 .app__tools { margin-left: auto; display: flex; align-items: center; gap: 20px; min-width: 0; }
 
