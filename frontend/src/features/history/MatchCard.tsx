@@ -1,7 +1,7 @@
-import { useId, useState, type ReactNode } from "react";
-import type { MatchParticipant, MatchSummary } from "../../shared/api/client";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { api, type MatchParticipant, type MatchSummary } from "../../shared/api/client";
 import { Link } from "../../shared/router/Link";
-import { isDemoMatchId } from "../../shared/router/routes";
+import { isDemoMatchId, isRealMatchId, routeToPath } from "../../shared/router/routes";
 import { championName } from "../matches/format";
 import { ChampionAvatar } from "./ChampionAvatar";
 import { useItemName } from "../../shared/hooks/useItemName";
@@ -72,8 +72,32 @@ function kdaOf(participant: MatchParticipant): string {
   return kills == null || deaths == null || assists == null ? "–" : `${kills} / ${deaths} / ${assists}`;
 }
 
+type RiotIds = ReadonlyMap<number, { gameName: string; tagLine: string }>;
+
+/** Riot ID de cada participante para abrir o perfil (CC-1210). A lista do Histórico não traz
+ * nomes de terceiros (o banco não os guarda); o detalhe da partida os lê na hora do bruto. Só
+ * busca quando o placar abre; sem resposta, o placar segue igual, só sem os links. */
+function useRiotIds(matchId: string, open: boolean): RiotIds {
+  const [ids, setIds] = useState<RiotIds>(() => new Map());
+  useEffect(() => {
+    if (!open || !isRealMatchId(matchId) || ids.size > 0) return;
+    const controller = new AbortController();
+    api.getMatch(matchId, controller.signal).then((detail) => {
+      const found = new Map<number, { gameName: string; tagLine: string }>();
+      for (const p of detail.participants) {
+        if (p.gameName && p.tagLine) found.set(p.participantId, { gameName: p.gameName, tagLine: p.tagLine });
+      }
+      setIds(found);
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [matchId, open, ids.size]);
+  return ids;
+}
+
 /** Placar das duas equipes, aberto dentro do cartão (como a linha expandida do op.gg). */
-function MatchDetails({ id, teams, localId, version }: { id: string; teams: MatchParticipant[][]; localId: number | null; version: string | null }) {
+function MatchDetails({ id, matchId, teams, localId, version, riotIds }: {
+  id: string; matchId: string; teams: MatchParticipant[][]; localId: number | null; version: string | null; riotIds: RiotIds;
+}) {
   return (
     <div id={id} className="match-details">
       <ItemNames version={version}>
@@ -95,12 +119,30 @@ function MatchDetails({ id, teams, localId, version }: { id: string; teams: Matc
                   const local = participant.participantId === localId;
                   const cs = participant.totalMinionsKilled != null || participant.neutralMinionsKilled != null
                     ? (participant.totalMinionsKilled ?? 0) + (participant.neutralMinionsKilled ?? 0) : null;
+                  const riotId = riotIds.get(participant.participantId);
                   return (
                     <tr key={participant.participantId} className={local ? "is-local" : undefined}>
                       <th scope="row">
                         <span className="match-details__who">
                           <ChampionAvatar participant={participant} size={28} className="portrait" />
-                          <span>{championName(participant)}{local ? <small> você</small> : null}</span>
+                          <span className="match-details__name">
+                            <span>{championName(participant)}{local ? <small> você</small> : null}</span>
+                            {riotId ? (
+                              <Link
+                                to={routeToPath({
+                                  name: "player",
+                                  ...riotId,
+                                  // O Riot ID da partida pode ter mudado: o perfil é achado pela conta.
+                                  fromMatch: { matchId, participantId: participant.participantId },
+                                })}
+                                className="match-details__riot-id"
+                                aria-label={`Perfil de ${riotId.gameName}#${riotId.tagLine}`}
+                                title="Riot ID como estava na partida"
+                              >
+                                {riotId.gameName}<span>#{riotId.tagLine}</span>
+                              </Link>
+                            ) : null}
+                          </span>
                         </span>
                       </th>
                       <td className="match-details__num">{kdaOf(participant)}</td>
@@ -143,6 +185,7 @@ export function MatchCard({ match, now, highlights = [] }: { match: MatchSummary
   const detailsId = useId();
   const version = local?.champion?.dataDragonVersion ?? teams.flat().find((p) => p.champion?.dataDragonVersion)?.champion?.dataDragonVersion ?? null;
   const canExpand = teams.length > 0 && teams.flat().some((p) => p.kills != null);
+  const riotIds = useRiotIds(match.matchId, open);
 
   return (
     // Fundo levemente tingido pelo resultado (padrão dos sites de estatísticas) sobre a superfície
@@ -229,7 +272,10 @@ export function MatchCard({ match, now, highlights = [] }: { match: MatchSummary
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
         </button>
       ) : null}
-      {open ? <MatchDetails id={detailsId} teams={teams} localId={local?.participantId ?? null} version={version} /> : null}
+      {open ? (
+        <MatchDetails id={detailsId} matchId={match.matchId} teams={teams} localId={local?.participantId ?? null}
+          version={version} riotIds={riotIds} />
+      ) : null}
     </li>
   );
 }

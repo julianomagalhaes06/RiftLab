@@ -119,7 +119,8 @@ describe("Histórico com dados realmente disponíveis", () => {
     fireEvent.click(screen.getByRole("button", { name: "Flex" }));
     expect(screen.getByRole("article", { name: /Ranqueada Flex/ })).toBeInTheDocument();
     expect(screen.queryByRole("article", { name: /Ranqueada Solo\/Duo/ })).not.toBeInTheDocument();
-    expect(api.callsTo("GET", /^\/api\/v1\/matches\/[^/]+$/)).toHaveLength(0);
+    // Só o placar aberto busca o detalhe (Riot ID para o perfil), uma vez; os filtros não buscam.
+    expect(api.callsTo("GET", /^\/api\/v1\/matches\/[^/]+$/).map((call) => call.path)).toEqual(["/api/v1/matches/BR1_1"]);
   });
 
   it("orienta lista vazia e recupera erro de API", async () => {

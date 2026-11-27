@@ -219,6 +219,12 @@
 .match-details__who { display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
 .match-details__who .champion-avatar { flex: none; }
 .match-details__who small { color: var(--accent); font-weight: 600; }
+/* Nome do campeão e, embaixo, o Riot ID da partida com link para o perfil (como no Placar). */
+.match-details__name { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.match-details__name > span { overflow: hidden; text-overflow: ellipsis; }
+.app a.match-details__riot-id { overflow: hidden; color: var(--accent); font-size: .75rem; font-weight: 500; text-decoration: none; text-overflow: ellipsis; }
+.app a.match-details__riot-id span { color: var(--ntext-subtle); }
+.app a.match-details__riot-id:hover { text-decoration: underline; text-underline-offset: 3px; }
 .match-details__num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
